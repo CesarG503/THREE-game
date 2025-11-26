@@ -14,6 +14,9 @@ export class NetworkManager {
         // Interpolation settings
         this.updateRate = 1000 / 20 // 20 updates per second
         this.lastUpdateTime = 0
+
+        this.onChatMessage = null
+        this.showPlayerNames = true
     }
 
     connect(serverUrl) {
@@ -104,6 +107,12 @@ export class NetworkManager {
                     }
                 })
                 break
+
+            case "chat":
+                if (this.onChatMessage) {
+                    this.onChatMessage(message.playerId, message.message)
+                }
+                break
         }
     }
 
@@ -120,6 +129,7 @@ export class NetworkManager {
         if (rotation !== undefined) {
             remotePlayer.setRotation(rotation)
         }
+        remotePlayer.setLabelVisibility(this.showPlayerNames)
         this.remotePlayers.set(playerId, remotePlayer)
     }
 
@@ -188,5 +198,22 @@ export class NetworkManager {
         }
         this.isConnected = false
         this.serverUrl = null
+    }
+
+    sendChatMessage(text) {
+        if (!this.isConnected || !this.socket || this.socket.readyState !== WebSocket.OPEN) return
+
+        const message = {
+            type: "chat",
+            text: text,
+        }
+        this.socket.send(JSON.stringify(message))
+    }
+
+    setShowPlayerNames(show) {
+        this.showPlayerNames = show
+        this.remotePlayers.forEach((player) => {
+            player.setLabelVisibility(show)
+        })
     }
 }

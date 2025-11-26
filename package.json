@@ -4,6 +4,7 @@
   "description": "Three.js Game",
   "scripts": {
     "dev": "vite",
+    "server": "node server/websocket-server.js",
     "start": "vite",
     "build": "vite build",
     "preview": "vite preview"

@@ -11,18 +11,16 @@ export class RemotePlayer {
         this.currentAction = null
         this.currentAnimation = "Idle"
 
-        // Position interpolation
         this.currentPosition = position.clone()
         this.targetPosition = position.clone()
         this.interpolationSpeed = 10
 
-        // Rotation
         this.currentRotation = 0
         this.targetRotation = 0
         this.rotationOffset = Math.PI
 
-        // Player label
         this.label = null
+        this.labelVisible = true
 
         this.loadModel()
     }
@@ -37,11 +35,9 @@ export class RemotePlayer {
                 this.model.rotation.y = this.rotationOffset
                 this.scene.add(this.model)
 
-                // Different color tint for remote players
                 this.model.traverse((object) => {
                     if (object.isMesh) {
                         object.castShadow = true
-                        // Clone material and add slight color variation
                         if (object.material) {
                             object.material = object.material.clone()
                             object.material.color.setHex(this.getPlayerColor())
@@ -58,7 +54,6 @@ export class RemotePlayer {
 
                 this.switchAnimation("Idle")
 
-                // Create player name label
                 this.createLabel()
             },
             undefined,
@@ -69,46 +64,43 @@ export class RemotePlayer {
     }
 
     getPlayerColor() {
-        // Generate a consistent color based on player ID
-        const colors = [
-            0x4488ff, // Blue
-            0xff4444, // Red
-            0x44ff44, // Green
-            0xffff44, // Yellow
-            0xff44ff, // Magenta
-            0x44ffff, // Cyan
-            0xff8844, // Orange
-            0x8844ff, // Purple
-        ]
+        const colors = [0x4488ff, 0xff4444, 0x44ff44, 0xffff44, 0xff44ff, 0x44ffff, 0xff8844, 0x8844ff]
         const hash = this.playerId.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0)
         return colors[hash % colors.length]
     }
 
     createLabel() {
-        // Create a sprite with player ID
         const canvas = document.createElement("canvas")
-        canvas.width = 256
-        canvas.height = 64
+        canvas.width = 128
+        canvas.height = 32
         const ctx = canvas.getContext("2d")
 
-        ctx.fillStyle = "rgba(0, 0, 0, 0.7)"
-        ctx.roundRect(0, 0, 256, 64, 10)
+        ctx.fillStyle = "rgba(0, 0, 0, 0.6)"
+        ctx.roundRect(0, 0, 128, 32, 6)
         ctx.fill()
 
         ctx.fillStyle = "#ffffff"
-        ctx.font = "bold 28px Arial"
+        ctx.font = "bold 16px Arial"
         ctx.textAlign = "center"
         ctx.textBaseline = "middle"
-        ctx.fillText(`Player ${this.playerId.slice(-4)}`, 128, 32)
+        ctx.fillText(`${this.playerId.slice(-4)}`, 64, 16)
 
         const texture = new THREE.CanvasTexture(canvas)
         const material = new THREE.SpriteMaterial({ map: texture })
         this.label = new THREE.Sprite(material)
-        this.label.scale.set(2, 0.5, 1)
-        this.label.position.y = 2.5
+        this.label.scale.set(1, 0.25, 1)
+        this.label.position.y = 2.2
+        this.label.visible = this.labelVisible
 
         if (this.model) {
             this.model.add(this.label)
+        }
+    }
+
+    setLabelVisibility(visible) {
+        this.labelVisible = visible
+        if (this.label) {
+            this.label.visible = visible
         }
     }
 
@@ -137,23 +129,19 @@ export class RemotePlayer {
     update(dt) {
         if (!this.model) return
 
-        // Interpolate position
         this.currentPosition.lerp(this.targetPosition, this.interpolationSpeed * dt)
         this.model.position.copy(this.currentPosition)
 
-        // Interpolate rotation
         let diff = this.targetRotation - this.currentRotation
         while (diff > Math.PI) diff -= Math.PI * 2
         while (diff < -Math.PI) diff += Math.PI * 2
         this.currentRotation += diff * 0.15
         this.model.rotation.y = this.currentRotation + this.rotationOffset
 
-        // Update animation mixer
         if (this.mixer) {
             this.mixer.update(dt)
         }
 
-        // Determine animation based on movement
         const distance = this.currentPosition.distanceTo(this.targetPosition)
         if (distance > 0.1) {
             this.switchAnimation("Run")

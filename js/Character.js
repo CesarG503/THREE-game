@@ -1,5 +1,6 @@
 import * as THREE from "three"
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js"
+import { CapsuleCollider, CollisionLayer } from "./collision/index.js"
 
 export class Character {
     constructor(scene, camera) {
@@ -22,7 +23,9 @@ export class Character {
 
         this.targetRotation = 0
         this.rotationSmoothness = 0.12
-        this.rotationOffset = Math.PI // Ajustar este valor para rotar el modelo (e.g. Math.PI, Math.PI / 2)
+        this.rotationOffset = Math.PI
+
+        this.collider = null
 
         this.loadModel()
     }
@@ -52,6 +55,22 @@ export class Character {
                 this.animations["Walk"] = this.mixer.clipAction(THREE.AnimationClip.findByName(clips, "Walk"))
 
                 this.switchAnimation("Idle")
+
+                this.collider = new CapsuleCollider({
+                    id: "local-player",
+                    parent: this.model,
+                    radius: 0.4,
+                    height: 1.8,
+                    offset: new THREE.Vector3(0, 0.9, 0),
+                    layer: CollisionLayer.PLAYER,
+                    collidesWithMask: CollisionLayer.REMOTE_PLAYER | CollisionLayer.NPC | CollisionLayer.ENVIRONMENT,
+                    onCollisionEnter: (other) => {
+                        console.log(`[Character] Collision started with: ${other.id}`)
+                    },
+                    onCollisionExit: (other) => {
+                        console.log(`[Character] Collision ended with: ${other.id}`)
+                    },
+                })
 
                 const loading = document.getElementById("loading")
                 if (loading) loading.style.display = "none"
@@ -184,5 +203,9 @@ export class Character {
 
     getRotation() {
         return this.model ? this.model.rotation.y : 0
+    }
+
+    getCollider() {
+        return this.collider
     }
 }

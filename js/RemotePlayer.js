@@ -1,5 +1,6 @@
 import * as THREE from "three"
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js"
+import { CapsuleCollider, CollisionLayer } from "./collision/index.js"
 
 export class RemotePlayer {
     constructor(scene, playerId, position = new THREE.Vector3(0, 0, 0)) {
@@ -21,6 +22,8 @@ export class RemotePlayer {
 
         this.label = null
         this.labelVisible = true
+
+        this.collider = null
 
         this.loadModel()
     }
@@ -55,6 +58,18 @@ export class RemotePlayer {
                 this.switchAnimation("Idle")
 
                 this.createLabel()
+
+                this.collider = new CapsuleCollider({
+                    id: `remote-player-${this.playerId}`,
+                    parent: this.model,
+                    radius: 0.4,
+                    height: 1.8,
+                    offset: new THREE.Vector3(0, 0.9, 0),
+                    layer: CollisionLayer.REMOTE_PLAYER,
+                    collidesWithMask: CollisionLayer.PLAYER | CollisionLayer.REMOTE_PLAYER | CollisionLayer.NPC,
+                    isStatic: true, // Los jugadores remotos no son empujados localmente
+                    userData: { playerId: this.playerId },
+                })
             },
             undefined,
             (error) => {
@@ -168,5 +183,12 @@ export class RemotePlayer {
             if (this.label.material.map) this.label.material.map.dispose()
             this.label.material.dispose()
         }
+        if (this.collider) {
+            this.collider.dispose()
+        }
+    }
+
+    getCollider() {
+        return this.collider
     }
 }

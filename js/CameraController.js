@@ -41,8 +41,8 @@ export class CameraController {
         this.fpPitch = 0
         this.maxPitch = Math.PI / 2 - 0.1
 
-        this.invertAxisX = false
-        this.invertAxisY = false
+        this.invertAxisX = true
+        this.invertAxisY = true
 
         this.isPaused = false
 

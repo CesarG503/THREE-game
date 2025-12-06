@@ -7,6 +7,7 @@ import { CharacterRapier } from "./CharacterRapier.js"
 import { NetworkManager } from "./NetworkManager.js"
 import { ChatManager } from "./ChatManager.js"
 import { NPCRapier } from "./NPCRapier.js"
+import { LevelBuilder } from "./environment/LevelBuilder.js"
 
 class Game {
     constructor() {
@@ -86,74 +87,14 @@ class Game {
     }
 
     buildEnvironment() {
-        // Helper to add Box
-        const addStaticBox = (x, y, z, w, h, d, color, rotation = { x: 0, y: 0, z: 0 }) => {
-            // Three
-            const mesh = new THREE.Mesh(
-                new THREE.BoxGeometry(w, h, d),
-                new THREE.MeshStandardMaterial({ color: color })
-            )
-            mesh.position.set(x, y, z)
-            mesh.rotation.set(rotation.x, rotation.y, rotation.z)
-            mesh.receiveShadow = true
-            mesh.castShadow = true
-            this.sceneManager.scene.add(mesh)
+        // Use the new LevelBuilder
+        this.levelBuilder = new LevelBuilder(this.sceneManager.scene, this.world)
+        this.levelBuilder.build()
 
-            // Rapier
-            // RigidBody
-            let dt = new THREE.Vector3(x, y, z)
-            let dr = new THREE.Quaternion().setFromEuler(new THREE.Euler(rotation.x, rotation.y, rotation.z))
-
-            let bodyDesc = RAPIER.RigidBodyDesc.fixed()
-                .setTranslation(dt.x, dt.y, dt.z)
-                .setRotation(dr)
-            let body = this.world.createRigidBody(bodyDesc)
-
-            // Collider
-            let colliderDesc = RAPIER.ColliderDesc.cuboid(w / 2, h / 2, d / 2)
-            this.world.createCollider(colliderDesc, body)
+        // Pass ladders to character if character exists
+        if (this.character) {
+            this.character.ladders = this.levelBuilder.ladders
         }
-
-        // Floor
-        addStaticBox(0, -0.5, 0, 100, 1, 100, 0x333333)
-
-        // Platform
-        addStaticBox(5, 1, 0, 4, 2, 4, 0x4488ff)
-
-        // --- RAMPS (Using the same test ramps as before) ---
-
-        // 1. Green (Low Angle ~15deg)
-        // Length 8, Height 2
-        // Tan(a) = 2/8 -> atan(0.25) = 14 deg = 0.24 rad
-        const angle1 = Math.atan2(2, 8)
-        const hyp1 = Math.sqrt(8 * 8 + 2 * 2)
-        // Center: x=-8, y=1 (0 + h/2), z=-5 + 8/2 = -1 (approx center of ramp footprint)
-        // Actually center logic: Start(-8, 0, -5). End(-8, 2, -5+8).
-        // Mid: (-8, 1, -1)
-        addStaticBox(-8, 1, -1, 2, 0.2, hyp1, 0x00ff00, { x: -angle1, y: 0, z: 0 })
-        // Top Platform
-        addStaticBox(-8, 1.5, -1 + 4 + 2, 4, 1, 4, 0x00ff00)
-
-
-        // 2. Yellow (Medium Angle ~30deg)
-        // Length 5, Height 3
-        // atan(0.6) = 31 deg
-        const angle2 = Math.atan2(3, 5)
-        const hyp2 = Math.sqrt(5 * 5 + 3 * 3)
-        addStaticBox(-12, 1.5, -2, 2, 0.2, hyp2, 0xffff00, { x: -angle2, y: 0, z: 0 })
-        // Top Platform
-        addStaticBox(-12, 2.5, -2 + 2.5 + 2, 4, 1, 4, 0xffff00)
-
-
-        // 3. Red (Steep Angle ~53deg)
-        // Length 3, Height 4
-        // atan(1.33) = 53 deg
-        // Rapier Controller maxSlopeClimbAngle should block this (set to 45 deg)
-        const angle3 = Math.atan2(4, 3)
-        const hyp3 = Math.sqrt(3 * 3 + 4 * 4)
-        addStaticBox(-16, 2, -3, 2, 0.2, hyp3, 0xff0000, { x: -angle3, y: 0, z: 0 })
-        // Top Platform
-        addStaticBox(-16, 3.5, -3 + 1.5 + 2, 4, 1, 4, 0xff0000)
     }
 
     animate() {

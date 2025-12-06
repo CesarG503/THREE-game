@@ -24,6 +24,11 @@ export class CharacterRapier {
         this.verticalVelocity = 0
         this.collider = null
 
+        this.ladders = [] // Reference to ladders in level
+        this.isClimbing = false
+
+        this.rotationSmoothness = 0.15
+
         this.rotationSmoothness = 0.15
         this.currentRotation = 0
 
@@ -99,7 +104,11 @@ export class CharacterRapier {
         if (input.keys.forward) moveDir.z += 1
         if (input.keys.backward) moveDir.z -= 1
         if (input.keys.left) moveDir.x -= 1
+        if (input.keys.left) moveDir.x -= 1
         if (input.keys.right) moveDir.x += 1
+
+        // Check for Ladder Interaction
+        this.checkClimbing()
 
         // Camera relative
         let desiredTranslation = new THREE.Vector3()
@@ -133,12 +142,43 @@ export class CharacterRapier {
         // No, Rapier Controller expects "desired movement". We must add gravity manually to that vector.
         // We accumulate gravity in a custom velocity variable?
 
-        // Simplified Gravity:
-        // Always try to move DOWN by gravity * dt
-        let gravityStep = -20 * dt
+        // Simplified Gravity
+        // If climbing, no gravity.
+        if (this.isClimbing) {
+            this.verticalVelocity = 0 // Reset standard gravity
+
+            // Map Forward/Back to Up/Down
+            if (input.keys.forward) this.verticalVelocity = 3
+            if (input.keys.backward) this.verticalVelocity = -3
+
+            // Override forward movement to be "Up" visually? 
+            // Actually, we want W to go UP the ladder. And S to go DOWN.
+            // But we also want to stick to the ladder?
+            // Simple approach: When climbing, W/S controls Y, A/D controls X/Z (strafe).
+
+            // Re-calculate moveDir usage for X/Z
+            // If climbing, remove Z component from desiredTranslation calculation down below?
+            // Actually, let's keep it simple. W usually moves forward.
+            // On a ladder, Forward IS Up.
+
+            // We need to suppress "Forward" causing Z-movement if we are moving Vertically.
+            // Let's modify desiredTranslation after calculation or change inputs before.
+
+        } else {
+            // Gravity
+            let gravityStep = -20 * dt
+        }
 
         // Jump
-        if (this.characterController.computedGrounded() && input.keys.jump) {
+        if (this.isClimbing) {
+            // Allow jumping off?
+            if (input.keys.jump) {
+                this.isClimbing = false
+                this.verticalVelocity = 5
+                // Jump AWAY from ladder?
+                // For now just up
+            }
+        } else if (this.characterController.computedGrounded() && input.keys.jump) {
             // We need vertical velocity state
             this.verticalVelocity = 10
         } else {
@@ -150,6 +190,28 @@ export class CharacterRapier {
         // Note: computedGrounded() is from Last Frame's compute
         if (this.characterController.computedGrounded() && this.verticalVelocity <= 0) {
             this.verticalVelocity = -5 // Stick to ground force
+        }
+
+        if (this.isClimbing) {
+            // If climbing, desiredTranslation.z (Forward) should be ZEROed out 
+            // because we converted it to Vertical Velocity above?
+            // Wait, I didn't zero it yet.
+
+            // When climbing, "Forward" input makes us go UP.
+            // So we shouldn't move Forward in XZ plane.
+            if (input.keys.forward || input.keys.backward) {
+                desiredTranslation.x = 0
+                desiredTranslation.z = 0
+
+                // If we want allow Strafing (A/D), we keep it. 
+                if (input.keys.left || input.keys.right) {
+                    // Recalculate just strafe
+                    const right = this.cameraController.getRightDirection()
+                    desiredTranslation.x = right.x * moveDir.x
+                    desiredTranslation.z = right.z * moveDir.x
+                    desiredTranslation.normalize().multiplyScalar(this.speed / 2 * dt) // Slower strafe
+                }
+            }
         }
 
         desiredTranslation.y = this.verticalVelocity * dt
@@ -173,6 +235,34 @@ export class CharacterRapier {
         this.updateModelVisuals()
 
         if (this.mixer) this.mixer.update(dt)
+    }
+
+    checkClimbing() {
+        if (!this.ladders || this.ladders.length === 0) return
+
+        const myPos = this.getPosition()
+        // Simple bounding box check
+        // Player height center
+        const center = myPos.clone().add(new THREE.Vector3(0, 1, 0))
+
+        let touchingLadder = false
+
+        for (const ladder of this.ladders) {
+            if (ladder.bounds.containsPoint(center)) {
+                touchingLadder = true
+                break
+            }
+        }
+
+        // State transition
+        if (touchingLadder && !this.isClimbing) {
+            // Only enter climbing if moving forward? Or auto?
+            // Auto is easier
+            this.isClimbing = true
+            this.verticalVelocity = 0
+        } else if (!touchingLadder && this.isClimbing) {
+            this.isClimbing = false
+        }
     }
 
     updateModelVisuals() {

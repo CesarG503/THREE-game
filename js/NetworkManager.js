@@ -2,8 +2,9 @@ import * as THREE from "three"
 import { RemotePlayer } from "./RemotePlayer.js"
 
 export class NetworkManager {
-    constructor(scene, onConnected) {
+    constructor(scene, world, onConnected) {
         this.scene = scene
+        this.world = world
         this.socket = null
         this.playerId = null
         this.remotePlayers = new Map() // Map<playerId, RemotePlayer>
@@ -125,7 +126,7 @@ export class NetworkManager {
             position?.z || Math.random() * 10 - 5,
         )
 
-        const remotePlayer = new RemotePlayer(this.scene, playerId, spawnPosition)
+        const remotePlayer = new RemotePlayer(this.scene, this.world, playerId, spawnPosition)
         if (rotation !== undefined) {
             remotePlayer.setRotation(rotation)
         }

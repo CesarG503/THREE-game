@@ -1,10 +1,11 @@
 import * as THREE from "three"
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js"
-import { CapsuleCollider, CollisionLayer } from "./collision/index.js"
+import RAPIER from "@dimforge/rapier3d-compat"
 
 export class RemotePlayer {
-    constructor(scene, playerId, position = new THREE.Vector3(0, 0, 0)) {
+    constructor(scene, world, playerId, position = new THREE.Vector3(0, 0, 0)) {
         this.scene = scene
+        this.world = world
         this.playerId = playerId
         this.model = null
         this.mixer = null
@@ -59,17 +60,15 @@ export class RemotePlayer {
 
                 this.createLabel()
 
-                this.collider = new CapsuleCollider({
-                    id: `remote-player-${this.playerId}`,
-                    parent: this.model,
-                    radius: 0.4,
-                    height: 1.8,
-                    offset: new THREE.Vector3(0, 0.9, 0),
-                    layer: CollisionLayer.REMOTE_PLAYER,
-                    collidesWithMask: CollisionLayer.PLAYER | CollisionLayer.REMOTE_PLAYER | CollisionLayer.NPC,
-                    isStatic: true, // Los jugadores remotos no son empujados localmente
-                    userData: { playerId: this.playerId },
-                })
+                this.createLabel()
+
+                // Rapier Collider (Kinematic)
+                let bodyDesc = RAPIER.RigidBodyDesc.kinematicPositionBased()
+                    .setTranslation(this.currentPosition.x, this.currentPosition.y, this.currentPosition.z)
+                this.rigidBody = this.world.createRigidBody(bodyDesc)
+
+                let colliderDesc = RAPIER.ColliderDesc.capsule(0.5, 0.4).setTranslation(0, 0.9, 0)
+                this.collider = this.world.createCollider(colliderDesc, this.rigidBody)
             },
             undefined,
             (error) => {
@@ -147,6 +146,15 @@ export class RemotePlayer {
         this.currentPosition.lerp(this.targetPosition, this.interpolationSpeed * dt)
         this.model.position.copy(this.currentPosition)
 
+        // Update Physics Body
+        if (this.rigidBody) {
+            this.rigidBody.setNextKinematicTranslation({
+                x: this.currentPosition.x,
+                y: this.currentPosition.y,
+                z: this.currentPosition.z
+            })
+        }
+
         let diff = this.targetRotation - this.currentRotation
         while (diff > Math.PI) diff -= Math.PI * 2
         while (diff < -Math.PI) diff += Math.PI * 2
@@ -183,8 +191,8 @@ export class RemotePlayer {
             if (this.label.material.map) this.label.material.map.dispose()
             this.label.material.dispose()
         }
-        if (this.collider) {
-            this.collider.dispose()
+        if (this.rigidBody) {
+            this.world.removeRigidBody(this.rigidBody)
         }
     }
 

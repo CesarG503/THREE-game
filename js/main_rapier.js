@@ -6,6 +6,7 @@ import { CameraController } from "./CameraController.js"
 import { CharacterRapier } from "./CharacterRapier.js"
 import { NetworkManager } from "./NetworkManager.js"
 import { ChatManager } from "./ChatManager.js"
+import { NPCRapier } from "./NPCRapier.js"
 
 class Game {
     constructor() {
@@ -41,12 +42,20 @@ class Game {
         this.character.cameraController = this.cameraController
 
         // Network & UI
-        this.networkManager = new NetworkManager(this.sceneManager.scene, (id) => {
+        this.networkManager = new NetworkManager(this.sceneManager.scene, this.world, (id) => {
             console.log("Player joined", id)
             this.updateConnectionStatus(true, id)
         })
 
         this.chatManager = new ChatManager(this.networkManager)
+
+        // NPC
+        this.npc = new NPCRapier(
+            this.sceneManager.scene,
+            this.world,
+            new THREE.Vector3(5, 5, 5),
+            [new THREE.Vector3(5, 0, 5), new THREE.Vector3(10, 0, 5), new THREE.Vector3(10, 0, 10), new THREE.Vector3(5, 0, 10)]
+        )
 
         // Wire up Chat Events
         this.networkManager.onChatMessage = (playerId, msg) => {
@@ -178,6 +187,9 @@ class Game {
             const countEl = document.getElementById("player-count")
             if (countEl) countEl.textContent = `Jugadores: ${this.networkManager.getPlayerCount()}`
         }
+
+        // NPC Update
+        if (this.npc) this.npc.update(dt)
 
         // Render
         this.updateDebugRender()

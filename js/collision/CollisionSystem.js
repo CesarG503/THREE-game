@@ -233,21 +233,26 @@ export class CollisionSystem {
           const wasCollidingA = a.activeCollisions.has(b.id)
           const wasCollidingB = b.activeCollisions.has(a.id)
 
+          // Resolver colisión física
+          const response = this.getCollisionResponse(a, b)
+
           if (!wasCollidingA) {
             a.activeCollisions.add(b.id)
             b.activeCollisions.add(a.id)
 
             // Callback onCollisionEnter
-            if (a.onCollisionEnter) a.onCollisionEnter(b)
-            if (b.onCollisionEnter) b.onCollisionEnter(a)
+            if (a.onCollisionEnter) a.onCollisionEnter(b, response)
+            // Para B, la normal es invertida
+            const responseForB = { ...response, normal: response.normal.clone().negate(), direction: response.direction.clone().negate() }
+            if (b.onCollisionEnter) b.onCollisionEnter(a, responseForB)
           } else {
             // Callback onCollisionStay
-            if (a.onCollisionStay) a.onCollisionStay(b)
-            if (b.onCollisionStay) b.onCollisionStay(a)
+            if (a.onCollisionStay) a.onCollisionStay(b, response)
+            // Para B, la normal es invertida
+            const responseForB = { ...response, normal: response.normal.clone().negate(), direction: response.direction.clone().negate() }
+            if (b.onCollisionStay) b.onCollisionStay(a, responseForB)
           }
 
-          // Resolver colisión física
-          const response = this.getCollisionResponse(a, b)
           this.resolveCollision(a, b, response)
         }
       }

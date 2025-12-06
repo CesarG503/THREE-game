@@ -20,6 +20,7 @@ export class Character {
         this.gravity = 30
         this.jumpForce = 15
         this.onGround = true
+        this.isGroundedCollision = false
 
         this.targetRotation = 0
         this.rotationSmoothness = 0.12
@@ -64,8 +65,20 @@ export class Character {
                     offset: new THREE.Vector3(0, 0.9, 0),
                     layer: CollisionLayer.PLAYER,
                     collidesWithMask: CollisionLayer.REMOTE_PLAYER | CollisionLayer.NPC | CollisionLayer.ENVIRONMENT,
-                    onCollisionEnter: (other) => {
+                    onCollisionEnter: (other, response) => {
                         console.log(`[Character] Collision started with: ${other.id}`)
+                        if (response && response.normal.y > 0.5) {
+                            this.isGroundedCollision = true
+                            this.velocity.y = 0
+                            this.onGround = true
+                        }
+                    },
+                    onCollisionStay: (other, response) => {
+                        if (response && response.normal.y > 0.5) {
+                            this.isGroundedCollision = true
+                            this.velocity.y = 0
+                            this.onGround = true
+                        }
                     },
                     onCollisionExit: (other) => {
                         console.log(`[Character] Collision ended with: ${other.id}`)
@@ -96,6 +109,43 @@ export class Character {
 
     update(dt, input) {
         if (!this.model) return
+
+        // Reset grounded state from collision for this frame (will be set by collision system later if still colliding)
+        // Actually, since collision runs AFTER update in main loop, we rely on flags set in PREVIOUS frame.
+        // But if we reset here, we lose the info from previous frame's collision?
+        // Wait.
+        // Frame 1 Update: isGroundedCollision is false (init) -> Gravity applies.
+        // Frame 1 Collision: Sets isGroundedCollision = true.
+        // Frame 2 Update: isGroundedCollision is true.
+        // We should start by setting it to false? No, if we set it to false here, we effectively treat it as "air" for this physics step until we read it? 
+        // No, we read it immediately to cancel gravity.
+        // If we reset it here, `this.isGroundedCollision` becomes false. Then we apply gravity.
+        // Then at end of frame, collision runs and sets it true.
+        // So effectively we apply 1 frame of gravity every frame?
+        //
+        // Better: Reset it to false at the very END of update? No.
+        //
+        // Standard pattern:
+        // 1. Clear flags.
+        // 2. Apply forces (Player input).
+        // 3. Move.
+        // 4. Resolve Collisions (sets flags).
+
+        // Use the flag set by the LAST frame's collision update.
+        // But we need to clear it so it doesn't stick true forever if we walk off a ledge.
+        // Who clears it?
+        // Method A: Clear at start of `collisionSystem.update`.
+        // Method B: Clear at start of `character.update`.
+
+        // If we clear at start of `character.update`, then we lose the "true" set by last frame's collision.
+        // So Frame N Collision set it true.
+        // Frame N+1 Update:
+        //   Read `isGroundedCollision` (true).
+        //   Apply logic.
+        //   Clear `isGroundedCollision` (false).
+
+        const wasGroundedByCollision = this.isGroundedCollision
+        this.isGroundedCollision = false // Reset for next collision pass
 
         this.direction.set(0, 0, 0)
 
@@ -178,17 +228,26 @@ export class Character {
         }
 
         // Gravity
-        this.velocity.y -= this.gravity * dt
+        if (!this.onGround && !wasGroundedByCollision) {
+            this.velocity.y -= this.gravity * dt
+        }
 
         // Apply Position
         const deltaPosition = this.velocity.clone().multiplyScalar(dt)
         this.model.position.add(deltaPosition)
 
-        // Floor Collision
+        // Floor Collision (World Y=0)
         if (this.model.position.y < 0) {
             this.model.position.y = 0
             this.velocity.y = 0
             this.onGround = true
+        } else if (wasGroundedByCollision) {
+            this.onGround = true
+            // Ensure we don't build up negative velocity while grounded
+            if (this.velocity.y < 0) this.velocity.y = 0
+        } else {
+            // If we are not at y=0 and not grounded by collision, we are in air
+            this.onGround = false
         }
 
         // Update Animation Mixer

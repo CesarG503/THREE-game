@@ -7,6 +7,7 @@ import { NPC } from "./NPC.js"
 import { NetworkManager } from "./NetworkManager.js"
 import { ChatManager } from "./ChatManager.js"
 import { CollisionSystem, BoxCollider, CollisionLayer } from "./collision/index.js"
+import { EnvironmentBuilder } from "./EnvironmentBuilder.js"
 
 class Game {
   constructor() {
@@ -19,6 +20,8 @@ class Game {
     this.character.setCameraController(this.cameraController)
 
     this.collisionSystem = new CollisionSystem(this.sceneManager.scene)
+    this.environmentBuilder = new EnvironmentBuilder(this.sceneManager.scene, this.collisionSystem)
+
     this.setupCollisions()
 
     this.networkManager = new NetworkManager(this.sceneManager.scene, (playerId) => {
@@ -90,6 +93,8 @@ class Game {
   }
 
   addEnvironmentColliders() {
+    this.environmentBuilder.buildLevel() // estructura del nivel prueba 
+
     // Caja de prueba 1
     const box1 = new BoxCollider({
       id: "env-box-1",

@@ -8,6 +8,7 @@ import { NetworkManager } from "./NetworkManager.js"
 import { ChatManager } from "./ChatManager.js"
 import { NPCRapier } from "./NPCRapier.js"
 import { LevelBuilder } from "./environment/LevelBuilder.js"
+import { LevelLoader } from "./environment/LevelLoader.js"
 
 class Game {
     constructor() {
@@ -75,7 +76,15 @@ class Game {
         this.setupMultiplayerUI()
 
         // Environment (Rapier Rigidbody + Three Mesh)
+        // Environment (Rapier Rigidbody + Three Mesh)
         this.buildEnvironment()
+
+        // Load Test Map (Offset by 30 units, Scale 0.01)
+        this.loadLevelFromFile(
+            "https://threejs.org/examples/models/gltf/LittlestTokyo.glb",
+            new THREE.Vector3(0, 8, 25),
+            new THREE.Vector3(0.04, 0.04, 0.04)
+        )
 
         // Debug
         this.debugEnabled = false
@@ -94,6 +103,30 @@ class Game {
         // Pass ladders to character if character exists
         if (this.character) {
             this.character.ladders = this.levelBuilder.ladders
+        }
+    }
+
+    /**
+     * Example of how to load a GLTF map
+     * Use offset to place it away from generated geometry
+     */
+    async loadLevelFromFile(url, position, scale) {
+        this.levelLoader = new LevelLoader(this.sceneManager.scene, this.world)
+        try {
+            await this.levelLoader.load(url, position, scale)
+            console.log("Map loaded successfully")
+
+            if (this.character) {
+                // Append loaded ladders to character's ladder list (or replace)
+                // If we want to support multiple sources, we should concat.
+                // For now, simpler to just add them.
+                if (this.levelLoader.ladders.length > 0) {
+                    this.character.ladders = this.character.ladders.concat(this.levelLoader.ladders)
+                }
+            }
+        } catch (e) {
+            console.error("Failed to load map, falling back to procedural", e)
+            this.buildEnvironment()
         }
     }
 

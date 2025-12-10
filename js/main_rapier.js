@@ -249,6 +249,7 @@ class Game {
         const resumeBtn = document.getElementById("resume-btn")
         const invertXCheckbox = document.getElementById("invert-x")
         const invertYCheckbox = document.getElementById("invert-y")
+        const tpTrackingCheckbox = document.getElementById("tp-tracking")
         const cameraModeText = document.getElementById("camera-mode-text")
 
         document.addEventListener("gamePauseChanged", (e) => {
@@ -257,6 +258,7 @@ class Game {
                 overlay.style.display = "block"
                 invertXCheckbox.checked = e.detail.invertAxisX
                 invertYCheckbox.checked = e.detail.invertAxisY
+                if (tpTrackingCheckbox) tpTrackingCheckbox.checked = this.cameraController.alwaysRotateThirdPerson
                 cameraModeText.textContent = e.detail.isFirstPerson ? "First Person" : "Third Person"
             } else {
                 settingsPanel.style.display = "none"
@@ -279,6 +281,12 @@ class Game {
         invertYCheckbox.addEventListener("change", (e) => {
             this.cameraController.setInvertAxisY(e.target.checked)
         })
+
+        if (tpTrackingCheckbox) {
+            tpTrackingCheckbox.addEventListener("change", (e) => {
+                this.cameraController.setAlwaysRotateThirdPerson(e.target.checked)
+            })
+        }
 
         const debugCheckbox = document.getElementById("debug-collisions")
         if (debugCheckbox) {

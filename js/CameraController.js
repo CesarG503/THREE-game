@@ -11,6 +11,7 @@ export class CameraController {
         // Third person settings
         this.thirdPersonDistance = 8
         this.thirdPersonHeight = 2
+        this.alwaysRotateThirdPerson = false // Added for TP tracking
         this.minDistance = 2
         this.maxDistance = 20
         this.minCameraHeight = 0.5
@@ -67,29 +68,38 @@ export class CameraController {
         this.domElement.addEventListener("mousedown", (e) => {
             if (e.button === 2 && !this.isPaused) {
                 this.isRightMouseDown = true
-                this.domElement.requestPointerLock()
+                if (!this.alwaysRotateThirdPerson) {
+                    this.domElement.requestPointerLock()
+                }
             }
         })
 
         this.domElement.addEventListener("mouseup", (e) => {
             if (e.button === 2) {
                 this.isRightMouseDown = false
-                document.exitPointerLock()
+                if (!this.isFirstPerson && !this.alwaysRotateThirdPerson) {
+                    document.exitPointerLock()
+                }
             }
         })
 
         // Mouse movement for camera rotation
         document.addEventListener("mousemove", (e) => {
-            if (this.isFirstPerson && !this.isPaused) {
-                if (document.pointerLockElement === this.domElement) {
+            if (this.isPaused) return
+
+            const isLocked = document.pointerLockElement === this.domElement
+            const canRotate = this.isFirstPerson || this.isRightMouseDown || (this.alwaysRotateThirdPerson && isLocked)
+
+            if (canRotate) {
+                if (this.isFirstPerson) {
                     this.fpYaw += e.movementX * this.rotationSpeed * (this.invertAxisX ? -1 : 1)
                     this.fpPitch -= e.movementY * this.rotationSpeed * (this.invertAxisY ? -1 : 1)
                     this.fpPitch = Math.max(-this.maxPitch, Math.min(this.maxPitch, this.fpPitch))
+                } else {
+                    this.theta += e.movementX * this.rotationSpeed * (this.invertAxisX ? -1 : 1)
+                    this.phi -= e.movementY * this.rotationSpeed * (this.invertAxisY ? -1 : 1)
+                    this.phi = Math.max(this.minPhi, Math.min(this.maxPhi, this.phi))
                 }
-            } else if (this.isRightMouseDown && !this.isPaused) {
-                this.theta += e.movementX * this.rotationSpeed * (this.invertAxisX ? -1 : 1)
-                this.phi -= e.movementY * this.rotationSpeed * (this.invertAxisY ? -1 : 1)
-                this.phi = Math.max(this.minPhi, Math.min(this.maxPhi, this.phi))
             }
         })
 
@@ -106,10 +116,12 @@ export class CameraController {
             e.preventDefault()
         })
 
-        // Click to lock pointer in first person
+        // Click to lock pointer
         this.domElement.addEventListener("click", () => {
-            if (this.isFirstPerson && !this.isPaused) {
-                this.domElement.requestPointerLock()
+            if (!this.isPaused) {
+                if (this.isFirstPerson || this.alwaysRotateThirdPerson) {
+                    this.domElement.requestPointerLock()
+                }
             }
         })
     }
@@ -119,7 +131,7 @@ export class CameraController {
 
         if (this.isPaused) {
             document.exitPointerLock()
-        } else if (this.isFirstPerson) {
+        } else if (this.isFirstPerson || this.alwaysRotateThirdPerson) {
             this.domElement.requestPointerLock()
         }
 
@@ -142,9 +154,20 @@ export class CameraController {
         this.invertAxisY = value
     }
 
+    setAlwaysRotateThirdPerson(value) {
+        this.alwaysRotateThirdPerson = value
+        if (value && !this.isPaused && !this.isFirstPerson && document.pointerLockElement !== this.domElement) {
+            // Effectively we expect user to click to lock, but we can't force it without user gesture here
+            // However, next click will lock it.
+        }
+        if (!value && !this.isFirstPerson && document.pointerLockElement === this.domElement) {
+            document.exitPointerLock()
+        }
+    }
+
     resume() {
         this.isPaused = false
-        if (this.isFirstPerson) {
+        if (this.isFirstPerson || this.alwaysRotateThirdPerson) {
             this.domElement.requestPointerLock()
         }
     }
@@ -157,7 +180,9 @@ export class CameraController {
             this.fpYaw = this.theta
             this.fpPitch = 0
         } else {
-            document.exitPointerLock()
+            if (!this.alwaysRotateThirdPerson) {
+                document.exitPointerLock()
+            }
             this.theta = this.fpYaw
         }
 

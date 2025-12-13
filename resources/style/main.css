@@ -389,3 +389,67 @@ input:checked+.toggle-slider:before {
     height: 16px;
     cursor: pointer;
 }
+
+/* Settings Select */
+.settings-select {
+    padding: 8px;
+    border-radius: 4px;
+    background: #444;
+    color: white;
+    border: 1px solid #555;
+    font-size: 14px;
+}
+
+/* Settings Slider */
+.slider-container {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.slider-container input[type="range"] {
+    width: 100px;
+}
+
+.slider-container span {
+    font-size: 14px;
+    width: 40px;
+    text-align: right;
+}
+
+/* Crosshair Variants */
+.crosshair-dynamic {
+    mix-blend-mode: difference;
+    filter: brightness(0) invert(1);
+}
+
+.crosshair-dot {
+    background-color: white;
+    border-radius: 50%;
+    width: 6px !important;
+    height: 6px !important;
+}
+
+.crosshair-plus {
+    background: transparent;
+}
+
+.crosshair-plus::before,
+.crosshair-plus::after {
+    content: '';
+    position: absolute;
+    background-color: white;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+}
+
+.crosshair-plus::before {
+    width: 2px;
+    height: 20px;
+}
+
+.crosshair-plus::after {
+    width: 20px;
+    height: 2px;
+}

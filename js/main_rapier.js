@@ -316,6 +316,49 @@ class Game {
                 if (this.debugMesh) this.debugMesh.visible = e.target.checked
             })
         }
+
+        // Crosshair Settings Logic
+        const chDynamic = document.getElementById("ch-dynamic")
+        const chType = document.getElementById("ch-type")
+        const chSize = document.getElementById("ch-size")
+        const chSizeVal = document.getElementById("ch-size-val")
+        const crosshair = document.getElementById("crosshair")
+
+        if (chDynamic && crosshair) {
+            chDynamic.addEventListener("change", (e) => {
+                if (e.target.checked) {
+                    crosshair.classList.add("crosshair-dynamic")
+                } else {
+                    crosshair.classList.remove("crosshair-dynamic")
+                }
+            })
+        }
+
+        if (chType && crosshair) {
+            chType.addEventListener("change", (e) => {
+                const type = e.target.value
+                // Reset
+                crosshair.style.backgroundImage = ""
+                crosshair.classList.remove("crosshair-dot", "crosshair-plus")
+
+                if (type === "image") {
+                    crosshair.style.backgroundImage = "url('./assets/ui/pointer.png')"
+                } else if (type === "dot") {
+                    crosshair.classList.add("crosshair-dot")
+                } else if (type === "plus") {
+                    crosshair.classList.add("crosshair-plus")
+                }
+            })
+        }
+
+        if (chSize && chSizeVal && crosshair) {
+            chSize.addEventListener("input", (e) => {
+                const size = e.target.value
+                crosshair.style.width = size + "px"
+                crosshair.style.height = size + "px"
+                chSizeVal.textContent = size + "px"
+            })
+        }
     }
 }
 

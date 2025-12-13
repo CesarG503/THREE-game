@@ -19,7 +19,7 @@
     <div id="game-container"></div>
 
     <!-- Crosshair -->
-    <img id="crosshair" src="./assets/ui/pointer.png" alt="crosshair" style="
+    <div id="crosshair" style="
         position: absolute;
         top: 50%;
         left: 50%;
@@ -30,7 +30,11 @@
         user-select: none;
         z-index: 1000;
         opacity: 0.8;
-    ">
+        background-image: url('./assets/ui/pointer.png');
+        background-size: contain;
+        background-repeat: no-repeat;
+        background-position: center;
+    "></div>
 
     <!-- Settings Panel -->
     <div id="overlay"></div>
@@ -40,6 +44,7 @@
         <div class="tabs">
             <div class="tab-btn active" data-tab="fp-settings">Primera Persona</div>
             <div class="tab-btn" data-tab="tp-settings">Tercera Persona</div>
+            <div class="tab-btn" data-tab="ch-settings">Puntero</div>
         </div>
 
         <div class="settings-content active" id="fp-settings">
@@ -82,6 +87,32 @@
                     <input type="checkbox" id="tp-tracking">
                     <span class="toggle-slider"></span>
                 </label>
+            </div>
+        </div>
+
+        <div class="settings-content" id="ch-settings">
+            <h3>Configuracion Puntero</h3>
+            <div class="setting-row">
+                <span class="setting-label">Color Dinamico</span>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="ch-dynamic">
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+            <div class="setting-row">
+                <span class="setting-label">Tipo</span>
+                <select id="ch-type" class="settings-select">
+                    <option value="image">Imagen</option>
+                    <option value="dot">Punto</option>
+                    <option value="plus">Cruz</option>
+                </select>
+            </div>
+            <div class="setting-row">
+                <span class="setting-label">Tamaño</span>
+                <div class="slider-container">
+                    <input type="range" id="ch-size" min="10" max="100" value="40">
+                    <span id="ch-size-val">40px</span>
+                </div>
             </div>
         </div>
 

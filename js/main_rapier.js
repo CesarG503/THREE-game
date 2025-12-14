@@ -282,6 +282,14 @@ class Game {
                 tpInvertY.checked = e.detail.tpInvertAxisY
 
                 if (tpTrackingCheckbox) tpTrackingCheckbox.checked = this.cameraController.alwaysRotateThirdPerson
+
+                const camHorizontalOffset = document.getElementById("cam-horizontal-offset")
+                const camHorizontalOffsetVal = document.getElementById("cam-horizontal-offset-val")
+                if (camHorizontalOffset) {
+                    camHorizontalOffset.value = this.cameraController.horizontalOffset
+                    if (camHorizontalOffsetVal) camHorizontalOffsetVal.textContent = this.cameraController.horizontalOffset.toFixed(2)
+                }
+
                 cameraModeText.textContent = e.detail.isFirstPerson ? "First Person" : "Third Person"
             } else {
                 settingsPanel.style.display = "none"
@@ -306,6 +314,29 @@ class Game {
         if (tpTrackingCheckbox) {
             tpTrackingCheckbox.addEventListener("change", (e) => {
                 this.cameraController.setAlwaysRotateThirdPerson(e.target.checked)
+            })
+        }
+
+        const camSmoothing = document.getElementById("cam-smoothing")
+        const camSmoothingVal = document.getElementById("cam-smoothing-val")
+        if (camSmoothing && camSmoothingVal) {
+            camSmoothing.addEventListener("input", (e) => {
+                const val = parseFloat(e.target.value)
+                this.cameraController.setSmoothing(val)
+                camSmoothingVal.textContent = val.toFixed(2)
+            })
+            // Set initial value
+            camSmoothing.value = this.cameraController.smoothing
+            camSmoothingVal.textContent = this.cameraController.smoothing.toFixed(2)
+        }
+
+        const camHorizontalOffset = document.getElementById("cam-horizontal-offset")
+        const camHorizontalOffsetVal = document.getElementById("cam-horizontal-offset-val")
+        if (camHorizontalOffset && camHorizontalOffsetVal) {
+            camHorizontalOffset.addEventListener("input", (e) => {
+                const val = parseFloat(e.target.value)
+                this.cameraController.setHorizontalOffset(val)
+                camHorizontalOffsetVal.textContent = val.toFixed(1)
             })
         }
 

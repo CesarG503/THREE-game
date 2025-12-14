@@ -28,14 +28,14 @@ export class CameraController {
         // Mouse control
         this.isRightMouseDown = false
         this.rotationSpeed = 0.004
-        this.smoothing = 0.08 // Smoother camera
+        this.smoothing = 1.0 // 1.0 = Instant locking, lower = smoother/laggy
 
         // Target position (character position)
         this.target = new THREE.Vector3()
         this.currentPosition = new THREE.Vector3()
         this.currentLookAt = new THREE.Vector3()
 
-        this.horizontalOffset = 0
+        this.horizontalOffset = 0.4
         this.verticalOffset = 0
 
         // First person look direction
@@ -178,6 +178,14 @@ export class CameraController {
         }
     }
 
+    setHorizontalOffset(value) {
+        this.horizontalOffset = value
+    }
+
+    setSmoothing(value) {
+        this.smoothing = value
+    }
+
     resume() {
         this.isPaused = false
         if (this.isFirstPerson || this.alwaysRotateThirdPerson) {
@@ -247,6 +255,15 @@ export class CameraController {
         targetCameraPos.y = characterPosition.y + this.thirdPersonHeight + verticalDist
         targetCameraPos.z = characterPosition.z - horizontalDist * Math.cos(this.theta)
 
+        // Apply horizontal offset (right vector)
+        // Right vector is perpendicular to the look direction (theta)
+        // Right vector x = -cos(theta), z = sin(theta) (based on getRightDirection logic)
+        const offsetX = -Math.cos(this.theta) * this.horizontalOffset
+        const offsetZ = Math.sin(this.theta) * this.horizontalOffset
+
+        targetCameraPos.x += offsetX
+        targetCameraPos.z += offsetZ
+
         targetCameraPos.y = Math.max(targetCameraPos.y, this.minCameraHeight)
 
         // Smooth camera movement
@@ -258,6 +275,11 @@ export class CameraController {
 
         const targetLookAt = characterPosition.clone()
         targetLookAt.y += 1.2
+
+        // Also offset the look-at target so we look parallel to the character, 
+        // effectively strafing the camera
+        targetLookAt.x += offsetX
+        targetLookAt.z += offsetZ
 
         this.currentLookAt.lerp(targetLookAt, this.smoothing)
         this.camera.lookAt(this.currentLookAt)

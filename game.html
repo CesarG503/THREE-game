@@ -82,11 +82,21 @@
                 </label>
             </div>
             <div class="setting-row">
-                <span class="setting-label">Seguimiento Camara</span>
-                <label class="toggle-switch">
-                    <input type="checkbox" id="tp-tracking">
-                    <span class="toggle-slider"></span>
-                </label>
+                <div class="setting-item">
+                    <label for="tp-tracking">
+                        <input type="checkbox" id="tp-tracking">
+                        Seguimiento Automatico del puntero
+                    </label>
+                </div>
+            </div>
+            <div class="setting-row">
+                <div class="setting-item">
+                    <label>Desplazamiento Horizontal</label>
+                    <div class="slider-container">
+                        <input type="range" id="cam-horizontal-offset" min="-0.4" max="0.4" step="0.01" value="0.4">
+                        <span id="cam-horizontal-offset-val">0.40</span>
+                    </div>
+                </div>
             </div>
         </div>
 

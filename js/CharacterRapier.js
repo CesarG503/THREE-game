@@ -32,8 +32,26 @@ export class CharacterRapier {
         this.rotationSmoothness = 0.15
         this.currentRotation = 0
 
+        // Momentum System
+        this.momentum = new THREE.Vector3(0, 0, 0)
+        this.momentumDamping = 2.0 // Friction/Air resistance for momentum
+
         this.loadModel()
         this.initPhysics()
+    }
+
+    applyImpulse(force) {
+        // Add to current momentum
+        this.momentum.add(force)
+
+        // If force has Y component, handle vertical velocity explicitly
+        if (force.y !== 0) {
+            this.verticalVelocity = force.y
+            // Remove Y from momentum to avoid double counting if we use momentum for XZ primarily
+            // But let's keep it simple: Momentum handles XZ, verticalVelocity handles Y
+            this.momentum.y = 0
+            this.grounded = false // Force ungrounded
+        }
     }
 
     initPhysics() {
@@ -247,6 +265,19 @@ export class CharacterRapier {
         }
 
         desiredTranslation.y = this.verticalVelocity * dt
+
+        // Apply Momentum (Decay)
+        // Damping
+        const dampingFactor = Math.exp(-this.momentumDamping * dt)
+        this.momentum.multiplyScalar(dampingFactor)
+
+        // Threshold to zero out
+        if (this.momentum.lengthSq() < 0.01) {
+            this.momentum.set(0, 0, 0)
+        }
+
+        // Add momentum to translation
+        desiredTranslation.add(this.momentum.clone().multiplyScalar(dt))
 
         // 3. EXECUTE MOVEMENT
         this.characterController.computeColliderMovement(

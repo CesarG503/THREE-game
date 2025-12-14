@@ -9,6 +9,7 @@ import { ChatManager } from "./ChatManager.js"
 import { NPCRapier } from "./NPCRapier.js"
 import { LevelBuilder } from "./environment/LevelBuilder.js"
 import { LevelLoader } from "./environment/LevelLoader.js"
+import { ImpulsePlatform } from "./ImpulsePlatform.js"
 
 class Game {
     constructor() {
@@ -58,6 +59,34 @@ class Game {
             new THREE.Vector3(5, 5, 5),
             [new THREE.Vector3(5, 0, 5), new THREE.Vector3(10, 0, 5), new THREE.Vector3(10, 0, 10), new THREE.Vector3(5, 0, 10)]
         )
+
+        // Impulse Platforms
+        this.platforms = []
+
+        // 1. Forward Boost (Rotatable)
+        // Positioned in front of spawn
+        const forwardPad = new ImpulsePlatform(
+            this.sceneManager.scene,
+            this.world,
+            new THREE.Vector3(0, 0.1, 10), // Position
+            new THREE.Vector3(0, 0, 1),    // Direction (Forward Z+)
+            30.0,                          // Strength
+            "pad"
+        )
+        this.platforms.push(forwardPad)
+
+        // 2. Upward Jump Pad
+        const jumpPad = new ImpulsePlatform(
+            this.sceneManager.scene,
+            this.world,
+            new THREE.Vector3(5, 0.1, 10), // Side
+            new THREE.Vector3(0, 1, 0),    // Direction (Up)
+            25.0,                          // Strength (Needs high value to overcome gravity/mass?) 
+            // Note: applyImpulse in Character assigns direct vertical velocity if Y > 0.
+            "pad"
+        )
+        this.platforms.push(jumpPad)
+
 
         // Wire up Chat Events
         this.networkManager.onChatMessage = (playerId, msg) => {
@@ -164,6 +193,11 @@ class Game {
 
         // NPC Update
         if (this.npc) this.npc.update(dt)
+
+        // Platforms Update
+        if (this.platforms) {
+            this.platforms.forEach(p => p.update(this.character))
+        }
 
         // Render
         this.updateDebugRender()

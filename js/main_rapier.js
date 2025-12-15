@@ -70,7 +70,7 @@ class Game {
             this.world,
             new THREE.Vector3(0, 0.1, 10), // Position
             new THREE.Vector3(0, 0, 1),    // Direction (Forward Z+)
-            30.0,                          // Strength
+            1.0,                          // Strength
             "pad"
         )
         this.platforms.push(forwardPad)

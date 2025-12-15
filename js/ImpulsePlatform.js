@@ -16,8 +16,6 @@ export class ImpulsePlatform {
 
         this.collider = null
         this.mesh = null
-        this.arrowMesh = null
-
         this.initPhysics()
         this.initVisuals()
     }
@@ -55,104 +53,9 @@ export class ImpulsePlatform {
         this.mesh.position.y -= this.height / 2 // Align with flush floor
         this.mesh.receiveShadow = true
         this.scene.add(this.mesh)
-
-        // Arrow / Direction Indicator
-        this.createArrow()
     }
 
-    createArrow() {
-        // Simple shape to indicate direction
-        const shape = new THREE.Shape()
-        shape.moveTo(0, 0.5)
-        shape.lineTo(0.4, -0.4)
-        shape.lineTo(0.2, -0.4)
-        shape.lineTo(0.2, -1.0)
-        shape.lineTo(-0.2, -1.0)
-        shape.lineTo(-0.2, -0.4)
-        shape.lineTo(-0.4, -0.4)
-        shape.lineTo(0, 0.5)
 
-        const extrudeSettings = { depth: 0.1, bevelEnabled: false }
-        const geometry = new THREE.ExtrudeGeometry(shape, extrudeSettings)
-        const material = new THREE.MeshBasicMaterial({ color: 0x00ff00 })
-
-        this.arrowMesh = new THREE.Mesh(geometry, material)
-
-        // Orient arrow
-        // Default shape points UP (Y). We want it flat on XZ pointing in 'direction'.
-        this.arrowMesh.rotation.x = -Math.PI / 2 // Lay flat
-        this.arrowMesh.position.y = this.height / 2 + 0.05 // Slightly above base
-
-        // Rotate to match direction vector
-        // Calculate angle from (0, 0, -1) [Forward] to this.direction
-        // Or simplified: atan2(x, z)
-        const angle = Math.atan2(this.direction.x, this.direction.z)
-        this.arrowMesh.rotation.z = -angle // Z-rotation because it's laying flat on X? No, wait. 
-
-        // Let's rethink rotation.
-        // Mesh is in local space.
-        // It's flat on XZ.
-        // Standard "Up" in 2D shape is Y+.
-        // When rotated -90 on X, Y+ becomes Z- (Forward).
-        // So default is pointing North (Z-).
-
-        // If direction is (0,0,-1) -> Angle 0.
-        // If direction is (1,0,0) -> Angle -90?
-
-        // Let's just create a container for the arrow and rotate that
-        this.mesh.add(this.arrowMesh)
-
-        // Reset local position since it's child now
-        this.arrowMesh.position.set(0, 0.51, 0) // On top surface
-
-        // Rotation
-        // ThreeJS LookAt is easier?
-        // But the arrow is flat.
-        // Let's use lookAt logic manually or object.lookAt
-
-        // Dummy object to calculate rotation?
-        const dummy = new THREE.Object3D()
-        dummy.lookAt(this.direction)
-        // dummy.quaternion has the rotation.
-        // But we want flat rotation.
-
-        // Manual Atan2
-        const targetAngle = Math.atan2(this.direction.x, this.direction.z)
-        this.arrowMesh.rotation.z = -targetAngle // On the floor, rotating around Y (which is Z local now?)
-        // Wait, arrow is child of Box. Box is not rotated.
-        // Arrow is Rotated X -90.
-        // So Arrow's "Z" axis IS the World "Y".
-        // Arrow's "Y" axis is World "Z-".
-
-        // Actually, let's keep it simple:
-        // Don't rotate X -90 yet.
-        // Just make a Cone pointing in direction.
-
-        if (this.arrowMesh) {
-            this.mesh.remove(this.arrowMesh)
-        }
-
-        // New Approach: Texture or simple Cylinder helper?
-        // Use a Cone.
-        const coneGeo = new THREE.ConeGeometry(0.5, 1.5, 8)
-        coneGeo.rotateX(Math.PI / 2); // Point along Z
-        const coneMat = new THREE.MeshBasicMaterial({ color: 0x00ff00 })
-        this.arrowMesh = new THREE.Mesh(coneGeo, coneMat)
-        this.arrowMesh.position.y = 0.5
-
-        // Look at direction
-        // Helper: 
-        // We want (0,0,1) to be direction.
-        const target = new THREE.Vector3().copy(this.direction).add(this.arrowMesh.position)
-        // But this direction is world space relative to platform?
-        // Platform is at `this.position`.
-        // So target is `this.position` + `this.direction`.
-
-        this.scene.add(this.arrowMesh);
-        this.arrowMesh.position.copy(this.position);
-        this.arrowMesh.position.y += 0.5;
-        this.arrowMesh.lookAt(this.position.clone().add(this.direction));
-    }
 
     update(character) {
         if (!character || !character.rigidBody || !this.collider) return

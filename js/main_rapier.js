@@ -429,6 +429,8 @@ class Game {
     }
     setupInventory() {
         this.currentInventorySlot = 0 // 0-indexed (0 to 5)
+        this.placementRotationIndex = 0 // 0=Forward, 1=Right, 2=Back, 3=Left
+
         const slots = document.querySelectorAll(".inventory-slot")
 
         const selectSlot = (index) => {
@@ -456,6 +458,13 @@ class Game {
             if (key >= 1 && key <= 6) {
                 selectSlot(key - 1)
             }
+
+            // Rotation Binding
+            if (e.key.toLowerCase() === 'r') {
+                this.placementRotationIndex = (this.placementRotationIndex + 1) % 4
+                console.log("Placement Rotation:", this.placementRotationIndex)
+                // TODO: Add visual feedback for rotation
+            }
         })
 
         // Scroll selection
@@ -471,6 +480,105 @@ class Game {
                 }
             }
         })
+
+        // Placement Input
+        document.addEventListener("mousedown", (e) => {
+            if (this.inputManager && !this.inputManager.enabled) return
+            // 0 is Left Click
+            if (e.button === 0) {
+                this.placeItem()
+            }
+        })
+    }
+
+    placeItem() {
+        // Only allow placement for slots 1 and 2 (index 0 and 1)
+        if (this.currentInventorySlot !== 0 && this.currentInventorySlot !== 1) return
+
+        // Raycast from camera center
+        const raycaster = new THREE.Raycaster()
+        raycaster.setFromCamera(new THREE.Vector2(0, 0), this.sceneManager.camera)
+
+        // Intersect with world meshes (exclude dynamic characters if possible, but environment is key)
+        // We can just intersect everything and filter? 
+        // For simplicity, let's intersect visual scene. 
+        // Ideally we should have a list of "placeable" meshes. 
+        // Let's assume everything visible is placeable for now except triggers.
+
+        const intersects = raycaster.intersectObjects(this.sceneManager.scene.children, true)
+
+        if (intersects.length > 0) {
+            // Find first valid hit (distance < some max range)
+            const hit = intersects.find(h => h.distance < 10 && h.object.type === "Mesh")
+
+            if (hit) {
+                const position = hit.point
+                // Lift slightly so it sits on top? ImpulsePlatform handles y alignment relative to its center?
+                // ImpulsePlatform constructor takes center position.
+                // It builds mesh from center - height/2 to center + height/2 ?
+                // Code says: this.mesh.position.y -= this.height / 2 
+                // So if we pass P, mesh bottom is at P - height. 
+                // Wait. 
+                // ImpulsePlatform:
+                // constructor(..., position, ...)
+                // mesh.position.copy(position)
+                // mesh.position.y -= height/2
+                // So if we pass P, the mesh CENTER is at P, and VISUAL is shifted down.
+                // If P is on floor (Y=0), Visual is at -0.1 (flush with floor if height=0.2).
+                // Usually we want the bottom of the pad to be at hit.point.y.
+                // If mesh bottom is at `pos.y - height/2`, and we want that to be `hit.y`.
+                // Then `pos.y - height/2 = hit.y` => `pos.y = hit.y + height/2`.
+
+                // Let's assume height is 0.2 from ImpulsePlatform class
+                const height = 0.2
+                const placePos = position.clone()
+                placePos.y += height / 2
+
+                if (this.currentInventorySlot === 0) {
+                    // Lateral Pad
+                    // Calculate direction based on rotation index relative to Camera or Fixed?
+                    // User asked for "Forward, Back, Right, Left".
+                    // Let's align with World Axes for simplicity + Rotation.
+                    // 0: Forward (Z+), 1: Right (X-), 2: Backward (Z-), 3: Left (X+)
+                    // Wait, standard ThreeJS coords:
+                    // Z+ is usually "Forward" out of screen? No, Z- is forward for camera.
+                    // Let's use World Coordinate directions.
+                    // 0: North (-Z)
+                    // 1: East (+X)
+                    // 2: South (+Z)
+                    // 3: West (-X)
+
+                    let dir = new THREE.Vector3(0, 0, -1) // Default Forward (-Z)
+                    if (this.placementRotationIndex === 1) dir.set(1, 0, 0) // East
+                    if (this.placementRotationIndex === 2) dir.set(0, 0, 1) // South
+                    if (this.placementRotationIndex === 3) dir.set(-1, 0, 0) // West
+
+                    const pad = new ImpulsePlatform(
+                        this.sceneManager.scene,
+                        this.world,
+                        placePos,
+                        dir,
+                        25.0,
+                        "pad"
+                    )
+                    this.platforms.push(pad)
+                    console.log("Placed Lateral Pad", dir)
+
+                } else if (this.currentInventorySlot === 1) {
+                    // Jump Pad
+                    const pad = new ImpulsePlatform(
+                        this.sceneManager.scene,
+                        this.world,
+                        placePos,
+                        new THREE.Vector3(0, 1, 0), // Up
+                        35.0, // Higher strength for jump
+                        "pad"
+                    )
+                    this.platforms.push(pad)
+                    console.log("Placed Jump Pad")
+                }
+            }
+        }
     }
 }
 

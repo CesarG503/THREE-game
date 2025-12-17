@@ -428,17 +428,46 @@ class Game {
         }
     }
     setupInventory() {
+        this.currentInventorySlot = 0 // 0-indexed (0 to 5)
         const slots = document.querySelectorAll(".inventory-slot")
+
+        const selectSlot = (index) => {
+            // Validate index
+            if (index < 0) index = 5
+            if (index > 5) index = 0
+
+            this.currentInventorySlot = index
+
+            // Visual update
+            slots.forEach(s => s.classList.remove("active"))
+            if (slots[this.currentInventorySlot]) {
+                slots[this.currentInventorySlot].classList.add("active")
+            }
+        }
+
+        // Initialize first slot
+        selectSlot(0)
+
+        // Key selection
         document.addEventListener("keydown", (e) => {
-            if (this.inputManager && !this.inputManager.enabled) return // Don't switch if typing in chat
+            if (this.inputManager && !this.inputManager.enabled) return
 
             const key = parseInt(e.key)
             if (key >= 1 && key <= 6) {
-                // Remove active class from all
-                slots.forEach(s => s.classList.remove("active"))
-                // Add to selected
-                if (slots[key - 1]) {
-                    slots[key - 1].classList.add("active")
+                selectSlot(key - 1)
+            }
+        })
+
+        // Scroll selection
+        document.addEventListener("wheel", (e) => {
+            // Only scroll inventory if Shift is NOT held (Shift is for zoom)
+            if (!e.shiftKey && !this.inputManager.enabled === false) {
+                // Logic: Scroll Down (positive delta) -> Next slot
+                // Scroll Up (negative delta) -> Previous slot
+                if (e.deltaY > 0) {
+                    selectSlot(this.currentInventorySlot + 1)
+                } else if (e.deltaY < 0) {
+                    selectSlot(this.currentInventorySlot - 1)
                 }
             }
         })

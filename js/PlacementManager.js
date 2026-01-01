@@ -106,7 +106,7 @@ export class PlacementManager {
         if (hit) {
             this.placementGhost.visible = true
             this.placementGhost.position.copy(hit.point)
-            // Ajuste de altura: Sin offset adicional para que quede a ras del suelo
+            this.placementGhost.position.y += 0.1 // Ajuste de altura: 0.10 por encima del suelo
             // (La geometría base ya está ajustada internamente para que su cara superior esté en 0 local)
 
             // Actualizar visuales según el slot

@@ -518,7 +518,7 @@ class Game {
 
         if (hitPoint) {
             const placePos = hitPoint.clone()
-            // placePos.y += 0 // Flush con el suelo
+            placePos.y += 0.1 // 0.10 por encima del suelo
 
 
             if (this.currentInventorySlot === 0) {

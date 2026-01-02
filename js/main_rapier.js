@@ -11,6 +11,9 @@ import { LevelBuilder } from "./environment/LevelBuilder.js"
 import { LevelLoader } from "./environment/LevelLoader.js"
 import { ImpulsePlatform } from "./ImpulsePlatform.js"
 import { PlacementManager } from "./PlacementManager.js"
+import { InventoryManager } from "./item/InventoryManager.js"
+import { ItemDropManager } from "./item/ItemDropManager.js"
+import { ImpulseItem } from "./item/ImpulseItem.js"
 
 class Game {
     constructor() {
@@ -108,7 +111,19 @@ class Game {
 
         this.setupSettingsPanel()
         this.setupMultiplayerUI()
-        this.setupInventory()
+
+        // --- New Inventory System ---
+        this.inventoryManager = new InventoryManager("inventory-container")
+        this.itemDropManager = new ItemDropManager(this.sceneManager.scene, this.world)
+
+        // Seed Inventory
+        const item1 = new ImpulseItem("pad_lat", "Impulso Lateral", "./assets/textures/impulso.png", "lateral", 25.0)
+        const item2 = new ImpulseItem("pad_jump", "Salto Vertical", "./assets/textures/salto.png", "jump", 35.0)
+
+        this.inventoryManager.addItem(item1)
+        this.inventoryManager.addItem(item2)
+
+        this.setupGameInput() // Replaces setupInventory logic for interactions
 
         // Environment (Rapier Rigidbody + Three Mesh)
         // Environment (Rapier Rigidbody + Three Mesh)
@@ -205,9 +220,58 @@ class Game {
             this.platforms.forEach(p => p.update(this.character))
         }
 
+        // Dropped Items Update
+        if (this.itemDropManager) {
+            this.itemDropManager.update(dt, this.clock.getElapsedTime())
+
+            // Interaction Prompt Logic
+            if (this.character) {
+                const charPos = this.character.getPosition()
+                // Get nearest item without removing it
+                const nearest = this.itemDropManager.getNearestItem(charPos, 3.0)
+
+                const promptEl = document.getElementById("interaction-prompt")
+                const promptTextEl = document.getElementById("prompt-text")
+
+                if (nearest && promptEl) {
+                    // Update text
+                    promptTextEl.textContent = `Recoger ${nearest.item.name}`
+
+                    // Show IT
+                    promptEl.style.display = "flex"
+
+                    // Project 3D position to 2D screen
+                    const itemPos = nearest.rigidBody.translation()
+                    const vec = new THREE.Vector3(itemPos.x, itemPos.y + 0.5, itemPos.z)
+                    vec.project(this.sceneManager.camera)
+
+                    const x = (vec.x * .5 + .5) * window.innerWidth
+                    const y = (-(vec.y * .5) + .5) * window.innerHeight
+
+                    // Only show if in front of camera (z < 1)
+                    if (vec.z < 1) {
+                        promptEl.style.left = `${x}px`
+                        promptEl.style.top = `${y}px`
+                    } else {
+                        promptEl.style.display = "none"
+                    }
+
+                } else if (promptEl) {
+                    promptEl.style.display = "none"
+                }
+            }
+        }
+
         // Ghost Preview Update (via Manager)
-        if (this.placementManager) {
-            this.placementManager.update(this.currentInventorySlot, this.placementRotationIndex)
+        if (this.placementManager && this.inventoryManager) {
+            const currentItem = this.inventoryManager.getCurrentItem()
+            // Map item to legacy slot index for visual only, or -1 if not a pad
+            let simSlot = -1
+            if (currentItem instanceof ImpulseItem) {
+                simSlot = currentItem.type === 'lateral' ? 0 : 1
+            }
+            // Use current rotation index
+            this.placementManager.update(simSlot, this.placementRotationIndex || 0)
         }
 
         // Render
@@ -445,127 +509,80 @@ class Game {
             })
         }
     }
-    setupInventory() {
-        this.currentInventorySlot = 0 // 0-indexed (0 to 5)
-        this.placementRotationIndex = 0 // 0=Forward, 1=Right, 2=Back, 3=Left
+    setupGameInput() {
+        this.placementRotationIndex = 0
 
-        const slots = document.querySelectorAll(".inventory-slot")
-
-        const selectSlot = (index) => {
-            // Validate index
-            if (index < 0) index = 5
-            if (index > 5) index = 0
-
-            this.currentInventorySlot = index
-
-            // Visual update
-            slots.forEach(s => s.classList.remove("active"))
-            if (slots[this.currentInventorySlot]) {
-                slots[this.currentInventorySlot].classList.add("active")
-            }
-        }
-
-        // Initialize first slot
-        selectSlot(0)
-
-        // Key selection
         document.addEventListener("keydown", (e) => {
             if (this.inputManager && !this.inputManager.enabled) return
 
-            const key = parseInt(e.key)
-            if (key >= 1 && key <= 6) {
-                selectSlot(key - 1)
-            }
+            const key = e.key.toLowerCase()
 
-            // Rotation Binding
-            if (e.key.toLowerCase() === 'r') {
+            // Rotation (R)
+            if (key === 'r') {
                 this.placementRotationIndex = (this.placementRotationIndex + 1) % 4
                 console.log("Placement Rotation:", this.placementRotationIndex)
-                // TODO: Add visual feedback for rotation
             }
-        })
 
-        // Scroll selection
-        document.addEventListener("wheel", (e) => {
-            // Only scroll inventory if Shift is NOT held (Shift is for zoom)
-            if (!e.shiftKey && !this.inputManager.enabled === false) {
-                // Logic: Scroll Down (positive delta) -> Next slot
-                // Scroll Up (negative delta) -> Previous slot
-                if (e.deltaY > 0) {
-                    selectSlot(this.currentInventorySlot + 1)
-                } else if (e.deltaY < 0) {
-                    selectSlot(this.currentInventorySlot - 1)
+            // Drop Item (Q)
+            if (key === 'q') {
+                const item = this.inventoryManager.removeCurrentItem()
+                if (item) {
+                    const charPos = this.character.getPosition()
+
+                    // Direction from Camera
+                    const camDir = new THREE.Vector3()
+                    this.sceneManager.camera.getWorldDirection(camDir)
+
+                    // Drop slightly in front of camera/character
+                    this.itemDropManager.dropItem(item, charPos, camDir)
+                }
+            }
+
+            // Pickup Item (F)
+            if (key === 'f') {
+                const charPos = this.character.getPosition()
+                const picked = this.itemDropManager.tryPickupNearest(charPos)
+                if (picked) {
+                    const added = this.inventoryManager.addItem(picked)
+                    if (!added) {
+                        // Inventory full, drop it back?
+                        console.log("Inventario lleno, soltando de nuevo...")
+                        const camDir = new THREE.Vector3()
+                        this.sceneManager.camera.getWorldDirection(camDir)
+                        this.itemDropManager.dropItem(picked, charPos, camDir)
+                    }
                 }
             }
         })
 
-        // Placement Input
+        // Use Item (Click)
         document.addEventListener("mousedown", (e) => {
             if (this.inputManager && !this.inputManager.enabled) return
-            // 0 is Left Click
-            if (e.button === 0) {
-                this.placeItem()
+            if (e.button === 0) { // Left Click
+                this.useCurrentItem()
             }
         })
     }
 
-    placeItem() {
-        // Only allow placement for slots 1 and 2 (index 0 and 1)
-        if (this.currentInventorySlot !== 0 && this.currentInventorySlot !== 1) return
+    useCurrentItem() {
+        const item = this.inventoryManager.getCurrentItem()
+        if (!item) return
 
-        // Usar el manager para obtener el punto de impacto exacto
-        const hitPoint = this.placementManager.update(this.currentInventorySlot, this.placementRotationIndex)
-
-        if (hitPoint) {
-            const placePos = hitPoint.clone()
-            placePos.y += 0.1 // 0.10 por encima del suelo
-
-
-            if (this.currentInventorySlot === 0) {
-                // Lateral Pad
-                // Calculate direction based on rotation index relative to Camera or Fixed?
-                // User asked for "Forward, Back, Right, Left".
-                // Let's align with World Axes for simplicity + Rotation.
-                // 0: Forward (Z+), 1: Right (X-), 2: Backward (Z-), 3: Left (X+)
-                // Wait, standard ThreeJS coords:
-                // Z+ is usually "Forward" out of screen? No, Z- is forward for camera.
-                // Let's use World Coordinate directions.
-                // 0: North (-Z)
-                // 1: East (+X)
-                // 2: South (+Z)
-                // 3: West (-X)
-
-                let dir = new THREE.Vector3(0, 0, -1) // Default Forward (-Z)
-                if (this.placementRotationIndex === 1) dir.set(1, 0, 0) // East
-                if (this.placementRotationIndex === 2) dir.set(0, 0, 1) // South
-                if (this.placementRotationIndex === 3) dir.set(-1, 0, 0) // West
-
-                const pad = new ImpulsePlatform(
-                    this.sceneManager.scene,
-                    this.world,
-                    placePos,
-                    dir,
-                    25.0,
-                    "pad"
-                )
-                this.platforms.push(pad)
-                console.log("Placed Lateral Pad", dir)
-
-            } else if (this.currentInventorySlot === 1) {
-                // Jump Pad
-                const pad = new ImpulsePlatform(
-                    this.sceneManager.scene,
-                    this.world,
-                    placePos,
-                    new THREE.Vector3(0, 1, 0), // Up
-                    35.0, // Higher strength for jump
-                    "pad"
-                )
-                this.platforms.push(pad)
-                console.log("Placed Jump Pad")
-            }
+        // Context needed for item usage
+        const context = {
+            scene: this.sceneManager.scene,
+            world: this.world,
+            placementManager: this.placementManager,
+            platforms: this.platforms,
+            rotationIndex: this.placementRotationIndex
         }
+
+        const consumed = item.use(context)
+        // If we implemented consumption (removing item), we would do it here
+        // if (consumed) this.inventoryManager.removeCurrentItem()
     }
+
+
 }
 
 new Game()

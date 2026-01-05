@@ -64,6 +64,39 @@
         <span class="key-hint">F</span> <span id="prompt-text">Recoger Item</span>
     </div>
 
+    <!-- Move Prompt & Progress -->
+    <div id="move-prompt-container" style="
+        position: absolute;
+        top: 60%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        display: none;
+        flex-direction: column;
+        align-items: center;
+        pointer-events: none;
+        z-index: 1000;
+    ">
+        <div
+            style="font-family: sans-serif; font-size: 18px; color: white; text-shadow: 1px 1px 2px black; margin-bottom: 8px;">
+            Mover Zona (Mantener F)
+        </div>
+        <div style="
+            width: 200px;
+            height: 10px;
+            background: rgba(0,0,0,0.5);
+            border: 2px solid white;
+            border-radius: 5px;
+            overflow: hidden;
+        ">
+            <div id="move-progress-bar" style="
+                width: 0%;
+                height: 100%;
+                background: linear-gradient(90deg, #ff4500, #ff8c00);
+                transition: width 0.1s linear;
+            "></div>
+        </div>
+    </div>
+
     <!-- Settings Panel -->
     <div id="overlay"></div>
     <div id="settings-panel">

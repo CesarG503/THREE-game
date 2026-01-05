@@ -128,6 +128,18 @@ class Game {
             this.itemDropManager,
             new THREE.Vector3(-5, 0.1, 10)
         )
+        // Move Logic State
+        this.fKeyHeldTime = 0
+        this.isMovingFarmingZone = false
+        this.isFKeyDown = false
+
+        // Ghost for Moving Farming Zone
+        this.moveGhost = new THREE.Mesh(
+            new THREE.BoxGeometry(3, 0.2, 3),
+            new THREE.MeshBasicMaterial({ color: 0xFF4500, transparent: true, opacity: 0.5, wireframe: true })
+        )
+        this.moveGhost.visible = false
+        this.sceneManager.scene.add(this.moveGhost)
 
         // Seed Inventory
         const item1 = new ImpulseItem("pad_lat", "Impulso Lateral", "./assets/textures/impulso.png", "lateral", 25.0)
@@ -292,6 +304,58 @@ class Game {
         // Farming Zone Update
         if (this.farmingZone) {
             this.farmingZone.update(dt)
+
+            // Move Logic Check
+            if (this.character && !this.isMovingFarmingZone) {
+                const charPos = this.character.getPosition()
+                const zonePos = this.farmingZone.position
+
+                // Dist check (simple Euclidean)
+                const dx = charPos.x - zonePos.x
+                const dz = charPos.z - zonePos.z
+                const distSq = dx * dx + dz * dz
+
+                const promptContainer = document.getElementById("move-prompt-container")
+                const progressBar = document.getElementById("move-progress-bar")
+
+                if (distSq < 16.0) { // Radius 4
+                    if (promptContainer) promptContainer.style.display = "flex"
+
+                    if (this.isFKeyDown) {
+                        this.fKeyHeldTime += dt
+                        const progress = Math.min(this.fKeyHeldTime / 5.0, 1.0)
+                        if (progressBar) progressBar.style.width = `${progress * 100}%`
+
+                        if (this.fKeyHeldTime >= 5.0) {
+                            // Trigger Move Mode
+                            this.isMovingFarmingZone = true
+                            this.fKeyHeldTime = 0
+                            if (promptContainer) promptContainer.style.display = "none"
+                            console.log("Farming Zone Move Mode Activated")
+                        }
+                    } else {
+                        this.fKeyHeldTime = 0
+                        if (progressBar) progressBar.style.width = "0%"
+                    }
+                } else {
+                    if (promptContainer) promptContainer.style.display = "none"
+                    this.fKeyHeldTime = 0 // Reset if walked away
+                }
+            } else if (this.isMovingFarmingZone) {
+                // In Move Mode
+                const raycaster = new THREE.Raycaster()
+                raycaster.setFromCamera(new THREE.Vector2(0, 0), this.sceneManager.camera)
+                const intersects = raycaster.intersectObjects(this.sceneManager.scene.children, true)
+                const hit = intersects.find(h => h.distance < 20 && h.object.type === "Mesh" && h.object !== this.moveGhost)
+
+                if (hit) {
+                    this.moveGhost.visible = true
+                    this.moveGhost.position.copy(hit.point)
+                    this.moveGhost.position.y += 0.1 // Flush
+                } else {
+                    this.moveGhost.visible = false
+                }
+            }
         }
 
         // Ghost Preview Update (via Manager)
@@ -575,15 +639,44 @@ class Game {
                 const charPos = this.character.getPosition()
                 const picked = this.itemDropManager.tryPickupNearest(charPos)
                 if (picked) {
-                    const added = this.inventoryManager.addItem(picked)
-                    if (!added) {
-                        // Inventory full, drop it back?
-                        console.log("Inventario lleno, soltando de nuevo...")
-                        const camDir = new THREE.Vector3()
-                        this.sceneManager.camera.getWorldDirection(camDir)
-                        this.itemDropManager.dropItem(picked, charPos, camDir)
+                    if (picked.id === "fuego") {
+                        this.fuegoCount++
+                        const counterEl = document.getElementById("fuego-count")
+                        if (counterEl) counterEl.textContent = this.fuegoCount
+                        console.log("Manual pickup fuego! Total:", this.fuegoCount)
+                    } else {
+                        const added = this.inventoryManager.addItem(picked)
+                        if (!added) {
+                            // Inventory full, drop it back?
+                            console.log("Inventario lleno, soltando de nuevo...")
+                            const camDir = new THREE.Vector3()
+                            this.sceneManager.camera.getWorldDirection(camDir)
+                            this.itemDropManager.dropItem(picked, charPos, camDir)
+                        }
                     }
                 }
+            }
+            // Pickup Item (F) Logic is already handled above in 'keydown'
+            // We need to track F state for holding
+            if (key === 'f') {
+                this.isFKeyDown = true
+
+                // Only trigger pickup if NOT moving zone and NOT holding long enough?
+                // Actually user said: "mantener presionado F por 5s". 
+                // Immediate press is pickup. Long press is move.
+                // We should theoretically block pickup if hold started? 
+                // Or allow pickup on press down, and start counting for move.
+                // Current pickup logic is on keydown. If close to item, it picks up.
+                // If close to zone, it starts counting. Both can happen. It's fine.
+            }
+        })
+
+        document.addEventListener("keyup", (e) => {
+            if (e.key.toLowerCase() === 'f') {
+                this.isFKeyDown = false
+                this.fKeyHeldTime = 0
+                const progressBar = document.getElementById("move-progress-bar")
+                if (progressBar) progressBar.style.width = "0%"
             }
         })
 
@@ -591,7 +684,15 @@ class Game {
         document.addEventListener("mousedown", (e) => {
             if (this.inputManager && !this.inputManager.enabled) return
             if (e.button === 0) { // Left Click
-                this.useCurrentItem()
+                if (this.isMovingFarmingZone && this.moveGhost.visible) {
+                    // Confirm Placement
+                    this.farmingZone.setPosition(this.moveGhost.position)
+                    this.isMovingFarmingZone = false
+                    this.moveGhost.visible = false
+                    console.log("Farming Zone Moved")
+                } else {
+                    this.useCurrentItem()
+                }
             }
         })
     }

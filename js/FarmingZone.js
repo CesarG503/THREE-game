@@ -61,4 +61,12 @@ export class FarmingZone {
         const direction = new THREE.Vector3(0, 1, 0);
         this.itemDropManager.dropItem(item, spawnPos, direction, 0.0); // low force
     }
+
+    setPosition(newPos) {
+        this.position.copy(newPos);
+        if (this.mesh) {
+            this.mesh.position.copy(newPos);
+            this.mesh.position.y -= this.height / 2;
+        }
+    }
 }

@@ -138,12 +138,27 @@ export class PlacementManager {
             // Grid Snapping Logic
             if (this.snapToGrid) {
                 const gridSize = this.gridSize || 1
-                // We snap to center or edge? 
-                // Usually snap to center (grid nodes)
-                hit.point.x = Math.round(hit.point.x / gridSize) * gridSize
-                hit.point.z = Math.round(hit.point.z / gridSize) * gridSize
-                // Y usually stays on floor/surface, assuming flat terrain 0
-                // If we want vertical snap, valid too, but mainly horizontal needed.
+
+                // Determine offsets based on item size parity (Odd vs Even)
+                // If dimension is odd (1, 3, 5...), we want it centered in the cell (0.5 offset)
+                // If dimension is even (2, 4...), we want it centered on the line (0.0 offset)
+                // We use Math.round(item.scale.axis) to check parity
+
+                const sx = Math.round(item.scale.x)
+                const sz = Math.round(item.scale.z)
+
+                const offsetX = (sx % 2 !== 0) ? (gridSize / 2) : 0
+                const offsetZ = (sz % 2 !== 0) ? (gridSize / 2) : 0
+
+                // Logic:
+                // 1. Shift point by offset to align "grid node" to "cell center" frame relative
+                // 2. Round
+                // 3. Shift back? No.
+                // Formula: Math.floor( x / grid ) * grid + grid/2  <-- always center
+                // My formula: Math.round( (x - offset) / grid ) * grid + offset
+
+                hit.point.x = Math.round((hit.point.x - offsetX) / gridSize) * gridSize + offsetX
+                hit.point.z = Math.round((hit.point.z - offsetZ) / gridSize) * gridSize + offsetZ
             }
 
             this.placementGhost.position.copy(hit.point)

@@ -42,11 +42,29 @@ export class CharacterRapier {
         this.momentum = new THREE.Vector3(0, 0, 0)
         this.momentumDamping = 2.0 // Friction/Air resistance for momentum
 
+        // No-Clip / Build Mode Ghost
+        this.noClip = false
+
         this.loadModel()
         this.initPhysics()
     }
 
+    setNoClip(enabled) {
+        this.noClip = enabled
+        // If enabling no-clip, we might want to ensure flying is on or gravity off? 
+        // For now, keep them separate or link them? 
+        // User asked for "disable collision", which implies flying through things usually.
+        // Let's force flight if noclip is on? Or just gravity exemption?
+        // Let's keep it simple: NoClip simply ignores barriers. 
+        if (enabled) {
+            console.log("No-Clip Enabled")
+        } else {
+            console.log("No-Clip Disabled")
+        }
+    }
+
     applyImpulse(force) {
+        // ... unchanged ...
         // Add to current momentum
         this.momentum.add(force)
 
@@ -60,6 +78,74 @@ export class CharacterRapier {
         }
     }
 
+    // ... initPhysics ... (unchanged, not included in replacement range unless needed)
+
+    // ... 
+
+    update(dt, input) {
+        if (!this.rigidBody) return
+
+        // 0. No-Clip Override
+        if (this.noClip) {
+            // In No-Clip, we behave like Spectator/God mode. 
+            // - No Gravity
+            // - Movement is direct translation
+            // - Flight mechanics logic reused or custom?
+
+            // Let's use logic similar to Flight but skipping computeColliderMovement
+            let speed = this.speed * 2
+            let moveDir = new THREE.Vector3()
+
+            if (this.cameraController) {
+                const camDir = new THREE.Vector3()
+                this.camera.getWorldDirection(camDir)
+                const right = this.cameraController.getRightDirection()
+
+                if (input.keys.forward) moveDir.add(camDir)
+                if (input.keys.backward) moveDir.sub(camDir)
+                if (input.keys.right) moveDir.add(right)
+                if (input.keys.left) moveDir.sub(right)
+
+                // Vertical
+                if (input.keys.jump) moveDir.y += 1
+                if (input.keys.crouch) moveDir.y -= 1 // Assuming crouch key exists or Shift?
+                // Default shift usually runs. Let's stick to Camera Pitch for Up/Down + Jump for pure Up.
+            }
+
+            if (moveDir.lengthSq() > 0) {
+                moveDir.normalize().multiplyScalar(speed * dt)
+            }
+
+            // Direct Translation (Bypassing Collider/Physics Solver)
+            let newPos = this.rigidBody.translation()
+            newPos.x += moveDir.x
+            newPos.y += moveDir.y
+            newPos.z += moveDir.z
+
+            this.rigidBody.setNextKinematicTranslation(newPos)
+            this.updateModelVisuals()
+            return // Skip rest of update
+        }
+
+        // Flight Mode Check (Standard Physics-based Flight)
+        if (this.isFlying) {
+            // ... existing flight logic ...
+            // We can defer to existing logic
+            // But let's keep the existing checkFlightToggle here
+        }
+
+        // ... rest of update function ...
+
+        // Flattening the code for replacement context:
+        // We are inserting the noClip block at the start of update.
+        // And we need to make sure we don't delete the rest.
+        // Wait, replace block size is limited? 
+        // I will use specific insertion using original lines.
+
+        // ...
+
+        // Retrying with precise target content for just the start of update + constructor
+    }
     initPhysics() {
         // 1. Create Rigid Body
         // KinematicPositionBased means we control position directly (via controller), perfect for characters
@@ -122,6 +208,40 @@ export class CharacterRapier {
 
     update(dt, input) {
         if (!this.rigidBody) return
+
+        // 0. No-Clip Override (God Mode)
+        if (this.noClip) {
+            let speed = this.speed * 2
+            let moveDir = new THREE.Vector3()
+
+            if (this.cameraController) {
+                const camDir = new THREE.Vector3()
+                this.camera.getWorldDirection(camDir)
+                const right = this.cameraController.getRightDirection()
+
+                if (input.keys.forward) moveDir.add(camDir)
+                if (input.keys.backward) moveDir.sub(camDir)
+                if (input.keys.right) moveDir.add(right)
+                if (input.keys.left) moveDir.sub(right)
+
+                if (input.keys.jump) moveDir.y += 1
+                // Shift to go down? Or keep simple.
+            }
+
+            if (moveDir.lengthSq() > 0) {
+                moveDir.normalize().multiplyScalar(speed * dt)
+            }
+
+            // Direct Translation (Bypassing Collider/Physics Solver)
+            let newPos = this.rigidBody.translation()
+            newPos.x += moveDir.x
+            newPos.y += moveDir.y
+            newPos.z += moveDir.z
+
+            this.rigidBody.setNextKinematicTranslation(newPos)
+            this.updateModelVisuals()
+            return // Skip physics update
+        }
 
         // Flight Mode Check
         if (this.isFlying) {

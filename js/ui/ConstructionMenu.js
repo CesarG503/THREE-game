@@ -222,6 +222,30 @@ export class ConstructionMenu {
         rowSnap.appendChild(checkSnap)
         rowSnap.appendChild(labelSnap)
         container.appendChild(rowSnap)
+
+        // No-Clip Toggle
+        const rowClip = document.createElement('div')
+        rowClip.style.cssText = `display: flex; align-items: center; gap: 10px;`
+
+        const checkClip = document.createElement('input')
+        checkClip.type = 'checkbox'
+        checkClip.id = 'chk-no-clip'
+        checkClip.style.transform = 'scale(1.5)'
+        checkClip.addEventListener('change', (e) => {
+            if (this.game.character && this.game.character.setNoClip) {
+                this.game.character.setNoClip(e.target.checked)
+            }
+        })
+
+        const labelClip = document.createElement('label')
+        labelClip.textContent = "Desactivar Colisión (Fantasma)"
+        labelClip.htmlFor = 'chk-no-clip'
+        labelClip.style.fontSize = "18px"
+        labelClip.style.cursor = "pointer"
+
+        rowClip.appendChild(checkClip)
+        rowClip.appendChild(labelClip)
+        container.appendChild(rowClip)
     }
 
     renderLibrary(container) {

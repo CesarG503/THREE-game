@@ -54,6 +54,14 @@ export class ConstructionMenu {
     }
 
     setupUI() {
+        // Init Grid Helper
+        this.gridHelper = new THREE.GridHelper(100, 100, 0x888888, 0x444444)
+        this.gridHelper.position.y = 0.01 // Slightly above 0 to avoid z-fighting
+        this.gridHelper.visible = false
+        if (this.game.sceneManager && this.game.sceneManager.scene) {
+            this.game.sceneManager.scene.add(this.gridHelper)
+        }
+
         // Main Container
         this.container = document.createElement('div')
         this.container.id = 'construction-menu'
@@ -81,25 +89,27 @@ export class ConstructionMenu {
         const header = document.createElement('div')
         header.style.cssText = `display: flex; gap: 20px; font-size: 24px; margin-bottom: 20px; border-bottom: 1px solid #555; padding-bottom: 10px;`
 
-        const tab1 = document.createElement('div')
-        tab1.textContent = "Librería de Objetos"
-        tab1.style.cursor = "pointer"
-        tab1.style.fontWeight = "bold"
-        tab1.style.borderBottom = "2px solid white"
+        this.tabLibrary = document.createElement('div')
+        this.tabLibrary.textContent = "Librería de Objetos"
+        this.tabLibrary.style.cursor = "pointer"
+        this.tabLibrary.style.fontWeight = "bold"
+        this.tabLibrary.style.borderBottom = "2px solid white"
+        this.tabLibrary.onclick = () => this.switchTab('library')
 
-        const tab2 = document.createElement('div')
-        tab2.textContent = "Configuración Entorno"
-        tab2.style.cursor = "pointer"
-        tab2.style.color = "#888" // Inactive look
-        tab2.onclick = () => alert("Configuración de entorno próximamente...")
+        this.tabSettings = document.createElement('div')
+        this.tabSettings.textContent = "Configuración Entorno"
+        this.tabSettings.style.cursor = "pointer"
+        this.tabSettings.style.color = "#888" // Inactive look
+        this.tabSettings.style.borderBottom = "none"
+        this.tabSettings.onclick = () => this.switchTab('settings')
 
-        header.appendChild(tab1)
-        header.appendChild(tab2)
+        header.appendChild(this.tabLibrary)
+        header.appendChild(this.tabSettings)
         this.container.appendChild(header)
 
-        // Content Area (Grid)
-        const content = document.createElement('div')
-        content.style.cssText = `
+        // Content Area Containers
+        this.contentLibrary = document.createElement('div')
+        this.contentLibrary.style.cssText = `
             flex: 1;
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
@@ -107,7 +117,86 @@ export class ConstructionMenu {
             overflow-y: auto;
             padding-right: 10px;
         `
+        this.renderLibrary(this.contentLibrary)
 
+        this.contentSettings = document.createElement('div')
+        this.contentSettings.style.cssText = `
+            flex: 1;
+            display: none; /* Hidden by default */
+            flex-direction: column;
+            gap: 15px;
+            overflow-y: auto;
+            padding: 10px;
+        `
+        this.renderSettings(this.contentSettings)
+
+        this.container.appendChild(this.contentLibrary)
+        this.container.appendChild(this.contentSettings)
+
+        // Instructions
+        const footer = document.createElement('div')
+        footer.textContent = "Arrastra objetos a tu barra de inventario inferior para equiparlos. Pulsa 'E' para cerrar."
+        footer.style.marginTop = "20px"
+        footer.style.color = "#aaa"
+        this.container.appendChild(footer)
+
+        document.body.appendChild(this.container)
+    }
+
+    switchTab(tabName) {
+        if (tabName === 'library') {
+            this.contentLibrary.style.display = 'grid'
+            this.contentSettings.style.display = 'none'
+
+            this.tabLibrary.style.fontWeight = "bold"
+            this.tabLibrary.style.color = "white"
+            this.tabLibrary.style.borderBottom = "2px solid white"
+
+            this.tabSettings.style.fontWeight = "normal"
+            this.tabSettings.style.color = "#888"
+            this.tabSettings.style.borderBottom = "none"
+
+        } else if (tabName === 'settings') {
+            this.contentLibrary.style.display = 'none'
+            this.contentSettings.style.display = 'flex'
+
+            this.tabLibrary.style.fontWeight = "normal"
+            this.tabLibrary.style.color = "#888"
+            this.tabLibrary.style.borderBottom = "none"
+
+            this.tabSettings.style.fontWeight = "bold"
+            this.tabSettings.style.color = "white"
+            this.tabSettings.style.borderBottom = "2px solid white"
+        }
+    }
+
+    renderSettings(container) {
+        // Grid Toggle
+        const row = document.createElement('div')
+        row.style.cssText = `display: flex; align-items: center; gap: 10px;`
+
+        const checkbox = document.createElement('input')
+        checkbox.type = 'checkbox'
+        checkbox.id = 'chk-show-grid'
+        checkbox.style.transform = 'scale(1.5)'
+        checkbox.addEventListener('change', (e) => {
+            if (this.gridHelper) {
+                this.gridHelper.visible = e.target.checked
+            }
+        })
+
+        const label = document.createElement('label')
+        label.textContent = "Mostrar Cuadrícula de Mapa"
+        label.htmlFor = 'chk-show-grid'
+        label.style.fontSize = "18px"
+        label.style.cursor = "pointer"
+
+        row.appendChild(checkbox)
+        row.appendChild(label)
+        container.appendChild(row)
+    }
+
+    renderLibrary(container) {
         // Populate Grid
         this.libraryItems.forEach(item => {
             const card = document.createElement('div')
@@ -151,19 +240,8 @@ export class ConstructionMenu {
                 e.dataTransfer.setData("text/plain", "item") // Required for drag to work in some browsers
             })
 
-            content.appendChild(card)
+            container.appendChild(card)
         })
-
-        this.container.appendChild(content)
-
-        // Instructions
-        const footer = document.createElement('div')
-        footer.textContent = "Arrastra objetos a tu barra de inventario inferior para equiparlos. Pulsa 'E' para cerrar."
-        footer.style.marginTop = "20px"
-        footer.style.color = "#aaa"
-        this.container.appendChild(footer)
-
-        document.body.appendChild(this.container)
     }
 
     toggle() {

@@ -25,7 +25,7 @@ export class ConstructionMenu {
             { id_prefix: "cube_s", name: "Cubo Pequeño", type: "wall", scale: { x: 1, y: 1, z: 1 } },
             { id_prefix: "cube_l", name: "Cubo Grande", type: "wall", scale: { x: 3, y: 3, z: 3 } }, // 3x3x3 fits grid better than 4x4 if grid=1? Let's use 3.
             { id_prefix: "ramp", name: "Rampa", type: "ramp", scale: { x: 4, y: 2, z: 4 } },
-            { id_prefix: "stairs", name: "Gradas", type: "stairs", scale: { x: 4, y: 3, z: 4 } }, // Matches ramp/wall size roughly
+            { id_prefix: "stairs", name: "Gradas", type: "stairs", scale: { x: 4, y: 2, z: 4 } }, // Matches ramp/wall size roughly
             { id_prefix: "tall", name: "Torre", type: "pillar", scale: { x: 2, y: 10, z: 2 } }
         ]
 

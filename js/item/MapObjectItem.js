@@ -133,20 +133,13 @@ export class MapObjectItem extends Item {
             // Create Collider
             let colliderDesc;
             if (this.type === 'ramp') {
-                // Approximate ramp with Convex Hull or Box for now? 
-                // Creating a true ramp collider is complex without vertices.
-                // Let's use a simple box rotated for now, or if possible hull.
-                // For simplicity in this demo step: Box matching bounds? No, that's not a ramp.
-                // Actually, Rapier has heightfield or trimesh.
-                // Re-using the geometry vertices for Convex Hull is best.
-
-                // Extract vertices from geometry?
-                // For now, let's just make it a Box Collider 
-                // But honestly, without a real ramp collider it feels bad.
-                // Let's omit physics for RAMP specifically if too complex, 
-                // OR try to approximate with a rotated box?
-                // Let's leave Ramp physics as TODO or simplistic box.
-                colliderDesc = RAPIER.ColliderDesc.cuboid(this.scale.x / 2, this.scale.y / 2, this.scale.z / 2)
+                // Use Convex Hull for Ramp to match slope
+                const vertices = geometry.attributes.position.array
+                colliderDesc = RAPIER.ColliderDesc.convexHull(vertices)
+                if (!colliderDesc) {
+                    console.warn("Fallo al crear Convex Hull para rampa, usando Cuboid fallback")
+                    colliderDesc = RAPIER.ColliderDesc.cuboid(this.scale.x / 2, this.scale.y / 2, this.scale.z / 2)
+                }
             } else {
                 // Box (Wall/Pillar)
                 // Half Extents
@@ -207,7 +200,11 @@ export class MapObjectItem extends Item {
 
             let colliderDesc;
             if (this.type === 'ramp') {
-                colliderDesc = RAPIER.ColliderDesc.cuboid(this.scale.x / 2, this.scale.y / 2, this.scale.z / 2)
+                const vertices = geometry.attributes.position.array
+                colliderDesc = RAPIER.ColliderDesc.convexHull(vertices)
+                if (!colliderDesc) {
+                    colliderDesc = RAPIER.ColliderDesc.cuboid(this.scale.x / 2, this.scale.y / 2, this.scale.z / 2)
+                }
             } else {
                 colliderDesc = RAPIER.ColliderDesc.cuboid(this.scale.x / 2, this.scale.y / 2, this.scale.z / 2)
             }

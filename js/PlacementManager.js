@@ -39,8 +39,8 @@ export class PlacementManager {
         this.placementGhost = new THREE.Group()
         this.scene.add(this.placementGhost)
 
-        // Geometría Base (Caja transparente)
-        const geometry = new THREE.BoxGeometry(3, 0.2, 3)
+        // 1. Ghost BOX (Paredes, Pilares, Pads)
+        const boxGeo = new THREE.BoxGeometry(1, 1, 1) // Base 1x1x1, scale later
         const material = new THREE.MeshBasicMaterial({
             color: 0xffffff,
             transparent: true,
@@ -49,11 +49,34 @@ export class PlacementManager {
         })
         this.ghostBaseMat = material
 
-        const mesh = new THREE.Mesh(geometry, material)
-        mesh.position.y -= 0.1 // Alinear flush con el suelo (centro es 0, mitad 0.1, movemos -0.1 para que top sea 0)
-        this.placementGhost.add(mesh)
+        this.ghostBoxMesh = new THREE.Mesh(boxGeo, material)
+        // Position handled in update
+        this.placementGhost.add(this.ghostBoxMesh)
 
-        // Flecha / Icono indicador
+        // 2. Ghost RAMP (Prisma Triangular)
+        const shape = new THREE.Shape();
+        shape.moveTo(0, 0);
+        shape.lineTo(1, 0);
+        shape.lineTo(0, 1);
+        shape.lineTo(0, 0);
+
+        const extrudeSettings = {
+            steps: 1,
+            depth: 1,
+            bevelEnabled: false,
+        };
+        const rampGeo = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+        // Center the geometry so scaling works from center or handle offset in update
+        // Extrude geometry usually starts at 0,0,0
+        // Let's center it to easier management
+        rampGeo.center()
+
+        this.ghostRampMesh = new THREE.Mesh(rampGeo, material) // Reuse material
+        this.ghostRampMesh.visible = false
+        this.placementGhost.add(this.ghostRampMesh)
+
+
+        // Flecha / Icono indicador (Solo para Pads viejos)
         const arrowGeo = new THREE.PlaneGeometry(2.4, 2.4)
         const arrowMat = new THREE.MeshBasicMaterial({
             color: 0xffffff,
@@ -111,17 +134,24 @@ export class PlacementManager {
 
             // Adjust visual based on item type
             if (item.constructor.name === "MapObjectItem") {
-                // Resize base to match item scale
-                this.ghostArrow.visible = false
+                this.ghostArrow.visible = false // Hide arrow for map objects
                 this.ghostBaseMat.visible = true
 
-                // We should ideally resize the box geometry to match the item
-                // But geometry is shared? Scale the mesh!
-                // Assuming first child is the Box Mesh
-                const mesh = this.placementGhost.children[0]
-                if (mesh) {
-                    mesh.scale.set(item.scale.x / 3, item.scale.y / 0.2, item.scale.z / 3) // Base is 3x0.2x3
-                    mesh.position.y = item.scale.y / 2 // Center visually
+                if (item.type === 'ramp') {
+                    // Activate RAMP Mesh
+                    this.ghostBoxMesh.visible = false
+                    this.ghostRampMesh.visible = true
+
+                    this.ghostRampMesh.scale.set(item.scale.z, item.scale.y, item.scale.x)
+                    this.ghostRampMesh.position.y = item.scale.y / 2
+
+                } else {
+                    // Activate BOX Mesh
+                    this.ghostRampMesh.visible = false
+                    this.ghostBoxMesh.visible = true
+
+                    this.ghostBoxMesh.scale.set(item.scale.x, item.scale.y, item.scale.z)
+                    this.ghostBoxMesh.position.y = item.scale.y / 2 // Center visually
                 }
 
                 // Color Code?
@@ -129,15 +159,15 @@ export class PlacementManager {
 
             } else {
                 // IMPULSE PADS (Legacy)
-                // Reset scale
-                const mesh = this.placementGhost.children[0]
-                if (mesh) {
-                    mesh.scale.set(1, 1, 1)
-                    mesh.position.y = 0 // Flush
-                }
+                this.ghostRampMesh.visible = false
+                this.ghostBoxMesh.visible = true
+
+                // Reset scale is 1x1x1? but Pads are 3x0.2x3
+                this.ghostBoxMesh.scale.set(3, 0.2, 3)
+                this.ghostBoxMesh.position.y = 0.1 // Flush offset
 
                 this.ghostArrow.visible = true
-                this.placementGhost.position.y += 0.1
+                // this.placementGhost.position.y += 0.1 // Removed double offset
 
                 // Texture Logic
                 const isJump = (item.id === "pad_jump")
@@ -158,6 +188,7 @@ export class PlacementManager {
             // Apply rotation to ghost group
             if (item.constructor.name === "MapObjectItem") {
                 this.placementGhost.rotation.y = 0
+
                 if (rotationIndex === 1) this.placementGhost.rotation.y = -Math.PI / 2
                 if (rotationIndex === 2) this.placementGhost.rotation.y = -Math.PI
                 if (rotationIndex === 3) this.placementGhost.rotation.y = Math.PI / 2

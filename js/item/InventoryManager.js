@@ -1,8 +1,12 @@
 export class InventoryManager {
     constructor() {
-        this.slots = new Array(6).fill(null);
-        this.currentSlotIndex = 0;
         this.uiSlots = document.querySelectorAll(".inventory-slot");
+        this.inputManager = null; // Will be set from main if needed, or we just rely on global events (current impl relies on global)
+
+        // Dynamic capacity based on HTML
+        this.capacity = this.uiSlots.length;
+        this.slots = new Array(this.capacity).fill(null);
+        this.currentSlotIndex = 0;
 
         // Initial binding
         this.setupEventListeners();
@@ -10,10 +14,10 @@ export class InventoryManager {
     }
 
     setupEventListeners() {
-        // Escuchar cambios de slot via teclado (1-6)
+        // Escuchar cambios de slot via teclado (1-N)
         document.addEventListener("keydown", (e) => {
             const key = parseInt(e.key);
-            if (key >= 1 && key <= 6) {
+            if (!isNaN(key) && key >= 1 && key <= this.capacity) {
                 this.selectSlot(key - 1);
             }
         });
@@ -22,9 +26,9 @@ export class InventoryManager {
         document.addEventListener("wheel", (e) => {
             if (!e.shiftKey) { // Shift suele ser para zoom
                 if (e.deltaY > 0) {
-                    this.selectSlot((this.currentSlotIndex + 1) % 6);
+                    this.selectSlot((this.currentSlotIndex + 1) % this.capacity);
                 } else if (e.deltaY < 0) {
-                    this.selectSlot((this.currentSlotIndex - 1 + 6) % 6);
+                    this.selectSlot((this.currentSlotIndex - 1 + this.capacity) % this.capacity);
                 }
             }
         });
@@ -76,8 +80,8 @@ export class InventoryManager {
     }
 
     selectSlot(index) {
-        if (index < 0) index = 5;
-        if (index > 5) index = 0;
+        if (index < 0) index = this.capacity - 1;
+        if (index >= this.capacity) index = 0;
         this.currentSlotIndex = index;
         this.updateUI();
     }

@@ -128,7 +128,9 @@ class Game {
         })
 
         this.setupSettingsPanel()
-        this.setupMultiplayerUI()
+        if (this.gameMode !== 'editor') {
+            this.setupMultiplayerUI()
+        }
 
         // --- New Inventory System ---
         this.inventoryManager = new InventoryManager("inventory-container")

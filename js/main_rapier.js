@@ -192,6 +192,11 @@ class Game {
             // Create Save/Load UI
             this.setupEditorUI();
 
+            // Construction Menu
+            import("./ui/ConstructionMenu.js").then(module => {
+                this.constructionMenu = new module.ConstructionMenu(this.inventoryManager, this)
+            })
+
         } else {
             // Seed Inventory (Normal)
             const item1 = new ImpulseItem("pad_lat", "Impulso Lateral", "./assets/textures/impulso.png", "lateral", 25.0)
@@ -203,6 +208,31 @@ class Game {
             this.inventoryManager.addItem(item2)
             this.inventoryManager.addItem(item3)
             this.inventoryManager.addItem(item4)
+        }
+
+        // Enable DragDrop on Inventory
+        if (this.gameMode === 'editor' && this.inventoryManager) {
+            this.inventoryManager.enableDragAndDrop((slotIndex) => {
+                // Callback when item dropped on slot index
+                if (this.constructionMenu && this.constructionMenu.draggedItem) {
+                    // Clone the dragged item pattern to new unique item? 
+                    // Or reuse reference if infinite?
+                    // MapObjectItem logic doesn't store unique state other than ID/Color.
+                    // We should clone it to ensure independent lifecycle if needed.
+                    const source = this.constructionMenu.draggedItem
+                    // Re-create new instance
+                    const newItem = new MapObjectItem(
+                        source.id, // Reuse ID prefix or make unique? 
+                        source.name,
+                        source.type,
+                        "",
+                        source.color,
+                        source.scale
+                    )
+                    this.inventoryManager.setItem(slotIndex, newItem)
+                    console.log("Equipped", newItem.name, "to slot", slotIndex + 1)
+                }
+            })
         }
 
         this.setupGameInput() // Replaces setupInventory logic for interactions
@@ -689,9 +719,25 @@ class Game {
         this.placementRotationIndex = 0
 
         document.addEventListener("keydown", (e) => {
-            if (this.inputManager && !this.inputManager.enabled) return
-
             const key = e.key.toLowerCase()
+
+            // Open/Close Construction Menu (E or ESC) - Editor Only
+            if ((key === 'e' || key === 'escape') && this.gameMode === 'editor' && this.constructionMenu) {
+                // Special case for ESC: Only close if open
+                if (key === 'escape') {
+                    if (this.constructionMenu.isVisible) {
+                        this.constructionMenu.toggle()
+                    }
+                    // If not visible, let ESC do default (pause menu?)
+                } else {
+                    // 'E' toggles
+                    this.constructionMenu.toggle()
+                }
+
+                if (key === 'e' || (key === 'escape' && this.constructionMenu.isVisible)) return
+            }
+
+            if (this.inputManager && !this.inputManager.enabled) return
 
             // Rotation (R)
             if (key === 'r') {

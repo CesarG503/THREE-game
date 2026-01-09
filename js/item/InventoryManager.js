@@ -34,6 +34,36 @@ export class InventoryManager {
         });
     }
 
+    /**
+     * Enables drop zones on slots. Called once or in updateUI if elements change.
+     * We'll call this in constructor for static slots.
+     */
+    enableDragAndDrop(onDropCallback) {
+        this.uiSlots.forEach((slot, index) => {
+            slot.addEventListener('dragover', (e) => {
+                e.preventDefault() // Allow drop
+                slot.style.borderColor = "yellow"
+            })
+            slot.addEventListener('dragleave', (e) => {
+                slot.style.borderColor = "" // Reset
+            })
+            slot.addEventListener('drop', (e) => {
+                e.preventDefault()
+                slot.style.borderColor = ""
+                // Pass drop event up? 
+                // We rely on the Menu to have set 'draggedItem'.
+                if (onDropCallback) onDropCallback(index)
+            })
+        })
+    }
+
+    setItem(index, item) {
+        if (index >= 0 && index < this.slots.length) {
+            this.slots[index] = item
+            this.updateUI()
+        }
+    }
+
     addItem(item) {
         // 1. Intentar apilar en slots existentes
         for (let i = 0; i < this.slots.length; i++) {
@@ -109,6 +139,7 @@ export class InventoryManager {
                 img.style.width = "70%";
                 img.style.height = "70%";
                 img.style.objectFit = "contain";
+                img.draggable = false // Don't drag from hotbar for now
                 slotEl.appendChild(img);
             }
         });

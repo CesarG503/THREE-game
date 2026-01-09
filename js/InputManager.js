@@ -17,13 +17,17 @@ export class InputManager {
         document.addEventListener("gamePauseChanged", (e) => {
             this.isPaused = e.detail.isPaused
             if (this.isPaused) {
-                this.keys.forward = false
-                this.keys.backward = false
-                this.keys.left = false
-                this.keys.right = false
-                this.keys.jump = false
+                this.reset()
             }
         })
+    }
+
+    reset() {
+        this.keys.forward = false
+        this.keys.backward = false
+        this.keys.left = false
+        this.keys.right = false
+        this.keys.jump = false
     }
 
     onKeyDown(event) {

@@ -797,6 +797,16 @@ class Game {
                 // Current pickup logic is on keydown. If close to item, it picks up.
                 // If close to zone, it starts counting. Both can happen. It's fine.
             }
+
+            // Aerial Grid Fixed Toggle (G)
+            if (key === 'g' && this.placementManager && this.placementManager.aerialGridActive) {
+                const isFixed = this.placementManager.toggleAerialGridFixed()
+                const statusEl = document.getElementById("aerial-grid-status")
+                if (statusEl) {
+                    statusEl.textContent = isFixed ? "G: Suelo Fijado" : "G: Suelo No Fijado"
+                    statusEl.style.color = isFixed ? "#FF0000" : "#00FF00"
+                }
+            }
         })
 
         document.addEventListener("keyup", (e) => {
@@ -847,6 +857,24 @@ class Game {
             <button id="load-map-btn">Cargar Mapa</button>
         `
         document.body.appendChild(editorPanel)
+
+        // Aerial Grid Status UI
+        const aerialStatus = document.createElement("div")
+        aerialStatus.id = "aerial-grid-status"
+        aerialStatus.style.cssText = `
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: #00FF00;
+            font-family: sans-serif;
+            font-size: 18px;
+            font-weight: bold;
+            display: none; /* Hidden by default */
+            text-shadow: 1px 1px 2px black;
+            pointer-events: none;
+        `
+        aerialStatus.textContent = "G: Suelo No Fijado"
+        document.body.appendChild(aerialStatus)
 
         document.getElementById("save-map-btn").addEventListener("click", () => {
             const mapData = this.saveMap()

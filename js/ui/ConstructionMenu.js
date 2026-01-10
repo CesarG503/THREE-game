@@ -250,6 +250,15 @@ export class ConstructionMenu {
         checkAerial.addEventListener('change', (e) => {
             if (this.game.placementManager) {
                 this.game.placementManager.setAerialGrid(e.target.checked)
+
+                // Toggle Status UI
+                const statusEl = document.getElementById("aerial-grid-status")
+                if (statusEl) {
+                    statusEl.style.display = e.target.checked ? "block" : "none"
+                    // Reset to default
+                    statusEl.textContent = "G: Suelo No Fijado"
+                    statusEl.style.color = "#00FF00"
+                }
             }
         })
 

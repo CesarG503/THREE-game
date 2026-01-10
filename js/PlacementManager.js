@@ -29,6 +29,7 @@ export class PlacementManager {
 
         // Configuración Aerial Grid
         this.aerialGridActive = false
+        this.aerialGridFixed = false
         this.aerialCollider = null
         this.aerialVisual = null
 
@@ -129,9 +130,20 @@ export class PlacementManager {
 
     setAerialGrid(active) {
         this.aerialGridActive = active
+        // Reset fixed state when disabled? Or keep memory? 
+        // User didn't specify, but usually disabling grid implies full reset.
+        if (!active) {
+            this.aerialGridFixed = false
+        }
         if (this.aerialVisual) {
             this.aerialVisual.visible = active
         }
+    }
+
+    toggleAerialGridFixed() {
+        if (!this.aerialGridActive) return false
+        this.aerialGridFixed = !this.aerialGridFixed
+        return this.aerialGridFixed
     }
 
     /**
@@ -157,15 +169,18 @@ export class PlacementManager {
 
         // --- Aerial Grid Dynamic Update ---
         if (this.aerialGridActive && playerPosition) {
-            // Round height to nearest integer or step
-            // e.g. if player at y=1.2, grid at 1.0. If at 1.8, grid at 2.0?
-            // Or floor? Construction usually built up.
-            // Let's use Math.floor(y) to build at foot level, or Math.round breaks at 0.5.
-            const gridY = Math.round(playerPosition.y)
+            // Only update Y if NOT fixed
+            if (!this.aerialGridFixed) {
+                // Round height to nearest integer or step
+                // e.g. if player at y=1.2, grid at 1.0. If at 1.8, grid at 2.0?
+                // Or floor? Construction usually built up.
+                // Let's use Math.floor(y) to build at foot level, or Math.round breaks at 0.5.
+                const gridY = Math.round(playerPosition.y)
+                this.aerialVisual.position.y = gridY
+                this.aerialCollider.position.y = gridY
+            }
 
             this.aerialVisual.visible = true
-            this.aerialVisual.position.y = gridY
-            this.aerialCollider.position.y = gridY
 
             // Should infinite plane move x/z to follow player so grid is always centered?
             // Grid helper is finite (100x100). Yes, center on player x/z snapped to grid size?

@@ -27,6 +27,11 @@ export class PlacementManager {
         this.snapToGrid = false
         this.gridSize = 1
 
+        // Configuración Aerial Grid
+        this.aerialGridActive = false
+        this.aerialCollider = null
+        this.aerialVisual = null
+
         this.init()
     }
 
@@ -70,12 +75,9 @@ export class PlacementManager {
             bevelEnabled: false,
         };
         const rampGeo = new THREE.ExtrudeGeometry(shape, extrudeSettings);
-        // Center the geometry so scaling works from center or handle offset in update
-        // Extrude geometry usually starts at 0,0,0
-        // Let's center it to easier management
         rampGeo.center()
 
-        this.ghostRampMesh = new THREE.Mesh(rampGeo, material) // Reuse material
+        this.ghostRampMesh = new THREE.Mesh(rampGeo, material)
         this.ghostRampMesh.visible = false
         this.placementGhost.add(this.ghostRampMesh)
 
@@ -95,17 +97,51 @@ export class PlacementManager {
         this.ghostArrow.position.y = 0.05 // Ligeramente elevado
         this.placementGhost.add(this.ghostArrow)
 
+        // Grid Aéreo
+        this.initAerialGrid()
+
         // Ocultar por defecto
         this.placementGhost.visible = false
+    }
+
+    initAerialGrid() {
+        // 1. Dynamic Collider Plane (Infinite-like Plane)
+        // We use a large flat box or plane. 
+        // 100x1x100 is good.
+        const geometry = new THREE.PlaneGeometry(1000, 1000)
+        geometry.rotateX(-Math.PI / 2) // Horizontal
+        const material = new THREE.MeshBasicMaterial({ visible: false, side: THREE.DoubleSide })
+        this.aerialCollider = new THREE.Mesh(geometry, material)
+        this.scene.add(this.aerialCollider)
+
+        // 2. Visual Grid (Single Layer)
+        this.aerialVisual = new THREE.Group()
+
+        // Single Grid Helper
+        // 100 size, 100 divisions = 1x1 cells
+        const grid = new THREE.GridHelper(100, 100, 0x444444, 0x222222)
+        this.aerialVisual.add(grid)
+
+        // No bounding box needed for infinite-like plane
+        this.aerialVisual.visible = false
+        this.scene.add(this.aerialVisual)
+    }
+
+    setAerialGrid(active) {
+        this.aerialGridActive = active
+        if (this.aerialVisual) {
+            this.aerialVisual.visible = active
+        }
     }
 
     /**
      * Actualiza la posición y visualización del fantasma
      * @param {number} inventorySlot - Índice del slot seleccionado (0 o 1)
      * @param {number} rotationIndex - Índice de rotación (0-3) para pads laterales
+     * @param {THREE.Vector3} [playerPosition] - Posición del jugador para altura dinámica
      * @returns {THREE.Vector3|null} - Punto de impacto válido o null
      */
-    update(item, rotationIndex) {
+    update(item, rotationIndex, playerPosition) {
         this.currentItem = item
         this.rotationIndex = rotationIndex
 
@@ -113,21 +149,65 @@ export class PlacementManager {
         if (!item || (!item.isImpulsePad && !item.type)) {
             this.placementGhost.visible = false
             this.currentHit = null
+            // Hide aerial if not building? Maybe keep it if active? 
+            // Better to hide if no tool selected to avoid confusion
+            if (this.aerialVisual) this.aerialVisual.visible = false
             return
+        }
+
+        // --- Aerial Grid Dynamic Update ---
+        if (this.aerialGridActive && playerPosition) {
+            // Round height to nearest integer or step
+            // e.g. if player at y=1.2, grid at 1.0. If at 1.8, grid at 2.0?
+            // Or floor? Construction usually built up.
+            // Let's use Math.floor(y) to build at foot level, or Math.round breaks at 0.5.
+            const gridY = Math.round(playerPosition.y)
+
+            this.aerialVisual.visible = true
+            this.aerialVisual.position.y = gridY
+            this.aerialCollider.position.y = gridY
+
+            // Should infinite plane move x/z to follow player so grid is always centered?
+            // Grid helper is finite (100x100). Yes, center on player x/z snapped to grid size?
+            // Or just keep it at 0,0,0 if map is small?
+            // Better to center it on player, snapped to 100 units?
+            // For now, center on player x/z so grid is always around them.
+            // But snap position to whole numbers to keep grid lines stable.
+            this.aerialVisual.position.x = Math.round(playerPosition.x)
+            this.aerialVisual.position.z = Math.round(playerPosition.z)
+            // Collider can just be at valid height, it's huge.
+
+        } else if (!this.aerialGridActive) {
+            // Only hide if disabled
+            if (this.aerialVisual) this.aerialVisual.visible = false
         }
 
         // Raycast
         const raycaster = new THREE.Raycaster()
         raycaster.setFromCamera(new THREE.Vector2(0, 0), this.camera)
-        const intersects = raycaster.intersectObjects(this.scene.children, true) // Should filter specific layers?
+
+        // Define objects to intersect
+        let objectsToIntersect = this.scene.children
+
+        // Explicitly handle aerial collider priority
+        if (this.aerialGridActive && this.aerialCollider) {
+            this.aerialCollider.visible = true // Must be visible for raycast? No, raycast works on invisible if recursive? 
+            // Raycast checks visibility by default? No, unless recursive check?
+            // THREE.Raycaster default doesn't check 'visible' unless traversing?
+            // Actually it's simpler to set it visible=false but it still intersects.
+            // But let's check.
+        }
+
+        const intersects = raycaster.intersectObjects(this.scene.children, true)
 
         // Filter out ghost and characters
         const hit = intersects.find(h =>
-            h.distance < 40 && // Increased range for building
+            h.distance < 60 && // Increased range for building
             h.object.type === "Mesh" &&
             h.object !== this.placementGhost &&
             !this.placementGhost.children.includes(h.object) &&
-            !h.object.userData.isPlayer // Avoid clicking self
+            !h.object.userData.isPlayer &&
+            (this.aerialGridActive || h.object !== this.aerialCollider) // Only accept aerialCollider if active
         )
 
         this.currentHit = hit ? hit.point : null
@@ -136,71 +216,69 @@ export class PlacementManager {
             this.placementGhost.visible = true
 
             // Grid Snapping Logic
-            if (this.snapToGrid) {
+            if (this.snapToGrid || this.aerialGridActive) { // Always snap if aerial active? Or respect toggle?
+                // User said "manipular y crear construcciones sin soporte en una maya 3d" 
+                // Implicitly implies using the grid.
                 const gridSize = this.gridSize || 1
 
-                // Determine offsets based on item size parity (Odd vs Even)
-                // If dimension is odd (1, 3, 5...), we want it centered in the cell (0.5 offset)
-                // If dimension is even (2, 4...), we want it centered on the line (0.0 offset)
-                // We use Math.round(item.scale.axis) to check parity
+                // If it's the Aerial Collider, force strict Y snap to that plane
+                const isAerialHit = (hit.object === this.aerialCollider)
 
                 const sx = Math.round(item.scale.x)
                 const sz = Math.round(item.scale.z)
+                // Height snapping too?
+                const sy = Math.round(item.scale.y)
 
                 const offsetX = (sx % 2 !== 0) ? (gridSize / 2) : 0
                 const offsetZ = (sz % 2 !== 0) ? (gridSize / 2) : 0
-
-                // Logic:
-                // 1. Shift point by offset to align "grid node" to "cell center" frame relative
-                // 2. Round
-                // 3. Shift back? No.
-                // Formula: Math.floor( x / grid ) * grid + grid/2  <-- always center
-                // My formula: Math.round( (x - offset) / grid ) * grid + offset
+                // Vertical snap offset? 
+                // Since our pivot is the BASE of the object, we usually do NOT want to offset Y based on height for snapping to floor.
+                // We want Base to be at Grid Y.
+                // So offsetY should be 0 for Base-pivoted objects.
+                const offsetY = 0
 
                 hit.point.x = Math.round((hit.point.x - offsetX) / gridSize) * gridSize + offsetX
                 hit.point.z = Math.round((hit.point.z - offsetZ) / gridSize) * gridSize + offsetZ
+
+                // Aerial Grid specific logic
+                if (isAerialHit) {
+                    // Snap Y to the aerial plane level exactly
+                    const gridY = this.aerialCollider.position.y
+                    hit.point.y = gridY
+                }
+                // For normal Snapping, we DO NOT modify Y. We trust the raycast hit (floor/wall).
+                // Existing logic before my changes did not snap Y, allowing it to sit on whatever surface.
             }
 
             this.placementGhost.position.copy(hit.point)
 
             // Adjust visual based on item type
             if (item.constructor.name === "MapObjectItem") {
-                this.ghostArrow.visible = false // Hide arrow for map objects
+                this.ghostArrow.visible = false
                 this.ghostBaseMat.visible = true
 
                 if (item.type === 'ramp') {
-                    // Activate RAMP Mesh
                     this.ghostBoxMesh.visible = false
                     this.ghostRampMesh.visible = true
-
                     this.ghostRampMesh.scale.set(item.scale.z, item.scale.y, item.scale.x)
                     this.ghostRampMesh.position.y = item.scale.y / 2
-
                 } else {
-                    // Activate BOX Mesh
                     this.ghostRampMesh.visible = false
                     this.ghostBoxMesh.visible = true
-
                     this.ghostBoxMesh.scale.set(item.scale.x, item.scale.y, item.scale.z)
-                    this.ghostBoxMesh.position.y = item.scale.y / 2 // Center visually
+                    this.ghostBoxMesh.position.y = item.scale.y / 2
                 }
-
-                // Color Code?
                 this.ghostBaseMat.color.setHex(0x00FF00)
 
             } else {
                 // IMPULSE PADS (Legacy)
                 this.ghostRampMesh.visible = false
                 this.ghostBoxMesh.visible = true
-
-                // Reset scale is 1x1x1? but Pads are 3x0.2x3
                 this.ghostBoxMesh.scale.set(3, 0.2, 3)
-                this.ghostBoxMesh.position.y = 0.1 // Flush offset
+                this.ghostBoxMesh.position.y = 0.1
 
                 this.ghostArrow.visible = true
-                // this.placementGhost.position.y += 0.1 // Removed double offset
 
-                // Texture Logic
                 const isJump = (item.id === "pad_jump")
                 if (isJump && this.texSalto) {
                     this.ghostArrowMat.map = this.texSalto
@@ -208,7 +286,6 @@ export class PlacementManager {
                     this.ghostArrowMat.map = this.texImpulso
                 }
 
-                // Rotation
                 let rotY = 0
                 if (rotationIndex === 1) rotY = -Math.PI / 2
                 if (rotationIndex === 2) rotY = -Math.PI
@@ -219,7 +296,6 @@ export class PlacementManager {
             // Apply rotation to ghost group
             if (item.constructor.name === "MapObjectItem") {
                 this.placementGhost.rotation.y = 0
-
                 if (rotationIndex === 1) this.placementGhost.rotation.y = -Math.PI / 2
                 if (rotationIndex === 2) this.placementGhost.rotation.y = -Math.PI
                 if (rotationIndex === 3) this.placementGhost.rotation.y = Math.PI / 2
@@ -230,8 +306,6 @@ export class PlacementManager {
 
             // Validation Logic (Restored)
             let isValid = true
-            // Only validate strict overlap for Impulse Pads for now, or all?
-            // Let's do generic overlap check for pads
             if (item.id.includes("pad")) {
                 const PAD_SIZE = 3
                 const isTargetPad = hit.object.userData && hit.object.userData.isImpulsePad
@@ -266,7 +340,6 @@ export class PlacementManager {
             } else {
                 this.ghostBaseMat.color.setHex(0xFF0000)
                 this.ghostArrowMat.color.setHex(0xFF0000) // Tint Red
-                // Return null to prevent placement if invalid
                 return null
             }
 

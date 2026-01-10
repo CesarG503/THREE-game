@@ -238,6 +238,31 @@ export class ConstructionMenu {
         rowClip.appendChild(checkClip)
         rowClip.appendChild(labelClip)
         container.appendChild(rowClip)
+
+        // Aerial Grid Toggle
+        const rowAerial = document.createElement('div')
+        rowAerial.style.cssText = `display: flex; align-items: center; gap: 10px; margin-top: 10px; border-top: 1px solid #444; padding-top: 10px;`
+
+        const checkAerial = document.createElement('input')
+        checkAerial.type = 'checkbox'
+        checkAerial.id = 'chk-aerial-grid'
+        checkAerial.style.transform = 'scale(1.5)'
+        checkAerial.addEventListener('change', (e) => {
+            if (this.game.placementManager) {
+                this.game.placementManager.setAerialGrid(e.target.checked)
+            }
+        })
+
+        const labelAerial = document.createElement('label')
+        labelAerial.textContent = "Activar Grid Aéreo (Construcción en el Aire)"
+        labelAerial.htmlFor = 'chk-aerial-grid'
+        labelAerial.style.fontSize = "18px"
+        labelAerial.style.cursor = "pointer"
+        labelAerial.style.color = "#00ffcc" // Highlight it
+
+        rowAerial.appendChild(checkAerial)
+        rowAerial.appendChild(labelAerial)
+        container.appendChild(rowAerial)
     }
 
     renderLibrary(container) {

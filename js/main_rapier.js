@@ -477,7 +477,9 @@ class Game {
         if (this.placementManager && this.inventoryManager) {
             const currentItem = this.inventoryManager.getCurrentItem()
             // Pass the item object directly!
-            this.placementManager.update(currentItem, this.placementRotationIndex || 0)
+            // Also pass position if character exists
+            const charPos = this.character ? this.character.getPosition() : null
+            this.placementManager.update(currentItem, this.placementRotationIndex || 0, charPos)
         }
 
         // Render

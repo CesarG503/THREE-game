@@ -318,26 +318,30 @@ export class PlacementManager {
     }
 
     updateToolbarVisibility() {
-        if (this.currentCollisionSize.shapeType === 'sphere') {
-            if (this.collisionShapeRow) this.collisionShapeRow.style.display = 'flex'
-            this.boxInputsContainer.style.display = 'none'
-            this.sphereInputsContainer.style.display = 'flex'
-            this.spawnInputsContainer.style.display = 'none'
-        } else if (this.currentItem && this.currentItem.type === 'spawn_point') {
+        // 1. Check for specific Item Types FIRST
+        if (this.currentItem && this.currentItem.type === 'spawn_point') {
             if (this.collisionShapeRow) this.collisionShapeRow.style.display = 'none'
             this.boxInputsContainer.style.display = 'none'
             this.sphereInputsContainer.style.display = 'none'
             this.spawnInputsContainer.style.display = 'flex'
 
-            // Show/Hide sub-sections based on Spawn Shape
+            // Spawn Point Sub-logic
             if (this.currentSpawnProperties.shapeType === 'circle') {
                 this.spawnCircleInputs.style.display = 'flex'
-                this.spawnSquareInputs.style.display = 'flex' // Show XYZ for Circle too
+                this.spawnSquareInputs.style.display = 'flex'
             } else {
                 this.spawnCircleInputs.style.display = 'none'
                 this.spawnSquareInputs.style.display = 'flex'
             }
+
+            // 2. Then check Collision Shape State (Implicitly for interactive_collision or defaults)
+        } else if (this.currentCollisionSize.shapeType === 'sphere') {
+            if (this.collisionShapeRow) this.collisionShapeRow.style.display = 'flex'
+            this.boxInputsContainer.style.display = 'none'
+            this.sphereInputsContainer.style.display = 'flex'
+            this.spawnInputsContainer.style.display = 'none'
         } else {
+            // Default: Box Collision
             if (this.collisionShapeRow) this.collisionShapeRow.style.display = 'flex'
             this.boxInputsContainer.style.display = 'flex'
             this.sphereInputsContainer.style.display = 'none'

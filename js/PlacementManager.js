@@ -922,6 +922,12 @@ export class PlacementManager {
                             this.ghostSphereMesh.position.y = 0
                         } else {
                             this.ghostSphereMesh.visible = false
+                            this.ghostBoxMesh.visible = true
+                            this.ghostBoxMesh.scale.set(
+                                this.currentCollisionSize.x,
+                                this.currentCollisionSize.y,
+                                this.currentCollisionSize.z
+                            )
                         }
                     } else if (item.type === 'spawn_point') {
                         // SPAWN POINT GHOST

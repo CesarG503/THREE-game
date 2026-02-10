@@ -178,11 +178,11 @@ export class PlacementManager {
             const inp = document.createElement('input'); inp.type = 'number'; inp.step = 0.5; inp.value = 2;
             inp.style.width = "60px"; inp.style.background = "#222"; inp.style.color = "white"; inp.style.border = "1px solid #555"; inp.style.padding = "4px";
 
-            inp.onchange = (e) => {
+            inp.oninput = (e) => {
                 let val = parseFloat(e.target.value)
                 if (isNaN(val) || val < 0.1) val = 0.1
                 this.currentCollisionSize[axis] = val
-                e.target.value = val // Snap back logic
+                // e.target.value = val // Don't snap back on input, interferes with typing
             }
             // Prevent event propagation to game inputs
             inp.onkeydown = (e) => e.stopPropagation()
@@ -203,11 +203,10 @@ export class PlacementManager {
         const radInp = document.createElement('input'); radInp.type = 'number'; radInp.step = 0.5; radInp.value = 1.0;
         radInp.style.width = "60px"; radInp.style.background = "#222"; radInp.style.color = "white"; radInp.style.border = "1px solid #555"; radInp.style.padding = "4px";
 
-        radInp.onchange = (e) => {
+        radInp.oninput = (e) => {
             let val = parseFloat(e.target.value)
             if (isNaN(val) || val < 0.1) val = 0.1
             this.currentCollisionSize.radius = val
-            e.target.value = val
         }
         radInp.onkeydown = (e) => e.stopPropagation()
 

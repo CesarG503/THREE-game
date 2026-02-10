@@ -172,6 +172,15 @@ export class MapObjectItem extends Item {
             // Left Click: UPDATE SCALE FROM TOOLBAR
             if (context.placementManager && context.placementManager.currentCollisionSize) {
                 this.scale = { ...context.placementManager.currentCollisionSize }
+
+                // FIX: Ensure Scale matches Radius for Sphere placement calculation
+                if (this.scale.shapeType === 'sphere') {
+                    const diameter = this.scale.radius * 2
+                    this.scale.x = diameter
+                    this.scale.y = diameter
+                    this.scale.z = diameter
+                }
+
                 // Proceed to spawn (fall through)
             }
         }

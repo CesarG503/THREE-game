@@ -45,6 +45,13 @@ export class CharacterController {
         // No-Clip / Build Mode Ghost
         this.noClip = false
 
+        // Stats & Health
+        this.maxHealth = 100
+        this.currentHealth = 100
+        this.respawns = -1 // -1 = Infinite
+        this.startPosition = new THREE.Vector3(0, 5, 0)
+        this.isDead = false
+
         this.initPhysics()
         this.setModelType(this.currentType) // Initialize visibility
     }
@@ -387,5 +394,66 @@ export class CharacterController {
 
     getRotation() {
         return this.currentRotation
+    }
+
+    setStats(stats) {
+        if (stats.speed !== undefined) this.speed = stats.speed
+        if (stats.jumpForce !== undefined) this.jumpForce = stats.jumpForce
+        if (stats.maxHealth !== undefined) {
+            this.maxHealth = stats.maxHealth
+            this.currentHealth = this.maxHealth // Reset health on profile change? Maybe.
+        }
+        if (stats.respawns !== undefined) this.respawns = stats.respawns
+
+        console.log("Stats Updated:", stats)
+    }
+
+    takeDamage(amount) {
+        if (this.isDead || this.noClip) return
+
+        this.currentHealth -= amount
+        console.log(`Player Health: ${this.currentHealth}/${this.maxHealth}`)
+
+        if (this.currentHealth <= 0) {
+            this.die()
+        }
+    }
+
+    die() {
+        if (this.isDead) return
+        this.isDead = true
+        console.log("Player Died!")
+
+        // Visual feedback? (Animation, Particle)
+
+        // Respawn Logic
+        if (this.respawns === -1 || this.respawns > 0) {
+            if (this.respawns > 0) this.respawns--
+            setTimeout(() => this.respawn(), 2000) // 2s delay
+        } else {
+            console.log("Game Over - No Respawns Left")
+            // Trigger Game Over UI or Spectator Mode
+            alert("¡Has muerto definitivamente!")
+        }
+    }
+
+    respawn() {
+        if (!this.rigidBody) return
+
+        this.isDead = false
+        this.currentHealth = this.maxHealth
+
+        // Reset Position (Teleport)
+        // Ideally use a Spawn Point from LogicSystem if available, else startPosition
+        let respawnPos = this.startPosition
+
+        // Check for Spawn Points in Scene? 
+        // We can't easily access LogicSystem here directly unless passed or via global.
+        // For now, use startPosition which we should update if we find a spawn point interactively.
+
+        this.rigidBody.setTranslation({ x: respawnPos.x, y: respawnPos.y, z: respawnPos.z }, true)
+        this.rigidBody.setLinvel({ x: 0, y: 0, z: 0 }, true)
+
+        console.log("Respawned at", respawnPos)
     }
 }

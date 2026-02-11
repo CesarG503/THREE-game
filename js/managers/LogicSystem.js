@@ -3,6 +3,7 @@ import { LogicToolbar } from "../ui/LogicToolbar.js"
 import { LogicSequenceEditor } from "../ui/LogicSequenceEditor.js"
 import { InteractiveCollisionLogic } from "../ui/logic_items/InteractiveCollisionLogic.js"
 import { GameHUD } from "../ui/GameHUD.js"
+import { PlayerConfigManager } from "../managers/PlayerConfigManager.js"
 
 export class LogicSystem {
     constructor(game) {
@@ -12,6 +13,7 @@ export class LogicSystem {
         this.toolbar = new LogicToolbar(game)
         this.sequenceEditor = new LogicSequenceEditor(game, this)
         this.hud = new GameHUD()
+        this.playerConfigManager = new PlayerConfigManager(game)
 
         // Toolbar Callbacks
         this.toolbar.onClose = () => this.endMapEdit()

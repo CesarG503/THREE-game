@@ -1,6 +1,7 @@
 import { MapObjectItem } from "../item/MapObjectItem.js"
 import { LogicSystem } from "../managers/LogicSystem.js"
 import { GameConfigPanel } from "./GameConfigPanel.js"
+import { PlayerConfigPanel } from "./PlayerConfigPanel.js"
 import * as THREE from "three"
 
 export class ConstructionMenu {
@@ -17,7 +18,10 @@ export class ConstructionMenu {
         this.generateLibrary()
         this.generateLogicLibrary() // Logic Items
 
+        this.generateLogicLibrary() // Logic Items
+
         this.gameConfigPanel = new GameConfigPanel(this.game, this.logicSystem)
+        this.playerConfigPanel = new PlayerConfigPanel(this.game, this.logicSystem.playerConfigManager)
 
         this.setupUI()
     }
@@ -161,7 +165,7 @@ export class ConstructionMenu {
 
         // Header / Tabs
         const header = document.createElement('div')
-        header.style.cssText = `display: flex; gap: 20px; font-size: 24px; margin-bottom: 20px; border-bottom: 1px solid #555; padding-bottom: 10px;`
+        header.style.cssText = `display: flex; gap: 20px; font-size: 24px; margin-bottom: 20px; border-bottom: 1px solid #555; padding-bottom: 10px; overflow-x: auto;`
 
         this.tabLibrary = document.createElement('div')
         this.tabLibrary.textContent = "Librería de Objetos"
@@ -178,7 +182,7 @@ export class ConstructionMenu {
         this.tabLogic.onclick = () => this.switchTab('logic')
 
         this.tabSettings = document.createElement('div')
-        this.tabSettings.textContent = "Configuración Entorno"
+        this.tabSettings.textContent = "Config Entorno"
         this.tabSettings.style.cursor = "pointer"
         this.tabSettings.style.color = "#888" // Inactive look
         this.tabSettings.style.borderBottom = "none"
@@ -191,6 +195,14 @@ export class ConstructionMenu {
         this.tabGameConfig.style.borderBottom = "none"
         this.tabGameConfig.onclick = () => this.switchTab('gameConfig')
 
+        this.tabPlayerConfig = document.createElement('div')
+        this.tabPlayerConfig.textContent = "Config Jugador"
+        this.tabPlayerConfig.style.cursor = "pointer"
+        this.tabPlayerConfig.style.color = "#888"
+        this.tabPlayerConfig.style.borderBottom = "none"
+        this.tabPlayerConfig.style.whiteSpace = "nowrap"
+        this.tabPlayerConfig.onclick = () => this.switchTab('playerConfig')
+
         this.tabSaveLoad = document.createElement('div')
         this.tabSaveLoad.textContent = "Guardar / Cargar"
         this.tabSaveLoad.style.cursor = "pointer"
@@ -201,6 +213,7 @@ export class ConstructionMenu {
         header.appendChild(this.tabLibrary)
         header.appendChild(this.tabLogic)
         header.appendChild(this.tabGameConfig)
+        header.appendChild(this.tabPlayerConfig)
         header.appendChild(this.tabSettings)
         header.appendChild(this.tabSaveLoad)
         this.container.appendChild(header)
@@ -388,10 +401,16 @@ export class ConstructionMenu {
         `
         this.gameConfigPanel.createUI(this.contentGameConfig)
 
+        // Player Config Content
+        this.contentPlayerConfig = document.createElement('div')
+        this.contentPlayerConfig.style.cssText = `flex: 1; display: none;`
+        this.playerConfigPanel.createUI(this.contentPlayerConfig)
+
         this.container.appendChild(this.contentLibrary)
         this.container.appendChild(this.contentLogic)
         this.container.appendChild(this.contentSettings)
         this.container.appendChild(this.contentGameConfig)
+        this.container.appendChild(this.contentPlayerConfig)
         this.container.appendChild(this.contentSaveLoad)
 
 
@@ -433,6 +452,11 @@ export class ConstructionMenu {
         this.tabGameConfig.style.color = "#888"
         this.tabGameConfig.style.borderBottom = "none"
 
+        this.contentPlayerConfig.style.display = 'none'
+        this.tabPlayerConfig.style.fontWeight = "normal"
+        this.tabPlayerConfig.style.color = "#888"
+        this.tabPlayerConfig.style.borderBottom = "none"
+
         // Activate Selected
         if (tabName === 'library') {
             this.contentLibrary.style.display = 'flex'
@@ -459,6 +483,13 @@ export class ConstructionMenu {
             this.tabGameConfig.style.color = "white"
             this.tabGameConfig.style.borderBottom = "2px solid white"
             this.gameConfigPanel.render()
+
+        } else if (tabName === 'playerConfig') {
+            this.contentPlayerConfig.style.display = 'flex'
+            this.tabPlayerConfig.style.fontWeight = "bold"
+            this.tabPlayerConfig.style.color = "white"
+            this.tabPlayerConfig.style.borderBottom = "2px solid white"
+            this.playerConfigPanel.render()
 
         } else if (tabName === 'saveload') {
             this.contentSaveLoad.style.display = 'flex'

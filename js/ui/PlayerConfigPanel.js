@@ -151,24 +151,67 @@ export class PlayerConfigPanel {
         respawnContainer.style.marginTop = "15px";
         respawnContainer.innerHTML = "<label style='display:block; color:#aaa; margin-bottom:5px;'>Reapariciones</label>";
 
+        const containerRow = document.createElement('div');
+        containerRow.style.display = 'flex';
+        containerRow.style.gap = '10px';
+
         const respawnSel = document.createElement('select');
-        respawnSel.style.cssText = "background:#333; color:white; padding:5px; border:1px solid #555; width: 100%;";
+        respawnSel.style.cssText = "background:#333; color:white; padding:5px; border:1px solid #555; flex:1;";
+
+        const respawnInput = document.createElement('input');
+        respawnInput.type = "number";
+        respawnInput.style.cssText = "background:#333; color:white; padding:5px; border:1px solid #555; width: 80px; display:none;";
+
         const rOpts = [
             { v: -1, t: "Infinitas" },
             { v: 0, t: "Muerte Permanente (0)" },
             { v: 1, t: "1 Vida Extra" },
             { v: 3, t: "3 Vidas" },
-            { v: 5, t: "5 Vidas" }
+            { v: 5, t: "5 Vidas" },
+            { v: 'custom', t: "Personalizado..." }
         ];
+
+        let isCustom = true;
         rOpts.forEach(o => {
             const opt = document.createElement('option');
             opt.value = o.v;
             opt.textContent = o.t;
-            if (profile.respawns === o.v) opt.selected = true;
+            if (profile.respawns === o.v) {
+                opt.selected = true;
+                isCustom = false;
+            }
             respawnSel.appendChild(opt);
         });
-        respawnSel.onchange = (e) => this.manager.updateProfile(profile.id, { respawns: parseInt(e.target.value) });
-        respawnContainer.appendChild(respawnSel);
+
+        if (isCustom) {
+            respawnSel.value = 'custom';
+            respawnInput.style.display = 'block';
+            respawnInput.value = profile.respawns;
+        }
+
+        respawnSel.onchange = (e) => {
+            if (e.target.value === 'custom') {
+                respawnInput.style.display = 'block';
+                respawnInput.value = profile.respawns > 0 ? profile.respawns : 10;
+                respawnInput.focus();
+                this.manager.updateProfile(profile.id, { respawns: parseInt(respawnInput.value) });
+            } else {
+                respawnInput.style.display = 'none';
+                this.manager.updateProfile(profile.id, { respawns: parseInt(e.target.value) });
+            }
+        };
+
+        respawnInput.onchange = (e) => {
+            this.manager.updateProfile(profile.id, { respawns: parseInt(e.target.value) });
+        };
+
+        const stopProp = (e) => { if (e.key === 'e' || e.key === 'E') e.stopPropagation(); };
+        respawnSel.onkeydown = stopProp;
+        respawnInput.onkeydown = stopProp;
+
+        containerRow.appendChild(respawnSel);
+        containerRow.appendChild(respawnInput);
+        respawnContainer.appendChild(containerRow);
         statsCol.appendChild(respawnContainer);
 
         grid.appendChild(statsCol);
@@ -213,6 +256,40 @@ export class PlayerConfigPanel {
         const valDisp = document.createElement('span');
         valDisp.textContent = value;
         valDisp.style.color = "#0ff";
+        valDisp.style.cursor = "pointer";
+        valDisp.title = "Doble click para editar";
+
+        valDisp.ondblclick = () => {
+            const input = document.createElement('input');
+            input.type = "number";
+            input.value = value;
+            input.style.cssText = "width:60px; background:#222; color:white; border:1px solid #555; padding:2px;";
+
+            const finish = () => {
+                let n = parseFloat(input.value);
+                if (isNaN(n)) n = value;
+                if (n < min) n = min;
+                if (n > max) n = max;
+
+                valDisp.textContent = n;
+                range.value = n;
+                onChange(n);
+                if (input.parentNode) header.replaceChild(valDisp, input);
+            };
+
+            input.onblur = finish;
+            input.onkeydown = (e) => {
+                if (e.key === 'e' || e.key === 'E') e.stopPropagation();
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    finish();
+                }
+            };
+
+            header.replaceChild(input, valDisp);
+            input.focus();
+            input.select();
+        };
 
         header.appendChild(lbl);
         header.appendChild(valDisp);

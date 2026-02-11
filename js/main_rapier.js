@@ -1078,6 +1078,15 @@ class Game {
         this.placementRotationIndex = 0
 
         document.addEventListener("keydown", (e) => {
+            // Ignore if typing in input
+            if (document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'SELECT' || document.activeElement.tagName === 'TEXTAREA')) {
+                if (e.key === 'Escape') {
+                    document.activeElement.blur() // Allow ESC to blur
+                } else {
+                    return
+                }
+            }
+
             const key = e.key.toLowerCase()
 
             // Open/Close Construction Menu (E or ESC) - Editor Only

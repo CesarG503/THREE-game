@@ -142,9 +142,9 @@ export class PlayerConfigPanel {
         const statsCol = document.createElement('div');
         statsCol.innerHTML = "<h4 style='color:#aaa; border-bottom:1px solid #444;'>Estadísticas Base</h4>";
 
-        this.createSlider(statsCol, "Vida Total", profile.maxHealth, 1, 1000, (v) => this.manager.updateProfile(profile.id, { maxHealth: v }));
-        this.createSlider(statsCol, "Velocidad Movimiento", profile.speed, 1, 50, (v) => this.manager.updateProfile(profile.id, { speed: v }));
-        this.createSlider(statsCol, "Fuerza de Salto", profile.jumpForce, 0, 50, (v) => this.manager.updateProfile(profile.id, { jumpForce: v }));
+        this.createStatControl(statsCol, "Vida Total", 'maxHealth', profile, 1, 1000);
+        this.createStatControl(statsCol, "Velocidad Movimiento", 'speed', profile, 1, 50);
+        this.createStatControl(statsCol, "Fuerza de Salto", 'jumpForce', profile, 0, 50);
 
         // Respawn Logic
         const respawnContainer = document.createElement('div');
@@ -240,73 +240,124 @@ export class PlayerConfigPanel {
         this.contentArea.appendChild(grid);
     }
 
-    createSlider(container, label, value, min, max, onChange) {
+    createStatControl(container, label, key, profile, min, max) {
         const wrap = document.createElement('div');
         wrap.style.marginBottom = "15px";
 
-        const header = document.createElement('div');
-        header.style.display = "flex";
-        header.style.justifyContent = "space-between";
-        header.style.marginBottom = "5px";
+        const render = () => {
+            wrap.innerHTML = "";
+            const mode = (profile.statModes && profile.statModes[key]) || 'standard';
+            const value = profile[key];
 
-        const lbl = document.createElement('label');
-        lbl.textContent = label;
-        lbl.style.color = "#ddd";
+            const header = document.createElement('div');
+            header.style.display = "flex";
+            header.style.justifyContent = "space-between";
+            header.style.alignItems = "center";
+            header.style.marginBottom = "5px";
 
-        const valDisp = document.createElement('span');
-        valDisp.textContent = value;
-        valDisp.style.color = "#0ff";
-        valDisp.style.cursor = "pointer";
-        valDisp.title = "Doble click para editar";
+            const leftSide = document.createElement('div');
+            leftSide.style.display = 'flex';
+            leftSide.style.alignItems = 'center';
+            leftSide.style.gap = '10px';
 
-        valDisp.ondblclick = () => {
-            const input = document.createElement('input');
-            input.type = "number";
-            input.value = value;
-            input.style.cssText = "width:60px; background:#222; color:white; border:1px solid #555; padding:2px;";
+            // Toggle Button
+            const toggleBtn = document.createElement('button');
+            toggleBtn.innerHTML = mode === 'standard' ? "&#9881;" : "&infin;"; // Gear or Infinite
+            toggleBtn.title = mode === 'standard' ? "Modo Estándar (Limitado)" : "Modo Libre (Sin Límite)";
+            toggleBtn.style.cssText = "background:none; border:1px solid #555; color:#aaa; cursor:pointer; padding: 0 5px; font-size:12px; border-radius:4px; width:24px; height:24px; display:flex; align-items:center; justify-content:center;";
+            toggleBtn.onclick = () => {
+                const newMode = mode === 'standard' ? 'free' : 'standard';
+                if (!profile.statModes) profile.statModes = {};
+                profile.statModes[key] = newMode;
 
-            const finish = () => {
-                let n = parseFloat(input.value);
-                if (isNaN(n)) n = value;
-                if (n < min) n = min;
-                if (n > max) n = max;
-
-                valDisp.textContent = n;
-                range.value = n;
-                onChange(n);
-                if (input.parentNode) header.replaceChild(valDisp, input);
-            };
-
-            input.onblur = finish;
-            input.onkeydown = (e) => {
-                if (e.key === 'e' || e.key === 'E') e.stopPropagation();
-                if (e.key === 'Enter') {
-                    e.preventDefault();
-                    finish();
+                if (newMode === 'standard') {
+                    let v = profile[key];
+                    if (v > max) v = max;
+                    if (v < min) v = min;
+                    this.manager.updateProfile(profile.id, { [key]: v });
+                } else {
+                    this.manager.updateProfile(profile.id, { statModes: profile.statModes });
                 }
+                render();
             };
 
-            header.replaceChild(input, valDisp);
-            input.focus();
-            input.select();
+            const lbl = document.createElement('label');
+            lbl.textContent = label;
+            lbl.style.color = "#ddd";
+
+            leftSide.appendChild(toggleBtn);
+            leftSide.appendChild(lbl);
+            header.appendChild(leftSide);
+
+            if (mode === 'standard') {
+                // Value Display (Editable)
+                const valDisp = document.createElement('span');
+                valDisp.textContent = value;
+                valDisp.style.color = "#0ff";
+                valDisp.style.cursor = "pointer";
+                valDisp.title = "Doble click para editar";
+
+                valDisp.ondblclick = () => {
+                    const input = document.createElement('input');
+                    input.type = "number";
+                    input.value = value;
+                    input.style.cssText = "width:60px; background:#222; color:white; border:1px solid #555; padding:2px;";
+
+                    const finish = () => {
+                        let n = parseFloat(input.value);
+                        if (isNaN(n)) n = value;
+                        if (n < min) n = min;
+                        if (n > max) n = max;
+
+                        this.manager.updateProfile(profile.id, { [key]: n });
+                        render();
+                    };
+
+                    input.onblur = finish;
+                    input.onkeydown = (e) => {
+                        if (e.key === 'e' || e.key === 'E') e.stopPropagation();
+                        if (e.key === 'Enter') { e.preventDefault(); finish(); }
+                    };
+
+                    header.replaceChild(input, valDisp);
+                    input.focus();
+                    input.select();
+                };
+
+                header.appendChild(valDisp);
+                wrap.appendChild(header);
+
+                // Slider
+                const range = document.createElement('input');
+                range.type = "range";
+                range.min = min;
+                range.max = max;
+                range.value = value;
+                range.style.width = "100%";
+                range.oninput = (e) => {
+                    const v = parseFloat(e.target.value);
+                    valDisp.textContent = v;
+                    this.manager.updateProfile(profile.id, { [key]: v });
+                };
+                wrap.appendChild(range);
+
+            } else {
+                // Free Mode - Input only
+                const input = document.createElement('input');
+                input.type = "number";
+                input.value = value;
+                input.style.cssText = "width: 80px; background:#222; color:#0f0; border:1px solid #555; padding:5px; text-align:right;";
+                input.onchange = (e) => {
+                    this.manager.updateProfile(profile.id, { [key]: parseFloat(e.target.value) });
+                };
+                input.onkeydown = (e) => { if (e.key === 'e' || e.key === 'E') e.stopPropagation(); };
+
+                header.appendChild(input);
+                wrap.appendChild(header);
+            }
         };
 
-        header.appendChild(lbl);
-        header.appendChild(valDisp);
-
-        const range = document.createElement('input');
-        range.type = "range";
-        range.min = min;
-        range.max = max;
-        range.value = value;
-        range.style.width = "100%";
-        range.oninput = (e) => {
-            valDisp.textContent = e.target.value;
-            onChange(parseFloat(e.target.value));
-        };
-
-        wrap.appendChild(header);
-        wrap.appendChild(range);
+        render();
         container.appendChild(wrap);
     }
 }

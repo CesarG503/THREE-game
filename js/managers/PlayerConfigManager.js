@@ -9,7 +9,8 @@ export class PlayerConfigManager {
                 speed: 10,
                 jumpForce: 20,
                 respawns: -1, // -1 = Infinite
-                color: '#ffffff'
+                color: '#ffffff',
+                statModes: {} // key -> 'standard' | 'free'
             }
         ];
         this.currentProfileId = 'default';
@@ -36,7 +37,8 @@ export class PlayerConfigManager {
             speed: 10,
             jumpForce: 20,
             respawns: -1,
-            color: '#' + Math.floor(Math.random() * 16777215).toString(16)
+            color: '#' + Math.floor(Math.random() * 16777215).toString(16),
+            statModes: {}
         };
         this.profiles.push(newProfile);
         return newProfile;

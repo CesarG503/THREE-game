@@ -7,18 +7,30 @@ export class PlayerConfigManager {
                 name: 'Jugador Estándar',
                 maxHealth: 100,
                 speed: 10,
-                jumpForce: 20,
+                jumpForce: 10,
                 respawns: -1, // -1 = Infinite
                 color: '#ffffff',
                 canFly: false,
                 maxMultiJumps: 1,
                 statModes: {} // key -> 'standard' | 'free'
+            },
+            {
+                id: 'admin_tester',
+                name: 'ADMIN tester',
+                maxHealth: 1000,
+                speed: 20,
+                jumpForce: 10,
+                respawns: -1,
+                color: '#ff0000',
+                canFly: true,
+                maxMultiJumps: 0,
+                statModes: {}
             }
         ];
-        this.currentProfileId = 'default';
+        this.currentProfileId = 'admin_tester'; // Default to admin for editor
         this.assignments = {
             mode: 'all', // 'all', 'random', 'team'
-            defaultProfileId: 'default',
+            defaultProfileId: 'admin_tester',
             teamProfiles: {} // teamId -> profileId
         };
     }
@@ -37,7 +49,7 @@ export class PlayerConfigManager {
             name: name || "Nuevo Perfil",
             maxHealth: 100,
             speed: 10,
-            jumpForce: 20,
+            jumpForce: 10,
             respawns: -1,
             color: '#' + Math.floor(Math.random() * 16777215).toString(16),
             canFly: false,

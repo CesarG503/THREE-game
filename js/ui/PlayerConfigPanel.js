@@ -343,34 +343,18 @@ export class PlayerConfigPanel {
         flightCheck.checked = profile.canFly || false;
         flightCheck.style.transform = "scale(1.2)";
         flightCheck.onchange = (e) => {
-            const isFlying = e.target.checked;
-            const updates = { canFly: isFlying };
-
-            // Mutual Exclusivity: If Flying is enabled, disable Multi-Jump (set to 0)
-            if (isFlying) {
-                updates.maxMultiJumps = 0;
-            }
-
-            this.manager.updateProfile(profile.id, updates);
-            this.renderContent(); // Re-render to update Multi-Jump UI state
+            // No mutual exclusivity -> Flight and Multi-Jump can coexist
+            this.manager.updateProfile(profile.id, { canFly: e.target.checked });
         };
 
         const flightLabel = document.createElement('label');
-        flightLabel.textContent = "Habilitar Vuelo (Desactiva Saltos en el Aire)";
+        flightLabel.textContent = "Habilitar Vuelo (Doble Salto)";
         flightLabel.style.color = "#ddd";
         flightLabel.onclick = () => flightCheck.click();
 
         flightContainer.appendChild(flightCheck);
         flightContainer.appendChild(flightLabel);
         statsCol.appendChild(flightContainer);
-
-        // Visual Feedback for Exclusivity
-        if (profile.canFly) {
-            // Optional: Hide or Disable the Multi-Jump control found via createStatControl
-            // Since createStatControl appends to statsCol, we can't easily grab the return of previous call unless modified.
-            // But re-rendering handles the data reset. 
-            // To make it clearer, we could disabled logic in createStatControl, but resetting to 0 is enough for now as requested.
-        }
 
         // Respawn Logic
         const respawnContainer = document.createElement('div');
@@ -444,11 +428,11 @@ export class PlayerConfigPanel {
 
         // Appearance / Logic Column
         const extraCol = document.createElement('div');
-        extraCol.innerHTML = "<h4 style='color:#aaa; border-bottom:1px solid #444;'>Configuración de Partida</h4>";
+        extraCol.innerHTML = "<h4 style='color:#aaa; border-bottom:1px solid #444;'>Aplicar Configuración</h4>";
 
         // Assignment Mode (Only show if this is the active config context, assumes single config for now)
         const modeContainer = document.createElement('div');
-        modeContainer.innerHTML = "<p style='color:#888; font-size:12px;'>Cómo aplicar estos roles en la partida:</p>";
+        modeContainer.innerHTML = "<p style='color:#888; font-size:12px;'>Aplica este rol al jugador local</p>";
 
         // Apply Button (Immediate Test)
         const applyBtn = document.createElement('button');

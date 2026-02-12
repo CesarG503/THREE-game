@@ -148,6 +148,9 @@ export class CharacterController {
         // Flight Mode Check
         if (this.isFlying) {
             this.checkFlightToggle(input)
+            // CRITICAL: Update jump state before potentially returning
+            this.wasJumpDown = input.keys.jump
+
             if (this.isFlying) {
                 let moveDir = new THREE.Vector3()
                 if (input.keys.forward) moveDir.z += 1

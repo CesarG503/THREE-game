@@ -328,7 +328,8 @@ export class PlayerConfigPanel {
         this.createStatControl(statsCol, "Vida Total", 'maxHealth', profile, 1, 1000);
         this.createStatControl(statsCol, "Velocidad Movimiento", 'speed', profile, 1, 50);
         this.createStatControl(statsCol, "Fuerza de Salto", 'jumpForce', profile, 0, 50);
-        this.createStatControl(statsCol, "Saltos en el Aire", 'maxMultiJumps', profile, 0, 10);
+        // Multi-Jump Control (Conditional)
+        const multiJumpControl = this.createStatControl(statsCol, "Saltos en el Aire", 'maxMultiJumps', profile, 0, 10);
 
         // Flight Toggle
         const flightContainer = document.createElement('div');
@@ -342,17 +343,34 @@ export class PlayerConfigPanel {
         flightCheck.checked = profile.canFly || false;
         flightCheck.style.transform = "scale(1.2)";
         flightCheck.onchange = (e) => {
-            this.manager.updateProfile(profile.id, { canFly: e.target.checked });
+            const isFlying = e.target.checked;
+            const updates = { canFly: isFlying };
+
+            // Mutual Exclusivity: If Flying is enabled, disable Multi-Jump (set to 0)
+            if (isFlying) {
+                updates.maxMultiJumps = 0;
+            }
+
+            this.manager.updateProfile(profile.id, updates);
+            this.renderContent(); // Re-render to update Multi-Jump UI state
         };
 
         const flightLabel = document.createElement('label');
-        flightLabel.textContent = "Habilitar Vuelo (Doble Salto)";
+        flightLabel.textContent = "Habilitar Vuelo (Desactiva Saltos en el Aire)";
         flightLabel.style.color = "#ddd";
         flightLabel.onclick = () => flightCheck.click();
 
         flightContainer.appendChild(flightCheck);
         flightContainer.appendChild(flightLabel);
         statsCol.appendChild(flightContainer);
+
+        // Visual Feedback for Exclusivity
+        if (profile.canFly) {
+            // Optional: Hide or Disable the Multi-Jump control found via createStatControl
+            // Since createStatControl appends to statsCol, we can't easily grab the return of previous call unless modified.
+            // But re-rendering handles the data reset. 
+            // To make it clearer, we could disabled logic in createStatControl, but resetting to 0 is enough for now as requested.
+        }
 
         // Respawn Logic
         const respawnContainer = document.createElement('div');

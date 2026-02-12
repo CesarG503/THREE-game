@@ -37,6 +37,9 @@ export class CharacterController {
         this.canFly = false
         this.isFlying = false
         this.lastJumpTime = 0
+        this.maxMultiJumps = 0;
+        this.jumpCount = 0;
+        this.wasJumpDown = false;
 
         // Momentum System
         this.momentum = new THREE.Vector3(0, 0, 0)
@@ -157,7 +160,7 @@ export class CharacterController {
             }
         }
 
-        // Double Jump Check
+        // Double Jump / Flight Toggle Check
         if (this.canFly) {
             this.checkFlightToggle(input)
         }
@@ -238,22 +241,45 @@ export class CharacterController {
                 }
             }
         } else {
-            let gravityStep = -20 * dt
+            // let gravityStep = -20 * dt
+            // Handled in jump logic now
         }
 
-        // Jump
+        // Jump Logic
+        // Reset Jump Count if grounded
+        const isGrounded = this.characterController.computedGrounded();
+        if (isGrounded) {
+            this.jumpCount = 0;
+        }
+
+        // Detect Jump Trigger (Rising Edge)
+        const jumpJustPressed = input.keys.jump && !this.wasJumpDown;
+
         if (this.isClimbing) {
             if (input.keys.jump) {
                 this.isClimbing = false
                 this.verticalVelocity = 5
             }
-        } else if (this.characterController.computedGrounded() && input.keys.jump) {
-            this.verticalVelocity = 10
-        } else {
-            if (this.verticalVelocity > -15) this.verticalVelocity -= 50 * dt
+        } else if (isGrounded && input.keys.jump) {
+            // Standard Ground Jump
+            this.verticalVelocity = this.jumpForce
+        } else if (!isGrounded && !this.isFlying) {
+            // Air / Multi Jump
+            if (jumpJustPressed && this.jumpCount < this.maxMultiJumps) {
+                this.verticalVelocity = this.jumpForce;
+                this.jumpCount++;
+                console.log(`Multi-Jump: ${this.jumpCount}/${this.maxMultiJumps}`);
+            }
+
+            // Gravity
+            if (this.verticalVelocity > -20) { // Limit terminal velocity
+                this.verticalVelocity -= 50 * dt
+            }
         }
 
-        if (this.characterController.computedGrounded() && this.verticalVelocity <= 0) {
+        this.wasJumpDown = input.keys.jump;
+
+        if (isGrounded && this.verticalVelocity <= 0) {
             this.verticalVelocity = -5
         }
 
@@ -342,7 +368,7 @@ export class CharacterController {
             }
             this.lastJumpTime = now
         }
-        this.wasJumpDown = input.keys.jump
+        // this.wasJumpDown = input.keys.jump // handled in update now
     }
 
     checkClimbing() {
@@ -404,6 +430,8 @@ export class CharacterController {
             this.currentHealth = this.maxHealth // Reset health on profile change? Maybe.
         }
         if (stats.respawns !== undefined) this.respawns = stats.respawns
+        if (stats.canFly !== undefined) this.canFly = stats.canFly
+        if (stats.maxMultiJumps !== undefined) this.maxMultiJumps = stats.maxMultiJumps
 
         console.log("Stats Updated:", stats)
     }

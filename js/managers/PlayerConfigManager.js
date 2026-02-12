@@ -10,6 +10,8 @@ export class PlayerConfigManager {
                 jumpForce: 20,
                 respawns: -1, // -1 = Infinite
                 color: '#ffffff',
+                canFly: false,
+                maxMultiJumps: 1,
                 statModes: {} // key -> 'standard' | 'free'
             }
         ];
@@ -38,6 +40,8 @@ export class PlayerConfigManager {
             jumpForce: 20,
             respawns: -1,
             color: '#' + Math.floor(Math.random() * 16777215).toString(16),
+            canFly: false,
+            maxMultiJumps: 1,
             statModes: {}
         };
         this.profiles.push(newProfile);
@@ -112,7 +116,9 @@ export class PlayerConfigManager {
                 speed: profile.speed,
                 jumpForce: profile.jumpForce,
                 maxHealth: profile.maxHealth,
-                respawns: profile.respawns
+                respawns: profile.respawns,
+                canFly: profile.canFly,
+                maxMultiJumps: profile.maxMultiJumps
             });
         } else {
             // Fallback direct assignment if method doesn't exist yet

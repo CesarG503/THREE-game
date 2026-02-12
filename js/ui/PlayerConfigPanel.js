@@ -328,6 +328,31 @@ export class PlayerConfigPanel {
         this.createStatControl(statsCol, "Vida Total", 'maxHealth', profile, 1, 1000);
         this.createStatControl(statsCol, "Velocidad Movimiento", 'speed', profile, 1, 50);
         this.createStatControl(statsCol, "Fuerza de Salto", 'jumpForce', profile, 0, 50);
+        this.createStatControl(statsCol, "Saltos en el Aire", 'maxMultiJumps', profile, 0, 10);
+
+        // Flight Toggle
+        const flightContainer = document.createElement('div');
+        flightContainer.style.marginTop = "10px";
+        flightContainer.style.display = "flex";
+        flightContainer.style.alignItems = "center";
+        flightContainer.style.gap = "10px";
+
+        const flightCheck = document.createElement('input');
+        flightCheck.type = "checkbox";
+        flightCheck.checked = profile.canFly || false;
+        flightCheck.style.transform = "scale(1.2)";
+        flightCheck.onchange = (e) => {
+            this.manager.updateProfile(profile.id, { canFly: e.target.checked });
+        };
+
+        const flightLabel = document.createElement('label');
+        flightLabel.textContent = "Habilitar Vuelo (Doble Salto)";
+        flightLabel.style.color = "#ddd";
+        flightLabel.onclick = () => flightCheck.click();
+
+        flightContainer.appendChild(flightCheck);
+        flightContainer.appendChild(flightLabel);
+        statsCol.appendChild(flightContainer);
 
         // Respawn Logic
         const respawnContainer = document.createElement('div');

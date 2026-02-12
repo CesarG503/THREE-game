@@ -33,6 +33,11 @@ export class PlayerConfigManager {
             defaultProfileId: 'admin_tester',
             teamProfiles: {} // teamId -> profileId
         };
+
+        // Auto-apply on potential reload or late load
+        if (this.game && this.game.character) {
+            this.applyConfiguration();
+        }
     }
 
     getProfiles() {

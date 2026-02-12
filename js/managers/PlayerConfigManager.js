@@ -66,6 +66,20 @@ export class PlayerConfigManager {
         }
     }
 
+    setTeamProfile(teamId, profileId) {
+        this.assignments.teamProfiles[teamId] = profileId;
+        console.log(`Team ${teamId} assigned to profile ${profileId}`);
+    }
+
+    setDefaultProfile(profileId) {
+        this.assignments.defaultProfileId = profileId;
+        console.log(`Default profile assigned to ${profileId}`);
+    }
+
+    getAssignments() {
+        return this.assignments;
+    }
+
     // Apply configuration to current game state
     applyConfiguration() {
         if (!this.game.character) return;

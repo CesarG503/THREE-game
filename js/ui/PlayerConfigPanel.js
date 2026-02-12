@@ -10,9 +10,58 @@ export class PlayerConfigPanel {
         this.container = document.createElement('div');
         this.container.style.cssText = `
             width: 100%; height: 100%;
-            display: flex; gap: 20px;
+            display: flex; flex-direction: column;
             color: white; font-family: sans-serif;
         `;
+
+        this.activeTab = 'roles'; // 'roles' or 'spawns'
+        parentContainer.appendChild(this.container);
+        this.render();
+    }
+
+    render() {
+        this.container.innerHTML = ""; // Clear for full re-render
+
+        // Tab Header
+        const tabHeader = document.createElement('div');
+        tabHeader.style.cssText = "display:flex; border-bottom:1px solid #444; margin-bottom:10px; background:#222; flex-shrink: 0;";
+
+        const createTab = (id, label) => {
+            const tab = document.createElement('div');
+            tab.textContent = label;
+            tab.style.cssText = `
+                padding: 10px 20px; cursor: pointer;
+                background: ${this.activeTab === id ? '#444' : 'transparent'};
+                color: ${this.activeTab === id ? 'white' : '#aaa'};
+                font-weight: bold; border-right: 1px solid #444;
+            `;
+            tab.onclick = () => {
+                this.activeTab = id;
+                this.render();
+            };
+            return tab;
+        };
+
+        tabHeader.appendChild(createTab('roles', 'Roles de Jugador'));
+        tabHeader.appendChild(createTab('spawns', 'Puntos de Aparición'));
+        this.container.appendChild(tabHeader);
+
+        // Content Container
+        const content = document.createElement('div');
+        content.style.cssText = "flex:1; display:flex; overflow:hidden;";
+        this.container.appendChild(content);
+
+        if (this.activeTab === 'roles') {
+            this.renderRolesTab(content);
+        } else {
+            this.renderSpawnPanel(content);
+        }
+    }
+
+    renderRolesTab(parentContainer) {
+        // Wrapper for 2-column layout
+        parentContainer.style.display = 'flex';
+        parentContainer.style.gap = '20px';
 
         // Left: Sidebar (Profile List)
         const sidebar = document.createElement('div');
@@ -25,7 +74,7 @@ export class PlayerConfigPanel {
         `;
 
         const sbTitle = document.createElement('h3');
-        sbTitle.textContent = "Perfiles de Jugador";
+        sbTitle.textContent = "Editor de Roles";
         sbTitle.style.margin = "0 0 10px 0";
         sbTitle.style.borderBottom = "1px solid #555";
         sbTitle.style.paddingBottom = "5px";
@@ -51,7 +100,7 @@ export class PlayerConfigPanel {
         };
         sidebar.appendChild(addBtn);
 
-        this.container.appendChild(sidebar);
+        parentContainer.appendChild(sidebar);
 
         // Right: Content (Editor)
         this.contentArea = document.createElement('div');
@@ -59,15 +108,122 @@ export class PlayerConfigPanel {
             flex: 1; display: flex; flex-direction: column; gap: 15px;
             padding: 10px; overflow-y: auto;
         `;
-        this.container.appendChild(this.contentArea);
+        parentContainer.appendChild(this.contentArea);
 
-        parentContainer.appendChild(this.container);
-        this.render();
-    }
-
-    render() {
         this.renderSidebar();
         this.renderContent();
+    }
+
+    renderSpawnPanel(parentContainer) {
+        parentContainer.style.flexDirection = 'column';
+        parentContainer.style.padding = '20px';
+        parentContainer.style.overflowY = 'auto';
+
+        const title = document.createElement('h2');
+        title.textContent = "Gestión de Puntos de Aparición";
+        title.style.borderBottom = "1px solid #555";
+        title.style.paddingBottom = "10px";
+        parentContainer.appendChild(title);
+
+        // Scan Scene
+        const spawns = [];
+        if (this.game.sceneManager && this.game.sceneManager.scene) {
+            this.game.sceneManager.scene.traverse(child => {
+                if (child.userData && child.userData.mapObjectType === 'spawn_point') {
+                    spawns.push(child);
+                }
+            });
+        }
+
+        const stats = document.createElement('div');
+        stats.style.marginBottom = "20px";
+        stats.innerHTML = `<p>Total Puntos de Aparición detectados: <strong style="color:#0f0">${spawns.length}</strong></p>`;
+        parentContainer.appendChild(stats);
+
+        // Group by Team
+        const teams = {}; // 0 = Global/No Team
+        spawns.forEach(s => {
+            const t = (s.userData.logicProperties && s.userData.logicProperties.team) || 1; // Default Team 1
+            if (!teams[t]) teams[t] = 0;
+            teams[t]++;
+        });
+
+        // 1. Global Default
+        const globalBox = document.createElement('div');
+        globalBox.style.cssText = "background:#222; padding:15px; border-radius:4px; margin-bottom:20px; border:1px solid #444;";
+        globalBox.innerHTML = "<h3 style='margin-top:0;'>Asignación Global</h3><p style='color:#aaa; font-size:12px;'>Rol por defecto para jugadores sin equipo o si no hay regla específica.</p>";
+
+        const globalRow = document.createElement('div');
+        globalRow.style.display = 'flex';
+        globalRow.style.gap = '10px';
+        globalRow.style.alignItems = 'center';
+
+        const globalSel = this.createProfileSelector(this.manager.assignments.defaultProfileId);
+        const globalBtn = document.createElement('button');
+        globalBtn.textContent = "Aplicar a Todo";
+        globalBtn.style.cssText = "padding:5px 10px; cursor:pointer; background:#444; color:white; border:none;";
+        globalBtn.onclick = () => {
+            this.manager.setDefaultProfile(globalSel.value);
+            alert("Rol Global Actualizado");
+        };
+
+        globalRow.appendChild(globalSel);
+        globalRow.appendChild(globalBtn);
+        globalBox.appendChild(globalRow);
+        parentContainer.appendChild(globalBox);
+
+        // 2. Team Assignments
+        const teamSection = document.createElement('div');
+        teamSection.innerHTML = "<h3>Asignación por Equipos</h3>";
+
+        Object.keys(teams).sort().forEach(teamId => {
+            const teamRow = document.createElement('div');
+            teamRow.style.cssText = "background:#333; padding:10px; margin-bottom:10px; border-radius:4px; display:flex; justify-content:space-between; align-items:center;";
+
+            const info = document.createElement('div');
+            info.innerHTML = `<strong>Equipo ${teamId}</strong> <span style='color:#aaa;'>(${teams[teamId]} Spawns)</span>`;
+
+            const actions = document.createElement('div');
+            actions.style.display = 'flex';
+            actions.style.gap = '10px';
+
+            const currentProfile = this.manager.assignments.teamProfiles[teamId] || 'default';
+            const sel = this.createProfileSelector(currentProfile);
+
+            const btn = document.createElement('button');
+            btn.textContent = "Asignar";
+            btn.style.cssText = "padding:5px 10px; cursor:pointer; background:#0066cc; color:white; border:none; border-radius:3px;";
+            btn.onclick = () => {
+                this.manager.setTeamProfile(teamId, sel.value);
+                alert(`Rol asignado al Equipo ${teamId}`);
+            };
+
+            actions.appendChild(sel);
+            actions.appendChild(btn);
+
+            teamRow.appendChild(info);
+            teamRow.appendChild(actions);
+            teamSection.appendChild(teamRow);
+        });
+
+        if (Object.keys(teams).length === 0) {
+            teamSection.innerHTML += "<p style='color:#aaa; font-style:italic;'>No se han detectado equipos (spawns con propiedad team).</p>";
+        }
+
+        parentContainer.appendChild(teamSection);
+    }
+
+    createProfileSelector(selectedId) {
+        const sel = document.createElement('select');
+        sel.style.cssText = "background:#111; color:white; padding:5px; border:1px solid #555; border-radius:3px;";
+        this.manager.getProfiles().forEach(p => {
+            const opt = document.createElement('option');
+            opt.value = p.id;
+            opt.textContent = p.name;
+            if (p.id === selectedId) opt.selected = true;
+            sel.appendChild(opt);
+        });
+        return sel;
     }
 
     renderSidebar() {

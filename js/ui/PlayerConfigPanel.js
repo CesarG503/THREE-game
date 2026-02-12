@@ -62,6 +62,21 @@ export class PlayerConfigPanel {
         // Wrapper for 2-column layout
         parentContainer.style.display = 'flex';
         parentContainer.style.gap = '20px';
+        parentContainer.style.height = '100%';
+        parentContainer.style.minHeight = '0'; // Prevent parent from growing
+
+        // Inject Scrollbar Style globally for this panel if not present
+        if (!document.getElementById('player-config-scroll-style')) {
+            const scrollStyle = document.createElement('style');
+            scrollStyle.id = 'player-config-scroll-style';
+            scrollStyle.innerHTML = `
+                .profile-list-scroll::-webkit-scrollbar { width: 6px; }
+                .profile-list-scroll::-webkit-scrollbar-track { background: #111; }
+                .profile-list-scroll::-webkit-scrollbar-thumb { background: #444; border-radius: 3px; }
+                .profile-list-scroll::-webkit-scrollbar-thumb:hover { background: #555; }
+            `;
+            this.container.appendChild(scrollStyle);
+        }
 
         // Left: Sidebar (Profile List)
         const sidebar = document.createElement('div');
@@ -71,6 +86,9 @@ export class PlayerConfigPanel {
             border-right: 1px solid #444;
             display: flex; flex-direction: column;
             padding: 10px; gap: 10px;
+            height: 100%;
+            overflow: hidden; 
+            box-sizing: border-box;
         `;
 
         const sbTitle = document.createElement('h3');
@@ -78,13 +96,20 @@ export class PlayerConfigPanel {
         sbTitle.style.margin = "0 0 10px 0";
         sbTitle.style.borderBottom = "1px solid #555";
         sbTitle.style.paddingBottom = "5px";
+        sbTitle.style.flexShrink = "0";
         sidebar.appendChild(sbTitle);
 
+        // Container for list to isolate scrolling
         this.profileList = document.createElement('div');
+        this.profileList.className = 'profile-list-scroll';
         this.profileList.style.cssText = `
-            flex: 1; overflow-y: auto;
+            flex: 1 1 auto; 
+            height: 0px; /* CRITICAL: Forces flex child to default to 0 and grow, enabling scroll */
+            overflow-y: auto;
             display: flex; flex-direction: column; gap: 5px;
+            padding-right: 5px;
         `;
+
         sidebar.appendChild(this.profileList);
 
         const addBtn = document.createElement('button');
@@ -92,6 +117,8 @@ export class PlayerConfigPanel {
         addBtn.style.cssText = `
             background: #00aa00; color: white; border: none; padding: 10px;
             cursor: pointer; border-radius: 4px; font-weight: bold;
+            flex-shrink: 0; 
+            margin-top: auto; /* Push to bottom if needed, but flex gap handles it */
         `;
         addBtn.onclick = () => {
             const newP = this.manager.addProfile();

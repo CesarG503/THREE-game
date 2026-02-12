@@ -15,7 +15,7 @@ export class CharacterController {
         this.glbModel = new GLBModel(scene)
         this.polygonModel = new PolygonModel(scene)
         this.polygonModelSkin = new PolygonModelSkin(scene)
-        this.currentType = 'glb' // 'glb' | 'polygon' | 'skin'
+        this.currentType = 'skin' // 'glb' | 'polygon' | 'skin'
 
         this.rigidBody = null
         this.characterController = null

@@ -3,6 +3,7 @@ import RAPIER from "@dimforge/rapier3d-compat"
 import { GLBModel } from "./GLBModel.js"
 import { PolygonModel } from "./PolygonModel.js"
 import { PolygonModelSkin } from "./PolygonModelSkin.js"
+import { ParticleSystem } from "../effects/ParticleSystem.js"
 
 export class CharacterController {
     constructor(scene, world, camera, cameraController) {
@@ -56,6 +57,7 @@ export class CharacterController {
         this.isDead = false
 
         this.initPhysics()
+        this.particleSystem = new ParticleSystem(scene)
         this.setModelType(this.currentType) // Initialize visibility
     }
 
@@ -228,6 +230,8 @@ export class CharacterController {
         this.polygonModel.update(dt, hasInput)
         this.polygonModelSkin.update(dt, hasInput, input.keys.crouch, input.keys.attack, isGrounded, this.verticalVelocity)
 
+        if (this.particleSystem) this.particleSystem.update(dt);
+
         // 2. Physics Movement Calculation
         if (this.isClimbing) {
             this.verticalVelocity = 0
@@ -272,6 +276,10 @@ export class CharacterController {
                 this.verticalVelocity = this.jumpForce;
                 this.jumpCount++;
                 console.log(`Multi-Jump: ${this.jumpCount}/${this.maxMultiJumps}`);
+
+                if (this.particleSystem) {
+                    this.particleSystem.spawnJumpEffect(this.getPosition());
+                }
             }
 
             // Gravity

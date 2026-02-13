@@ -436,6 +436,10 @@ export class CharacterController {
         if (stats.canFly !== undefined) this.canFly = stats.canFly
         if (stats.maxMultiJumps !== undefined) this.maxMultiJumps = stats.maxMultiJumps
 
+        if (stats.jumpAnimationType !== undefined) {
+            this.polygonModelSkin.setJumpAnimationType(stats.jumpAnimationType)
+        }
+
         console.log("Stats Updated:", stats)
     }
 

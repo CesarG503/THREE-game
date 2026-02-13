@@ -434,6 +434,51 @@ export class PlayerConfigPanel {
         const modeContainer = document.createElement('div');
         modeContainer.innerHTML = "<p style='color:#888; font-size:12px;'>Aplica este rol al jugador local</p>";
 
+        // --- ANIMATIONS SECTION ---
+        const animHeader = document.createElement('h4');
+        animHeader.textContent = "Animaciones";
+        animHeader.style.cssText = "color:#aaa; border-bottom:1px solid #444; margin-top: 20px;";
+        extraCol.appendChild(animHeader);
+
+        const animContainer = document.createElement('div');
+        animContainer.style.marginBottom = "15px";
+
+        const jumpAnimLabel = document.createElement('label');
+        jumpAnimLabel.textContent = "Animación de Salto";
+        jumpAnimLabel.style.display = "block";
+        jumpAnimLabel.style.color = "#ddd";
+        jumpAnimLabel.style.marginBottom = "5px";
+        animContainer.appendChild(jumpAnimLabel);
+
+        const jumpAnimSelect = document.createElement('select');
+        jumpAnimSelect.style.cssText = "background:#333; color:white; padding:5px; border:1px solid #555; width: 100%; box-sizing: border-box;";
+
+        const jumpOptions = [
+            { v: 'none', t: "Ninguna" },
+            { v: 'flip', t: "Salto Mortal (Flip)" }
+        ];
+
+        jumpOptions.forEach(opt => {
+            const o = document.createElement('option');
+            o.value = opt.v;
+            o.textContent = opt.t;
+            if (profile.jumpAnimationType === opt.v) o.selected = true;
+            jumpAnimSelect.appendChild(o);
+        });
+
+        // Default to flip if undefined
+        if (!profile.jumpAnimationType) {
+            jumpAnimSelect.value = 'flip';
+        }
+
+        jumpAnimSelect.onchange = (e) => {
+            this.manager.updateProfile(profile.id, { jumpAnimationType: e.target.value });
+        };
+
+        animContainer.appendChild(jumpAnimSelect);
+        extraCol.appendChild(animContainer);
+
+
         // Apply Button (Immediate Test)
         const applyBtn = document.createElement('button');
         applyBtn.textContent = "Aplicar este Rol al Jugador Local (Test)";

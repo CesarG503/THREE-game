@@ -356,6 +356,10 @@ export class PolygonModelSkin {
         return this.model ? this.model.position.clone() : new THREE.Vector3()
     }
 
+    setJumpAnimationType(type) {
+        this.jumpAnimationType = type;
+    }
+
     update(dt, isMoving, isCrouching, isAttacking, isGrounded = true, verticalVelocity = 0) {
         if (!this.model || !this.isVisible) return
 
@@ -481,56 +485,57 @@ export class PolygonModelSkin {
         }
 
         // --- JUMP ANIMATION (FLIP) ---
-        if (!isGrounded) {
-            const jumpLerp = 0.15
+        // Valid types: 'flip', 'none'
+        // Default to 'flip' if undefined for backward compatibility or ensure set
+        const animType = this.jumpAnimationType || 'flip';
 
-            // 1. Pose Changes
-            // Tucking in slightly for the flip?
-            // Arms in
-            this.rightArmGroup.rotation.z = THREE.MathUtils.lerp(this.rightArmGroup.rotation.z, 0, jumpLerp)
-            this.leftArmGroup.rotation.z = THREE.MathUtils.lerp(this.leftArmGroup.rotation.z, 0, jumpLerp)
+        if (animType === 'flip') {
+            if (!isGrounded) {
+                const jumpLerp = 0.15
 
-            this.rightArmGroup.rotation.x = THREE.MathUtils.lerp(this.rightArmGroup.rotation.x, -0.5, jumpLerp)
-            this.leftArmGroup.rotation.x = THREE.MathUtils.lerp(this.leftArmGroup.rotation.x, -0.5, jumpLerp)
+                // 1. Pose Changes
+                // Tucking in slightly for the flip?
+                // Arms in
+                this.rightArmGroup.rotation.z = THREE.MathUtils.lerp(this.rightArmGroup.rotation.z, 0, jumpLerp)
+                this.leftArmGroup.rotation.z = THREE.MathUtils.lerp(this.leftArmGroup.rotation.z, 0, jumpLerp)
 
-            // Legs tuck
-            this.rightLegGroup.rotation.x = THREE.MathUtils.lerp(this.rightLegGroup.rotation.x, 0.5, jumpLerp)
-            this.leftLegGroup.rotation.x = THREE.MathUtils.lerp(this.leftLegGroup.rotation.x, 0.5, jumpLerp)
+                this.rightArmGroup.rotation.x = THREE.MathUtils.lerp(this.rightArmGroup.rotation.x, -0.5, jumpLerp)
+                this.leftArmGroup.rotation.x = THREE.MathUtils.lerp(this.leftArmGroup.rotation.x, -0.5, jumpLerp)
 
-            // 2. The FLIP (Spin)
-            // We want a continuous front flip or a single clean 360
-            // Let's rely on time or velocity?
-            // A continuous spin based on time is easier to control visually.
-            // Speed of spin: 
-            const spinSpeed = 10
-            // We accumulate rotation? No, model is reset every frame? No, it's persistent.
-            // BUT we can't just add to rotation because we need to reset it on land.
-            // Let's use Date.now() or a time accumulator?
-            // Using Date.now() is fine if we want consistent speed.
+                // Legs tuck
+                this.rightLegGroup.rotation.x = THREE.MathUtils.lerp(this.rightLegGroup.rotation.x, 0.5, jumpLerp)
+                this.leftLegGroup.rotation.x = THREE.MathUtils.lerp(this.leftLegGroup.rotation.x, 0.5, jumpLerp)
 
-            const time = Date.now() / 1000
-            this.pivotGroup.rotation.x -= spinSpeed * dt
+                // 2. The FLIP (Spin)
+                const spinSpeed = 10
+                const time = Date.now() / 1000
+                this.pivotGroup.rotation.x -= spinSpeed * dt
 
-            // Wrap around? No need, just let it spin.
+            } else {
+                // Grounded - Reset Flip
+                let currentRot = this.pivotGroup.rotation.x
+                const TwoPI = Math.PI * 2
+                const targetRot = Math.round(currentRot / TwoPI) * TwoPI
 
+                // Lerp towards upright
+                this.pivotGroup.rotation.x = THREE.MathUtils.lerp(currentRot, targetRot, 10 * dt)
+
+                // If very close, snap to 0 to avoid large numbers over time
+                if (Math.abs(this.pivotGroup.rotation.x - targetRot) < 0.01) {
+                    this.pivotGroup.rotation.x = 0
+                }
+            }
         } else {
-            // Grounded - Reset Flip
-            // Smoothly return to 0 (or nearest multiple of 2PI if we want to land on feet)
-            // For simplicity, just Lerp to 0. If we spun a lot, this might look weird (snap back).
-            // Better: Lerp to nearest 2PI.
-
+            // 'none' or other - Ensure upright
             let currentRot = this.pivotGroup.rotation.x
-            // Normalize to -PI..PI range?
-            // We want to snap to 0, -2PI, -4PI etc.
-            const TwoPI = Math.PI * 2
-            const targetRot = Math.round(currentRot / TwoPI) * TwoPI
+            if (Math.abs(currentRot) > 0.001) {
+                const TwoPI = Math.PI * 2
+                const targetRot = Math.round(currentRot / TwoPI) * TwoPI
+                this.pivotGroup.rotation.x = THREE.MathUtils.lerp(currentRot, targetRot, 15 * dt)
 
-            // Lerp towards upright
-            this.pivotGroup.rotation.x = THREE.MathUtils.lerp(currentRot, targetRot, 10 * dt)
-
-            // If very close, snap to 0 to avoid large numbers over time
-            if (Math.abs(this.pivotGroup.rotation.x - targetRot) < 0.01) {
-                this.pivotGroup.rotation.x = 0
+                if (Math.abs(this.pivotGroup.rotation.x - targetRot) < 0.01) {
+                    this.pivotGroup.rotation.x = 0
+                }
             }
         }
     }

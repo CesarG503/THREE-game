@@ -12,6 +12,7 @@ export class PlayerConfigManager {
                 color: '#ffffff',
                 canFly: false,
                 maxMultiJumps: 1,
+                jumpAnimationType: 'flip',
                 statModes: {} // key -> 'standard' | 'free'
             },
             {
@@ -24,6 +25,7 @@ export class PlayerConfigManager {
                 color: '#ff0000',
                 canFly: true,
                 maxMultiJumps: 0,
+                jumpAnimationType: 'flip',
                 statModes: {}
             }
         ];
@@ -59,6 +61,7 @@ export class PlayerConfigManager {
             color: '#' + Math.floor(Math.random() * 16777215).toString(16),
             canFly: false,
             maxMultiJumps: 1,
+            jumpAnimationType: 'flip',
             statModes: {}
         };
         this.profiles.push(newProfile);
@@ -135,7 +138,8 @@ export class PlayerConfigManager {
                 maxHealth: profile.maxHealth,
                 respawns: profile.respawns,
                 canFly: profile.canFly,
-                maxMultiJumps: profile.maxMultiJumps
+                maxMultiJumps: profile.maxMultiJumps,
+                jumpAnimationType: profile.jumpAnimationType
             });
         } else {
             // Fallback direct assignment if method doesn't exist yet

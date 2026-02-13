@@ -439,6 +439,9 @@ export class CharacterController {
         if (stats.jumpAnimationType !== undefined) {
             this.polygonModelSkin.setJumpAnimationType(stats.jumpAnimationType)
         }
+        if (stats.fallAnimationType !== undefined) {
+            this.polygonModelSkin.setFallAnimationType(stats.fallAnimationType)
+        }
 
         console.log("Stats Updated:", stats)
     }

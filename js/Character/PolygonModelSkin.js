@@ -360,6 +360,10 @@ export class PolygonModelSkin {
         this.jumpAnimationType = type;
     }
 
+    setFallAnimationType(type) {
+        this.fallAnimationType = type;
+    }
+
     update(dt, isMoving, isCrouching, isAttacking, isGrounded = true, verticalVelocity = 0) {
         if (!this.model || !this.isVisible) return
 
@@ -484,49 +488,67 @@ export class PolygonModelSkin {
             this.rightArmGroup.rotation.y = THREE.MathUtils.lerp(this.rightArmGroup.rotation.y, resetTwist, animLerp)
         }
 
-        // --- JUMP ANIMATION (FLIP) ---
-        // Valid types: 'flip', 'none'
-        // Default to 'flip' if undefined for backward compatibility or ensure set
-        const animType = this.jumpAnimationType || 'flip';
-
-        if (animType === 'flip') {
-            if (!isGrounded) {
-                const jumpLerp = 0.15
-
-                // 1. Pose Changes
-                // Tucking in slightly for the flip?
-                // Arms in
-                this.rightArmGroup.rotation.z = THREE.MathUtils.lerp(this.rightArmGroup.rotation.z, 0, jumpLerp)
-                this.leftArmGroup.rotation.z = THREE.MathUtils.lerp(this.leftArmGroup.rotation.z, 0, jumpLerp)
-
-                this.rightArmGroup.rotation.x = THREE.MathUtils.lerp(this.rightArmGroup.rotation.x, -0.5, jumpLerp)
-                this.leftArmGroup.rotation.x = THREE.MathUtils.lerp(this.leftArmGroup.rotation.x, -0.5, jumpLerp)
-
-                // Legs tuck
-                this.rightLegGroup.rotation.x = THREE.MathUtils.lerp(this.rightLegGroup.rotation.x, 0.5, jumpLerp)
-                this.leftLegGroup.rotation.x = THREE.MathUtils.lerp(this.leftLegGroup.rotation.x, 0.5, jumpLerp)
-
-                // 2. The FLIP (Spin)
-                const spinSpeed = 10
-                const time = Date.now() / 1000
-                this.pivotGroup.rotation.x -= spinSpeed * dt
-
-            } else {
-                // Grounded - Reset Flip
-                let currentRot = this.pivotGroup.rotation.x
-                const TwoPI = Math.PI * 2
-                const targetRot = Math.round(currentRot / TwoPI) * TwoPI
-
-                // Lerp towards upright
-                this.pivotGroup.rotation.x = THREE.MathUtils.lerp(currentRot, targetRot, 10 * dt)
-
-                // If very close, snap to 0 to avoid large numbers over time
-                if (Math.abs(this.pivotGroup.rotation.x - targetRot) < 0.01) {
-                    this.pivotGroup.rotation.x = 0
-                }
-            }
+        // --- FLIP / FALL LOGIC ---
+        // Track Air Time
+        if (!isGrounded) {
+            this.airTime = (this.airTime || 0) + dt;
         } else {
-            // 'none' or other - Ensure upright
+            this.airTime = 0;
+        }
+
+        const jumpAnim = this.jumpAnimationType || 'flip';
+        const fallAnim = this.fallAnimationType || 'none';
+
+        // Check conditions
+        // Wait, original logic was just !isGrounded -> Flip.
+        // If jump is 'flip', we flip immediately on !isGrounded.
+        // If jump is 'none', we don't flip initially.
+
+        // If fall is 'flip', we flip after threshold (e.g. 0.5s) IF we aren't already flipping?
+        // Or if we are just falling (no jump)?
+        // Simplest interpretation:
+        // IF (Jump=Flip AND !Grounded) -> Flip
+        // IF (Fall=Flip AND !Grounded AND AirTime > 0.5) -> Flip
+
+        // But what if Jump=None?
+        // Then we don't flip initially.
+        // But if Fall=Flip, we start flipping after 0.5s.
+
+        let shouldFlip = false;
+
+        // Jump Condition (Immediate on air)
+        if (jumpAnim === 'flip' && !isGrounded) {
+            shouldFlip = true;
+        }
+
+        // Fall Condition (Delayed on air)
+        if (fallAnim === 'flip' && !isGrounded && this.airTime > 0.5) {
+            shouldFlip = true;
+        }
+
+        if (shouldFlip) {
+            const jumpLerp = 0.15
+
+            // 1. Pose Changes
+            // Tucking in slightly for the flip?
+            // Arms in
+            this.rightArmGroup.rotation.z = THREE.MathUtils.lerp(this.rightArmGroup.rotation.z, 0, jumpLerp)
+            this.leftArmGroup.rotation.z = THREE.MathUtils.lerp(this.leftArmGroup.rotation.z, 0, jumpLerp)
+
+            this.rightArmGroup.rotation.x = THREE.MathUtils.lerp(this.rightArmGroup.rotation.x, -0.5, jumpLerp)
+            this.leftArmGroup.rotation.x = THREE.MathUtils.lerp(this.leftArmGroup.rotation.x, -0.5, jumpLerp)
+
+            // Legs tuck
+            this.rightLegGroup.rotation.x = THREE.MathUtils.lerp(this.rightLegGroup.rotation.x, 0.5, jumpLerp)
+            this.leftLegGroup.rotation.x = THREE.MathUtils.lerp(this.leftLegGroup.rotation.x, 0.5, jumpLerp)
+
+            // 2. The FLIP (Spin)
+            const spinSpeed = 10
+            // const time = Date.now() / 1000
+            this.pivotGroup.rotation.x -= spinSpeed * dt
+
+        } else {
+            // Grounded or Not Flipping - Ensure upright
             let currentRot = this.pivotGroup.rotation.x
             if (Math.abs(currentRot) > 0.001) {
                 const TwoPI = Math.PI * 2

@@ -476,6 +476,43 @@ export class PlayerConfigPanel {
         };
 
         animContainer.appendChild(jumpAnimSelect);
+
+        // Fall Animation
+        const fallAnimLabel = document.createElement('label');
+        fallAnimLabel.textContent = "Animación de Caída";
+        fallAnimLabel.style.display = "block";
+        fallAnimLabel.style.color = "#ddd";
+        fallAnimLabel.style.marginTop = "10px";
+        fallAnimLabel.style.marginBottom = "5px";
+        animContainer.appendChild(fallAnimLabel);
+
+        const fallAnimSelect = document.createElement('select');
+        fallAnimSelect.style.cssText = "background:#333; color:white; padding:5px; border:1px solid #555; width: 100%; box-sizing: border-box;";
+
+        const fallOptions = [
+            { v: 'none', t: "Ninguna" },
+            { v: 'flip', t: "Salto Mortal (Flip)" }
+        ];
+
+        fallOptions.forEach(opt => {
+            const o = document.createElement('option');
+            o.value = opt.v;
+            o.textContent = opt.t;
+            if (profile.fallAnimationType === opt.v) o.selected = true;
+            fallAnimSelect.appendChild(o);
+        });
+
+        // Default to none if undefined
+        if (!profile.fallAnimationType) {
+            fallAnimSelect.value = 'none';
+        }
+
+        fallAnimSelect.onchange = (e) => {
+            this.manager.updateProfile(profile.id, { fallAnimationType: e.target.value });
+        };
+
+        animContainer.appendChild(fallAnimSelect);
+
         extraCol.appendChild(animContainer);
 
 

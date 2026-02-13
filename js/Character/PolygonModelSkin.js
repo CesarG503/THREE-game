@@ -15,6 +15,9 @@ export class PolygonModelSkin {
         this.leftLeg = null
 
         // Groups for pivoting
+        this.pivotGroup = null // For whole body rotation (flip)
+        this.contentGroup = null // Holds all body parts, offset from pivot
+
         this.headGroup = null
         this.rightArmGroup = null
         this.leftArmGroup = null
@@ -38,6 +41,17 @@ export class PolygonModelSkin {
         this.model = new THREE.Group()
         this.model.userData.isPlayer = true
         this.model.visible = false
+
+        // --- Hierarchy for Flip Animation ---
+        // Pivot at center of mass (~0.9y)
+        this.pivotGroup = new THREE.Group()
+        this.pivotGroup.position.y = 0.9
+        this.model.add(this.pivotGroup)
+
+        // Content group offset back down so feet are at 0 relative to model
+        this.contentGroup = new THREE.Group()
+        this.contentGroup.position.y = -0.9
+        this.pivotGroup.add(this.contentGroup)
 
         // Load Skin
         const texture = this.textureLoader.load(this.skinUrl)
@@ -68,7 +82,7 @@ export class PolygonModelSkin {
         // --- Head ---
         this.headGroup = new THREE.Group()
         this.headGroup.position.y = 1.30 // Lowered by 0.20
-        this.model.add(this.headGroup)
+        this.contentGroup.add(this.headGroup)
 
         const headGeo = this.createBoxGeometryWithUVs(8, 8, 8, 0, 0)
         this.head = new THREE.Mesh(headGeo, material)
@@ -91,20 +105,20 @@ export class PolygonModelSkin {
         this.body.position.y = 1.30 - (6 * pixelScale) // Lowered by 0.20
         this.body.scale.set(pixelScale, pixelScale, pixelScale)
         this.body.castShadow = true
-        this.model.add(this.body)
+        this.contentGroup.add(this.body)
 
         // Body Outer Layer (Jacket)
         const bodyOuterGeo = this.createBoxGeometryWithUVs(8, 12, 4, 16, 32)
         const bodyOuter = new THREE.Mesh(bodyOuterGeo, material)
         bodyOuter.position.copy(this.body.position)
         bodyOuter.scale.set(pixelScale * 1.05, pixelScale * 1.05, pixelScale * 1.05)
-        this.model.add(bodyOuter)
+        this.contentGroup.add(bodyOuter)
 
         // --- Arms ---
         // Right Arm
         this.rightArmGroup = new THREE.Group()
         this.rightArmGroup.position.set(4 * pixelScale + 2 * pixelScale, 1.30 - 2 * pixelScale, 0) // Lowered by 0.20
-        this.model.add(this.rightArmGroup)
+        this.contentGroup.add(this.rightArmGroup)
 
         const rArmGeo = this.createBoxGeometryWithUVs(4, 12, 4, 40, 16)
         this.rightArm = new THREE.Mesh(rArmGeo, material)
@@ -123,7 +137,7 @@ export class PolygonModelSkin {
         // Left Arm
         this.leftArmGroup = new THREE.Group()
         this.leftArmGroup.position.set(-4 * pixelScale - 2 * pixelScale, 1.30 - 2 * pixelScale, 0) // Lowered by 0.20
-        this.model.add(this.leftArmGroup)
+        this.contentGroup.add(this.leftArmGroup)
 
         const lArmGeo = this.createBoxGeometryWithUVs(4, 12, 4, 32, 48)
         this.leftArm = new THREE.Mesh(lArmGeo, material)
@@ -143,7 +157,7 @@ export class PolygonModelSkin {
         // Right Leg
         this.rightLegGroup = new THREE.Group()
         this.rightLegGroup.position.set(2 * pixelScale, 1.30 - 12 * pixelScale, 0) // Lowered by 0.20
-        this.model.add(this.rightLegGroup)
+        this.contentGroup.add(this.rightLegGroup)
 
         const rLegGeo = this.createBoxGeometryWithUVs(4, 12, 4, 0, 16)
         this.rightLeg = new THREE.Mesh(rLegGeo, material)
@@ -162,7 +176,7 @@ export class PolygonModelSkin {
         // Left Leg
         this.leftLegGroup = new THREE.Group()
         this.leftLegGroup.position.set(-2 * pixelScale, 1.30 - 12 * pixelScale, 0) // Lowered by 0.20
-        this.model.add(this.leftLegGroup)
+        this.contentGroup.add(this.leftLegGroup)
 
         const lLegGeo = this.createBoxGeometryWithUVs(4, 12, 4, 16, 48)
         this.leftLeg = new THREE.Mesh(lLegGeo, material)
@@ -342,7 +356,7 @@ export class PolygonModelSkin {
         return this.model ? this.model.position.clone() : new THREE.Vector3()
     }
 
-    update(dt, isMoving, isCrouching, isAttacking) {
+    update(dt, isMoving, isCrouching, isAttacking, isGrounded = true, verticalVelocity = 0) {
         if (!this.model || !this.isVisible) return
 
         // --- ATTACK SMOOTHING ---
@@ -464,6 +478,60 @@ export class PolygonModelSkin {
             this.headGroup.rotation.y = THREE.MathUtils.lerp(this.headGroup.rotation.y, resetTwist, animLerp)
             this.leftArmGroup.rotation.y = THREE.MathUtils.lerp(this.leftArmGroup.rotation.y, resetTwist, animLerp)
             this.rightArmGroup.rotation.y = THREE.MathUtils.lerp(this.rightArmGroup.rotation.y, resetTwist, animLerp)
+        }
+
+        // --- JUMP ANIMATION (FLIP) ---
+        if (!isGrounded) {
+            const jumpLerp = 0.15
+
+            // 1. Pose Changes
+            // Tucking in slightly for the flip?
+            // Arms in
+            this.rightArmGroup.rotation.z = THREE.MathUtils.lerp(this.rightArmGroup.rotation.z, 0, jumpLerp)
+            this.leftArmGroup.rotation.z = THREE.MathUtils.lerp(this.leftArmGroup.rotation.z, 0, jumpLerp)
+
+            this.rightArmGroup.rotation.x = THREE.MathUtils.lerp(this.rightArmGroup.rotation.x, -0.5, jumpLerp)
+            this.leftArmGroup.rotation.x = THREE.MathUtils.lerp(this.leftArmGroup.rotation.x, -0.5, jumpLerp)
+
+            // Legs tuck
+            this.rightLegGroup.rotation.x = THREE.MathUtils.lerp(this.rightLegGroup.rotation.x, 0.5, jumpLerp)
+            this.leftLegGroup.rotation.x = THREE.MathUtils.lerp(this.leftLegGroup.rotation.x, 0.5, jumpLerp)
+
+            // 2. The FLIP (Spin)
+            // We want a continuous front flip or a single clean 360
+            // Let's rely on time or velocity?
+            // A continuous spin based on time is easier to control visually.
+            // Speed of spin: 
+            const spinSpeed = 10
+            // We accumulate rotation? No, model is reset every frame? No, it's persistent.
+            // BUT we can't just add to rotation because we need to reset it on land.
+            // Let's use Date.now() or a time accumulator?
+            // Using Date.now() is fine if we want consistent speed.
+
+            const time = Date.now() / 1000
+            this.pivotGroup.rotation.x -= spinSpeed * dt
+
+            // Wrap around? No need, just let it spin.
+
+        } else {
+            // Grounded - Reset Flip
+            // Smoothly return to 0 (or nearest multiple of 2PI if we want to land on feet)
+            // For simplicity, just Lerp to 0. If we spun a lot, this might look weird (snap back).
+            // Better: Lerp to nearest 2PI.
+
+            let currentRot = this.pivotGroup.rotation.x
+            // Normalize to -PI..PI range?
+            // We want to snap to 0, -2PI, -4PI etc.
+            const TwoPI = Math.PI * 2
+            const targetRot = Math.round(currentRot / TwoPI) * TwoPI
+
+            // Lerp towards upright
+            this.pivotGroup.rotation.x = THREE.MathUtils.lerp(currentRot, targetRot, 10 * dt)
+
+            // If very close, snap to 0 to avoid large numbers over time
+            if (Math.abs(this.pivotGroup.rotation.x - targetRot) < 0.01) {
+                this.pivotGroup.rotation.x = 0
+            }
         }
     }
 }

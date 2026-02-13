@@ -223,9 +223,10 @@ export class CharacterController {
         }
 
         // Update Model Animations
+        const isGrounded = this.characterController.computedGrounded();
         this.glbModel.update(dt, hasInput)
         this.polygonModel.update(dt, hasInput)
-        this.polygonModelSkin.update(dt, hasInput, input.keys.crouch, input.keys.attack)
+        this.polygonModelSkin.update(dt, hasInput, input.keys.crouch, input.keys.attack, isGrounded, this.verticalVelocity)
 
         // 2. Physics Movement Calculation
         if (this.isClimbing) {
@@ -250,7 +251,6 @@ export class CharacterController {
 
         // Jump Logic
         // Reset Jump Count if grounded
-        const isGrounded = this.characterController.computedGrounded();
         if (isGrounded) {
             this.jumpCount = 0;
         }

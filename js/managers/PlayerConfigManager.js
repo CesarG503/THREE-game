@@ -12,7 +12,7 @@ export class PlayerConfigManager {
                 color: '#ffffff',
                 canFly: false,
                 maxMultiJumps: 1,
-                jumpAnimationType: 'flip',
+                jumpAnimationType: 'none',
                 fallAnimationType: 'none',
                 statModes: {} // key -> 'standard' | 'free'
             },
@@ -26,7 +26,7 @@ export class PlayerConfigManager {
                 color: '#ff0000',
                 canFly: true,
                 maxMultiJumps: 0,
-                jumpAnimationType: 'flip',
+                jumpAnimationType: 'none',
                 fallAnimationType: 'none',
                 statModes: {}
             }
@@ -63,7 +63,7 @@ export class PlayerConfigManager {
             color: '#' + Math.floor(Math.random() * 16777215).toString(16),
             canFly: false,
             maxMultiJumps: 1,
-            jumpAnimationType: 'flip',
+            jumpAnimationType: 'none',
             fallAnimationType: 'none',
             statModes: {}
         };

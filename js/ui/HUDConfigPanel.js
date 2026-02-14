@@ -1,4 +1,5 @@
 import { animate, stagger } from 'animejs';
+import { HUDLayoutSystem } from './modules/HUDLayoutSystem.js';
 
 export class HUDConfigPanel {
     constructor(game, manager, onClose) {
@@ -8,7 +9,8 @@ export class HUDConfigPanel {
         this.container = null;
         this.previewHUD = null;
         this.tempSettings = {};
-        this.activeDrag = null; // Track current dragging element
+
+        this.layoutSystem = null;
     }
 
     open(profile) {
@@ -70,22 +72,13 @@ export class HUDConfigPanel {
             background: transparent;
         `;
 
-        // Grid/Guides (Optional, for visual help)
-        const grid = document.createElement('div');
-        grid.style.cssText = `
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            pointer-events: none; opacity: 0.1;
-            background-image: linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px);
-            background-size: 50px 50px;
-        `;
-        previewArea.appendChild(grid);
-
-        // Container for HUD Elements
-        this.previewContainer = document.createElement('div');
-        this.previewContainer.style.cssText = "position:absolute; top:0; left:0; width:100%; height:100%;";
-        previewArea.appendChild(this.previewContainer);
-
         this.container.appendChild(previewArea);
+
+        // Initialize Layout System
+        this.layoutSystem = new HUDLayoutSystem(previewArea);
+        this.layoutSystem.enableEditMode(true); // Show grid
+
+        this.previewContainer = previewArea;
 
         // 2. Floating Config Window
         const configWindow = document.createElement('div');
@@ -98,17 +91,26 @@ export class HUDConfigPanel {
             display: flex; flex-direction: column;
             max-height: 85%;
             backdrop-filter: blur(5px);
+            z-index: 2001; /* Above grid */
+            user-select: none;
         `;
+
+        // Make Window Draggable
+        this.makeWindowDraggable(configWindow);
 
         // Header
         const header = document.createElement('div');
-        header.style.cssText = "padding: 15px; border-bottom: 1px solid #444; display: flex; justify-content: space-between; align-items: center; background: rgba(50,50,50,0.5); border-radius: 8px 8px 0 0;";
-        header.innerHTML = `<h3 style="margin:0; color:white; font-size:16px;">Editor de HUD</h3>`;
+        header.className = 'drag-handle';
+        header.style.cssText = "padding: 15px; border-bottom: 1px solid #444; display: flex; justify-content: space-between; align-items: center; background: rgba(50,50,50,0.5); border-radius: 8px 8px 0 0; cursor: move;";
+        header.innerHTML = `<h3 style="margin:0; color:white; font-size:16px; pointer-events:none;">Editor de HUD</h3>`;
 
         const closeBtn = document.createElement('button');
         closeBtn.innerHTML = "✕";
         closeBtn.style.cssText = "background:none; border:none; color:#aaa; font-size: 18px; cursor: pointer;";
-        closeBtn.onclick = () => this.close();
+        closeBtn.onclick = (e) => {
+            e.stopPropagation();
+            this.close();
+        };
         header.appendChild(closeBtn);
         configWindow.appendChild(header);
 
@@ -144,80 +146,52 @@ export class HUDConfigPanel {
         this.container.appendChild(configWindow);
         document.body.appendChild(this.container);
 
-        // Setup Drag Events on Container
-        this.setupDragEvents();
-
         this.updatePreview();
     }
 
-    setupDragEvents() {
-        // Global mouse moves for dragging
-        this.container.onmousemove = (e) => {
-            if (this.activeDrag) {
-                e.preventDefault();
-                const rect = this.previewContainer.getBoundingClientRect();
-                const x = e.clientX - rect.left;
-                const y = e.clientY - rect.top;
+    makeWindowDraggable(win) {
+        let isDragging = false;
+        let startX, startY, initialLeft, initialTop;
 
-                // Update Position (relative % or px)
-                // Using px for precision during drag, will save as %/px hybrid or just px
-                const el = this.activeDrag.el;
+        const onMouseDown = (e) => {
+            if (!e.target.closest('.drag-handle')) return;
 
-                // Center the element on cursor (approx) or keep offset? 
-                // Let's keep strict top/left for now
-                const w = el.offsetWidth;
-                const h = el.offsetHeight;
+            isDragging = true;
+            startX = e.clientX;
+            startY = e.clientY;
 
-                let newLeft = x - (w / 2);
-                let newTop = y - (h / 2);
+            const rect = win.getBoundingClientRect();
 
-                // Bounds check
-                if (newLeft < 0) newLeft = 0;
-                if (newTop < 0) newTop = 0;
-                if (newLeft + w > rect.width) newLeft = rect.width - w;
-                if (newTop + h > rect.height) newTop = rect.height - h;
+            // Fix position to absolute/left/top if checking
+            win.style.right = 'auto';
+            win.style.bottom = 'auto';
+            win.style.left = rect.left + 'px';
+            win.style.top = rect.top + 'px';
 
-                el.style.left = newLeft + 'px';
-                el.style.top = newTop + 'px';
-                el.style.bottom = 'auto';
-                el.style.right = 'auto';
-                el.style.transform = 'none'; // Remove center transforms during drag
+            initialLeft = rect.left;
+            initialTop = rect.top;
 
-                // Update Settings Live
-                const key = this.activeDrag.key;
-                // Convert to percentage for responsiveness? Or keep px? 
-                // Let's use % for responsiveness
-                const leftPct = (newLeft / rect.width) * 100;
-                const topPct = (newTop / rect.height) * 100;
-
-                this.tempSettings[key + 'Pos'] = {
-                    left: leftPct.toFixed(2) + '%',
-                    top: topPct.toFixed(2) + '%'
-                };
-            }
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
         };
 
-        this.container.onmouseup = () => {
-            if (this.activeDrag) {
-                this.activeDrag.el.style.cursor = 'grab';
-                this.activeDrag.el.style.zIndex = '';
-                this.activeDrag = null;
-            }
+        const onMouseMove = (e) => {
+            if (!isDragging) return;
+            e.preventDefault();
+            const dx = e.clientX - startX;
+            const dy = e.clientY - startY;
+
+            win.style.left = (initialLeft + dx) + 'px';
+            win.style.top = (initialTop + dy) + 'px';
         };
-    }
 
-    makeDraggable(element, key) {
-        element.style.cursor = 'grab';
-        element.style.userSelect = 'none';
-
-        element.onmousedown = (e) => {
-            e.preventDefault(); // Prevent text selection
-            e.stopPropagation(); // Don't bubble to container click
-
-            this.activeDrag = { el: element, key: key };
-            element.style.cursor = 'grabbing';
-            element.style.zIndex = '1000'; // Bring to front
+        const onMouseUp = () => {
+            isDragging = false;
+            document.removeEventListener('mousemove', onMouseMove);
+            document.removeEventListener('mouseup', onMouseUp);
         };
+
+        win.addEventListener('mousedown', onMouseDown);
     }
 
     createSection(parent, title, type) {
@@ -305,7 +279,14 @@ export class HUDConfigPanel {
     }
 
     updatePreview() {
-        this.previewContainer.innerHTML = '';
+        if (!this.contentWrapper) {
+            this.contentWrapper = document.createElement('div');
+            this.contentWrapper.style.cssText = "position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none;";
+            this.previewContainer.appendChild(this.contentWrapper);
+        }
+
+        this.contentWrapper.innerHTML = '';
+        this.contentWrapper.style.zIndex = '10';
 
         if (this.tempSettings.showHealth) {
             this.renderPreviewHealth();
@@ -319,8 +300,7 @@ export class HUDConfigPanel {
             this.renderPreviewInventory();
         }
 
-        // Check for animate to animate children entry
-        const children = this.previewContainer.children;
+        const children = this.contentWrapper.children;
         if (children.length > 0) {
             animate(children, {
                 opacity: [0, 1],
@@ -332,22 +312,9 @@ export class HUDConfigPanel {
         }
     }
 
-    applyPos(el, pos) {
-        if (!pos) return;
-        if (pos.top) el.style.top = pos.top;
-        if (pos.left) el.style.left = pos.left;
-        if (pos.bottom) el.style.bottom = pos.bottom;
-        if (pos.right) el.style.right = pos.right;
-        if (pos.transform) el.style.transform = pos.transform;
-        else el.style.transform = 'none'; // Reset if undefined (important for dragging overriding defaults)
-    }
-
     renderPreviewHealth() {
         const el = document.createElement('div');
-        // Base style
-        el.style.cssText = `position: absolute; display: flex; gap: 5px;`;
-        this.applyPos(el, this.tempSettings.healthPos);
-        this.makeDraggable(el, 'health');
+        el.style.cssText = `display: flex; gap: 5px;`;
 
         if (this.tempSettings.healthStyle === 'bar') {
             el.innerHTML = `
@@ -361,14 +328,17 @@ export class HUDConfigPanel {
         } else {
             el.innerHTML = `<span style="font-size:40px; font-weight:900; color:#ff3333; -webkit-text-stroke:1px white;">80</span>`;
         }
-        this.previewContainer.appendChild(el);
+
+        this.contentWrapper.appendChild(el);
+
+        this.layoutSystem.registerElement(el, 'health', this.tempSettings.healthPos, (newPos) => {
+            this.tempSettings.healthPos = newPos;
+        });
     }
 
     renderPreviewJump() {
         const el = document.createElement('div');
-        el.style.cssText = `position: absolute; display: flex; align-items: center;`;
-        this.applyPos(el, this.tempSettings.jumpPos);
-        this.makeDraggable(el, 'jump');
+        el.style.cssText = `display: flex; align-items: center;`;
 
         if (this.tempSettings.jumpStyle === 'bar') {
             el.innerHTML = `
@@ -384,17 +354,20 @@ export class HUDConfigPanel {
                </svg>
             `;
         }
-        this.previewContainer.appendChild(el);
+
+        this.contentWrapper.appendChild(el);
+
+        this.layoutSystem.registerElement(el, 'jump', this.tempSettings.jumpPos, (newPos) => {
+            this.tempSettings.jumpPos = newPos;
+        });
     }
 
     renderPreviewInventory() {
         const el = document.createElement('div');
         el.style.cssText = `
-            position: absolute; display: flex; gap: 8px; background: rgba(0,0,0,0.5); padding: 8px; border-radius: 8px;
+            display: flex; gap: 8px; background: rgba(0,0,0,0.5); padding: 8px; border-radius: 8px;
             border: 1px solid rgba(255,255,255,0.1);
         `;
-        this.applyPos(el, this.tempSettings.inventoryPos);
-        this.makeDraggable(el, 'inventory');
 
         for (let i = 0; i < this.tempSettings.inventorySlots; i++) {
             el.innerHTML += `
@@ -403,7 +376,12 @@ export class HUDConfigPanel {
                 </div>
             `;
         }
-        this.previewContainer.appendChild(el);
+
+        this.contentWrapper.appendChild(el);
+
+        this.layoutSystem.registerElement(el, 'inventory', this.tempSettings.inventoryPos, (newPos) => {
+            this.tempSettings.inventoryPos = newPos;
+        });
     }
 
     save() {
@@ -413,7 +391,10 @@ export class HUDConfigPanel {
 
     close() {
         if (this.container) {
-            // Animate Window Exit
+            if (this.layoutSystem) {
+                this.layoutSystem.disableEditMode();
+            }
+
             const win = this.container.querySelector('.hud-config-window');
             if (win) {
                 animate(win, {

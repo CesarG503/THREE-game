@@ -24,7 +24,15 @@ export class GameHUD {
         // Clear existing (except timer)
         if (this.healthElement) this.healthElement.remove();
         if (this.jumpElement) this.jumpElement.remove();
-        if (this.inventoryElement) this.inventoryElement.remove();
+        // Do not remove inventoryElement as it is a shared DOM element
+        if (this.inventoryElement && this.inventoryElement.id !== 'inventory-container') {
+            this.inventoryElement.remove();
+        } else if (this.inventoryElement) {
+            // If we are hiding it this turn
+            if (!this.settings.showInventory) {
+                this.inventoryElement.style.display = 'none';
+            }
+        }
 
         if (this.settings.showHealth) this.createHealth(this.settings);
         if (this.settings.showJump) this.createJump(this.settings);
@@ -80,24 +88,32 @@ export class GameHUD {
     }
 
     createInventory(s) {
-        const el = document.createElement('div');
-        el.id = 'hud-inventory';
-        el.style.cssText = `
-            display: flex; gap: 8px; background: rgba(0,0,0,0.5); padding: 8px; border-radius: 8px;
-            border: 1px solid rgba(255,255,255,0.1); position: absolute; pointer-events: auto;
-        `;
+        // Use existing inventory container from game.html
+        const el = document.getElementById('inventory-container');
 
-        for (let i = 0; i < s.inventorySlots; i++) {
-            el.innerHTML += `
-                <div class="hud-slot" data-index="${i}" style="width:50px; height:50px; background:rgba(0,0,0,0.3); border:2px solid ${i === 0 ? '#fff' : '#888'}; border-radius:6px; display:flex; align-items:center; justify-content:center; cursor: pointer; transition: transform 0.1s;">
-                    <div style="color:rgba(255,255,255,0.5);">${i + 1}</div>
-                </div>
-            `;
+        if (el) {
+            // Ensure it's visible (GameHUD manages visibility now based on settings)
+            el.style.display = 'flex';
+
+            // Apply positioning from settings
+            this.applyPosition(el, s.inventoryPos);
+
+            // Handle slot visibility based on settings
+            const slots = el.querySelectorAll('.inventory-slot');
+            const targetCount = s.inventorySlots || 9;
+
+            slots.forEach((slot, index) => {
+                if (index < targetCount) {
+                    slot.style.display = 'flex';
+                } else {
+                    slot.style.display = 'none';
+                }
+            });
+
+            this.inventoryElement = el;
+        } else {
+            console.warn("GameHUD: #inventory-container not found in DOM.");
         }
-
-        this.applyPosition(el, s.inventoryPos);
-        this.container.appendChild(el);
-        this.inventoryElement = el;
     }
 
     updateHealth(current, max) {

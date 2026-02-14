@@ -364,17 +364,40 @@ export class HUDConfigPanel {
 
     renderPreviewInventory() {
         const el = document.createElement('div');
+        // Match #inventory-container styles roughly for preview
+        el.className = "inventory-container-preview";
         el.style.cssText = `
-            display: flex; gap: 8px; background: rgba(0,0,0,0.5); padding: 8px; border-radius: 8px;
-            border: 1px solid rgba(255,255,255,0.1);
+            display: flex; gap: 8px; justify-content: center;
         `;
 
+        // Use the same structure as game.html
         for (let i = 0; i < this.tempSettings.inventorySlots; i++) {
-            el.innerHTML += `
-                <div style="width:50px; height:50px; background:rgba(0,0,0,0.3); border:2px solid ${i === 0 ? '#fff' : '#888'}; border-radius:6px; display:flex; align-items:center; justify-content:center; ${i === 0 ? 'transform:scale(1.1); background:rgba(255,255,255,0.1);' : ''}">
-                    <div style="color:rgba(255,255,255,0.5);">${i + 1}</div>
-                </div>
-            `;
+            // We use 'inventory-slot' class to match game styles if they are global
+            // But since we are in a shadow-like preview, we might need to inline some styles 
+            // IF the css is not available. 
+            // Assuming main.css is available globally.
+
+            const isActive = (i === 0);
+
+            /* 
+               Structure from game.html:
+               <div class="inventory-slot active">
+                   <span class="slot-number">1</span>
+                   <img ...>
+               </div>
+            */
+
+            const slot = document.createElement('div');
+            slot.className = `inventory-slot ${isActive ? 'active' : ''}`;
+            // Inline minimal styles to ensure it looks right even if CSS is quirky in preview
+            slot.style.position = 'relative'; // ensure content flows
+
+            slot.innerHTML = `
+                <span class="slot-number">${i + 1}</span>
+                ${i < 2 ? `<div style="width:70%; height:70%; background:rgba(255,255,255,0.2); border-radius:4px;"></div>` : ''} 
+             `;
+
+            el.appendChild(slot);
         }
 
         this.contentWrapper.appendChild(el);

@@ -414,6 +414,7 @@ export class HUDConfigPanel {
                         document.body.removeChild(this.container);
                     }
                     this.container = null;
+                    this.contentWrapper = null;
                     if (this.onClose) this.onClose();
                 }
             });

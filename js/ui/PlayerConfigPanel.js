@@ -1,9 +1,14 @@
+import { HUDConfigPanel } from './HUDConfigPanel.js';
+
 export class PlayerConfigPanel {
     constructor(game, manager) {
         this.game = game;
         this.manager = manager;
         this.container = null;
         this.selectedProfileId = 'default';
+        this.hudPanel = new HUDConfigPanel(game, manager, () => {
+            // Optional callback on close
+        });
     }
 
     createUI(parentContainer) {
@@ -18,6 +23,7 @@ export class PlayerConfigPanel {
         parentContainer.appendChild(this.container);
         this.render();
     }
+
 
     render() {
         this.container.innerHTML = ""; // Clear for full re-render
@@ -514,6 +520,15 @@ export class PlayerConfigPanel {
         animContainer.appendChild(fallAnimSelect);
 
         extraCol.appendChild(animContainer);
+
+        // --- HUD CONFIG BUTTON ---
+        const hudBtn = document.createElement('button');
+        hudBtn.textContent = "Editar HUD e Inventario";
+        hudBtn.style.cssText = "background: #d6b600; color: black; border: none; padding: 10px; width: 100%; cursor: pointer; border-radius: 4px; margin-top: 10px; font-weight:bold;";
+        hudBtn.onclick = () => {
+            this.hudPanel.open(profile);
+        };
+        extraCol.appendChild(hudBtn);
 
 
         // Apply Button (Immediate Test)

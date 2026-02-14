@@ -14,7 +14,18 @@ export class PlayerConfigManager {
                 maxMultiJumps: 1,
                 jumpAnimationType: 'none',
                 fallAnimationType: 'none',
-                statModes: {} // key -> 'standard' | 'free'
+                statModes: {}, // key -> 'standard' | 'free'
+                hudSettings: {
+                    showHealth: true,
+                    healthStyle: 'bar',
+                    healthPos: { top: '85%', left: '5%' },
+                    showJump: true,
+                    jumpStyle: 'bar',
+                    jumpPos: { top: '80%', left: '5%' },
+                    showInventory: true,
+                    inventorySlots: 5,
+                    inventoryPos: { top: '90%', left: '50%', transform: 'translateX(-50%)' }
+                }
             },
             {
                 id: 'admin_tester',
@@ -28,7 +39,18 @@ export class PlayerConfigManager {
                 maxMultiJumps: 0,
                 jumpAnimationType: 'none',
                 fallAnimationType: 'none',
-                statModes: {}
+                statModes: {},
+                hudSettings: {
+                    showHealth: true,
+                    healthStyle: 'bar',
+                    healthPos: { top: '85%', left: '5%' },
+                    showJump: true,
+                    jumpStyle: 'bar', // Using bar for test
+                    jumpPos: { top: '80%', left: '5%' },
+                    showInventory: true,
+                    inventorySlots: 5,
+                    inventoryPos: { top: '90%', left: '50%', transform: 'translateX(-50%)' }
+                }
             }
         ];
         this.currentProfileId = 'admin_tester'; // Default to admin for editor
@@ -65,7 +87,18 @@ export class PlayerConfigManager {
             maxMultiJumps: 1,
             jumpAnimationType: 'none',
             fallAnimationType: 'none',
-            statModes: {}
+            statModes: {},
+            hudSettings: {
+                showHealth: true,
+                healthStyle: 'bar',
+                healthPos: { top: '85%', left: '5%' },
+                showJump: true,
+                jumpStyle: 'bar',
+                jumpPos: { top: '80%', left: '5%' },
+                showInventory: true,
+                inventorySlots: 5,
+                inventoryPos: { top: '90%', left: '50%', transform: 'translateX(-50%)' }
+            }
         };
         this.profiles.push(newProfile);
         return newProfile;
@@ -107,13 +140,8 @@ export class PlayerConfigManager {
         return this.assignments;
     }
 
-    // Apply configuration to current game state
-    applyConfiguration() {
-        if (!this.game.character) return;
-
-        // For single player / editor, we just apply the "default" or selected logic
-        // In a real multiplayer match, this would handle distribution.
-
+    getCurrentProfile() {
+        // Simple logic for single player / editor
         let profileToApply = this.getProfile('default');
 
         if (this.assignments.mode === 'all') {
@@ -122,6 +150,15 @@ export class PlayerConfigManager {
         } else if (this.assignments.mode === 'random') {
             profileToApply = this.profiles[Math.floor(Math.random() * this.profiles.length)];
         }
+
+        return profileToApply;
+    }
+
+    // Apply configuration to current game state
+    applyConfiguration() {
+        if (!this.game.character) return;
+
+        const profileToApply = this.getCurrentProfile();
 
         if (profileToApply) {
             this.applyToCharacter(this.game.character, profileToApply);
@@ -146,9 +183,24 @@ export class PlayerConfigManager {
                 fallAnimationType: profile.fallAnimationType
             });
         } else {
-            // Fallback direct assignment if method doesn't exist yet
+            // Fallback
             character.speed = profile.speed;
             character.jumpForce = profile.jumpForce;
+        }
+
+        // Apply HUD Settings if available
+        if (this.game.hud && profile.hudSettings) {
+            this.game.hud.createHUD(profile.hudSettings);
+
+            // Force an update to show current values immediately
+            if (character.currentHealth !== undefined) {
+                this.game.hud.updateHealth(character.currentHealth, character.maxHealth);
+            }
+            if (character.maxMultiJumps !== undefined) {
+                // Calculate available jumps
+                const jumpsLeft = character.maxMultiJumps - (character.jumpCount || 0);
+                this.game.hud.updateJump(jumpsLeft, character.maxMultiJumps);
+            }
         }
     }
 

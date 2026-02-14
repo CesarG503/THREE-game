@@ -1,3 +1,5 @@
+import { animate } from 'animejs';
+
 export class GameHUD {
     constructor() {
         this.container = document.createElement('div')
@@ -9,6 +11,213 @@ export class GameHUD {
         document.body.appendChild(this.container)
 
         this.timerElement = null
+        this.healthElement = null
+        this.jumpElement = null
+        this.inventoryElement = null
+
+        this.settings = {}
+    }
+
+    createHUD(settings) {
+        this.settings = settings || {};
+
+        // Clear existing (except timer)
+        if (this.healthElement) this.healthElement.remove();
+        if (this.jumpElement) this.jumpElement.remove();
+        if (this.inventoryElement) this.inventoryElement.remove();
+
+        if (this.settings.showHealth) this.createHealth(this.settings);
+        if (this.settings.showJump) this.createJump(this.settings);
+        if (this.settings.showInventory) this.createInventory(this.settings);
+    }
+
+    createHealth(s) {
+        const el = document.createElement('div');
+        el.id = 'hud-health';
+        el.style.cssText = `display: flex; gap: 5px; position: absolute; pointer-events: none;`;
+
+        if (s.healthStyle === 'bar') {
+            el.innerHTML = `
+                <div style="width: 300px; height: 20px; background: rgba(0,0,0,0.7); border: 2px solid #333; border-radius: 10px; position:relative; overflow:hidden;">
+                    <div id="hud-health-bar" style="width: 100%; height: 100%; background: linear-gradient(90deg, #ff3333, #ff6666);"></div>
+                    <div id="hud-health-text" style="position:absolute; top:0; left:0; width:100%; height:100%; display:flex; align-items:center; justify-content:center; color:white; font-size:12px; font-weight:bold;">100 / 100</div>
+                </div>
+            `;
+        } else if (s.healthStyle === 'hearts') {
+            el.innerHTML = `<span id="hud-health-hearts" style="font-size:24px; color:#ff3333;">❤❤❤❤❤</span>`;
+        } else {
+            el.innerHTML = `<span id="hud-health-simple" style="font-size:40px; font-weight:900; color:#ff3333; -webkit-text-stroke:1px white;">100</span>`;
+        }
+
+        this.applyPosition(el, s.healthPos);
+        this.container.appendChild(el);
+        this.healthElement = el;
+    }
+
+    createJump(s) {
+        const el = document.createElement('div');
+        el.id = 'hud-jump';
+        el.style.cssText = `display: flex; align-items: center; position: absolute; pointer-events: none;`;
+
+        if (s.jumpStyle === 'bar') {
+            el.innerHTML = `
+                <div style="width: 200px; height: 8px; background: rgba(0,0,0,0.7); border-radius: 4px; overflow:hidden; margin-left:5px;">
+                    <div id="hud-jump-bar" style="width: 100%; height: 100%; background: linear-gradient(90deg, #33ccff, #3388ff);"></div>
+                </div>
+            `;
+        } else {
+            el.innerHTML = `
+               <svg width="50" height="50" style="transform: rotate(-90deg)">
+                   <circle cx="25" cy="25" r="20" stroke="rgba(0,0,0,0.5)" stroke-width="5" fill="transparent"/>
+                   <circle id="hud-jump-circle" cx="25" cy="25" r="20" stroke="#33ccff" stroke-width="5" fill="transparent" stroke-dasharray="125.6" stroke-dashoffset="0"/>
+               </svg>
+            `;
+        }
+
+        this.applyPosition(el, s.jumpPos);
+        this.container.appendChild(el);
+        this.jumpElement = el;
+    }
+
+    createInventory(s) {
+        const el = document.createElement('div');
+        el.id = 'hud-inventory';
+        el.style.cssText = `
+            display: flex; gap: 8px; background: rgba(0,0,0,0.5); padding: 8px; border-radius: 8px;
+            border: 1px solid rgba(255,255,255,0.1); position: absolute; pointer-events: auto;
+        `;
+
+        for (let i = 0; i < s.inventorySlots; i++) {
+            el.innerHTML += `
+                <div class="hud-slot" data-index="${i}" style="width:50px; height:50px; background:rgba(0,0,0,0.3); border:2px solid ${i === 0 ? '#fff' : '#888'}; border-radius:6px; display:flex; align-items:center; justify-content:center; cursor: pointer; transition: transform 0.1s;">
+                    <div style="color:rgba(255,255,255,0.5);">${i + 1}</div>
+                </div>
+            `;
+        }
+
+        this.applyPosition(el, s.inventoryPos);
+        this.container.appendChild(el);
+        this.inventoryElement = el;
+    }
+
+    updateHealth(current, max) {
+        if (!this.healthElement) return;
+
+        if (this.settings.healthStyle === 'bar') {
+            const bar = this.healthElement.querySelector('#hud-health-bar');
+            const txt = this.healthElement.querySelector('#hud-health-text');
+
+            const pct = Math.max(0, (current / max) * 100);
+
+            if (bar) {
+                animate(bar, {
+                    width: `${pct}%`,
+                    duration: 300,
+                    easing: 'easeOutQuad'
+                });
+            }
+            if (txt) txt.textContent = `${Math.ceil(current)} / ${max}`;
+
+        } else if (this.settings.healthStyle === 'hearts') {
+            // Visualize 1 heart per 20hp? Or just simple hearts
+            const hearts = this.healthElement.querySelector('#hud-health-hearts');
+            const totalHearts = 5;
+            const hpPerHeart = max / totalHearts;
+            const heartsCount = Math.ceil(current / hpPerHeart);
+            let str = "";
+            for (let i = 0; i < totalHearts; i++) {
+                str += (i < heartsCount) ? "❤" : "♡";
+            }
+            if (hearts) hearts.textContent = str;
+
+        } else {
+            const txt = this.healthElement.querySelector('#hud-health-simple');
+            if (txt) {
+                // Animate number? 
+                txt.textContent = Math.ceil(current);
+            }
+        }
+    }
+
+    updateJump(current, max) {
+        if (!this.jumpElement) return;
+
+        if (this.settings.jumpStyle === 'bar') {
+            const bar = this.jumpElement.querySelector('#hud-jump-bar');
+            const pct = Math.max(0, (current / max) * 100);
+            if (bar) {
+                animate(bar, {
+                    width: `${pct}%`,
+                    duration: 200,
+                    easing: 'easeOutQuad'
+                });
+            }
+        } else {
+            const circle = this.jumpElement.querySelector('#hud-jump-circle');
+            if (circle) {
+                const totalLength = 125.6; // 2 * PI * r (r=20)
+                const pct = current / max;
+                const offset = totalLength * (1 - pct);
+
+                animate(circle, {
+                    strokeDashoffset: offset,
+                    duration: 200,
+                    easing: 'easeOutQuad'
+                });
+            }
+        }
+    }
+
+    applyPosition(el, pos) {
+        if (!pos) return;
+        // Check if explicit top/left props exist in pos object
+        if (pos.top) el.style.top = pos.top;
+        if (pos.left) el.style.left = pos.left;
+        if (pos.bottom) el.style.bottom = pos.bottom;
+        if (pos.right) el.style.right = pos.right;
+        if (pos.transform) el.style.transform = pos.transform;
+        else el.style.transform = 'none';
+
+        // Backward compatibility if only using predefined strings 
+        if (typeof pos === 'string') {
+            this.applyPresetPosition(el, pos);
+        }
+    }
+
+    applyPresetPosition(el, pos) {
+        const margin = "20px"
+        switch (pos) {
+            case 'top-left':
+                el.style.top = margin; el.style.left = margin;
+                break;
+            case 'top-center':
+                el.style.top = margin; el.style.left = "50%"; el.style.transform = "translateX(-50%)";
+                break;
+            case 'top-right':
+                el.style.top = margin; el.style.right = margin;
+                break;
+            case 'middle-left':
+                el.style.top = "50%"; el.style.left = margin; el.style.transform = "translateY(-50%)";
+                break;
+            case 'center':
+                el.style.top = "50%"; el.style.left = "50%"; el.style.transform = "translate(-50%, -50%)";
+                break;
+            case 'middle-right':
+                el.style.top = "50%"; el.style.right = margin; el.style.transform = "translateY(-50%)";
+                break;
+            case 'bottom-left':
+                el.style.bottom = margin; el.style.left = margin;
+                break;
+            case 'bottom-center':
+                el.style.bottom = margin; el.style.left = "50%"; el.style.transform = "translateX(-50%)";
+                break;
+            case 'bottom-right':
+                el.style.bottom = margin; el.style.right = margin;
+                break;
+            default: // Default Top Center
+                el.style.top = margin; el.style.left = "50%"; el.style.transform = "translateX(-50%)";
+                break;
+        }
     }
 
     updateTimer(timeSeconds, style, position = 'top-center') {
@@ -46,42 +255,6 @@ export class GameHUD {
             this.applySportsStyle(this.timerElement)
         } else {
             this.applyNeonStyle(this.timerElement)
-        }
-    }
-
-    applyPosition(el, pos) {
-        const margin = "20px"
-        switch (pos) {
-            case 'top-left':
-                el.style.top = margin; el.style.left = margin;
-                break;
-            case 'top-center':
-                el.style.top = margin; el.style.left = "50%"; el.style.transform = "translateX(-50%)";
-                break;
-            case 'top-right':
-                el.style.top = margin; el.style.right = margin;
-                break;
-            case 'middle-left':
-                el.style.top = "50%"; el.style.left = margin; el.style.transform = "translateY(-50%)";
-                break;
-            case 'center':
-                el.style.top = "50%"; el.style.left = "50%"; el.style.transform = "translate(-50%, -50%)";
-                break;
-            case 'middle-right':
-                el.style.top = "50%"; el.style.right = margin; el.style.transform = "translateY(-50%)";
-                break;
-            case 'bottom-left':
-                el.style.bottom = margin; el.style.left = margin;
-                break;
-            case 'bottom-center':
-                el.style.bottom = margin; el.style.left = "50%"; el.style.transform = "translateX(-50%)";
-                break;
-            case 'bottom-right':
-                el.style.bottom = margin; el.style.right = margin;
-                break;
-            default: // Default Top Center
-                el.style.top = margin; el.style.left = "50%"; el.style.transform = "translateX(-50%)";
-                break;
         }
     }
 

@@ -59,6 +59,25 @@ export class CharacterController {
         this.initPhysics()
         this.particleSystem = new ParticleSystem(scene)
         this.setModelType(this.currentType) // Initialize visibility
+
+        // Event System
+        this.listeners = {};
+    }
+
+    on(event, callback) {
+        if (!this.listeners[event]) this.listeners[event] = [];
+        this.listeners[event].push(callback);
+    }
+
+    off(event, callback) {
+        if (!this.listeners[event]) return;
+        this.listeners[event] = this.listeners[event].filter(cb => cb !== callback);
+    }
+
+    emit(event, data) {
+        if (this.listeners[event]) {
+            this.listeners[event].forEach(cb => cb(data));
+        }
     }
 
     setModelType(type) {
@@ -256,7 +275,10 @@ export class CharacterController {
         // Jump Logic
         // Reset Jump Count if grounded
         if (isGrounded) {
-            this.jumpCount = 0;
+            if (this.jumpCount > 0) {
+                this.jumpCount = 0;
+                this.emit('jumpChanged', { current: this.maxMultiJumps, max: this.maxMultiJumps, type: 'reset' });
+            }
         }
 
         // Detect Jump Trigger (Rising Edge)
@@ -276,6 +298,12 @@ export class CharacterController {
                 this.verticalVelocity = this.jumpForce;
                 this.jumpCount++;
                 console.log(`Multi-Jump: ${this.jumpCount}/${this.maxMultiJumps}`);
+
+                this.emit('jumpChanged', {
+                    current: this.maxMultiJumps - this.jumpCount,
+                    max: this.maxMultiJumps,
+                    type: 'air-jump'
+                });
 
                 if (this.particleSystem) {
                     this.particleSystem.spawnJumpEffect(this.getPosition());
@@ -460,6 +488,8 @@ export class CharacterController {
         this.currentHealth -= amount
         console.log(`Player Health: ${this.currentHealth}/${this.maxHealth}`)
 
+        this.emit('healthChanged', { current: this.currentHealth, max: this.maxHealth });
+
         if (this.currentHealth <= 0) {
             this.die()
         }
@@ -488,6 +518,9 @@ export class CharacterController {
 
         this.isDead = false
         this.currentHealth = this.maxHealth
+
+        this.emit('healthChanged', { current: this.currentHealth, max: this.maxHealth });
+        this.emit('jumpChanged', { current: this.maxMultiJumps, max: this.maxMultiJumps });
 
         // Reset Position (Teleport)
         // Ideally use a Spawn Point from LogicSystem if available, else startPosition

@@ -23,6 +23,8 @@ import { PelotaItem } from "./item/PelotaItem.js"
 import { MapObjectItem } from "./item/MapObjectItem.js"
 import { ObjectInspector } from "./ui/ObjectInspector.js"
 import { StairsUtils } from "./utils/StairsUtils.js"
+import { PlayerConfigManager } from "./managers/PlayerConfigManager.js"
+import { GameHUD } from "./ui/GameHUD.js"
 
 class Game {
     constructor() {
@@ -57,6 +59,10 @@ class Game {
             this.character.canFly = true;
             console.log("Editor Mode Enabled: Flight Active");
         }
+
+        // Managers & UI
+        this.playerConfigManager = new PlayerConfigManager(this)
+        this.hud = new GameHUD() // Shared HUD
 
         // Camera Controller
         this.cameraController = new CameraController(
@@ -136,6 +142,23 @@ class Game {
         if (this.gameMode !== 'editor') {
             this.setupMultiplayerUI()
         }
+
+        // --- HUD & Player Init ---
+        const profile = this.playerConfigManager.getCurrentProfile()
+        if (profile) {
+            // Apply stats
+            if (profile.stats) this.character.setStats(profile.stats)
+            // Init HUD
+            if (profile.hudSettings) this.hud.createHUD(profile.hudSettings)
+        }
+
+        // Wiring Events
+        this.character.on('healthChanged', (data) => {
+            this.hud.updateHealth(data.current, data.max)
+        })
+        this.character.on('jumpChanged', (data) => {
+            this.hud.updateJump(data.current, data.max)
+        })
 
         // --- New Inventory System ---
         this.inventoryManager = new InventoryManager("inventory-container")

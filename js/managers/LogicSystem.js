@@ -12,7 +12,8 @@ export class LogicSystem {
         this.editingObject = null
         this.toolbar = new LogicToolbar(game)
         this.sequenceEditor = new LogicSequenceEditor(game, this)
-        this.hud = new GameHUD()
+        // this.hud = new GameHUD() // Use shared HUD from Game
+        this.hud = this.game.hud
         this.playerConfigManager = new PlayerConfigManager(game)
 
         // Toolbar Callbacks

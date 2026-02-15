@@ -552,10 +552,14 @@ export class HUDConfigPanel {
 
     renderPreviewInventory() {
         const el = document.createElement('div');
-        // Match #inventory-container styles roughly for preview
+        // Match #inventory-container styles from main.css exactly
         el.className = "inventory-container-preview";
         el.style.cssText = `
-            display: flex; gap: 8px; justify-content: center;
+            display: flex; gap: 10px; justify-content: center;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 10px;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
         `;
 
         // Use the same structure as game.html

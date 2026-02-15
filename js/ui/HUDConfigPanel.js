@@ -43,6 +43,13 @@ export class HUDConfigPanel {
         if (this.tempSettings.inventorySlotSize === undefined) this.tempSettings.inventorySlotSize = 50;
         if (!this.tempSettings.inventoryPos) this.tempSettings.inventoryPos = { top: '90%', left: '50%', transform: 'translateX(-50%)' };
 
+        // New Inventory Defaults
+        if (this.tempSettings.inventoryContainerWidth === undefined) this.tempSettings.inventoryContainerWidth = 350;
+        if (this.tempSettings.inventoryContainerHeight === undefined) this.tempSettings.inventoryContainerHeight = 80;
+        if (this.tempSettings.inventoryPadding === undefined) this.tempSettings.inventoryPadding = 10;
+        if (this.tempSettings.inventoryFreeLayout === undefined) this.tempSettings.inventoryFreeLayout = false;
+        if (!this.tempSettings.inventorySlotPositions) this.tempSettings.inventorySlotPositions = [];
+
         this.createUI();
 
         // Animate Entry
@@ -422,6 +429,79 @@ export class HUDConfigPanel {
 
             sec.appendChild(sizeLabel);
             sec.appendChild(sizeInput);
+
+            // Container Dimensions
+            const dimRow = document.createElement('div');
+            dimRow.style.cssText = "display: flex; gap: 10px; margin-top: 10px;";
+
+            // Width
+            const widthContainer = document.createElement('div');
+            const wLabel = document.createElement('div');
+            wLabel.textContent = "Ancho Fondo";
+            wLabel.style.fontSize = "10px"; wLabel.style.color = "#aaa";
+            const wInput = document.createElement('input');
+            wInput.type = "number"; wInput.min = 50; wInput.value = this.tempSettings.inventoryContainerWidth || 300;
+            wInput.style.cssText = "width: 100%; background: #333; color: white; border: 1px solid #555;";
+            wInput.onchange = (e) => {
+                this.tempSettings.inventoryContainerWidth = parseInt(e.target.value) || 300;
+                this.updatePreview();
+            };
+            widthContainer.appendChild(wLabel);
+            widthContainer.appendChild(wInput);
+
+            // Height
+            const heightContainer = document.createElement('div');
+            const hLabel = document.createElement('div');
+            hLabel.textContent = "Alto Fondo";
+            hLabel.style.fontSize = "10px"; hLabel.style.color = "#aaa";
+            const hInput = document.createElement('input');
+            hInput.type = "number"; hInput.min = 50; hInput.value = this.tempSettings.inventoryContainerHeight || 100;
+            hInput.style.cssText = "width: 100%; background: #333; color: white; border: 1px solid #555;";
+            hInput.onchange = (e) => {
+                this.tempSettings.inventoryContainerHeight = parseInt(e.target.value) || 100;
+                this.updatePreview();
+            };
+            heightContainer.appendChild(hLabel);
+            heightContainer.appendChild(hInput);
+
+            dimRow.appendChild(widthContainer);
+            dimRow.appendChild(heightContainer);
+            sec.appendChild(dimRow);
+
+            // Free Layout Toggle
+            const freeRow = document.createElement('div');
+            freeRow.style.cssText = "margin-top: 10px; display: flex; align-items: center; gap: 10px;";
+            const freeCheck = document.createElement('input');
+            freeCheck.type = "checkbox";
+            freeCheck.checked = this.tempSettings.inventoryFreeLayout || false;
+            freeCheck.onchange = (e) => {
+                this.tempSettings.inventoryFreeLayout = e.target.checked;
+                this.updatePreview();
+            };
+            const freeLabel = document.createElement('label');
+            freeLabel.textContent = "Diseño Libre (Mover Slots)";
+            freeLabel.style.color = "#ccc";
+            freeLabel.style.fontSize = "12px";
+            freeRow.appendChild(freeCheck);
+            freeRow.appendChild(freeLabel);
+            sec.appendChild(freeRow);
+
+            // Padding
+            const padRow = document.createElement('div');
+            padRow.style.cssText = "margin-top: 10px; display: flex; align-items: center; gap: 10px;";
+            const padLabel = document.createElement('label');
+            padLabel.textContent = "Padding:";
+            padLabel.style.color = "#aaa";
+            const padInput = document.createElement('input');
+            padInput.type = "number"; padInput.value = this.tempSettings.inventoryPadding !== undefined ? this.tempSettings.inventoryPadding : 10;
+            padInput.style.cssText = "width: 50px; background: #333; color: white; border: 1px solid #555;";
+            padInput.onchange = (e) => {
+                this.tempSettings.inventoryPadding = parseInt(e.target.value) || 0;
+                this.updatePreview();
+            };
+            padRow.appendChild(padLabel);
+            padRow.appendChild(padInput);
+            sec.appendChild(padRow);
         }
 
         parent.appendChild(sec);
@@ -578,19 +658,39 @@ export class HUDConfigPanel {
 
     renderPreviewInventory() {
         const el = document.createElement('div');
-        // Match #inventory-container styles from main.css exactly, but with fit-content behavior
+        // Match #inventory-container styles from main.css roughly
         el.className = "inventory-container-preview";
+
+        const padding = this.tempSettings.inventoryPadding !== undefined ? this.tempSettings.inventoryPadding : 10;
+        const width = this.tempSettings.inventoryContainerWidth || 300;
+        const height = this.tempSettings.inventoryContainerHeight || 100;
+        const isFree = this.tempSettings.inventoryFreeLayout;
+
         el.style.cssText = `
-            display: flex; gap: 10px; justify-content: center;
             background: rgba(0, 0, 0, 0.5);
-            padding: 10px;
+            padding: ${padding}px;
             border-radius: 12px;
             border: 1px solid rgba(255, 255, 255, 0.1);
-            width: max-content; /* Ensure background hugs content */
-            height: max-content;
+            width: ${width}px;
+            height: ${height}px;
+            position: relative;
+            box-sizing: border-box; /* Important for padding */
         `;
 
+        if (isFree) {
+            el.style.display = 'block';
+        } else {
+            el.style.display = 'flex';
+            el.style.gap = '10px';
+            el.style.justifyContent = 'center';
+            el.style.alignItems = 'center';
+            el.style.flexWrap = 'wrap';
+            // If not free, allow flex to overflow or wrap, but better to keep fixed size if user set it?
+            // If user set size, we must respect it. If content overflows, it overflows.
+        }
+
         const size = this.tempSettings.inventorySlotSize || 50;
+        if (!this.tempSettings.inventorySlotPositions) this.tempSettings.inventorySlotPositions = [];
 
         // Use the same structure as game.html
         for (let i = 0; i < this.tempSettings.inventorySlots; i++) {
@@ -598,14 +698,46 @@ export class HUDConfigPanel {
 
             const slot = document.createElement('div');
             slot.className = `inventory-slot ${isActive ? 'active' : ''}`;
-            // Inline minimal styles to ensure it looks right even if CSS is quirky in preview
-            // Use the dynamic size
-            slot.style.position = 'relative';
+
+            // Basic Slot Styles
             slot.style.width = size + 'px';
             slot.style.height = size + 'px';
+            slot.style.display = 'flex'; // Ensure flex for content centering
+            slot.style.alignItems = 'center';
+            slot.style.justifyContent = 'center';
+            slot.style.backgroundColor = 'rgba(0,0,0,0.3)';
+            slot.style.border = '1px solid #444';
+            slot.style.borderRadius = '8px';
+            slot.style.boxSizing = 'border-box';
+            slot.style.userSelect = 'none';
+
+            if (isFree) {
+                slot.style.position = 'absolute';
+                // Load position or default
+                let pos = this.tempSettings.inventorySlotPositions[i];
+                if (!pos) {
+                    // Default grid layout if no position saved yet
+                    const cols = Math.floor((width - padding * 2) / (size + 10));
+                    const row = Math.floor(i / cols);
+                    const col = i % cols;
+                    pos = {
+                        left: (padding + col * (size + 10)) + 'px',
+                        top: (padding + row * (size + 10)) + 'px'
+                    };
+                    this.tempSettings.inventorySlotPositions[i] = pos;
+                }
+                slot.style.left = pos.left;
+                slot.style.top = pos.top;
+
+                // Make draggable within container
+                this.makeSlotDraggable(slot, el, i);
+            } else {
+                slot.style.position = 'relative';
+                // Reset standard flex behavior
+            }
 
             slot.innerHTML = `
-                <span class="slot-number" style="font-size: ${Math.max(10, size / 5)}px;">${i + 1}</span>
+                <span class="slot-number" style="font-size: ${Math.max(10, size / 5)}px; position:absolute; top:2px; left:5px; color:rgba(255,255,255,0.7);">${i + 1}</span>
                 ${i < 2 ? `<div style="width:70%; height:70%; background:rgba(255,255,255,0.2); border-radius:4px;"></div>` : ''} 
              `;
 
@@ -614,12 +746,61 @@ export class HUDConfigPanel {
 
         this.contentWrapper.appendChild(el);
 
-        // Enable Resizing for Inventory (Scaling slots)
-        this.makeResizable(el, 'inventory');
+        // Enable Resizing for Inventory Container
+        // We reuse makeResizable but update it to handle resizing the CONTAINER, not the slots (slots are resized with input)
+        // Wait, the previous logic used resizing to change slot size. Now we want it to change container size.
+        // Let's change the resizing logic for inventory to affect container Width/Height
+        this.makeResizable(el, 'inventoryContainer');
 
         this.layoutSystem.registerElement(el, 'inventory', this.tempSettings.inventoryPos, (newPos) => {
             this.tempSettings.inventoryPos = newPos;
         });
+    }
+
+    makeSlotDraggable(slot, container, index) {
+        slot.onmousedown = (e) => {
+            e.preventDefault();
+            e.stopPropagation(); // Don't drag the main container
+
+            const startX = e.clientX;
+            const startY = e.clientY;
+
+            // Get current left/top as numbers
+            const rect = slot.getBoundingClientRect();
+            const parentRect = container.getBoundingClientRect();
+
+            const offsetX = startX - rect.left;
+            const offsetY = startY - rect.top;
+
+            const onMouseMove = (ev) => {
+                const x = ev.clientX - parentRect.left - offsetX;
+                const y = ev.clientY - parentRect.top - offsetY;
+
+                // Clamp
+                const maxW = parentRect.width - slot.offsetWidth;
+                const maxH = parentRect.height - slot.offsetHeight;
+
+                const clampedX = Math.max(0, Math.min(x, maxW));
+                const clampedY = Math.max(0, Math.min(y, maxH));
+
+                slot.style.left = clampedX + 'px';
+                slot.style.top = clampedY + 'px';
+
+                // Save
+                this.tempSettings.inventorySlotPositions[index] = {
+                    left: clampedX + 'px',
+                    top: clampedY + 'px'
+                };
+            };
+
+            const onMouseUp = () => {
+                document.removeEventListener('mousemove', onMouseMove);
+                document.removeEventListener('mouseup', onMouseUp);
+            };
+
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+        };
     }
 
     save() {
@@ -650,6 +831,9 @@ export class HUDConfigPanel {
             let startW, startH, startSize;
             if (prefix === 'inventory') {
                 startSize = this.tempSettings.inventorySlotSize || 50;
+            } else if (prefix === 'inventoryContainer') {
+                startW = this.tempSettings.inventoryContainerWidth || 300;
+                startH = this.tempSettings.inventoryContainerHeight || 100;
             } else {
                 startW = this.tempSettings[prefix + 'Width'] || 300;
                 startH = this.tempSettings[prefix + 'Height'] || 20;
@@ -660,27 +844,23 @@ export class HUDConfigPanel {
                 const dy = ev.clientY - startY;
 
                 if (prefix === 'inventory') {
-                    // Inventory Scaling Logic
-                    // Use dx (drag right) to increase size
-                    let newSize = startSize + dx;
-                    if (newSize < 30) newSize = 30;
-                    if (newSize > 100) newSize = 100;
+                    // Legacy Inventory Scaling Logic (if we keep it reachable via another means, or remove)
+                    // Currently we switched 'inventory' resizer to 'inventoryContainer' in renderPreviewInventory
+                    // But if we want to keep slot scaling via drag, we need a separate handle or mode.
+                    // For now, let's assume valid 'inventoryContainer' usage.
+                } else if (prefix === 'inventoryContainer') {
+                    let newW = startW + dx;
+                    let newH = startH + dy;
+                    if (newW < 100) newW = 100;
+                    if (newH < 50) newH = 50;
 
-                    this.tempSettings.inventorySlotSize = newSize;
+                    this.tempSettings.inventoryContainerWidth = newW;
+                    this.tempSettings.inventoryContainerHeight = newH;
 
-                    // Update Input if exists
-                    if (this.uiInputs['inventorySlotSize']) {
-                        this.uiInputs['inventorySlotSize'].value = newSize;
-                    }
+                    el.style.width = newW + 'px';
+                    el.style.height = newH + 'px';
 
-                    // Live Update ALL slots
-                    const slots = el.querySelectorAll('.inventory-slot');
-                    slots.forEach(slot => {
-                        slot.style.width = newSize + 'px';
-                        slot.style.height = newSize + 'px';
-                        const num = slot.querySelector('.slot-number');
-                        if (num) num.style.fontSize = Math.max(10, newSize / 5) + 'px';
-                    });
+                    // If free layout, slots stay put. If flex, they might wrap differently.
 
                 } else {
                     // Standard Bar Resizing Logic

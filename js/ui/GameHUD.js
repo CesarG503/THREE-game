@@ -132,6 +132,36 @@ export class GameHUD {
             // Apply positioning from settings
             this.applyPosition(el, s.inventoryPos);
 
+            // Apply Container Style
+            const padding = s.inventoryPadding !== undefined ? s.inventoryPadding : 10;
+            const width = s.inventoryContainerWidth || 300;
+            const height = s.inventoryContainerHeight || 100;
+            const isFree = s.inventoryFreeLayout;
+
+            // Allow container configuration
+            // If user has set specific width/height in config, use it. Otherwise use max-content or similar?
+            // If free layout is ON, we definitely need dimensions.
+            if (s.inventoryContainerWidth) el.style.width = `${width}px`;
+            else el.style.width = 'max-content';
+
+            if (s.inventoryContainerHeight) el.style.height = `${height}px`;
+            else el.style.height = 'max-content';
+
+            el.style.padding = `${padding}px`;
+            el.style.boxSizing = 'border-box'; // Ensure padding doesn't expand width if set
+
+            // Layout Mode
+            if (isFree) {
+                el.style.display = 'block'; // Block to allow absolute children relative to it
+                el.style.position = 'absolute'; // Already absolute via applyPosition
+            } else {
+                el.style.display = 'flex';
+                el.style.gap = '10px';
+                el.style.justifyContent = 'center';
+                el.style.alignItems = 'center';
+                el.style.flexWrap = 'wrap';
+            }
+
             // Handle slot visibility and size based on settings
             const slots = el.querySelectorAll('.inventory-slot');
             const targetCount = s.inventorySlots || 9;
@@ -141,13 +171,35 @@ export class GameHUD {
                 // Apply Size
                 slot.style.width = `${slotSize}px`;
                 slot.style.height = `${slotSize}px`;
+                slot.style.boxSizing = 'border-box';
 
                 // Update Number Font Size
                 const num = slot.querySelector('.slot-number');
-                if (num) num.style.fontSize = `${Math.max(10, slotSize / 5)}px`;
+                if (num) {
+                    num.style.fontSize = `${Math.max(10, slotSize / 5)}px`;
+                    // Restore numbers if they were moved
+                    num.style.position = 'absolute';
+                    num.style.top = '2px';
+                    num.style.left = '5px';
+                }
 
                 if (index < targetCount) {
                     slot.style.display = 'flex';
+
+                    if (isFree) {
+                        slot.style.position = 'absolute';
+                        const pos = (s.inventorySlotPositions && s.inventorySlotPositions[index])
+                            ? s.inventorySlotPositions[index]
+                            : { left: `${padding + (index * (slotSize + 10))}px`, top: `${padding}px` }; // Fallback simple internal layout
+
+                        slot.style.left = pos.left;
+                        slot.style.top = pos.top;
+                    } else {
+                        slot.style.position = 'relative';
+                        slot.style.left = 'auto';
+                        slot.style.top = 'auto';
+                    }
+
                 } else {
                     slot.style.display = 'none';
                 }

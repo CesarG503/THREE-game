@@ -42,19 +42,35 @@ export class GameHUD {
     createHealth(s) {
         const el = document.createElement('div');
         el.id = 'hud-health';
-        el.style.cssText = `display: flex; gap: 5px; position: absolute; pointer-events: none;`;
+        el.style.cssText = `display: flex; gap: 5px; position: absolute; pointer-events: none;`; // Add pointer-events none to container
+
+        // Orientation
+        if (s.healthOrientation === 'vertical') {
+            el.style.flexDirection = 'column-reverse';
+            el.style.alignItems = 'center';
+        } else {
+            el.style.flexDirection = 'row';
+            el.style.alignItems = 'center';
+        }
 
         if (s.healthStyle === 'bar') {
+            const w = s.healthWidth || 300;
+            const h = s.healthHeight || 20;
+            const isVert = s.healthOrientation === 'vertical';
+            const fillDir = isVert ? 'to top' : '90deg';
+
             el.innerHTML = `
-                <div style="width: 300px; height: 20px; background: rgba(0,0,0,0.7); border: 2px solid #333; border-radius: 10px; position:relative; overflow:hidden;">
-                    <div id="hud-health-bar" style="width: 100%; height: 100%; background: linear-gradient(90deg, #ff3333, #ff6666);"></div>
-                    <div id="hud-health-text" style="position:absolute; top:0; left:0; width:100%; height:100%; display:flex; align-items:center; justify-content:center; color:white; font-size:12px; font-weight:bold;">100 / 100</div>
+                <div style="width: ${w}px; height: ${h}px; background: rgba(0,0,0,0.7); border: 2px solid #333; border-radius: ${Math.min(w, h) / 2}px; position:relative; overflow:hidden;">
+                    <div id="health-bar-fill" style="width: 100%; height: 100%; background: linear-gradient(${fillDir}, #ff3333, #ff6666); transform-origin: ${isVert ? 'bottom' : 'left'};"></div>
+                    ${s.healthShowText ?
+                    `<div id="health-text" style="position:absolute; top:0; left:0; width:100%; height:100%; display:flex; align-items:center; justify-content:center; color:white; font-size:${Math.min(w, h) / 1.5}px; font-weight:bold; text-shadow:1px 1px 1px black;">100 / 100</div>`
+                    : ''}
                 </div>
             `;
         } else if (s.healthStyle === 'hearts') {
-            el.innerHTML = `<span id="hud-health-hearts" style="font-size:24px; color:#ff3333;">❤❤❤❤❤</span>`;
+            el.innerHTML = `<span style="font-size:24px; color:#ff3333;">❤❤❤❤</span><span style="font-size:24px; color:#555;">♡</span>`;
         } else {
-            el.innerHTML = `<span id="hud-health-simple" style="font-size:40px; font-weight:900; color:#ff3333; -webkit-text-stroke:1px white;">100</span>`;
+            el.innerHTML = `<span id="health-text-simple" style="font-size:40px; font-weight:900; color:#ff3333; -webkit-text-stroke:1px white;">100</span>`;
         }
 
         this.applyPosition(el, s.healthPos);
@@ -67,17 +83,32 @@ export class GameHUD {
         el.id = 'hud-jump';
         el.style.cssText = `display: flex; align-items: center; position: absolute; pointer-events: none;`;
 
+        // Orientation
+        if (s.jumpOrientation === 'vertical') {
+            el.style.flexDirection = 'column-reverse';
+        } else {
+            el.style.flexDirection = 'row';
+        }
+
         if (s.jumpStyle === 'bar') {
+            const w = s.jumpWidth || 200;
+            const h = s.jumpHeight || 8;
+            const isVert = s.jumpOrientation === 'vertical';
+            const fillDir = isVert ? 'to top' : '90deg';
+
             el.innerHTML = `
-                <div style="width: 200px; height: 8px; background: rgba(0,0,0,0.7); border-radius: 4px; overflow:hidden; margin-left:5px;">
-                    <div id="hud-jump-bar" style="width: 100%; height: 100%; background: linear-gradient(90deg, #33ccff, #3388ff);"></div>
+                <div style="width: ${w}px; height: ${h}px; background: rgba(0,0,0,0.7); border-radius: ${Math.min(w, h) / 2}px; overflow:hidden; position:relative;">
+                    <div id="jump-bar-fill" style="width: 100%; height: 100%; background: linear-gradient(${fillDir}, #33ccff, #3388ff); transform-origin: ${isVert ? 'bottom' : 'left'};"></div>
+                     ${s.jumpShowText ?
+                    `<div id="jump-text" style="position:absolute; top:0; left:0; width:100%; height:100%; display:flex; align-items:center; justify-content:center; color:white; font-size:${Math.min(w, h) / 1.5}px; font-weight:bold; text-shadow:1px 1px 1px black;">1</div>`
+                    : ''}
                 </div>
             `;
         } else {
             el.innerHTML = `
                <svg width="50" height="50" style="transform: rotate(-90deg)">
                    <circle cx="25" cy="25" r="20" stroke="rgba(0,0,0,0.5)" stroke-width="5" fill="transparent"/>
-                   <circle id="hud-jump-circle" cx="25" cy="25" r="20" stroke="#33ccff" stroke-width="5" fill="transparent" stroke-dasharray="125.6" stroke-dashoffset="0"/>
+                   <circle id="jump-circle-fill" cx="25" cy="25" r="20" stroke="#33ccff" stroke-width="5" fill="transparent" stroke-dasharray="125.6" stroke-dashoffset="125.6"/>
                </svg>
             `;
         }
@@ -119,66 +150,87 @@ export class GameHUD {
     updateHealth(current, max) {
         if (!this.healthElement) return;
 
+        // Ensure valid numbers
+        current = typeof current === 'number' ? current : 100;
+        max = (typeof max === 'number' && max > 0) ? max : 100;
+
+        // Health Bar
         if (this.settings.healthStyle === 'bar') {
-            const bar = this.healthElement.querySelector('#hud-health-bar');
-            const txt = this.healthElement.querySelector('#hud-health-text');
+            const fill = this.healthElement.querySelector('#health-bar-fill');
+            const text = this.healthElement.querySelector('#health-text');
+            const percentage = Math.max(0, Math.min(100, (current / max) * 100));
 
-            const pct = Math.max(0, (current / max) * 100);
+            if (fill) {
+                // Determine property based on orientation
+                const isVert = this.settings.healthOrientation === 'vertical';
+                const prop = isVert ? 'height' : 'width';
 
-            if (bar) {
-                animate(bar, {
-                    width: `${pct}%`,
-                    duration: 300,
-                    easing: 'easeOutQuad'
+                // API v4: animate(targets, parameters)
+                animate(fill, {
+                    [prop]: `${percentage}%`,
+                    easing: 'easeOutQuad',
+                    duration: 300
                 });
             }
-            if (txt) txt.textContent = `${Math.ceil(current)} / ${max}`;
+
+            if (text) {
+                text.textContent = `${Math.round(current)} / ${max}`;
+            }
 
         } else if (this.settings.healthStyle === 'hearts') {
-            // Visualize 1 heart per 20hp? Or just simple hearts
-            const hearts = this.healthElement.querySelector('#hud-health-hearts');
-            const totalHearts = 5;
-            const hpPerHeart = max / totalHearts;
-            const heartsCount = Math.ceil(current / hpPerHeart);
-            let str = "";
-            for (let i = 0; i < totalHearts; i++) {
-                str += (i < heartsCount) ? "❤" : "♡";
-            }
-            if (hearts) hearts.textContent = str;
+            // Hearts logic (simplified for now, just text change or visual)
+            // ... existing heart logic or placeholder
+            const hearts = Math.ceil((current / max) * 5);
+            let hStr = "";
+            for (let i = 0; i < 5; i++) hStr += (i < hearts ? "❤" : "♡");
+            this.healthElement.innerHTML = `<span style="font-size:24px; color:#ff3333;">${hStr}</span>`;
 
         } else {
-            const txt = this.healthElement.querySelector('#hud-health-simple');
-            if (txt) {
-                // Animate number? 
-                txt.textContent = Math.ceil(current);
-            }
+            // Simple Text
+            const txt = this.healthElement.querySelector('#health-text-simple');
+            if (txt) txt.textContent = Math.round(current);
         }
     }
 
     updateJump(current, max) {
         if (!this.jumpElement) return;
 
+        // Ensure valid numbers
+        current = typeof current === 'number' ? current : 0;
+        max = (typeof max === 'number' && max > 0) ? max : 1;
+
         if (this.settings.jumpStyle === 'bar') {
-            const bar = this.jumpElement.querySelector('#hud-jump-bar');
-            const pct = Math.max(0, (current / max) * 100);
-            if (bar) {
-                animate(bar, {
-                    width: `${pct}%`,
-                    duration: 200,
-                    easing: 'easeOutQuad'
+            const fill = this.jumpElement.querySelector('#jump-bar-fill');
+            const text = this.jumpElement.querySelector('#jump-text'); // If text is enabled
+            const percentage = Math.max(0, Math.min(100, (current / max) * 100));
+
+            if (fill) {
+                const isVert = this.settings.jumpOrientation === 'vertical';
+                const prop = isVert ? 'height' : 'width';
+
+                // API v4: animate(targets, parameters)
+                animate(fill, {
+                    [prop]: `${percentage}%`,
+                    easing: 'easeOutQuad',
+                    duration: 100
                 });
             }
-        } else {
-            const circle = this.jumpElement.querySelector('#hud-jump-circle');
-            if (circle) {
-                const totalLength = 125.6; // 2 * PI * r (r=20)
-                const pct = current / max;
-                const offset = totalLength * (1 - pct);
+            if (text) {
+                text.textContent = Math.floor(current);
+            }
 
+        } else {
+            // Circle
+            const circle = this.jumpElement.querySelector('#jump-circle-fill');
+            if (circle) {
+                const circumference = 2 * Math.PI * 20; // r=20
+                const offset = circumference - ((current / max) * circumference);
+
+                // API v4: animate(targets, parameters)
                 animate(circle, {
                     strokeDashoffset: offset,
-                    duration: 200,
-                    easing: 'easeOutQuad'
+                    easing: 'linear',
+                    duration: 100
                 });
             }
         }

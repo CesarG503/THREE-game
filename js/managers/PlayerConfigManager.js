@@ -19,11 +19,21 @@ export class PlayerConfigManager {
                     showHealth: true,
                     healthStyle: 'bar',
                     healthPos: { top: '85%', left: '5%' },
+                    healthShowText: true,
+                    healthOrientation: 'horizontal',
+                    healthWidth: 300,
+                    healthHeight: 20,
+
                     showJump: true,
                     jumpStyle: 'bar',
                     jumpPos: { top: '80%', left: '5%' },
+                    jumpShowText: false, // Jump usually doesn't have text
+                    jumpOrientation: 'horizontal',
+                    jumpWidth: 200,
+                    jumpHeight: 8,
+
                     showInventory: true,
-                    inventorySlots: 5,
+                    inventorySlots: 9,
                     inventoryPos: { top: '90%', left: '50%', transform: 'translateX(-50%)' }
                 }
             },
@@ -44,11 +54,21 @@ export class PlayerConfigManager {
                     showHealth: true,
                     healthStyle: 'bar',
                     healthPos: { top: '85%', left: '5%' },
+                    healthShowText: true,
+                    healthOrientation: 'horizontal',
+                    healthWidth: 300,
+                    healthHeight: 20,
+
                     showJump: true,
                     jumpStyle: 'bar', // Using bar for test
                     jumpPos: { top: '80%', left: '5%' },
+                    jumpShowText: false,
+                    jumpOrientation: 'horizontal',
+                    jumpWidth: 200,
+                    jumpHeight: 8,
+
                     showInventory: true,
-                    inventorySlots: 5,
+                    inventorySlots: 9,
                     inventoryPos: { top: '90%', left: '50%', transform: 'translateX(-50%)' }
                 }
             }
@@ -92,11 +112,21 @@ export class PlayerConfigManager {
                 showHealth: true,
                 healthStyle: 'bar',
                 healthPos: { top: '85%', left: '5%' },
+                healthShowText: true,
+                healthOrientation: 'horizontal',
+                healthWidth: 300,
+                healthHeight: 20,
+
                 showJump: true,
                 jumpStyle: 'bar',
                 jumpPos: { top: '80%', left: '5%' },
+                jumpShowText: false,
+                jumpOrientation: 'horizontal',
+                jumpWidth: 200,
+                jumpHeight: 8,
+
                 showInventory: true,
-                inventorySlots: 5,
+                inventorySlots: 9,
                 inventoryPos: { top: '90%', left: '50%', transform: 'translateX(-50%)' }
             }
         };

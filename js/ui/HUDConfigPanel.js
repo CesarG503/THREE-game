@@ -22,11 +22,19 @@ export class HUDConfigPanel {
         if (this.tempSettings.showHealth === undefined) this.tempSettings.showHealth = true;
         if (this.tempSettings.healthStyle === undefined) this.tempSettings.healthStyle = 'bar';
         if (!this.tempSettings.healthPos) this.tempSettings.healthPos = { top: '85%', left: '5%' };
+        if (this.tempSettings.healthWidth === undefined) this.tempSettings.healthWidth = 300;
+        if (this.tempSettings.healthHeight === undefined) this.tempSettings.healthHeight = 20;
+        if (this.tempSettings.healthOrientation === undefined) this.tempSettings.healthOrientation = 'horizontal';
+        if (this.tempSettings.healthShowText === undefined) this.tempSettings.healthShowText = true;
 
         // Jump
         if (this.tempSettings.showJump === undefined) this.tempSettings.showJump = true;
         if (this.tempSettings.jumpStyle === undefined) this.tempSettings.jumpStyle = 'bar';
         if (!this.tempSettings.jumpPos) this.tempSettings.jumpPos = { top: '80%', left: '5%' };
+        if (this.tempSettings.jumpWidth === undefined) this.tempSettings.jumpWidth = 200;
+        if (this.tempSettings.jumpHeight === undefined) this.tempSettings.jumpHeight = 8;
+        if (this.tempSettings.jumpOrientation === undefined) this.tempSettings.jumpOrientation = 'horizontal';
+        if (this.tempSettings.jumpShowText === undefined) this.tempSettings.jumpShowText = false;
 
         // Inventory
         if (this.tempSettings.showInventory === undefined) this.tempSettings.showInventory = true;
@@ -225,18 +233,123 @@ export class HUDConfigPanel {
         sec.appendChild(visRow);
 
         // Style / Options
-        if (type === 'health') {
-            const styleSel = this.createSelect(['bar', 'hearts', 'text'], ['Barra Clásica', 'Corazones', 'Texto Simple'], this.tempSettings.healthStyle, (v) => {
-                this.tempSettings.healthStyle = v;
+        if (type === 'health' || type === 'jump') {
+            const prefix = type;
+
+            // 1. Style
+            const styleLabel = document.createElement('div');
+            styleLabel.textContent = "Estilo:";
+            styleLabel.style.color = "#aaa";
+            styleLabel.style.marginBottom = "5px";
+            styleLabel.style.fontSize = "12px";
+            sec.appendChild(styleLabel);
+
+            const styles = type === 'health' ? ['bar', 'hearts', 'text'] : ['bar', 'circle'];
+            const styleTexts = type === 'health' ? ['Barra Clásica', 'Corazones', 'Texto Simple'] : ['Barra de Estamina', 'Círculo de Carga'];
+
+            const styleSel = this.createSelect(styles, styleTexts, this.tempSettings[prefix + 'Style'], (v) => {
+                this.tempSettings[prefix + 'Style'] = v;
                 this.updatePreview();
+                // Toggle visibility of bar options
+                updateBarOptionsAccess(v);
             });
             sec.appendChild(styleSel);
-        } else if (type === 'jump') {
-            const styleSel = this.createSelect(['bar', 'circle'], ['Barra de Estamina', 'Círculo de Carga'], this.tempSettings.jumpStyle, (v) => {
-                this.tempSettings.jumpStyle = v;
+
+            // Container for Bar-only options
+            const barOptions = document.createElement('div');
+            barOptions.style.marginTop = "10px";
+            barOptions.style.paddingLeft = "10px";
+            barOptions.style.borderLeft = "2px solid #555";
+
+            // 2. Show Text (Checkbox)
+            const textRow = document.createElement('div');
+            textRow.style.cssText = "margin-bottom: 5px; display: flex; align-items: center; gap: 10px;";
+            const textCheck = document.createElement('input');
+            textCheck.type = "checkbox";
+            const tKey = prefix + 'ShowText';
+            // Default check if undefined in old profile
+            if (this.tempSettings[tKey] === undefined) this.tempSettings[tKey] = true;
+            textCheck.checked = this.tempSettings[tKey];
+            textCheck.onchange = (e) => {
+                this.tempSettings[tKey] = e.target.checked;
+                this.updatePreview();
+            };
+            const textLabel = document.createElement('label');
+            textLabel.textContent = "Mostrar Texto/Dígito";
+            textLabel.style.color = "#ccc";
+            textLabel.style.fontSize = "12px";
+            textRow.appendChild(textCheck);
+            textRow.appendChild(textLabel);
+            barOptions.appendChild(textRow);
+
+            // 3. Orientation
+            const orientRow = document.createElement('div');
+            orientRow.style.marginBottom = "5px";
+            const orientLabel = document.createElement('div');
+            orientLabel.textContent = "Orientación:";
+            orientLabel.style.color = "#aaa";
+            orientLabel.style.fontSize = "12px";
+            orientRow.appendChild(orientLabel);
+            const orientSel = this.createSelect(['horizontal', 'vertical'], ['Horizontal', 'Vertical'], this.tempSettings[prefix + 'Orientation'] || 'horizontal', (v) => {
+                this.tempSettings[prefix + 'Orientation'] = v;
+                // Swap W/H just for UX convenience? No, let user do it.
                 this.updatePreview();
             });
-            sec.appendChild(styleSel);
+            orientRow.appendChild(orientSel);
+            barOptions.appendChild(orientRow);
+
+            // 4. Dimensions (Width / Height)
+            const dimRow = document.createElement('div');
+            dimRow.style.display = "flex";
+            dimRow.style.gap = "10px";
+
+            // Width
+            const widthContainer = document.createElement('div');
+            const wLabel = document.createElement('div');
+            wLabel.textContent = "Ancho (px)";
+            wLabel.style.fontSize = "10px"; wLabel.style.color = "#aaa";
+            const wInput = document.createElement('input');
+            wInput.type = "number"; wInput.min = 50; wInput.value = this.tempSettings[prefix + 'Width'] || (type === 'health' ? 300 : 200);
+            wInput.style.width = "100%"; wInput.style.background = "#333"; wInput.style.color = "white"; wInput.style.border = "1px solid #555";
+            wInput.onchange = (e) => {
+                this.tempSettings[prefix + 'Width'] = parseInt(e.target.value) || 100;
+                this.updatePreview();
+            };
+            widthContainer.appendChild(wLabel);
+            widthContainer.appendChild(wInput);
+
+            // Height
+            const heightContainer = document.createElement('div');
+            const hLabel = document.createElement('div');
+            hLabel.textContent = "Alto (px)";
+            hLabel.style.fontSize = "10px"; hLabel.style.color = "#aaa";
+            const hInput = document.createElement('input');
+            hInput.type = "number"; hInput.min = 5; hInput.value = this.tempSettings[prefix + 'Height'] || (type === 'health' ? 20 : 8);
+            hInput.style.width = "100%"; hInput.style.background = "#333"; hInput.style.color = "white"; hInput.style.border = "1px solid #555";
+            hInput.onchange = (e) => {
+                this.tempSettings[prefix + 'Height'] = parseInt(e.target.value) || 10;
+                this.updatePreview();
+            };
+            heightContainer.appendChild(hLabel);
+            heightContainer.appendChild(hInput);
+
+            dimRow.appendChild(widthContainer);
+            dimRow.appendChild(heightContainer);
+            barOptions.appendChild(dimRow);
+
+            sec.appendChild(barOptions);
+
+            const updateBarOptionsAccess = (style) => {
+                if (style === 'bar') {
+                    barOptions.style.display = 'block';
+                } else {
+                    barOptions.style.display = 'none';
+                }
+            };
+
+            // Initial call
+            updateBarOptionsAccess(this.tempSettings[prefix + 'Style']);
+
         } else if (type === 'inventory') {
             const slotInput = document.createElement('input');
             slotInput.type = "number";
@@ -316,11 +429,34 @@ export class HUDConfigPanel {
         const el = document.createElement('div');
         el.style.cssText = `display: flex; gap: 5px;`;
 
+        // Handle Orientation
+        if (this.tempSettings.healthOrientation === 'vertical') {
+            el.style.flexDirection = 'column-reverse'; // Bar fills up
+            el.style.alignItems = 'center';
+        } else {
+            el.style.flexDirection = 'row';
+            el.style.alignItems = 'center';
+        }
+
         if (this.tempSettings.healthStyle === 'bar') {
+            const w = this.tempSettings.healthWidth || 300;
+            const h = this.tempSettings.healthHeight || 20;
+
+            // Bar Calculation
+            // For vertical, we might swap w/h concept or just respect w/h as raw pixels
+            // Usually "width" in UI means "Length of bar", but let's stick to raw CSS width/height for simplicity unless rotated.
+            // Actually, if vertical, width usually becomes thickness and height becomes length.
+            // But user has explicit Width/Height inputs. Let's just use them as CSS props.
+
+            const isVert = this.tempSettings.healthOrientation === 'vertical';
+            const fillDir = isVert ? 'to top' : '90deg';
+
             el.innerHTML = `
-                <div style="width: 300px; height: 20px; background: rgba(0,0,0,0.7); border: 2px solid #333; border-radius: 10px; position:relative; overflow:hidden;">
-                    <div style="width: 80%; height: 100%; background: linear-gradient(90deg, #ff3333, #ff6666);"></div>
-                    <div style="position:absolute; top:0; left:0; width:100%; height:100%; display:flex; align-items:center; justify-content:center; color:white; font-size:12px; font-weight:bold;">80 / 100</div>
+                <div style="width: ${w}px; height: ${h}px; background: rgba(0,0,0,0.7); border: 2px solid #333; border-radius: ${Math.min(w, h) / 2}px; position:relative; overflow:hidden;">
+                    <div style="width: 100%; height: 100%; background: linear-gradient(${fillDir}, #ff3333, #ff6666); clip-path: inset(${isVert ? '20% 0 0 0' : '0 20% 0 0'});"></div>
+                    ${this.tempSettings.healthShowText ?
+                    `<div style="position:absolute; top:0; left:0; width:100%; height:100%; display:flex; align-items:center; justify-content:center; color:white; font-size:${Math.min(w, h) / 1.5}px; font-weight:bold; text-shadow:1px 1px 1px black;">80 / 100</div>`
+                    : ''}
                 </div>
             `;
         } else if (this.tempSettings.healthStyle === 'hearts') {
@@ -340,13 +476,31 @@ export class HUDConfigPanel {
         const el = document.createElement('div');
         el.style.cssText = `display: flex; align-items: center;`;
 
+        // Handle Orientation
+        if (this.tempSettings.jumpOrientation === 'vertical') {
+            el.style.flexDirection = 'column-reverse';
+        } else {
+            el.style.flexDirection = 'row';
+        }
+
         if (this.tempSettings.jumpStyle === 'bar') {
+            const w = this.tempSettings.jumpWidth || 200;
+            const h = this.tempSettings.jumpHeight || 8;
+
+            const isVert = this.tempSettings.jumpOrientation === 'vertical';
+            const fillDir = isVert ? 'to top' : '90deg';
+
             el.innerHTML = `
-                <div style="width: 200px; height: 8px; background: rgba(0,0,0,0.7); border-radius: 4px; overflow:hidden; margin-left:5px;">
-                    <div style="width: 50%; height: 100%; background: linear-gradient(90deg, #33ccff, #3388ff);"></div>
+                <div style="width: ${w}px; height: ${h}px; background: rgba(0,0,0,0.7); border-radius: ${Math.min(w, h) / 2}px; overflow:hidden; position:relative;">
+                    <div style="width: 100%; height: 100%; background: linear-gradient(${fillDir}, #33ccff, #3388ff); clip-path: inset(${isVert ? '50% 0 0 0' : '0 50% 0 0'});"></div>
+                     ${this.tempSettings.jumpShowText ?
+                    `<div style="position:absolute; top:0; left:0; width:100%; height:100%; display:flex; align-items:center; justify-content:center; color:white; font-size:${Math.min(w, h) / 1.5}px; font-weight:bold; text-shadow:1px 1px 1px black;">1</div>`
+                    : ''}
                 </div>
             `;
         } else {
+            // Circle handles orientation/size differently (fixed size in preview for now or scale?)
+            // Let's just leave circle as is since options were hidden for non-bar
             el.innerHTML = `
                <svg width="50" height="50" style="transform: rotate(-90deg)">
                    <circle cx="25" cy="25" r="20" stroke="rgba(0,0,0,0.5)" stroke-width="5" fill="transparent"/>

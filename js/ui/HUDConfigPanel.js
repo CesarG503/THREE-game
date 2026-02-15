@@ -11,6 +11,7 @@ export class HUDConfigPanel {
         this.tempSettings = {};
 
         this.layoutSystem = null;
+        this.uiInputs = {}; // Store references to inputs for live updates
     }
 
     open(profile) {
@@ -291,8 +292,25 @@ export class HUDConfigPanel {
             orientLabel.style.fontSize = "12px";
             orientRow.appendChild(orientLabel);
             const orientSel = this.createSelect(['horizontal', 'vertical'], ['Horizontal', 'Vertical'], this.tempSettings[prefix + 'Orientation'] || 'horizontal', (v) => {
+                const oldOrient = this.tempSettings[prefix + 'Orientation'];
                 this.tempSettings[prefix + 'Orientation'] = v;
-                // Swap W/H just for UX convenience? No, let user do it.
+
+                // Auto-swap dimensions if orientation changes
+                if (oldOrient !== v) {
+                    const wKey = prefix + 'Width';
+                    const hKey = prefix + 'Height';
+                    const curW = this.tempSettings[wKey];
+                    const curH = this.tempSettings[hKey];
+
+                    // Swap
+                    this.tempSettings[wKey] = curH;
+                    this.tempSettings[hKey] = curW;
+
+                    // Update Inputs
+                    if (this.uiInputs[wKey]) this.uiInputs[wKey].value = curH;
+                    if (this.uiInputs[hKey]) this.uiInputs[hKey].value = curW;
+                }
+
                 this.updatePreview();
             });
             orientRow.appendChild(orientSel);
@@ -308,6 +326,7 @@ export class HUDConfigPanel {
             const wLabel = document.createElement('div');
             wLabel.textContent = "Ancho (px)";
             wLabel.style.fontSize = "10px"; wLabel.style.color = "#aaa";
+
             const wInput = document.createElement('input');
             wInput.type = "number"; wInput.min = 50; wInput.value = this.tempSettings[prefix + 'Width'] || (type === 'health' ? 300 : 200);
             wInput.style.width = "100%"; wInput.style.background = "#333"; wInput.style.color = "white"; wInput.style.border = "1px solid #555";
@@ -315,6 +334,8 @@ export class HUDConfigPanel {
                 this.tempSettings[prefix + 'Width'] = parseInt(e.target.value) || 100;
                 this.updatePreview();
             };
+            this.uiInputs[prefix + 'Width'] = wInput; // Store reference
+
             widthContainer.appendChild(wLabel);
             widthContainer.appendChild(wInput);
 
@@ -323,6 +344,7 @@ export class HUDConfigPanel {
             const hLabel = document.createElement('div');
             hLabel.textContent = "Alto (px)";
             hLabel.style.fontSize = "10px"; hLabel.style.color = "#aaa";
+
             const hInput = document.createElement('input');
             hInput.type = "number"; hInput.min = 5; hInput.value = this.tempSettings[prefix + 'Height'] || (type === 'health' ? 20 : 8);
             hInput.style.width = "100%"; hInput.style.background = "#333"; hInput.style.color = "white"; hInput.style.border = "1px solid #555";
@@ -330,6 +352,8 @@ export class HUDConfigPanel {
                 this.tempSettings[prefix + 'Height'] = parseInt(e.target.value) || 10;
                 this.updatePreview();
             };
+            this.uiInputs[prefix + 'Height'] = hInput; // Store reference
+
             heightContainer.appendChild(hLabel);
             heightContainer.appendChild(hInput);
 
@@ -467,6 +491,11 @@ export class HUDConfigPanel {
 
         this.contentWrapper.appendChild(el);
 
+        // Enable Resizing if style is 'bar'
+        if (this.tempSettings.healthStyle === 'bar') {
+            this.makeResizable(el, 'health');
+        }
+
         this.layoutSystem.registerElement(el, 'health', this.tempSettings.healthPos, (newPos) => {
             this.tempSettings.healthPos = newPos;
         });
@@ -510,6 +539,11 @@ export class HUDConfigPanel {
         }
 
         this.contentWrapper.appendChild(el);
+
+        // Enable Resizing if style is 'bar'
+        if (this.tempSettings.jumpStyle === 'bar') {
+            this.makeResizable(el, 'jump');
+        }
 
         this.layoutSystem.registerElement(el, 'jump', this.tempSettings.jumpPos, (newPos) => {
             this.tempSettings.jumpPos = newPos;
@@ -564,6 +598,99 @@ export class HUDConfigPanel {
     save() {
         this.manager.updateProfile(this.profile.id, { hudSettings: this.tempSettings });
         this.close();
+    }
+
+    makeResizable(el, prefix) {
+        // Create Handle
+        const handle = document.createElement('div');
+        handle.style.cssText = `
+            position: absolute; bottom: 0; right: 0;
+            width: 10px; height: 10px;
+            background: white; border: 1px solid #333;
+            cursor: nwse-resize; z-index: 10;
+            clip-path: polygon(100% 0, 100% 100%, 0 100%);
+        `;
+        el.appendChild(handle);
+
+        handle.onmousedown = (e) => {
+            e.preventDefault();
+            e.stopPropagation(); // Prevent drag of element
+
+            const startX = e.clientX;
+            const startY = e.clientY;
+            const startW = this.tempSettings[prefix + 'Width'] || (prefix === 'health' ? 300 : 200);
+            const startH = this.tempSettings[prefix + 'Height'] || (prefix === 'health' ? 20 : 8);
+
+            const onMouseMove = (ev) => {
+                const dx = ev.clientX - startX;
+                const dy = ev.clientY - startY;
+
+                // Allow resizing based on mouse movement
+                // If rotated vertically, it might be tricky visually, but usually width is x, height is y relative to screen
+                // UNLES transform rotation is applied.
+
+                // My render logic uses flex-direction for orientation, so the element ITSELF is not rotated (transform),
+                // it just changes shape. So dx acts on width, dy acts on height globally.
+                // However, for vertical bars, visual width is "Height" and visual height is "Width"?
+                // Let's check render logic:
+                // Vertical: flex-direction: column-reverse; width: {w}, height: {h}
+                // Wait, if I set width: 300, height: 20 for vertical, it creates a wide, short box STACKED vertically?
+                // No, createHealth says:
+                // if vertical: flex-reverse.
+                // Inner HTML: style="width: ${w}px; height: ${h}px"
+                // So the DIV is sized WxH.
+                // If I have a vertical bar, I probably want W to be small (20) and H to be large (300).
+                // So dragging right (dx > 0) should increase W (thickness), dragging down (dy > 0) should increase H (length).
+                // This seems consistent.
+
+                let newW = startW + dx;
+                let newH = startH + dy;
+
+                if (newW < 20) newW = 20;
+                if (newH < 5) newH = 5;
+
+                // Update Settings
+                this.tempSettings[prefix + 'Width'] = newW;
+                this.tempSettings[prefix + 'Height'] = newH;
+
+                // Update Inputs
+                if (this.uiInputs[prefix + 'Width']) this.uiInputs[prefix + 'Width'].value = newW;
+                if (this.uiInputs[prefix + 'Height']) this.uiInputs[prefix + 'Height'].value = newH;
+
+                // Update Visuals (Only inner div size needs update mostly, but re-rendering whole thing is safer/easier
+                // but might flicker. Let's try to update specific styles if possible, else updatePreview)
+                // updatePreview calls re-render which is fast enough for 1 element? 
+                // Let's try updating directly for smoothness.
+
+                // The 'el' passed here is container.
+                // The inner div determines size.
+                // Structure: el -> inner div (styled with w/h)
+                const inner = el.firstElementChild; // The main container div inside 'el'
+                if (inner) {
+                    inner.style.width = newW + 'px';
+                    inner.style.height = newH + 'px';
+
+                    // Also need to update border-radius or clip-paths if they depend on w/h
+                    inner.style.borderRadius = (Math.min(newW, newH) / 2) + 'px';
+                    // Font fix?
+                    const textDiv = inner.querySelector('div[id$="-text"]'); // rough selector
+                    if (textDiv) {
+                        // We don't have easy ref to text div here without query
+                        //  textDiv.style.fontSize = (Math.min(newW, newH)/1.5) + 'px';
+                    }
+                }
+            };
+
+            const onMouseUp = () => {
+                document.removeEventListener('mousemove', onMouseMove);
+                document.removeEventListener('mouseup', onMouseUp);
+                // Final full re-render to ensure everything (border radius, font sizes) matches exactly
+                this.updatePreview();
+            };
+
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+        };
     }
 
     close() {

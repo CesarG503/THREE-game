@@ -39,13 +39,14 @@ export class HUDConfigPanel {
 
         // Inventory
         if (this.tempSettings.showInventory === undefined) this.tempSettings.showInventory = true;
-        if (this.tempSettings.inventorySlots === undefined) this.tempSettings.inventorySlots = 5;
+        if (this.tempSettings.inventorySlots === undefined) this.tempSettings.inventorySlots = 9;
         if (this.tempSettings.inventorySlotSize === undefined) this.tempSettings.inventorySlotSize = 50;
-        if (!this.tempSettings.inventoryPos) this.tempSettings.inventoryPos = { top: '90%', left: '50%', transform: 'translateX(-50%)' };
+        if (!this.tempSettings.inventoryPos) this.tempSettings.inventoryPos = { bottom: '20px', left: '50%', transform: 'translateX(-50%)' };
 
         // New Inventory Defaults
-        if (this.tempSettings.inventoryContainerWidth === undefined) this.tempSettings.inventoryContainerWidth = 350;
-        if (this.tempSettings.inventoryContainerHeight === undefined) this.tempSettings.inventoryContainerHeight = 80;
+        // Do NOT set default width/height so it can be auto-calculated
+        // if (this.tempSettings.inventoryContainerWidth === undefined) this.tempSettings.inventoryContainerWidth = 350;
+        // if (this.tempSettings.inventoryContainerHeight === undefined) this.tempSettings.inventoryContainerHeight = 80;
         if (this.tempSettings.inventoryPadding === undefined) this.tempSettings.inventoryPadding = 10;
         if (this.tempSettings.inventoryFreeLayout === undefined) this.tempSettings.inventoryFreeLayout = false;
         if (!this.tempSettings.inventorySlotPositions) this.tempSettings.inventorySlotPositions = [];
@@ -446,6 +447,7 @@ export class HUDConfigPanel {
                 this.tempSettings.inventoryContainerWidth = parseInt(e.target.value) || 300;
                 this.updatePreview();
             };
+            this.uiInputs['inventoryContainerWidth'] = wInput;
             widthContainer.appendChild(wLabel);
             widthContainer.appendChild(wInput);
 
@@ -461,6 +463,7 @@ export class HUDConfigPanel {
                 this.tempSettings.inventoryContainerHeight = parseInt(e.target.value) || 100;
                 this.updatePreview();
             };
+            this.uiInputs['inventoryContainerHeight'] = hInput;
             heightContainer.appendChild(hLabel);
             heightContainer.appendChild(hInput);
 
@@ -474,10 +477,33 @@ export class HUDConfigPanel {
             const freeCheck = document.createElement('input');
             freeCheck.type = "checkbox";
             freeCheck.checked = this.tempSettings.inventoryFreeLayout || false;
+
             freeCheck.onchange = (e) => {
-                this.tempSettings.inventoryFreeLayout = e.target.checked;
+                const isFree = e.target.checked;
+                this.tempSettings.inventoryFreeLayout = isFree;
+
+                if (!isFree) {
+                    // Reset to Auto Mode: Clear custom positions and dimensions
+                    this.tempSettings.inventorySlotPositions = [];
+
+                    // Reset dimensions to allow auto-calculate (undefined or null)
+                    // We'll set them to undefined so renderPreview re-measures
+                    delete this.tempSettings.inventoryContainerWidth;
+                    delete this.tempSettings.inventoryContainerHeight;
+
+                    // Update inputs to reflect reset (they will be updated again after render if needed)
+                    if (this.uiInputs['inventoryContainerWidth']) this.uiInputs['inventoryContainerWidth'].value = '';
+                    if (this.uiInputs['inventoryContainerHeight']) this.uiInputs['inventoryContainerHeight'].value = '';
+
+                } else {
+                    // Switch to Free Mode: Initialize dimensions if missing
+                    if (!this.tempSettings.inventoryContainerWidth) this.tempSettings.inventoryContainerWidth = 300;
+                    if (!this.tempSettings.inventoryContainerHeight) this.tempSettings.inventoryContainerHeight = 100;
+                }
+
                 this.updatePreview();
             };
+
             const freeLabel = document.createElement('label');
             freeLabel.textContent = "Diseño Libre (Mover Slots)";
             freeLabel.style.color = "#ccc";
@@ -662,31 +688,53 @@ export class HUDConfigPanel {
         el.className = "inventory-container-preview";
 
         const padding = this.tempSettings.inventoryPadding !== undefined ? this.tempSettings.inventoryPadding : 10;
-        const width = this.tempSettings.inventoryContainerWidth || 300;
-        const height = this.tempSettings.inventoryContainerHeight || 100;
+        let width = this.tempSettings.inventoryContainerWidth;
+        let height = this.tempSettings.inventoryContainerHeight;
         const isFree = this.tempSettings.inventoryFreeLayout;
+
+        // If Auto Mode (not free) and dimensions are undefined/deleted, let it be auto
+        let cssWidth = width ? `${width}px` : 'max-content';
+        let cssHeight = height ? `${height}px` : 'max-content';
 
         el.style.cssText = `
             background: rgba(0, 0, 0, 0.5);
             padding: ${padding}px;
             border-radius: 12px;
             border: 1px solid rgba(255, 255, 255, 0.1);
-            width: ${width}px;
-            height: ${height}px;
+            width: ${cssWidth};
+            height: ${cssHeight};
             position: relative;
             box-sizing: border-box; /* Important for padding */
         `;
 
         if (isFree) {
             el.style.display = 'block';
+            // Ensure we have explicit dimensions for Free Mode
+            if (!width) width = 300;
+            if (!height) height = 100;
+            el.style.width = width + 'px';
+            el.style.height = height + 'px';
+
         } else {
             el.style.display = 'flex';
             el.style.gap = '10px';
             el.style.justifyContent = 'center';
             el.style.alignItems = 'center';
             el.style.flexWrap = 'wrap';
-            // If not free, allow flex to overflow or wrap, but better to keep fixed size if user set it?
-            // If user set size, we must respect it. If content overflows, it overflows.
+
+            // Auto-Mode: Measure after render
+            // usage of requestAnimationFrame to ensure DOM update
+            requestAnimationFrame(() => {
+                if (el.offsetWidth > 0 && el.offsetHeight > 0) {
+                    // Update settings with ACTUAL auto size so next load/save is correct
+                    // Or just update UI?
+                    // If we update settings, then it becomes "Fixed" size next time? 
+                    // No, only if we set it. But here we want to Display it.
+                    // Let's just update the Inputs for visual feedback.
+                    if (this.uiInputs['inventoryContainerWidth']) this.uiInputs['inventoryContainerWidth'].value = el.offsetWidth;
+                    if (this.uiInputs['inventoryContainerHeight']) this.uiInputs['inventoryContainerHeight'].value = el.offsetHeight;
+                }
+            });
         }
 
         const size = this.tempSettings.inventorySlotSize || 50;

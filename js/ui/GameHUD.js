@@ -125,6 +125,9 @@ export class GameHUD {
         if (el) {
             // Ensure it's visible (GameHUD manages visibility now based on settings)
             el.style.display = 'flex';
+            // Prevent stretching
+            el.style.width = 'max-content';
+            el.style.height = 'max-content';
 
             // Apply positioning from settings
             this.applyPosition(el, s.inventoryPos);
@@ -248,10 +251,11 @@ export class GameHUD {
     applyPosition(el, pos) {
         if (!pos) return;
         // Check if explicit top/left props exist in pos object
-        if (pos.top) el.style.top = pos.top;
-        if (pos.left) el.style.left = pos.left;
-        if (pos.bottom) el.style.bottom = pos.bottom;
-        if (pos.right) el.style.right = pos.right;
+        if (pos.top) { el.style.top = pos.top; el.style.bottom = 'auto'; }
+        if (pos.left) { el.style.left = pos.left; el.style.right = 'auto'; }
+        if (pos.bottom) { el.style.bottom = pos.bottom; el.style.top = 'auto'; }
+        if (pos.right) { el.style.right = pos.right; el.style.left = 'auto'; }
+
         if (pos.transform) el.style.transform = pos.transform;
         else el.style.transform = 'none';
 

@@ -40,6 +40,7 @@ export class HUDConfigPanel {
         // Inventory
         if (this.tempSettings.showInventory === undefined) this.tempSettings.showInventory = true;
         if (this.tempSettings.inventorySlots === undefined) this.tempSettings.inventorySlots = 5;
+        if (this.tempSettings.inventorySlotSize === undefined) this.tempSettings.inventorySlotSize = 50;
         if (!this.tempSettings.inventoryPos) this.tempSettings.inventoryPos = { top: '90%', left: '50%', transform: 'translateX(-50%)' };
 
         this.createUI();
@@ -396,6 +397,31 @@ export class HUDConfigPanel {
 
             sec.appendChild(slotLabel);
             sec.appendChild(slotInput);
+
+            // Slot Size Input
+            const sizeInput = document.createElement('input');
+            sizeInput.type = "number";
+            sizeInput.min = 30;
+            sizeInput.max = 100;
+            sizeInput.value = this.tempSettings.inventorySlotSize || 50;
+            sizeInput.style.cssText = "background: #333; color: white; border: 1px solid #555; padding: 5px; width: 60px; margin-left: 10px;";
+            sizeInput.onchange = (e) => {
+                let v = parseInt(e.target.value);
+                if (v < 30) v = 30;
+                if (v > 100) v = 100;
+                this.tempSettings.inventorySlotSize = v;
+                this.updatePreview();
+            };
+            this.uiInputs['inventorySlotSize'] = sizeInput;
+
+            const sizeLabel = document.createElement('div');
+            sizeLabel.textContent = "Tamaño Item:";
+            sizeLabel.style.color = "#aaa";
+            sizeLabel.style.marginBottom = "5px";
+            sizeLabel.style.marginTop = "10px";
+
+            sec.appendChild(sizeLabel);
+            sec.appendChild(sizeInput);
         }
 
         parent.appendChild(sec);
@@ -552,7 +578,7 @@ export class HUDConfigPanel {
 
     renderPreviewInventory() {
         const el = document.createElement('div');
-        // Match #inventory-container styles from main.css exactly
+        // Match #inventory-container styles from main.css exactly, but with fit-content behavior
         el.className = "inventory-container-preview";
         el.style.cssText = `
             display: flex; gap: 10px; justify-content: center;
@@ -560,32 +586,26 @@ export class HUDConfigPanel {
             padding: 10px;
             border-radius: 12px;
             border: 1px solid rgba(255, 255, 255, 0.1);
+            width: max-content; /* Ensure background hugs content */
+            height: max-content;
         `;
+
+        const size = this.tempSettings.inventorySlotSize || 50;
 
         // Use the same structure as game.html
         for (let i = 0; i < this.tempSettings.inventorySlots; i++) {
-            // We use 'inventory-slot' class to match game styles if they are global
-            // But since we are in a shadow-like preview, we might need to inline some styles 
-            // IF the css is not available. 
-            // Assuming main.css is available globally.
-
             const isActive = (i === 0);
-
-            /* 
-               Structure from game.html:
-               <div class="inventory-slot active">
-                   <span class="slot-number">1</span>
-                   <img ...>
-               </div>
-            */
 
             const slot = document.createElement('div');
             slot.className = `inventory-slot ${isActive ? 'active' : ''}`;
             // Inline minimal styles to ensure it looks right even if CSS is quirky in preview
-            slot.style.position = 'relative'; // ensure content flows
+            // Use the dynamic size
+            slot.style.position = 'relative';
+            slot.style.width = size + 'px';
+            slot.style.height = size + 'px';
 
             slot.innerHTML = `
-                <span class="slot-number">${i + 1}</span>
+                <span class="slot-number" style="font-size: ${Math.max(10, size / 5)}px;">${i + 1}</span>
                 ${i < 2 ? `<div style="width:70%; height:70%; background:rgba(255,255,255,0.2); border-radius:4px;"></div>` : ''} 
              `;
 
@@ -593,6 +613,9 @@ export class HUDConfigPanel {
         }
 
         this.contentWrapper.appendChild(el);
+
+        // Enable Resizing for Inventory (Scaling slots)
+        this.makeResizable(el, 'inventory');
 
         this.layoutSystem.registerElement(el, 'inventory', this.tempSettings.inventoryPos, (newPos) => {
             this.tempSettings.inventoryPos = newPos;
@@ -622,65 +645,62 @@ export class HUDConfigPanel {
 
             const startX = e.clientX;
             const startY = e.clientY;
-            const startW = this.tempSettings[prefix + 'Width'] || (prefix === 'health' ? 300 : 200);
-            const startH = this.tempSettings[prefix + 'Height'] || (prefix === 'health' ? 20 : 8);
+
+            // Capture initial state
+            let startW, startH, startSize;
+            if (prefix === 'inventory') {
+                startSize = this.tempSettings.inventorySlotSize || 50;
+            } else {
+                startW = this.tempSettings[prefix + 'Width'] || 300;
+                startH = this.tempSettings[prefix + 'Height'] || 20;
+            }
 
             const onMouseMove = (ev) => {
                 const dx = ev.clientX - startX;
                 const dy = ev.clientY - startY;
 
-                // Allow resizing based on mouse movement
-                // If rotated vertically, it might be tricky visually, but usually width is x, height is y relative to screen
-                // UNLES transform rotation is applied.
+                if (prefix === 'inventory') {
+                    // Inventory Scaling Logic
+                    // Use dx (drag right) to increase size
+                    let newSize = startSize + dx;
+                    if (newSize < 30) newSize = 30;
+                    if (newSize > 100) newSize = 100;
 
-                // My render logic uses flex-direction for orientation, so the element ITSELF is not rotated (transform),
-                // it just changes shape. So dx acts on width, dy acts on height globally.
-                // However, for vertical bars, visual width is "Height" and visual height is "Width"?
-                // Let's check render logic:
-                // Vertical: flex-direction: column-reverse; width: {w}, height: {h}
-                // Wait, if I set width: 300, height: 20 for vertical, it creates a wide, short box STACKED vertically?
-                // No, createHealth says:
-                // if vertical: flex-reverse.
-                // Inner HTML: style="width: ${w}px; height: ${h}px"
-                // So the DIV is sized WxH.
-                // If I have a vertical bar, I probably want W to be small (20) and H to be large (300).
-                // So dragging right (dx > 0) should increase W (thickness), dragging down (dy > 0) should increase H (length).
-                // This seems consistent.
+                    this.tempSettings.inventorySlotSize = newSize;
 
-                let newW = startW + dx;
-                let newH = startH + dy;
+                    // Update Input if exists
+                    if (this.uiInputs['inventorySlotSize']) {
+                        this.uiInputs['inventorySlotSize'].value = newSize;
+                    }
 
-                if (newW < 20) newW = 20;
-                if (newH < 5) newH = 5;
+                    // Live Update ALL slots
+                    const slots = el.querySelectorAll('.inventory-slot');
+                    slots.forEach(slot => {
+                        slot.style.width = newSize + 'px';
+                        slot.style.height = newSize + 'px';
+                        const num = slot.querySelector('.slot-number');
+                        if (num) num.style.fontSize = Math.max(10, newSize / 5) + 'px';
+                    });
 
-                // Update Settings
-                this.tempSettings[prefix + 'Width'] = newW;
-                this.tempSettings[prefix + 'Height'] = newH;
+                } else {
+                    // Standard Bar Resizing Logic
+                    let newW = startW + dx;
+                    let newH = startH + dy;
 
-                // Update Inputs
-                if (this.uiInputs[prefix + 'Width']) this.uiInputs[prefix + 'Width'].value = newW;
-                if (this.uiInputs[prefix + 'Height']) this.uiInputs[prefix + 'Height'].value = newH;
+                    if (newW < 20) newW = 20;
+                    if (newH < 5) newH = 5;
 
-                // Update Visuals (Only inner div size needs update mostly, but re-rendering whole thing is safer/easier
-                // but might flicker. Let's try to update specific styles if possible, else updatePreview)
-                // updatePreview calls re-render which is fast enough for 1 element? 
-                // Let's try updating directly for smoothness.
+                    this.tempSettings[prefix + 'Width'] = newW;
+                    this.tempSettings[prefix + 'Height'] = newH;
 
-                // The 'el' passed here is container.
-                // The inner div determines size.
-                // Structure: el -> inner div (styled with w/h)
-                const inner = el.firstElementChild; // The main container div inside 'el'
-                if (inner) {
-                    inner.style.width = newW + 'px';
-                    inner.style.height = newH + 'px';
+                    if (this.uiInputs[prefix + 'Width']) this.uiInputs[prefix + 'Width'].value = newW;
+                    if (this.uiInputs[prefix + 'Height']) this.uiInputs[prefix + 'Height'].value = newH;
 
-                    // Also need to update border-radius or clip-paths if they depend on w/h
-                    inner.style.borderRadius = (Math.min(newW, newH) / 2) + 'px';
-                    // Font fix?
-                    const textDiv = inner.querySelector('div[id$="-text"]'); // rough selector
-                    if (textDiv) {
-                        // We don't have easy ref to text div here without query
-                        //  textDiv.style.fontSize = (Math.min(newW, newH)/1.5) + 'px';
+                    const inner = el.firstElementChild;
+                    if (inner) {
+                        inner.style.width = newW + 'px';
+                        inner.style.height = newH + 'px';
+                        inner.style.borderRadius = (Math.min(newW, newH) / 2) + 'px';
                     }
                 }
             };
@@ -688,7 +708,6 @@ export class HUDConfigPanel {
             const onMouseUp = () => {
                 document.removeEventListener('mousemove', onMouseMove);
                 document.removeEventListener('mouseup', onMouseUp);
-                // Final full re-render to ensure everything (border radius, font sizes) matches exactly
                 this.updatePreview();
             };
 

@@ -129,11 +129,20 @@ export class GameHUD {
             // Apply positioning from settings
             this.applyPosition(el, s.inventoryPos);
 
-            // Handle slot visibility based on settings
+            // Handle slot visibility and size based on settings
             const slots = el.querySelectorAll('.inventory-slot');
             const targetCount = s.inventorySlots || 9;
+            const slotSize = s.inventorySlotSize || 50;
 
             slots.forEach((slot, index) => {
+                // Apply Size
+                slot.style.width = `${slotSize}px`;
+                slot.style.height = `${slotSize}px`;
+
+                // Update Number Font Size
+                const num = slot.querySelector('.slot-number');
+                if (num) num.style.fontSize = `${Math.max(10, slotSize / 5)}px`;
+
                 if (index < targetCount) {
                     slot.style.display = 'flex';
                 } else {

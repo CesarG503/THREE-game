@@ -157,9 +157,29 @@ export class GameHUD {
             } else {
                 el.style.display = 'flex';
                 el.style.gap = '10px';
-                el.style.justifyContent = 'center';
-                el.style.alignItems = 'center';
                 el.style.flexWrap = 'wrap';
+
+                // Apply Alignment
+                const align = s.inventorySlotAlignment || 'center';
+                let justify = 'center';
+                let alignItems = 'center';
+                let alignContent = 'center';
+
+                switch (align) {
+                    case 'top-left': justify = 'flex-start'; alignContent = 'flex-start'; alignItems = 'flex-start'; break;
+                    case 'top-center': justify = 'center'; alignContent = 'flex-start'; alignItems = 'flex-start'; break;
+                    case 'top-right': justify = 'flex-end'; alignContent = 'flex-start'; alignItems = 'flex-start'; break;
+                    case 'center-left': justify = 'flex-start'; alignContent = 'center'; alignItems = 'center'; break;
+                    case 'center': justify = 'center'; alignContent = 'center'; alignItems = 'center'; break;
+                    case 'center-right': justify = 'flex-end'; alignContent = 'center'; alignItems = 'center'; break;
+                    case 'bottom-left': justify = 'flex-start'; alignContent = 'flex-end'; alignItems = 'flex-end'; break;
+                    case 'bottom-center': justify = 'center'; alignContent = 'flex-end'; alignItems = 'flex-end'; break;
+                    case 'bottom-right': justify = 'flex-end'; alignContent = 'flex-end'; alignItems = 'flex-end'; break;
+                }
+
+                el.style.justifyContent = justify;
+                el.style.alignContent = alignContent;
+                el.style.alignItems = alignItems;
             }
 
             // Handle slot visibility and size based on settings

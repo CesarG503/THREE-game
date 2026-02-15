@@ -559,6 +559,55 @@ export class HUDConfigPanel {
             padRow.appendChild(padLabel);
             padRow.appendChild(padInput);
             sec.appendChild(padRow);
+
+            // Alignment Grid (3x3)
+            const alignContainer = document.createElement('div');
+            alignContainer.style.cssText = "margin-top: 15px;";
+
+            const alignLabel = document.createElement('div');
+            alignLabel.textContent = "Alineación de Slots (Auto Mode):";
+            alignLabel.style.fontSize = "12px"; alignLabel.style.color = "#aaa"; alignLabel.style.marginBottom = "5px";
+            alignContainer.appendChild(alignLabel);
+
+            const grid = document.createElement('div');
+            grid.style.cssText = "display: grid; grid-template-columns: repeat(3, 20px); gap: 2px; width: fit-content;";
+
+            // Default alignment if not set
+            if (!this.tempSettings.inventorySlotAlignment) this.tempSettings.inventorySlotAlignment = 'center';
+
+            const alignments = [
+                'top-left', 'top-center', 'top-right',
+                'center-left', 'center', 'center-right',
+                'bottom-left', 'bottom-center', 'bottom-right'
+            ];
+
+            alignments.forEach(align => {
+                const cell = document.createElement('div');
+                cell.style.cssText = "width: 20px; height: 20px; background: #333; border: 1px solid #555; cursor: pointer;";
+                cell.title = align;
+
+                // Highlight active
+                if (this.tempSettings.inventorySlotAlignment === align) {
+                    cell.style.background = '#4CAF50';
+                    cell.style.borderColor = '#4CAF50';
+                }
+
+                cell.onclick = () => {
+                    this.tempSettings.inventorySlotAlignment = align;
+                    // Update visual selection
+                    Array.from(grid.children).forEach(c => {
+                        c.style.background = '#333';
+                        c.style.borderColor = '#555';
+                    });
+                    cell.style.background = '#4CAF50';
+                    cell.style.borderColor = '#4CAF50';
+
+                    this.updatePreview();
+                };
+                grid.appendChild(cell);
+            });
+            alignContainer.appendChild(grid);
+            sec.appendChild(alignContainer);
         }
 
         parent.appendChild(sec);
@@ -749,9 +798,29 @@ export class HUDConfigPanel {
         } else {
             el.style.display = 'flex';
             el.style.gap = '10px';
-            el.style.justifyContent = 'center';
-            el.style.alignItems = 'center';
-            el.style.flexWrap = 'wrap';
+            el.style.flexWrap = 'wrap'; // Allow wrapping by default
+
+            // Apply 3x3 Alignment
+            const align = this.tempSettings.inventorySlotAlignment || 'center';
+            let justify = 'center';
+            let alignItems = 'center';
+            let alignContent = 'center';
+
+            switch (align) {
+                case 'top-left': justify = 'flex-start'; alignContent = 'flex-start'; alignItems = 'flex-start'; break;
+                case 'top-center': justify = 'center'; alignContent = 'flex-start'; alignItems = 'flex-start'; break;
+                case 'top-right': justify = 'flex-end'; alignContent = 'flex-start'; alignItems = 'flex-start'; break;
+                case 'center-left': justify = 'flex-start'; alignContent = 'center'; alignItems = 'center'; break;
+                case 'center': justify = 'center'; alignContent = 'center'; alignItems = 'center'; break;
+                case 'center-right': justify = 'flex-end'; alignContent = 'center'; alignItems = 'center'; break;
+                case 'bottom-left': justify = 'flex-start'; alignContent = 'flex-end'; alignItems = 'flex-end'; break;
+                case 'bottom-center': justify = 'center'; alignContent = 'flex-end'; alignItems = 'flex-end'; break;
+                case 'bottom-right': justify = 'flex-end'; alignContent = 'flex-end'; alignItems = 'flex-end'; break;
+            }
+
+            el.style.justifyContent = justify;
+            el.style.alignContent = alignContent;
+            el.style.alignItems = alignItems;
 
             // Auto-Mode: Measure after render
             // usage of requestAnimationFrame to ensure DOM update

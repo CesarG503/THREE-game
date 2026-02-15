@@ -483,27 +483,55 @@ export class HUDConfigPanel {
 
             freeCheck.onchange = (e) => {
                 const isFree = e.target.checked;
-                this.tempSettings.inventoryFreeLayout = isFree;
 
-                if (!isFree) {
+                if (isFree) {
+                    // Switch to Free Mode: Capture CURRENT visuals to make transition seamless
+                    const container = this.contentWrapper.querySelector('.inventory-container-preview');
+                    if (container) {
+                        // 1. Capture Dimensions
+                        const currentW = container.offsetWidth;
+                        const currentH = container.offsetHeight;
+
+                        this.tempSettings.inventoryContainerWidth = currentW;
+                        this.tempSettings.inventoryContainerHeight = currentH;
+
+                        // Update Inputs immediately
+                        if (this.uiInputs['inventoryContainerWidth']) this.uiInputs['inventoryContainerWidth'].value = currentW;
+                        if (this.uiInputs['inventoryContainerHeight']) this.uiInputs['inventoryContainerHeight'].value = currentH;
+
+                        // 2. Capture Slot Positions
+                        // We need to get positions relative to the container *before* we switch mode
+                        // Currently they are static/relative/flex. 
+                        // offsetLeft/Top gives position relative to offsetParent (the container)
+                        const slots = container.querySelectorAll('.inventory-slot');
+                        const positions = [];
+                        slots.forEach(slot => {
+                            positions.push({
+                                left: slot.offsetLeft + 'px',
+                                top: slot.offsetTop + 'px'
+                            });
+                        });
+                        this.tempSettings.inventorySlotPositions = positions;
+                    } else {
+                        // Fallback if container not found (rare)
+                        if (!this.tempSettings.inventoryContainerWidth) this.tempSettings.inventoryContainerWidth = 300;
+                        if (!this.tempSettings.inventoryContainerHeight) this.tempSettings.inventoryContainerHeight = 100;
+                    }
+
+                } else {
                     // Reset to Auto Mode: Clear custom positions and dimensions
                     this.tempSettings.inventorySlotPositions = [];
 
                     // Reset dimensions to allow auto-calculate (undefined or null)
-                    // We'll set them to undefined so renderPreview re-measures
                     delete this.tempSettings.inventoryContainerWidth;
                     delete this.tempSettings.inventoryContainerHeight;
 
-                    // Update inputs to reflect reset (they will be updated again after render if needed)
+                    // Update inputs to reflect reset
                     if (this.uiInputs['inventoryContainerWidth']) this.uiInputs['inventoryContainerWidth'].value = '';
                     if (this.uiInputs['inventoryContainerHeight']) this.uiInputs['inventoryContainerHeight'].value = '';
-
-                } else {
-                    // Switch to Free Mode: Initialize dimensions if missing
-                    if (!this.tempSettings.inventoryContainerWidth) this.tempSettings.inventoryContainerWidth = 300;
-                    if (!this.tempSettings.inventoryContainerHeight) this.tempSettings.inventoryContainerHeight = 100;
                 }
 
+                this.tempSettings.inventoryFreeLayout = isFree;
                 this.updatePreview();
             };
 

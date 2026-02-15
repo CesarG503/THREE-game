@@ -441,7 +441,9 @@ export class HUDConfigPanel {
             wLabel.textContent = "Ancho Fondo";
             wLabel.style.fontSize = "10px"; wLabel.style.color = "#aaa";
             const wInput = document.createElement('input');
-            wInput.type = "number"; wInput.min = 50; wInput.value = this.tempSettings.inventoryContainerWidth || 300;
+            wInput.type = "number"; wInput.min = 50;
+            // Default to empty if undefined, let preview update it
+            wInput.value = this.tempSettings.inventoryContainerWidth || '';
             wInput.style.cssText = "width: 100%; background: #333; color: white; border: 1px solid #555;";
             wInput.onchange = (e) => {
                 this.tempSettings.inventoryContainerWidth = parseInt(e.target.value) || 300;
@@ -457,7 +459,8 @@ export class HUDConfigPanel {
             hLabel.textContent = "Alto Fondo";
             hLabel.style.fontSize = "10px"; hLabel.style.color = "#aaa";
             const hInput = document.createElement('input');
-            hInput.type = "number"; hInput.min = 50; hInput.value = this.tempSettings.inventoryContainerHeight || 100;
+            hInput.type = "number"; hInput.min = 50;
+            hInput.value = this.tempSettings.inventoryContainerHeight || '';
             hInput.style.cssText = "width: 100%; background: #333; color: white; border: 1px solid #555;";
             hInput.onchange = (e) => {
                 this.tempSettings.inventoryContainerHeight = parseInt(e.target.value) || 100;
@@ -880,8 +883,9 @@ export class HUDConfigPanel {
             if (prefix === 'inventory') {
                 startSize = this.tempSettings.inventorySlotSize || 50;
             } else if (prefix === 'inventoryContainer') {
-                startW = this.tempSettings.inventoryContainerWidth || 300;
-                startH = this.tempSettings.inventoryContainerHeight || 100;
+                // Use current dimensions if settings are undefined (Auto Mode) to prevent snapping
+                startW = this.tempSettings.inventoryContainerWidth || el.offsetWidth;
+                startH = this.tempSettings.inventoryContainerHeight || el.offsetHeight;
             } else {
                 startW = this.tempSettings[prefix + 'Width'] || 300;
                 startH = this.tempSettings[prefix + 'Height'] || 20;

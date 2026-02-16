@@ -18,23 +18,42 @@ export class PlayerConfigManager {
                 hudSettings: {
                     showHealth: true,
                     healthStyle: 'bar',
-                    healthPos: { top: '85%', left: '5%' },
-                    healthShowText: true,
+                    healthPos: {
+                        left: '36.72%',
+                        top: '96.89%'
+                    },
+                    healthShowText: false,
                     healthOrientation: 'horizontal',
-                    healthWidth: 300,
-                    healthHeight: 20,
-
+                    healthWidth: 515,
+                    healthHeight: 5,
                     showJump: true,
                     jumpStyle: 'bar',
-                    jumpPos: { top: '80%', left: '5%' },
-                    jumpShowText: false, // Jump usually doesn't have text
+                    jumpPos: {
+                        left: '36.78%',
+                        top: '95.75%'
+                    },
+                    jumpShowText: false,
                     jumpOrientation: 'horizontal',
-                    jumpWidth: 200,
-                    jumpHeight: 8,
-
+                    jumpWidth: 283,
+                    jumpHeight: 6,
                     showInventory: true,
                     inventorySlots: 9,
-                    inventoryPos: { top: '90%', left: '50%', transform: 'translateX(-50%)' }
+                    inventoryPos: {
+                        left: '35.98%',
+                        top: '89.51%'
+                    },
+                    inventorySlotSize: 50,
+                    inventoryPadding: 10,
+                    inventoryFreeLayout: false,
+                    inventorySlotPositions: [],
+                    inventorySlotAlignment: 'top-center',
+                    layerOrder: [
+                        'health',
+                        'jump',
+                        'inventory'
+                    ],
+                    inventoryContainerWidth: 553,
+                    inventoryContainerHeight: 93
                 }
             },
             {
@@ -53,23 +72,42 @@ export class PlayerConfigManager {
                 hudSettings: {
                     showHealth: true,
                     healthStyle: 'bar',
-                    healthPos: { top: '85%', left: '5%' },
-                    healthShowText: true,
+                    healthPos: {
+                        left: '36.72%',
+                        top: '96.89%'
+                    },
+                    healthShowText: false,
                     healthOrientation: 'horizontal',
-                    healthWidth: 300,
-                    healthHeight: 20,
-
+                    healthWidth: 515,
+                    healthHeight: 5,
                     showJump: true,
-                    jumpStyle: 'bar', // Using bar for test
-                    jumpPos: { top: '80%', left: '5%' },
+                    jumpStyle: 'bar',
+                    jumpPos: {
+                        left: '36.78%',
+                        top: '95.75%'
+                    },
                     jumpShowText: false,
                     jumpOrientation: 'horizontal',
-                    jumpWidth: 200,
-                    jumpHeight: 8,
-
+                    jumpWidth: 283,
+                    jumpHeight: 6,
                     showInventory: true,
                     inventorySlots: 9,
-                    inventoryPos: { top: '90%', left: '50%', transform: 'translateX(-50%)' }
+                    inventoryPos: {
+                        left: '35.98%',
+                        top: '89.51%'
+                    },
+                    inventorySlotSize: 50,
+                    inventoryPadding: 10,
+                    inventoryFreeLayout: false,
+                    inventorySlotPositions: [],
+                    inventorySlotAlignment: 'top-center',
+                    layerOrder: [
+                        'health',
+                        'jump',
+                        'inventory'
+                    ],
+                    inventoryContainerWidth: 553,
+                    inventoryContainerHeight: 93
                 }
             }
         ];
@@ -111,23 +149,42 @@ export class PlayerConfigManager {
             hudSettings: {
                 showHealth: true,
                 healthStyle: 'bar',
-                healthPos: { top: '85%', left: '5%' },
-                healthShowText: true,
+                healthPos: {
+                    left: '36.72%',
+                    top: '96.89%'
+                },
+                healthShowText: false,
                 healthOrientation: 'horizontal',
-                healthWidth: 300,
-                healthHeight: 20,
-
+                healthWidth: 515,
+                healthHeight: 5,
                 showJump: true,
                 jumpStyle: 'bar',
-                jumpPos: { top: '80%', left: '5%' },
+                jumpPos: {
+                    left: '36.78%',
+                    top: '95.75%'
+                },
                 jumpShowText: false,
                 jumpOrientation: 'horizontal',
-                jumpWidth: 200,
-                jumpHeight: 8,
-
+                jumpWidth: 283,
+                jumpHeight: 6,
                 showInventory: true,
                 inventorySlots: 9,
-                inventoryPos: { top: '90%', left: '50%', transform: 'translateX(-50%)' }
+                inventoryPos: {
+                    left: '35.98%',
+                    top: '89.51%'
+                },
+                inventorySlotSize: 50,
+                inventoryPadding: 10,
+                inventoryFreeLayout: false,
+                inventorySlotPositions: [],
+                inventorySlotAlignment: 'top-center',
+                layerOrder: [
+                    'health',
+                    'jump',
+                    'inventory'
+                ],
+                inventoryContainerWidth: 553,
+                inventoryContainerHeight: 93
             }
         };
         this.profiles.push(newProfile);

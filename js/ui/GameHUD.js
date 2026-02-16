@@ -34,9 +34,22 @@ export class GameHUD {
             }
         }
 
-        if (this.settings.showHealth) this.createHealth(this.settings);
-        if (this.settings.showJump) this.createJump(this.settings);
-        if (this.settings.showInventory) this.createInventory(this.settings);
+        const layerOrder = this.settings.layerOrder || ['health', 'jump', 'inventory'];
+        // User wants: Last in list = Bottom Layer
+        // DOM: First appended = Bottom Layer
+        // So we append in reverse order of the list (Last -> First)
+        // List: [Top, Middle, Bottom] -> Append: Bottom, Middle, Top.
+        // wait, user said "el ultimo objeto en la lista sera el que estara abajo de todo"
+        // List: [A, B, C] -> C is Bottom.
+        // So append C first (index 2), then B (1), then A (0).
+        // Iterate backwards.
+
+        for (let i = layerOrder.length - 1; i >= 0; i--) {
+            const id = layerOrder[i];
+            if (id === 'health' && this.settings.showHealth) this.createHealth(this.settings);
+            else if (id === 'jump' && this.settings.showJump) this.createJump(this.settings);
+            else if (id === 'inventory' && this.settings.showInventory) this.createInventory(this.settings);
+        }
     }
 
     createHealth(s) {

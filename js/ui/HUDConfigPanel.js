@@ -192,30 +192,94 @@ export class HUDConfigPanel {
 
     renderSidebar() {
         this.sidebar.innerHTML = '';
-        const items = [
-            { id: 'health', label: 'Salud' },
-            { id: 'jump', label: 'Salto' },
-            { id: 'inventory', label: 'Inventario' }
-        ];
+        const order = this.tempSettings.layerOrder || ['health', 'jump', 'inventory'];
+        // Ensure layerOrder is initialized if missing
+        if (!this.tempSettings.layerOrder) this.tempSettings.layerOrder = order;
 
-        items.forEach(item => {
+        const labels = { 'health': 'Salud', 'jump': 'Salto', 'inventory': 'Inventario' };
+        const items = order.map(id => ({ id: id, label: labels[id] || id }));
+
+        let draggedItem = null;
+
+        items.forEach((item, index) => {
             const row = document.createElement('div');
             const isSelected = this.selectedId === item.id;
             const isMultiSelected = this.layoutSystem.selection.has(item.id);
 
             row.style.cssText = `
-                padding: 8px; margin-bottom: 5px; border-radius: 4px;
-                cursor: pointer; display: flex; align-items: center; gap: 8px;
+                padding: 10px; margin-bottom: 5px; border-radius: 4px;
+                cursor: grab; display: flex; align-items: center; gap: 8px;
                 background: ${isSelected ? '#4CAF50' : (isMultiSelected ? 'rgba(76, 175, 80, 0.3)' : 'transparent')};
                 color: ${isSelected ? 'white' : '#ccc'};
                 border: 1px solid ${isMultiSelected ? '#4CAF50' : 'transparent'};
+                transition: background 0.2s, transform 0.2s;
             `;
+
+            // Drag and Drop Logic
+            row.draggable = true;
+
+            row.ondragstart = (e) => {
+                draggedItem = index;
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', index);
+                row.style.opacity = '0.5';
+            };
+
+            row.ondragend = () => {
+                row.style.opacity = '1';
+                draggedItem = null;
+                // Remove visual cues from all rows
+                Array.from(this.sidebar.children).forEach(child => {
+                    child.style.borderTop = '';
+                    child.style.borderBottom = '';
+                });
+            };
+
+            row.ondragover = (e) => {
+                e.preventDefault(); // Necessary to allow dropping
+                e.dataTransfer.dropEffect = 'move';
+                return false;
+            };
+
+            row.ondragenter = (e) => {
+                e.preventDefault();
+                if (draggedItem !== index) {
+                    if (index < draggedItem) {
+                        row.style.borderTop = '2px solid #4CAF50';
+                    } else {
+                        row.style.borderBottom = '2px solid #4CAF50';
+                    }
+                }
+            };
+
+            row.ondragleave = () => {
+                row.style.borderTop = '';
+                row.style.borderBottom = '';
+            };
+
+            row.ondrop = (e) => {
+                e.stopPropagation();
+                e.preventDefault();
+
+                if (draggedItem !== null && draggedItem !== index) {
+                    // Reorder array
+                    const newOrder = [...this.tempSettings.layerOrder];
+                    const [movedItem] = newOrder.splice(draggedItem, 1);
+                    newOrder.splice(index, 0, movedItem);
+
+                    this.tempSettings.layerOrder = newOrder;
+                    this.updatePreview(); // Reflect changes in Z-Index
+                    this.renderSidebar(); // Re-render list
+                }
+                return false;
+            };
 
             // Vis Checkbox (Stop propagation so we don't select row when checking)
             const check = document.createElement('input');
             check.type = "checkbox";
             const vKey = item.id === 'health' ? 'showHealth' : (item.id === 'jump' ? 'showJump' : 'showInventory');
             check.checked = this.tempSettings[vKey];
+            check.style.cursor = "pointer";
             check.onclick = (e) => e.stopPropagation();
             check.onchange = (e) => {
                 this.tempSettings[vKey] = e.target.checked;
@@ -227,7 +291,16 @@ export class HUDConfigPanel {
             const label = document.createElement('span');
             label.textContent = item.label;
             label.style.fontSize = "13px";
+            label.style.flex = "1";
+            label.style.pointerEvents = "none"; // Let clicks pass through to row
             row.appendChild(label);
+
+            // Drag Handle Icon (Optional visual)
+            const handle = document.createElement('span');
+            handle.innerHTML = '☰';
+            handle.style.cssText = "color: #666; font-size: 12px; cursor: grab;";
+            row.appendChild(handle);
+
 
             row.onclick = (e) => {
                 if (e.shiftKey || e.ctrlKey || e.metaKey) {
@@ -236,6 +309,10 @@ export class HUDConfigPanel {
                     this.selectedId = item.id; // For properties panel
                     this.layoutSystem.select(item.id, false); // Exclusive select
                 }
+                // Re-render to update selection styles without full rebuild?
+                // Actually full rebuild is safer for state consistency
+                this.renderSidebar();
+                this.renderProperties();
             };
 
             this.sidebar.appendChild(row);
@@ -496,9 +573,7 @@ export class HUDConfigPanel {
     }
 
     // Helper Styles
-    updatePreview() { // Placeholder for the existing updatePreview method reference
-        super.updatePreview(); // Reference existing if not replaced
-    }
+
 
 
     makeWindowDraggable(win) {
@@ -972,16 +1047,14 @@ export class HUDConfigPanel {
         this.contentWrapper.innerHTML = '';
         this.contentWrapper.style.zIndex = '10';
 
-        if (this.tempSettings.showHealth) {
-            this.renderPreviewHealth();
-        }
-
-        if (this.tempSettings.showJump) {
-            this.renderPreviewJump();
-        }
-
-        if (this.tempSettings.showInventory) {
-            this.renderPreviewInventory();
+        const layerOrder = this.tempSettings.layerOrder || ['health', 'jump', 'inventory'];
+        // Append in reverse order (Bottom Layer first)
+        // List: [Top, Middle, Bottom] -> Append: Bottom, Middle, Top
+        for (let i = layerOrder.length - 1; i >= 0; i--) {
+            const id = layerOrder[i];
+            if (id === 'health' && this.tempSettings.showHealth) this.renderPreviewHealth();
+            else if (id === 'jump' && this.tempSettings.showJump) this.renderPreviewJump();
+            else if (id === 'inventory' && this.tempSettings.showInventory) this.renderPreviewInventory();
         }
 
         const children = this.contentWrapper.children;
@@ -1411,6 +1484,8 @@ export class HUDConfigPanel {
             });
         }
     }
+
+
 
     toggleMinimize(win, content, footer, btn) {
         this.isMinimized = !this.isMinimized;

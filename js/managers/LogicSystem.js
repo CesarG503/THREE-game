@@ -14,7 +14,8 @@ export class LogicSystem {
         this.sequenceEditor = new LogicSequenceEditor(game, this)
         // this.hud = new GameHUD() // Use shared HUD from Game
         this.hud = this.game.hud
-        this.playerConfigManager = new PlayerConfigManager(game)
+        // Use shared PlayerConfigManager from Game if available
+        this.playerConfigManager = game.playerConfigManager || new PlayerConfigManager(game)
 
         // Toolbar Callbacks
         this.toolbar.onClose = () => this.endMapEdit()

@@ -1305,7 +1305,9 @@ class Game {
             // Save Global Logic Config
             gameConfig: (this.constructionMenu && this.constructionMenu.logicSystem)
                 ? this.constructionMenu.logicSystem.gameConfig
-                : null
+                : null,
+            // Save Player Config (Roles & Assignments)
+            playerConfig: this.playerConfigManager ? this.playerConfigManager.saveData() : null
         }
     }
 
@@ -1323,6 +1325,20 @@ class Game {
         // if we don't clear. BUT, reloading page is standard for "Open Map".
         // Let's implement ADDITIVE load for now (Merging), or simply suggest refresh.
         // Or simple hack: Only remove visual for now, let's assume we are empty.
+
+        // Load Player Config FIRST
+        if (jsonData.playerConfig && this.playerConfigManager) {
+            this.playerConfigManager.loadData(jsonData.playerConfig)
+            // If ConstructionMenu is open and on PlayerConfig tab, valid refresh might be needed
+            if (this.constructionMenu && this.constructionMenu.playerConfigPanel) {
+                // If it exposes a refresh/render method call it?
+                // It renders on tab switch or internal events.
+                // We can force a re-render if it's simpler
+                if (this.constructionMenu.playerConfigPanel.container) {
+                    this.constructionMenu.playerConfigPanel.render()
+                }
+            }
+        }
 
         // Load Global Logic Config
         if (jsonData.gameConfig && this.constructionMenu && this.constructionMenu.logicSystem) {

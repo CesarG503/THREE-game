@@ -2,19 +2,34 @@ export class HUDLayoutSystem {
     constructor(container) {
         this.container = container;
         this.elements = new Map(); // id -> { el, config, onMove }
+        this.selection = new Set(); // Set of selected IDs
         this.activeDrag = null;
         this.isEditMode = false;
+        this.onSelectionChange = null; // Callback
 
         this.grid = null;
 
-        // Bind handlers to retain 'this'
+        // Marquee State
+        this.isMarqueeSelecting = false;
+        this.marqueeStart = { x: 0, y: 0 };
+        this.marqueeBox = null;
+
+        // Bind handlers
         this.onMouseMove = this.onMouseMove.bind(this);
         this.onMouseUp = this.onMouseUp.bind(this);
+        this.onContainerMouseDown = this.onContainerMouseDown.bind(this);
+    }
+
+    setSelectionCallback(cb) {
+        this.onSelectionChange = cb;
     }
 
     enableEditMode(showGrid = true) {
         this.isEditMode = true;
-        this.container.style.pointerEvents = 'auto'; // Enable interaction
+        this.container.style.pointerEvents = 'auto';
+
+        // Add marquee listener to container
+        this.container.addEventListener('mousedown', this.onContainerMouseDown);
 
         if (showGrid) {
             if (!this.grid) {
@@ -33,30 +48,70 @@ export class HUDLayoutSystem {
 
     disableEditMode() {
         this.isEditMode = false;
-        // this.container.style.pointerEvents = 'none'; // Avoid disabling if we want consistent state, or...
-        // Actually for HUD Editor, container is fullscreen. We want pass through?
         this.container.style.pointerEvents = 'none';
+        this.container.removeEventListener('mousedown', this.onContainerMouseDown);
 
         if (this.grid) {
             this.grid.style.display = 'none';
         }
+        this.clearSelection();
     }
 
-    registerElement(element, id, initialPos, onMoveCallback) {
-        // Ensure element is absolute and interactive
-        element.style.position = 'absolute';
-        element.style.pointerEvents = 'auto'; // Crucial for receiving events
+    // --- Selection API ---
 
-        // Apply initial pos
+    select(id, add = false) {
+        if (!add) {
+            this.clearSelection(true);
+        }
+        this.selection.add(id);
+        this.updateVisualSelection();
+        if (this.onSelectionChange) this.onSelectionChange(Array.from(this.selection));
+    }
+
+    deselect(id) {
+        this.selection.delete(id);
+        this.updateVisualSelection();
+        if (this.onSelectionChange) this.onSelectionChange(Array.from(this.selection));
+    }
+
+    clearSelection(silent = false) {
+        this.selection.clear();
+        this.updateVisualSelection();
+        if (!silent && this.onSelectionChange) this.onSelectionChange([]);
+    }
+
+    toggleSelection(id) {
+        if (this.selection.has(id)) {
+            this.deselect(id);
+        } else {
+            this.select(id, true);
+        }
+    }
+
+    updateVisualSelection() {
+        this.elements.forEach((meta, id) => {
+            if (this.selection.has(id)) {
+                meta.el.style.outline = "2px solid #4CAF50";
+                meta.el.style.boxShadow = "0 0 10px rgba(76, 175, 80, 0.5)";
+            } else {
+                meta.el.style.outline = "none";
+                meta.el.style.boxShadow = "none";
+            }
+        });
+    }
+
+    // --- Element Reg ---
+
+    registerElement(element, id, initialPos, onMoveCallback) {
+        element.style.position = 'absolute';
+        element.style.pointerEvents = 'auto';
         this.applyPosition(element, initialPos);
 
-        // Store metadata
         this.elements.set(id, {
             el: element,
             onMove: onMoveCallback
         });
 
-        // Setup drag handlers on the element itself
         this.makeDraggable(element, id);
     }
 
@@ -66,91 +121,174 @@ export class HUDLayoutSystem {
         if (pos.left) el.style.left = pos.left;
         if (pos.bottom) el.style.bottom = pos.bottom;
         if (pos.right) el.style.right = pos.right;
-
-        // Handle transforms carefully
-        if (pos.transform) {
-            el.style.transform = pos.transform;
-        } else {
-            el.style.transform = 'none';
-        }
+        if (pos.transform) el.style.transform = pos.transform;
+        else el.style.transform = 'none';
     }
 
+    // --- Interaction ---
+
     makeDraggable(element, id) {
-        // Visual cues
         element.style.cursor = 'grab';
         element.style.userSelect = 'none';
 
         element.onmousedown = (e) => {
             if (!this.isEditMode) return;
-
             e.preventDefault();
-            e.stopPropagation();
+            e.stopPropagation(); // Prevent Marquee
 
-            this.activeDrag = { el: element, id: id };
+            // Selection Logic
+            if (e.shiftKey || e.ctrlKey || e.metaKey) {
+                this.toggleSelection(id);
+            } else {
+                // If clicking an unselected item, select only it
+                if (!this.selection.has(id)) {
+                    this.select(id, false);
+                }
+                // If clicking a selected item, keep selection (allow group drag)
+            }
+
+            // Start Drag
+            this.activeDrag = {
+                startX: e.clientX,
+                startY: e.clientY
+            };
+
+            // Store initial offsets for ALL selected items
+            this.dragOffsets = new Map();
+            const containerRect = this.container.getBoundingClientRect();
+
+            this.selection.forEach(selId => {
+                const meta = this.elements.get(selId);
+                if (meta) {
+                    const elRect = meta.el.getBoundingClientRect();
+                    this.dragOffsets.set(selId, {
+                        offsetX: elRect.left - containerRect.left,
+                        offsetY: elRect.top - containerRect.top
+                    });
+                }
+            });
+
             element.style.cursor = 'grabbing';
-            element.style.zIndex = '1000'; // Bring to front while dragging
-
-            // Add global listeners
             document.addEventListener('mousemove', this.onMouseMove);
             document.addEventListener('mouseup', this.onMouseUp);
         };
     }
 
+    onContainerMouseDown(e) {
+        if (!this.isEditMode) return;
+        // If we hit background, start marquee
+        this.isMarqueeSelecting = true;
+        this.marqueeStart = { x: e.clientX, y: e.clientY };
+
+        if (!e.shiftKey && !e.ctrlKey && !e.metaKey) {
+            this.clearSelection();
+        }
+
+        // Create Box
+        this.marqueeBox = document.createElement('div');
+        this.marqueeBox.style.cssText = `
+            position: fixed; border: 1px solid #4CAF50; background: rgba(76, 175, 80, 0.2);
+            pointer-events: none; z-index: 9999;
+        `;
+        document.body.appendChild(this.marqueeBox);
+
+        document.addEventListener('mousemove', this.onMouseMove);
+        document.addEventListener('mouseup', this.onMouseUp);
+    }
+
     onMouseMove(e) {
-        if (this.activeDrag && this.isEditMode) {
+        if (this.activeDrag) {
+            // DRAGGING ELEMENTS
             e.preventDefault();
-            const rect = this.container.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
+            const dx = e.clientX - this.activeDrag.startX;
+            const dy = e.clientY - this.activeDrag.startY;
+            const containerRect = this.container.getBoundingClientRect();
 
-            const el = this.activeDrag.el;
-            const w = el.offsetWidth;
-            const h = el.offsetHeight;
+            // Move ALL selected elements
+            this.selection.forEach(selId => {
+                const meta = this.elements.get(selId);
+                const startOff = this.dragOffsets.get(selId);
 
-            // Centered drag logic
-            let newLeft = x - (w / 2);
-            let newTop = y - (h / 2);
+                if (meta && startOff) {
+                    let newLeft = startOff.offsetX + dx;
+                    let newTop = startOff.offsetY + dy;
 
-            // Bounds clamping
-            if (newLeft < 0) newLeft = 0;
-            if (newTop < 0) newTop = 0;
-            if (newLeft + w > rect.width) newLeft = rect.width - w;
-            if (newTop + h > rect.height) newTop = rect.height - h;
+                    // Clamp (Simple: Clamp inside container)
+                    const w = meta.el.offsetWidth;
+                    const h = meta.el.offsetHeight;
 
-            // Apply pixel position for smooth dragging
-            el.style.left = newLeft + 'px';
-            el.style.top = newTop + 'px';
-            el.style.bottom = 'auto';
-            el.style.right = 'auto';
-            el.style.transform = 'none';
+                    if (newLeft < 0) newLeft = 0;
+                    if (newTop < 0) newTop = 0;
+                    if (newLeft + w > containerRect.width) newLeft = containerRect.width - w;
+                    if (newTop + h > containerRect.height) newTop = containerRect.height - h;
 
-            // Calculate percentages for storage
-            const leftPct = (newLeft / rect.width) * 100;
-            const topPct = (newTop / rect.height) * 100;
+                    meta.el.style.left = newLeft + 'px';
+                    meta.el.style.top = newTop + 'px';
+                    meta.el.style.bottom = 'auto';
+                    meta.el.style.right = 'auto';
+                    meta.el.style.transform = 'none';
 
-            // Helper to format as string
-            const posData = {
-                left: leftPct.toFixed(2) + '%',
-                top: topPct.toFixed(2) + '%'
-            };
+                    // Callback
+                    const leftPct = (newLeft / containerRect.width) * 100;
+                    const topPct = (newTop / containerRect.height) * 100;
+                    if (meta.onMove) meta.onMove({ left: leftPct.toFixed(2) + '%', top: topPct.toFixed(2) + '%' });
+                }
+            });
 
-            // Notify callback
-            const meta = this.elements.get(this.activeDrag.id);
-            if (meta && meta.onMove) {
-                meta.onMove(posData);
-            }
+        } else if (this.isMarqueeSelecting) {
+            // MARQUEE SELECTION
+            e.preventDefault();
+            const currentX = e.clientX;
+            const currentY = e.clientY;
+
+            const left = Math.min(this.marqueeStart.x, currentX);
+            const top = Math.min(this.marqueeStart.y, currentY);
+            const width = Math.abs(currentX - this.marqueeStart.x);
+            const height = Math.abs(currentY - this.marqueeStart.y);
+
+            this.marqueeBox.style.left = left + 'px';
+            this.marqueeBox.style.top = top + 'px';
+            this.marqueeBox.style.width = width + 'px';
+            this.marqueeBox.style.height = height + 'px';
         }
     }
 
     onMouseUp(e) {
         if (this.activeDrag) {
-            this.activeDrag.el.style.cursor = 'grab';
-            this.activeDrag.el.style.zIndex = '';
             this.activeDrag = null;
-
-            // Remove global listeners
-            document.removeEventListener('mousemove', this.onMouseMove);
-            document.removeEventListener('mouseup', this.onMouseUp);
         }
+
+        if (this.isMarqueeSelecting) {
+            // Finalize Marquee
+            const mbRect = this.marqueeBox.getBoundingClientRect();
+
+            // Check Intersections
+            this.elements.forEach((meta, id) => {
+                const elRect = meta.el.getBoundingClientRect();
+                const intersects = !(mbRect.right < elRect.left ||
+                    mbRect.left > elRect.right ||
+                    mbRect.bottom < elRect.top ||
+                    mbRect.top > elRect.bottom);
+
+                if (intersects) {
+                    this.selection.add(id);
+                }
+            });
+
+            this.updateVisualSelection();
+            if (this.onSelectionChange) this.onSelectionChange(Array.from(this.selection));
+
+            document.body.removeChild(this.marqueeBox);
+            this.marqueeBox = null;
+            this.isMarqueeSelecting = false;
+        }
+
+        document.removeEventListener('mousemove', this.onMouseMove);
+        document.removeEventListener('mouseup', this.onMouseUp);
+
+        // Reset cursors
+        this.elements.forEach((meta) => {
+            meta.el.style.cursor = 'grab';
+        });
     }
 }

@@ -17,8 +17,9 @@ export class HUDConfigPanel {
     open(profile) {
         this.profile = profile;
         this.tempSettings = JSON.parse(JSON.stringify(profile.hudSettings || {}));
+        this.selectedId = 'health'; // Default selection
 
-        // Initialize Defaults
+        // Initialize Defaults (Keep existing defaults logic...)
         // Health
         if (this.tempSettings.showHealth === undefined) this.tempSettings.showHealth = true;
         if (this.tempSettings.healthStyle === undefined) this.tempSettings.healthStyle = 'bar';
@@ -45,11 +46,10 @@ export class HUDConfigPanel {
 
         // New Inventory Defaults
         // Do NOT set default width/height so it can be auto-calculated
-        // if (this.tempSettings.inventoryContainerWidth === undefined) this.tempSettings.inventoryContainerWidth = 350;
-        // if (this.tempSettings.inventoryContainerHeight === undefined) this.tempSettings.inventoryContainerHeight = 80;
         if (this.tempSettings.inventoryPadding === undefined) this.tempSettings.inventoryPadding = 10;
         if (this.tempSettings.inventoryFreeLayout === undefined) this.tempSettings.inventoryFreeLayout = false;
         if (!this.tempSettings.inventorySlotPositions) this.tempSettings.inventorySlotPositions = [];
+        if (!this.tempSettings.inventorySlotAlignment) this.tempSettings.inventorySlotAlignment = 'center';
 
         this.createUI();
 
@@ -82,38 +82,38 @@ export class HUDConfigPanel {
             font-family: sans-serif; overflow: hidden;
         `;
 
-        // 1. Fullscreen Preview Area (The "Background" workspace)
+        // 1. Fullscreen Preview Area
         const previewArea = document.createElement('div');
         previewArea.id = 'hud-preview-area';
         previewArea.style.cssText = `
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             background: transparent;
         `;
-
         this.container.appendChild(previewArea);
 
         // Initialize Layout System
         this.layoutSystem = new HUDLayoutSystem(previewArea);
-        this.layoutSystem.enableEditMode(true); // Show grid
+        this.layoutSystem.enableEditMode(true);
+        this.layoutSystem.setSelectionCallback((selectedIds) => {
+            this.onSelectionChange(selectedIds);
+        });
 
         this.previewContainer = previewArea;
 
-        // 2. Floating Config Window
+        // 2. Floating Config Window (Resized and Layout Changed)
         const configWindow = document.createElement('div');
         configWindow.className = 'hud-config-window';
         configWindow.style.cssText = `
-            position: absolute; right: 30px; top: 30px; width: 320px;
+            position: absolute; right: 30px; top: 30px; width: 500px; height: 600px;
             background: rgba(30, 30, 30, 0.95);
             border: 1px solid #555; border-radius: 8px;
             box-shadow: 0 10px 40px rgba(0,0,0,0.8);
             display: flex; flex-direction: column;
-            max-height: 85%;
             backdrop-filter: blur(5px);
-            z-index: 2001; /* Above grid */
+            z-index: 2001;
             user-select: none;
         `;
 
-        // Make Window Draggable
         this.makeWindowDraggable(configWindow);
 
         // Header
@@ -125,47 +125,368 @@ export class HUDConfigPanel {
         const closeBtn = document.createElement('button');
         closeBtn.innerHTML = "✕";
         closeBtn.style.cssText = "background:none; border:none; color:#aaa; font-size: 18px; cursor: pointer;";
-        closeBtn.onclick = (e) => {
-            e.stopPropagation();
-            this.close();
-        };
+        closeBtn.onclick = (e) => { e.stopPropagation(); this.close(); };
         header.appendChild(closeBtn);
         configWindow.appendChild(header);
 
-        // Scrollable Content
+        // SPLIT VIEW CONTENT
         const content = document.createElement('div');
-        content.style.cssText = "padding: 20px; overflow-y: auto; flex: 1;";
+        content.style.cssText = "display: flex; flex: 1; overflow: hidden;";
 
-        this.createSection(content, "Salud (Vida)", 'health');
-        this.createSection(content, "Salto (Carga)", 'jump');
-        this.createSection(content, "Inventario", 'inventory');
+        // SIDEBAR (List)
+        this.sidebar = document.createElement('div');
+        this.sidebar.style.cssText = "width: 150px; background: rgba(0,0,0,0.2); border-right: 1px solid #444; padding: 10px; overflow-y: auto;";
+        content.appendChild(this.sidebar);
 
-        // Instructions
-        const hint = document.createElement('div');
-        hint.innerHTML = `<p style="color:#aaa; font-size:12px; font-style:italic; margin-top:20px; text-align:center;">
-            💡 Arrastra los elementos en la pantalla para cambiar su posición.
-        </p>`;
-        content.appendChild(hint);
+        // PROPERTIES PANEL
+        this.propertyPanel = document.createElement('div');
+        this.propertyPanel.style.cssText = "flex: 1; padding: 20px; overflow-y: auto; background: transparent;";
+        content.appendChild(this.propertyPanel);
 
         configWindow.appendChild(content);
 
         // Footer
         const footer = document.createElement('div');
         footer.style.cssText = "padding: 15px; border-top: 1px solid #444; display: flex; justify-content: flex-end; gap: 10px; background: rgba(40,40,40,0.8); border-radius: 0 0 8px 8px;";
-
         const saveBtn = document.createElement('button');
         saveBtn.textContent = "Guardar y Salir";
         saveBtn.style.cssText = "padding: 8px 15px; background: #00aa00; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; width:100%;";
         saveBtn.onclick = () => this.save();
-
         footer.appendChild(saveBtn);
         configWindow.appendChild(footer);
 
         this.container.appendChild(configWindow);
         document.body.appendChild(this.container);
 
+        // Initial Render
+        this.renderSidebar();
+        this.renderProperties();
         this.updatePreview();
     }
+
+    // --- Split View Logic ---
+
+    onSelectionChange(selectedIds) {
+        // Highlighting in Sidebar handled by renderSidebar
+        if (selectedIds.length === 1) {
+            this.selectedId = selectedIds[0];
+        } else if (selectedIds.length === 0) {
+            // Keep showing properties of last selected? or clear?
+            // Let's keep last or default
+        }
+        this.renderSidebar();
+        this.renderProperties();
+    }
+
+    renderSidebar() {
+        this.sidebar.innerHTML = '';
+        const items = [
+            { id: 'health', label: 'Salud' },
+            { id: 'jump', label: 'Salto' },
+            { id: 'inventory', label: 'Inventario' }
+        ];
+
+        items.forEach(item => {
+            const row = document.createElement('div');
+            const isSelected = this.selectedId === item.id;
+            const isMultiSelected = this.layoutSystem.selection.has(item.id);
+
+            row.style.cssText = `
+                padding: 8px; margin-bottom: 5px; border-radius: 4px;
+                cursor: pointer; display: flex; align-items: center; gap: 8px;
+                background: ${isSelected ? '#4CAF50' : (isMultiSelected ? 'rgba(76, 175, 80, 0.3)' : 'transparent')};
+                color: ${isSelected ? 'white' : '#ccc'};
+                border: 1px solid ${isMultiSelected ? '#4CAF50' : 'transparent'};
+            `;
+
+            // Vis Checkbox (Stop propagation so we don't select row when checking)
+            const check = document.createElement('input');
+            check.type = "checkbox";
+            const vKey = item.id === 'health' ? 'showHealth' : (item.id === 'jump' ? 'showJump' : 'showInventory');
+            check.checked = this.tempSettings[vKey];
+            check.onclick = (e) => e.stopPropagation();
+            check.onchange = (e) => {
+                this.tempSettings[vKey] = e.target.checked;
+                this.updatePreview();
+            };
+            row.appendChild(check);
+
+            const label = document.createElement('span');
+            label.textContent = item.label;
+            label.style.fontSize = "13px";
+            row.appendChild(label);
+
+            row.onclick = (e) => {
+                if (e.shiftKey || e.ctrlKey || e.metaKey) {
+                    this.layoutSystem.toggleSelection(item.id);
+                } else {
+                    this.selectedId = item.id; // For properties panel
+                    this.layoutSystem.select(item.id, false); // Exclusive select
+                }
+            };
+
+            this.sidebar.appendChild(row);
+        });
+    }
+
+    renderProperties() {
+        this.propertyPanel.innerHTML = '';
+
+        if (!this.selectedId) {
+            this.propertyPanel.innerHTML = `<div style="color:#666; text-align:center; margin-top:50px;">Selecciona un elemento</div>`;
+            return;
+        }
+
+        const type = this.selectedId;
+        const title = type === 'health' ? "Salud (Vida)" : (type === 'jump' ? "Salto (Carga)" : "Inventario");
+
+        // Re-use logic from createSection but adapt to just render one
+        this.createSection(this.propertyPanel, title, type);
+    }
+
+    // Kept for backward compat with renderProperties calling it
+    // But simplified to assume parent is propertyPanel
+    createSection(sec, title, type) {
+        // Header
+        const h3 = document.createElement('h3');
+        h3.textContent = title;
+        h3.style.cssText = "color: #ddd; border-bottom: 1px solid #444; padding-bottom: 5px; margin-bottom: 10px; font-size:14px;";
+        sec.appendChild(h3);
+
+        if (this.layoutSystem.selection.size > 1) {
+            const hint = document.createElement('div');
+            hint.textContent = "Multi-Selección Activa: Moviendo en grupo.";
+            hint.style.cssText = "padding: 5px; background: rgba(76, 175, 80, 0.2); border: 1px solid #4CAF50; color: #aaa; font-size: 11px; margin-bottom: 10px;";
+            sec.appendChild(hint);
+        }
+
+        // ... existing property generation logic ...
+        // We need to bring back the bulk of createSection logic here or let it run
+        // For now, I replaced the top part of createSection in the diff, I need to ensure the rest follows.
+        // ACTUALLY, I should just modify createSection to append to the passed parent and remove the wrapper div creation if needed?
+        // The previous createSection created a 'div' wrapper. I'll stick to that.
+
+        // ... Visibility Checkbox (Redundant but fine to keep in properties too) ...
+        const visRow = document.createElement('div');
+        visRow.style.cssText = "margin-bottom: 10px; display: flex; align-items: center; gap: 10px;";
+
+        const visCheck = document.createElement('input');
+        // this.checkStyle(visCheck);
+        const vKey = type === 'health' ? 'showHealth' : (type === 'jump' ? 'showJump' : 'showInventory');
+        visCheck.checked = this.tempSettings[vKey];
+        visCheck.onchange = (e) => {
+            this.tempSettings[vKey] = e.target.checked;
+            this.updatePreview();
+            this.renderSidebar(); // Update sidebar checkbox too
+        };
+        const visLabel = document.createElement('label'); visLabel.textContent = "Mostrar"; visLabel.style.color = "#aaa";
+        visRow.appendChild(visCheck); visRow.appendChild(visLabel); sec.appendChild(visRow);
+
+        this.generateSpecificOptions(sec, type);
+    }
+
+    generateSpecificOptions(sec, type) {
+        // Extracted logic from old createSection to be cleaner
+        if (type === 'health' || type === 'jump') {
+            const prefix = type;
+
+            // 1. Style
+            const styleLabel = document.createElement('div');
+            styleLabel.textContent = "Estilo:";
+            styleLabel.style.color = "#aaa";
+            styleLabel.style.marginBottom = "5px";
+            styleLabel.style.fontSize = "12px";
+            sec.appendChild(styleLabel);
+
+            const styles = type === 'health' ? ['bar', 'hearts', 'text'] : ['bar', 'circle'];
+            const styleTexts = type === 'health' ? ['Barra Clásica', 'Corazones', 'Texto Simple'] : ['Barra de Estamina', 'Círculo de Carga'];
+
+            const styleSel = this.createSelect(styles, styleTexts, this.tempSettings[prefix + 'Style'], (v) => {
+                this.tempSettings[prefix + 'Style'] = v;
+                this.updatePreview();
+                updateBarOptionsAccess(v);
+            });
+            sec.appendChild(styleSel);
+
+            // Container for Bar-only options
+            const barOptions = document.createElement('div');
+            barOptions.style.marginTop = "10px";
+            barOptions.style.paddingLeft = "10px";
+            barOptions.style.borderLeft = "2px solid #555";
+
+            // 2. Show Text (Checkbox)
+            const textRow = document.createElement('div');
+            textRow.style.cssText = "margin-bottom: 5px; display: flex; align-items: center; gap: 10px;";
+            const textCheck = document.createElement('input'); // this.checkStyle(textCheck);
+            const tKey = prefix + 'ShowText';
+            if (this.tempSettings[tKey] === undefined) this.tempSettings[tKey] = true;
+            textCheck.checked = this.tempSettings[tKey];
+            textCheck.onchange = (e) => {
+                this.tempSettings[tKey] = e.target.checked;
+                this.updatePreview();
+            };
+            const textLabel = document.createElement('label'); textLabel.textContent = "Mostrar Texto/Dígito"; textLabel.style.color = "#ccc"; textLabel.style.fontSize = "12px";
+            textRow.appendChild(textCheck); textRow.appendChild(textLabel);
+            barOptions.appendChild(textRow);
+
+            // 3. Orientation
+            const orientRow = document.createElement('div'); orientRow.style.marginBottom = "5px";
+            const orientLabel = document.createElement('div'); orientLabel.textContent = "Orientación:"; orientLabel.style.color = "#aaa"; orientLabel.style.fontSize = "12px";
+            orientRow.appendChild(orientLabel);
+            const orientSel = this.createSelect(['horizontal', 'vertical'], ['Horizontal', 'Vertical'], this.tempSettings[prefix + 'Orientation'] || 'horizontal', (v) => {
+                const oldOrient = this.tempSettings[prefix + 'Orientation'];
+                this.tempSettings[prefix + 'Orientation'] = v;
+                if (oldOrient !== v) {
+                    const wKey = prefix + 'Width'; const hKey = prefix + 'Height';
+                    const curW = this.tempSettings[wKey]; const curH = this.tempSettings[hKey];
+                    this.tempSettings[wKey] = curH; this.tempSettings[hKey] = curW; // Swap
+                    // Logic to update inputs handled by re-render or explicit ref
+                    this.renderProperties(); // Re-render to update inputs
+                }
+                this.updatePreview();
+            });
+            orientRow.appendChild(orientSel);
+            barOptions.appendChild(orientRow);
+
+            // 4. Dimensions
+            const dimRow = document.createElement('div'); dimRow.style.display = "flex"; dimRow.style.gap = "10px";
+            // Width
+            const widthContainer = document.createElement('div');
+            const wLabel = document.createElement('div'); wLabel.textContent = "Ancho (px)"; wLabel.style.fontSize = "10px"; wLabel.style.color = "#aaa";
+            const wInput = document.createElement('input'); inputStyle(wInput);
+            wInput.value = this.tempSettings[prefix + 'Width'] || (type === 'health' ? 300 : 200);
+            wInput.onchange = (e) => { this.tempSettings[prefix + 'Width'] = parseInt(e.target.value) || 100; this.updatePreview(); };
+            this.uiInputs[prefix + 'Width'] = wInput;
+            widthContainer.appendChild(wLabel); widthContainer.appendChild(wInput);
+            // Height
+            const heightContainer = document.createElement('div');
+            const hLabel = document.createElement('div'); hLabel.textContent = "Alto (px)"; hLabel.style.fontSize = "10px"; hLabel.style.color = "#aaa";
+            const hInput = document.createElement('input'); inputStyle(hInput);
+            hInput.value = this.tempSettings[prefix + 'Height'] || (type === 'health' ? 20 : 8);
+            hInput.onchange = (e) => { this.tempSettings[prefix + 'Height'] = parseInt(e.target.value) || 10; this.updatePreview(); };
+            this.uiInputs[prefix + 'Height'] = hInput;
+            heightContainer.appendChild(hLabel); heightContainer.appendChild(hInput);
+
+            dimRow.appendChild(widthContainer); dimRow.appendChild(heightContainer);
+            barOptions.appendChild(dimRow);
+            sec.appendChild(barOptions);
+
+            const updateBarOptionsAccess = (style) => {
+                barOptions.style.display = style === 'bar' ? 'block' : 'none';
+            };
+            updateBarOptionsAccess(this.tempSettings[prefix + 'Style']);
+
+        } else if (type === 'inventory') {
+            // Inventory Options (Ported from old createSection)
+            const slotInput = document.createElement('input'); this.inputStyle(slotInput); slotInput.style.width = "60px";
+            slotInput.value = this.tempSettings.inventorySlots;
+            slotInput.onchange = (e) => {
+                let v = parseInt(e.target.value); if (v < 1) v = 1; if (v > 10) v = 10;
+                this.tempSettings.inventorySlots = v; this.updatePreview();
+            };
+            const slotLabel = document.createElement('div'); slotLabel.textContent = "Espacios (1-10):"; slotLabel.style.color = "#aaa"; slotLabel.style.marginBottom = "5px";
+            sec.appendChild(slotLabel); sec.appendChild(slotInput);
+
+            // Slot Size
+            const sizeInput = document.createElement('input'); this.inputStyle(sizeInput); sizeInput.style.width = "60px";
+            sizeInput.value = this.tempSettings.inventorySlotSize || 50;
+            sizeInput.onchange = (e) => {
+                let v = parseInt(e.target.value); if (v < 30) v = 30; if (v > 100) v = 100;
+                this.tempSettings.inventorySlotSize = v; this.updatePreview();
+            };
+            const sizeLabel = document.createElement('div'); sizeLabel.textContent = "Tamaño Item:"; sizeLabel.style.color = "#aaa"; sizeLabel.style.marginBottom = "5px"; sizeLabel.style.marginTop = "10px";
+            sec.appendChild(sizeLabel); sec.appendChild(sizeInput);
+
+            // Container Dims
+            const dimRow = document.createElement('div'); dimRow.style.cssText = "display: flex; gap: 10px; margin-top: 10px;";
+            // Width
+            const widthContainer = document.createElement('div');
+            const wLabel = document.createElement('div'); wLabel.textContent = "Ancho Fondo"; wLabel.style.fontSize = "10px"; wLabel.style.color = "#aaa";
+            const wInput = document.createElement('input'); inputStyle(wInput);
+            wInput.value = this.tempSettings.inventoryContainerWidth || '';
+            wInput.onchange = (e) => { this.tempSettings.inventoryContainerWidth = parseInt(e.target.value) || 300; this.updatePreview(); };
+            this.uiInputs['inventoryContainerWidth'] = wInput;
+            widthContainer.appendChild(wLabel); widthContainer.appendChild(wInput);
+            // Height
+            const heightContainer = document.createElement('div');
+            const hLabel = document.createElement('div'); hLabel.textContent = "Alto Fondo"; hLabel.style.fontSize = "10px"; hLabel.style.color = "#aaa";
+            const hInput = document.createElement('input'); inputStyle(hInput);
+            hInput.value = this.tempSettings.inventoryContainerHeight || '';
+            hInput.onchange = (e) => { this.tempSettings.inventoryContainerHeight = parseInt(e.target.value) || 100; this.updatePreview(); };
+            this.uiInputs['inventoryContainerHeight'] = hInput;
+            heightContainer.appendChild(hLabel); heightContainer.appendChild(hInput);
+
+            dimRow.appendChild(widthContainer); dimRow.appendChild(heightContainer);
+            sec.appendChild(dimRow);
+
+            // Free Layout
+            const freeRow = document.createElement('div'); freeRow.style.cssText = "margin-top: 10px; display: flex; align-items: center; gap: 10px;";
+            const freeCheck = document.createElement('input'); // this.checkStyle(freeCheck);
+            freeCheck.checked = this.tempSettings.inventoryFreeLayout || false;
+            freeCheck.onchange = (e) => {
+                const isFree = e.target.checked;
+                if (isFree) {
+                    // Capture Logic (Same as before)
+                    const container = this.contentWrapper.querySelector('.inventory-container-preview');
+                    if (container) {
+                        const currentW = container.offsetWidth; const currentH = container.offsetHeight;
+                        this.tempSettings.inventoryContainerWidth = currentW; this.tempSettings.inventoryContainerHeight = currentH;
+                        if (this.uiInputs['inventoryContainerWidth']) this.uiInputs['inventoryContainerWidth'].value = currentW;
+                        if (this.uiInputs['inventoryContainerHeight']) this.uiInputs['inventoryContainerHeight'].value = currentH;
+
+                        const slots = container.querySelectorAll('.inventory-slot');
+                        const positions = [];
+                        slots.forEach(slot => { positions.push({ left: slot.offsetLeft + 'px', top: slot.offsetTop + 'px' }); });
+                        this.tempSettings.inventorySlotPositions = positions;
+                    }
+                } else {
+                    this.tempSettings.inventorySlotPositions = [];
+                    delete this.tempSettings.inventoryContainerWidth; delete this.tempSettings.inventoryContainerHeight;
+                    if (this.uiInputs['inventoryContainerWidth']) this.uiInputs['inventoryContainerWidth'].value = '';
+                    if (this.uiInputs['inventoryContainerHeight']) this.uiInputs['inventoryContainerHeight'].value = '';
+                }
+                this.tempSettings.inventoryFreeLayout = isFree; this.updatePreview(); this.renderProperties(); // Re-render to update inputs/visibility
+            };
+            const freeLabel = document.createElement('label'); freeLabel.textContent = "Diseño Libre (Mover Slots)"; freeLabel.style.color = "#ccc"; freeLabel.style.fontSize = "12px";
+            freeRow.appendChild(freeCheck); freeRow.appendChild(freeLabel);
+            sec.appendChild(freeRow);
+
+            // Padding
+            const padRow = document.createElement('div'); padRow.style.cssText = "margin-top: 10px; display: flex; align-items: center; gap: 10px;";
+            const padLabel = document.createElement('label'); padLabel.textContent = "Padding:"; padLabel.style.color = "#aaa";
+            const padInput = document.createElement('input'); this.inputStyle(padInput); padInput.style.width = "50px";
+            padInput.value = this.tempSettings.inventoryPadding !== undefined ? this.tempSettings.inventoryPadding : 10;
+            padInput.onchange = (e) => { this.tempSettings.inventoryPadding = parseInt(e.target.value) || 0; this.updatePreview(); };
+            padRow.appendChild(padLabel); padRow.appendChild(padInput);
+            sec.appendChild(padRow);
+
+            // Alignment Grid (3x3)
+            const alignContainer = document.createElement('div'); alignContainer.style.cssText = "margin-top: 15px;";
+            const alignLabel = document.createElement('div'); alignLabel.textContent = "Alineación (Auto):"; alignLabel.style.fontSize = "12px"; alignLabel.style.color = "#aaa"; alignLabel.style.marginBottom = "5px";
+            alignContainer.appendChild(alignLabel);
+            const grid = document.createElement('div'); grid.style.cssText = "display: grid; grid-template-columns: repeat(3, 20px); gap: 2px; width: fit-content;";
+            const alignments = ['top-left', 'top-center', 'top-right', 'center-left', 'center', 'center-right', 'bottom-left', 'bottom-center', 'bottom-right'];
+            alignments.forEach(align => {
+                const cell = document.createElement('div');
+                cell.style.cssText = "width: 20px; height: 20px; background: #333; border: 1px solid #555; cursor: pointer;";
+                cell.title = align;
+                if (this.tempSettings.inventorySlotAlignment === align) { cell.style.background = '#4CAF50'; cell.style.borderColor = '#4CAF50'; }
+                cell.onclick = () => {
+                    this.tempSettings.inventorySlotAlignment = align;
+                    this.updatePreview(); this.renderProperties(); // Re-render for highlight
+                };
+                grid.appendChild(cell);
+            });
+            alignContainer.appendChild(grid);
+            sec.appendChild(alignContainer);
+        }
+    }
+
+    // Helper Styles
+    updatePreview() { // Placeholder for the existing updatePreview method reference
+        super.updatePreview(); // Reference existing if not replaced
+    }
+
 
     makeWindowDraggable(win) {
         let isDragging = false;

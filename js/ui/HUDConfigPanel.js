@@ -12,6 +12,7 @@ export class HUDConfigPanel {
 
         this.layoutSystem = null;
         this.uiInputs = {}; // Store references to inputs for live updates
+        this.isMinimized = false; // State for minimization
     }
 
     open(profile) {
@@ -122,11 +123,22 @@ export class HUDConfigPanel {
         header.style.cssText = "padding: 15px; border-bottom: 1px solid #444; display: flex; justify-content: space-between; align-items: center; background: rgba(50,50,50,0.5); border-radius: 8px 8px 0 0; cursor: move;";
         header.innerHTML = `<h3 style="margin:0; color:white; font-size:16px; pointer-events:none;">Editor de HUD</h3>`;
 
+        // Minimize Button
+        const minBtn = document.createElement('button');
+        minBtn.innerHTML = "−";
+        minBtn.style.cssText = "background:none; border:none; color:#aaa; font-size: 18px; cursor: pointer; margin-right: 10px; font-weight: bold; vertical-align: middle;";
+        minBtn.onclick = (e) => { e.stopPropagation(); this.toggleMinimize(configWindow, content, footer, minBtn); };
+
+        const controls = document.createElement('div');
+        controls.style.display = 'flex'; controls.style.alignItems = 'center';
+        controls.appendChild(minBtn);
+
         const closeBtn = document.createElement('button');
         closeBtn.innerHTML = "✕";
         closeBtn.style.cssText = "background:none; border:none; color:#aaa; font-size: 18px; cursor: pointer;";
         closeBtn.onclick = (e) => { e.stopPropagation(); this.close(); };
-        header.appendChild(closeBtn);
+        controls.appendChild(closeBtn);
+        header.appendChild(controls);
         configWindow.appendChild(header);
 
         // SPLIT VIEW CONTENT
@@ -208,6 +220,7 @@ export class HUDConfigPanel {
             check.onchange = (e) => {
                 this.tempSettings[vKey] = e.target.checked;
                 this.updatePreview();
+                this.renderProperties(); // Sync with Properties Panel
             };
             row.appendChild(check);
 
@@ -553,6 +566,7 @@ export class HUDConfigPanel {
         visCheck.onchange = (e) => {
             this.tempSettings[vKey] = e.target.checked;
             this.updatePreview();
+            this.renderSidebar(); // Sync with Sidebar
         };
 
         const visLabel = document.createElement('label');
@@ -1397,4 +1411,20 @@ export class HUDConfigPanel {
             });
         }
     }
+
+    toggleMinimize(win, content, footer, btn) {
+        this.isMinimized = !this.isMinimized;
+        if (this.isMinimized) {
+            content.style.display = 'none';
+            footer.style.display = 'none';
+            win.style.height = 'auto';
+            if (btn) btn.innerHTML = "☐";
+        } else {
+            content.style.display = 'flex';
+            footer.style.display = 'flex';
+            win.style.height = '600px';
+            if (btn) btn.innerHTML = "−";
+        }
+    }
 }
+

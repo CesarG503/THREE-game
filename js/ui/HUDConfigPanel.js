@@ -334,243 +334,6 @@ export class HUDConfigPanel {
         this.createSection(this.propertyPanel, title, type);
     }
 
-    // Kept for backward compat with renderProperties calling it
-    // But simplified to assume parent is propertyPanel
-    createSection(sec, title, type) {
-        // Header
-        const h3 = document.createElement('h3');
-        h3.textContent = title;
-        h3.style.cssText = "color: #ddd; border-bottom: 1px solid #444; padding-bottom: 5px; margin-bottom: 10px; font-size:14px;";
-        sec.appendChild(h3);
-
-        if (this.layoutSystem.selection.size > 1) {
-            const hint = document.createElement('div');
-            hint.textContent = "Multi-Selección Activa: Moviendo en grupo.";
-            hint.style.cssText = "padding: 5px; background: rgba(76, 175, 80, 0.2); border: 1px solid #4CAF50; color: #aaa; font-size: 11px; margin-bottom: 10px;";
-            sec.appendChild(hint);
-        }
-
-        // ... existing property generation logic ...
-        // We need to bring back the bulk of createSection logic here or let it run
-        // For now, I replaced the top part of createSection in the diff, I need to ensure the rest follows.
-        // ACTUALLY, I should just modify createSection to append to the passed parent and remove the wrapper div creation if needed?
-        // The previous createSection created a 'div' wrapper. I'll stick to that.
-
-        // ... Visibility Checkbox (Redundant but fine to keep in properties too) ...
-        const visRow = document.createElement('div');
-        visRow.style.cssText = "margin-bottom: 10px; display: flex; align-items: center; gap: 10px;";
-
-        const visCheck = document.createElement('input');
-        // this.checkStyle(visCheck);
-        const vKey = type === 'health' ? 'showHealth' : (type === 'jump' ? 'showJump' : 'showInventory');
-        visCheck.checked = this.tempSettings[vKey];
-        visCheck.onchange = (e) => {
-            this.tempSettings[vKey] = e.target.checked;
-            this.updatePreview();
-            this.renderSidebar(); // Update sidebar checkbox too
-        };
-        const visLabel = document.createElement('label'); visLabel.textContent = "Mostrar"; visLabel.style.color = "#aaa";
-        visRow.appendChild(visCheck); visRow.appendChild(visLabel); sec.appendChild(visRow);
-
-        this.generateSpecificOptions(sec, type);
-    }
-
-    generateSpecificOptions(sec, type) {
-        // Extracted logic from old createSection to be cleaner
-        if (type === 'health' || type === 'jump') {
-            const prefix = type;
-
-            // 1. Style
-            const styleLabel = document.createElement('div');
-            styleLabel.textContent = "Estilo:";
-            styleLabel.style.color = "#aaa";
-            styleLabel.style.marginBottom = "5px";
-            styleLabel.style.fontSize = "12px";
-            sec.appendChild(styleLabel);
-
-            const styles = type === 'health' ? ['bar', 'hearts', 'text'] : ['bar', 'circle'];
-            const styleTexts = type === 'health' ? ['Barra Clásica', 'Corazones', 'Texto Simple'] : ['Barra de Estamina', 'Círculo de Carga'];
-
-            const styleSel = this.createSelect(styles, styleTexts, this.tempSettings[prefix + 'Style'], (v) => {
-                this.tempSettings[prefix + 'Style'] = v;
-                this.updatePreview();
-                updateBarOptionsAccess(v);
-            });
-            sec.appendChild(styleSel);
-
-            // Container for Bar-only options
-            const barOptions = document.createElement('div');
-            barOptions.style.marginTop = "10px";
-            barOptions.style.paddingLeft = "10px";
-            barOptions.style.borderLeft = "2px solid #555";
-
-            // 2. Show Text (Checkbox)
-            const textRow = document.createElement('div');
-            textRow.style.cssText = "margin-bottom: 5px; display: flex; align-items: center; gap: 10px;";
-            const textCheck = document.createElement('input'); // this.checkStyle(textCheck);
-            const tKey = prefix + 'ShowText';
-            if (this.tempSettings[tKey] === undefined) this.tempSettings[tKey] = true;
-            textCheck.checked = this.tempSettings[tKey];
-            textCheck.onchange = (e) => {
-                this.tempSettings[tKey] = e.target.checked;
-                this.updatePreview();
-            };
-            const textLabel = document.createElement('label'); textLabel.textContent = "Mostrar Texto/Dígito"; textLabel.style.color = "#ccc"; textLabel.style.fontSize = "12px";
-            textRow.appendChild(textCheck); textRow.appendChild(textLabel);
-            barOptions.appendChild(textRow);
-
-            // 3. Orientation
-            const orientRow = document.createElement('div'); orientRow.style.marginBottom = "5px";
-            const orientLabel = document.createElement('div'); orientLabel.textContent = "Orientación:"; orientLabel.style.color = "#aaa"; orientLabel.style.fontSize = "12px";
-            orientRow.appendChild(orientLabel);
-            const orientSel = this.createSelect(['horizontal', 'vertical'], ['Horizontal', 'Vertical'], this.tempSettings[prefix + 'Orientation'] || 'horizontal', (v) => {
-                const oldOrient = this.tempSettings[prefix + 'Orientation'];
-                this.tempSettings[prefix + 'Orientation'] = v;
-                if (oldOrient !== v) {
-                    const wKey = prefix + 'Width'; const hKey = prefix + 'Height';
-                    const curW = this.tempSettings[wKey]; const curH = this.tempSettings[hKey];
-                    this.tempSettings[wKey] = curH; this.tempSettings[hKey] = curW; // Swap
-                    // Logic to update inputs handled by re-render or explicit ref
-                    this.renderProperties(); // Re-render to update inputs
-                }
-                this.updatePreview();
-            });
-            orientRow.appendChild(orientSel);
-            barOptions.appendChild(orientRow);
-
-            // 4. Dimensions
-            const dimRow = document.createElement('div'); dimRow.style.display = "flex"; dimRow.style.gap = "10px";
-            // Width
-            const widthContainer = document.createElement('div');
-            const wLabel = document.createElement('div'); wLabel.textContent = "Ancho (px)"; wLabel.style.fontSize = "10px"; wLabel.style.color = "#aaa";
-            const wInput = document.createElement('input'); inputStyle(wInput);
-            wInput.value = this.tempSettings[prefix + 'Width'] || (type === 'health' ? 300 : 200);
-            wInput.onchange = (e) => { this.tempSettings[prefix + 'Width'] = parseInt(e.target.value) || 100; this.updatePreview(); };
-            this.uiInputs[prefix + 'Width'] = wInput;
-            widthContainer.appendChild(wLabel); widthContainer.appendChild(wInput);
-            // Height
-            const heightContainer = document.createElement('div');
-            const hLabel = document.createElement('div'); hLabel.textContent = "Alto (px)"; hLabel.style.fontSize = "10px"; hLabel.style.color = "#aaa";
-            const hInput = document.createElement('input'); inputStyle(hInput);
-            hInput.value = this.tempSettings[prefix + 'Height'] || (type === 'health' ? 20 : 8);
-            hInput.onchange = (e) => { this.tempSettings[prefix + 'Height'] = parseInt(e.target.value) || 10; this.updatePreview(); };
-            this.uiInputs[prefix + 'Height'] = hInput;
-            heightContainer.appendChild(hLabel); heightContainer.appendChild(hInput);
-
-            dimRow.appendChild(widthContainer); dimRow.appendChild(heightContainer);
-            barOptions.appendChild(dimRow);
-            sec.appendChild(barOptions);
-
-            const updateBarOptionsAccess = (style) => {
-                barOptions.style.display = style === 'bar' ? 'block' : 'none';
-            };
-            updateBarOptionsAccess(this.tempSettings[prefix + 'Style']);
-
-        } else if (type === 'inventory') {
-            // Inventory Options (Ported from old createSection)
-            const slotInput = document.createElement('input'); this.inputStyle(slotInput); slotInput.style.width = "60px";
-            slotInput.value = this.tempSettings.inventorySlots;
-            slotInput.onchange = (e) => {
-                let v = parseInt(e.target.value); if (v < 1) v = 1; if (v > 10) v = 10;
-                this.tempSettings.inventorySlots = v; this.updatePreview();
-            };
-            const slotLabel = document.createElement('div'); slotLabel.textContent = "Espacios (1-10):"; slotLabel.style.color = "#aaa"; slotLabel.style.marginBottom = "5px";
-            sec.appendChild(slotLabel); sec.appendChild(slotInput);
-
-            // Slot Size
-            const sizeInput = document.createElement('input'); this.inputStyle(sizeInput); sizeInput.style.width = "60px";
-            sizeInput.value = this.tempSettings.inventorySlotSize || 50;
-            sizeInput.onchange = (e) => {
-                let v = parseInt(e.target.value); if (v < 30) v = 30; if (v > 100) v = 100;
-                this.tempSettings.inventorySlotSize = v; this.updatePreview();
-            };
-            const sizeLabel = document.createElement('div'); sizeLabel.textContent = "Tamaño Item:"; sizeLabel.style.color = "#aaa"; sizeLabel.style.marginBottom = "5px"; sizeLabel.style.marginTop = "10px";
-            sec.appendChild(sizeLabel); sec.appendChild(sizeInput);
-
-            // Container Dims
-            const dimRow = document.createElement('div'); dimRow.style.cssText = "display: flex; gap: 10px; margin-top: 10px;";
-            // Width
-            const widthContainer = document.createElement('div');
-            const wLabel = document.createElement('div'); wLabel.textContent = "Ancho Fondo"; wLabel.style.fontSize = "10px"; wLabel.style.color = "#aaa";
-            const wInput = document.createElement('input'); inputStyle(wInput);
-            wInput.value = this.tempSettings.inventoryContainerWidth || '';
-            wInput.onchange = (e) => { this.tempSettings.inventoryContainerWidth = parseInt(e.target.value) || 300; this.updatePreview(); };
-            this.uiInputs['inventoryContainerWidth'] = wInput;
-            widthContainer.appendChild(wLabel); widthContainer.appendChild(wInput);
-            // Height
-            const heightContainer = document.createElement('div');
-            const hLabel = document.createElement('div'); hLabel.textContent = "Alto Fondo"; hLabel.style.fontSize = "10px"; hLabel.style.color = "#aaa";
-            const hInput = document.createElement('input'); inputStyle(hInput);
-            hInput.value = this.tempSettings.inventoryContainerHeight || '';
-            hInput.onchange = (e) => { this.tempSettings.inventoryContainerHeight = parseInt(e.target.value) || 100; this.updatePreview(); };
-            this.uiInputs['inventoryContainerHeight'] = hInput;
-            heightContainer.appendChild(hLabel); heightContainer.appendChild(hInput);
-
-            dimRow.appendChild(widthContainer); dimRow.appendChild(heightContainer);
-            sec.appendChild(dimRow);
-
-            // Free Layout
-            const freeRow = document.createElement('div'); freeRow.style.cssText = "margin-top: 10px; display: flex; align-items: center; gap: 10px;";
-            const freeCheck = document.createElement('input'); // this.checkStyle(freeCheck);
-            freeCheck.checked = this.tempSettings.inventoryFreeLayout || false;
-            freeCheck.onchange = (e) => {
-                const isFree = e.target.checked;
-                if (isFree) {
-                    // Capture Logic (Same as before)
-                    const container = this.contentWrapper.querySelector('.inventory-container-preview');
-                    if (container) {
-                        const currentW = container.offsetWidth; const currentH = container.offsetHeight;
-                        this.tempSettings.inventoryContainerWidth = currentW; this.tempSettings.inventoryContainerHeight = currentH;
-                        if (this.uiInputs['inventoryContainerWidth']) this.uiInputs['inventoryContainerWidth'].value = currentW;
-                        if (this.uiInputs['inventoryContainerHeight']) this.uiInputs['inventoryContainerHeight'].value = currentH;
-
-                        const slots = container.querySelectorAll('.inventory-slot');
-                        const positions = [];
-                        slots.forEach(slot => { positions.push({ left: slot.offsetLeft + 'px', top: slot.offsetTop + 'px' }); });
-                        this.tempSettings.inventorySlotPositions = positions;
-                    }
-                } else {
-                    this.tempSettings.inventorySlotPositions = [];
-                    delete this.tempSettings.inventoryContainerWidth; delete this.tempSettings.inventoryContainerHeight;
-                    if (this.uiInputs['inventoryContainerWidth']) this.uiInputs['inventoryContainerWidth'].value = '';
-                    if (this.uiInputs['inventoryContainerHeight']) this.uiInputs['inventoryContainerHeight'].value = '';
-                }
-                this.tempSettings.inventoryFreeLayout = isFree; this.updatePreview(); this.renderProperties(); // Re-render to update inputs/visibility
-            };
-            const freeLabel = document.createElement('label'); freeLabel.textContent = "Diseño Libre (Mover Slots)"; freeLabel.style.color = "#ccc"; freeLabel.style.fontSize = "12px";
-            freeRow.appendChild(freeCheck); freeRow.appendChild(freeLabel);
-            sec.appendChild(freeRow);
-
-            // Padding
-            const padRow = document.createElement('div'); padRow.style.cssText = "margin-top: 10px; display: flex; align-items: center; gap: 10px;";
-            const padLabel = document.createElement('label'); padLabel.textContent = "Padding:"; padLabel.style.color = "#aaa";
-            const padInput = document.createElement('input'); this.inputStyle(padInput); padInput.style.width = "50px";
-            padInput.value = this.tempSettings.inventoryPadding !== undefined ? this.tempSettings.inventoryPadding : 10;
-            padInput.onchange = (e) => { this.tempSettings.inventoryPadding = parseInt(e.target.value) || 0; this.updatePreview(); };
-            padRow.appendChild(padLabel); padRow.appendChild(padInput);
-            sec.appendChild(padRow);
-
-            // Alignment Grid (3x3)
-            const alignContainer = document.createElement('div'); alignContainer.style.cssText = "margin-top: 15px;";
-            const alignLabel = document.createElement('div'); alignLabel.textContent = "Alineación (Auto):"; alignLabel.style.fontSize = "12px"; alignLabel.style.color = "#aaa"; alignLabel.style.marginBottom = "5px";
-            alignContainer.appendChild(alignLabel);
-            const grid = document.createElement('div'); grid.style.cssText = "display: grid; grid-template-columns: repeat(3, 20px); gap: 2px; width: fit-content;";
-            const alignments = ['top-left', 'top-center', 'top-right', 'center-left', 'center', 'center-right', 'bottom-left', 'bottom-center', 'bottom-right'];
-            alignments.forEach(align => {
-                const cell = document.createElement('div');
-                cell.style.cssText = "width: 20px; height: 20px; background: #333; border: 1px solid #555; cursor: pointer;";
-                cell.title = align;
-                if (this.tempSettings.inventorySlotAlignment === align) { cell.style.background = '#4CAF50'; cell.style.borderColor = '#4CAF50'; }
-                cell.onclick = () => {
-                    this.tempSettings.inventorySlotAlignment = align;
-                    this.updatePreview(); this.renderProperties(); // Re-render for highlight
-                };
-                grid.appendChild(cell);
-            });
-            alignContainer.appendChild(grid);
-            sec.appendChild(alignContainer);
-        }
-    }
 
     // Helper Styles
 
@@ -747,10 +510,13 @@ export class HUDConfigPanel {
             wLabel.style.fontSize = "10px"; wLabel.style.color = "#aaa";
 
             const wInput = document.createElement('input');
-            wInput.type = "number"; wInput.min = 50; wInput.value = this.tempSettings[prefix + 'Width'] || (type === 'health' ? 300 : 200);
+            wInput.type = "number"; wInput.min = 5; wInput.value = this.tempSettings[prefix + 'Width'] || (type === 'health' ? 300 : 200);
             wInput.style.width = "100%"; wInput.style.background = "#333"; wInput.style.color = "white"; wInput.style.border = "1px solid #555";
             wInput.onchange = (e) => {
-                this.tempSettings[prefix + 'Width'] = parseInt(e.target.value) || 100;
+                let val = parseInt(e.target.value) || 100;
+                if (val < 5) val = 5; // Minimal Width 5px
+                e.target.value = val;
+                this.tempSettings[prefix + 'Width'] = val;
                 this.updatePreview();
             };
             this.uiInputs[prefix + 'Width'] = wInput; // Store reference
@@ -768,7 +534,10 @@ export class HUDConfigPanel {
             hInput.type = "number"; hInput.min = 5; hInput.value = this.tempSettings[prefix + 'Height'] || (type === 'health' ? 20 : 8);
             hInput.style.width = "100%"; hInput.style.background = "#333"; hInput.style.color = "white"; hInput.style.border = "1px solid #555";
             hInput.onchange = (e) => {
-                this.tempSettings[prefix + 'Height'] = parseInt(e.target.value) || 10;
+                let val = parseInt(e.target.value) || 10;
+                if (val < 5) val = 5; // Minimal Height 5px
+                e.target.value = val;
+                this.tempSettings[prefix + 'Height'] = val;
                 this.updatePreview();
             };
             this.uiInputs[prefix + 'Height'] = hInput; // Store reference
@@ -819,13 +588,13 @@ export class HUDConfigPanel {
             // Slot Size Input
             const sizeInput = document.createElement('input');
             sizeInput.type = "number";
-            sizeInput.min = 30;
+            sizeInput.min = 5;
             sizeInput.max = 100;
             sizeInput.value = this.tempSettings.inventorySlotSize || 50;
             sizeInput.style.cssText = "background: #333; color: white; border: 1px solid #555; padding: 5px; width: 60px; margin-left: 10px;";
             sizeInput.onchange = (e) => {
                 let v = parseInt(e.target.value);
-                if (v < 30) v = 30;
+                if (v < 5) v = 5;
                 if (v > 100) v = 100;
                 this.tempSettings.inventorySlotSize = v;
                 this.updatePreview();
@@ -851,12 +620,14 @@ export class HUDConfigPanel {
             wLabel.textContent = "Ancho Fondo";
             wLabel.style.fontSize = "10px"; wLabel.style.color = "#aaa";
             const wInput = document.createElement('input');
-            wInput.type = "number"; wInput.min = 50;
+            wInput.type = "number"; wInput.min = 5;
             // Default to empty if undefined, let preview update it
             wInput.value = this.tempSettings.inventoryContainerWidth || '';
             wInput.style.cssText = "width: 100%; background: #333; color: white; border: 1px solid #555;";
             wInput.onchange = (e) => {
-                this.tempSettings.inventoryContainerWidth = parseInt(e.target.value) || 300;
+                let val = parseInt(e.target.value) || 300;
+                if (val < 5) val = 5;
+                this.tempSettings.inventoryContainerWidth = val;
                 this.updatePreview();
             };
             this.uiInputs['inventoryContainerWidth'] = wInput;
@@ -869,11 +640,13 @@ export class HUDConfigPanel {
             hLabel.textContent = "Alto Fondo";
             hLabel.style.fontSize = "10px"; hLabel.style.color = "#aaa";
             const hInput = document.createElement('input');
-            hInput.type = "number"; hInput.min = 50;
+            hInput.type = "number"; hInput.min = 5;
             hInput.value = this.tempSettings.inventoryContainerHeight || '';
             hInput.style.cssText = "width: 100%; background: #333; color: white; border: 1px solid #555;";
             hInput.onchange = (e) => {
-                this.tempSettings.inventoryContainerHeight = parseInt(e.target.value) || 100;
+                let val = parseInt(e.target.value) || 100;
+                if (val < 5) val = 5;
+                this.tempSettings.inventoryContainerHeight = val;
                 this.updatePreview();
             };
             this.uiInputs['inventoryContainerHeight'] = hInput;
@@ -1408,8 +1181,8 @@ export class HUDConfigPanel {
                 } else if (prefix === 'inventoryContainer') {
                     let newW = startW + dx;
                     let newH = startH + dy;
-                    if (newW < 100) newW = 100;
-                    if (newH < 50) newH = 50;
+                    if (newW < 5) newW = 5;
+                    if (newH < 5) newH = 5;
 
                     this.tempSettings.inventoryContainerWidth = newW;
                     this.tempSettings.inventoryContainerHeight = newH;
@@ -1424,7 +1197,7 @@ export class HUDConfigPanel {
                     let newW = startW + dx;
                     let newH = startH + dy;
 
-                    if (newW < 20) newW = 20;
+                    if (newW < 5) newW = 5;
                     if (newH < 5) newH = 5;
 
                     this.tempSettings[prefix + 'Width'] = newW;

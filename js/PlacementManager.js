@@ -94,6 +94,14 @@ export class PlacementManager {
         this.ghostRampMesh.visible = false
         this.placementGhost.add(this.ghostRampMesh)
 
+        // 3. Ghost STAIRS
+        this.ghostStairsGroup = new THREE.Group()
+        this.placementGhost.add(this.ghostStairsGroup)
+
+        // 4. Ghost LADDER
+        this.ghostLadderGroup = new THREE.Group()
+        this.placementGhost.add(this.ghostLadderGroup)
+
 
         // Flecha / Icono indicador (Solo para Pads viejos)
         const arrowGeo = new THREE.PlaneGeometry(2.4, 2.4)
@@ -519,6 +527,46 @@ export class PlacementManager {
         }
     }
 
+    rebuildLadderGhost(item) {
+        const key = `${item.scale.x}_${item.scale.y}_${item.scale.z}`
+        if (this.ghostLadderLastKey === key && this.ghostLadderGroup.children.length > 0) return
+
+        this.ghostLadderLastKey = key
+
+        // Clear
+        while (this.ghostLadderGroup.children.length > 0) {
+            this.ghostLadderGroup.remove(this.ghostLadderGroup.children[0])
+        }
+
+        const height = item.scale.y
+        const width = item.scale.x
+
+        // Rails
+        const railGeo = new THREE.BoxGeometry(0.1, height, 0.1)
+
+        const leftRail = new THREE.Mesh(railGeo, this.ghostBaseMat)
+        leftRail.position.set(-width / 2, height / 2, 0) // Shift UP to sit on pivot
+
+        const rightRail = new THREE.Mesh(railGeo, this.ghostBaseMat)
+        rightRail.position.set(width / 2, height / 2, 0) // Shift UP to sit on pivot
+
+        this.ghostLadderGroup.add(leftRail)
+        this.ghostLadderGroup.add(rightRail)
+
+        // Rungs
+        const rungCount = Math.floor(height / 0.4)
+        const rungGeo = new THREE.CylinderGeometry(0.04, 0.04, width, 8)
+        rungGeo.rotateZ(Math.PI / 2)
+
+        for (let i = 0; i < rungCount; i++) {
+            const rung = new THREE.Mesh(rungGeo, this.ghostBaseMat)
+            // Start from bottom (0) + first step. 
+            // Pivot is now at Y=0 (Bottom of ladder)
+            rung.position.set(0, (i + 1) * 0.4, 0)
+            this.ghostLadderGroup.add(rung)
+        }
+    }
+
     /**
      * Actualiza la posición y visualización del fantasma
      * @param {number} inventorySlot - Índice del slot seleccionado (0 o 1)
@@ -619,6 +667,7 @@ export class PlacementManager {
                 this.ghostArrow.visible = false;
                 if (this.ghostRampMesh) this.ghostRampMesh.visible = false;
                 if (this.ghostStairsGroup) this.ghostStairsGroup.visible = false;
+                if (this.ghostLadderGroup) this.ghostLadderGroup.visible = false;
 
                 // Use Box Mesh for highlight
                 this.ghostBoxMesh.visible = true;
@@ -655,9 +704,16 @@ export class PlacementManager {
 
                 this.placementGhost.visible = true
                 if (this.ghostLabelSprite) this.ghostLabelSprite.visible = false
+
+                // Hide generic box, show ladder
+                this.ghostBoxMesh.visible = false
+                if (this.ghostStairsGroup) this.ghostStairsGroup.visible = false
+                this.rebuildLadderGhost(item)
+                this.ghostLadderGroup.visible = true
+
                 this.ghostBaseMat.opacity = 0.3
 
-                // Set Size
+                // Set Size (not needed for ghost visuals as we rebuilt it, but good for logic)
                 const realSize = this.getRealSize(item, rotationIndex)
 
                 // Position
@@ -736,6 +792,7 @@ export class PlacementManager {
             this.ghostBaseMat.opacity = 0.3 // Reset opacity
 
             this.placementGhost.visible = true
+            if (this.ghostLadderGroup) this.ghostLadderGroup.visible = false
 
             // --- Determine Size (Smart Sizing) ---
             let realSize = this.getRealSize(item, rotationIndex)

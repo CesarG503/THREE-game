@@ -703,6 +703,13 @@ export class ObjectInspector {
             // We should use setFromObject(this.selectedObject) after updateMatrixWorld
             this.selectedObject.updateMatrixWorld(true)
             this.selectedObject.bounds.setFromObject(this.selectedObject)
+
+            // FIX: Manually extend the top of the AABB to allow climbing to top
+            // Box3 is in World Space. 
+            // We can't easily know "Top" if rotated arbitrarily, 
+            // but ladders are usually upright (Y-axis).
+            this.selectedObject.bounds.max.y += 2.0
+
             this.selectedObject.bounds.expandByScalar(0.5)
 
 

@@ -473,8 +473,17 @@ class Game {
         } else if (objectMesh.userData.mapObjectType === 'ladder') {
             // Ladder (Sensor)
             // Sensor for climbing detection/interaction area
-            colDesc = RAPIER.ColliderDesc.cuboid(dims.x / 2, dims.y / 2, 0.2)
+            // FIX: Extend sensor height by +2.0 (so +1.0 to half-height and offset center)
+            // Original: dims.y / 2
+            // New Center: dims.y / 2 + 1.0 (Shift up by 1)
+            // New HalfHeight: (dims.y + 2.0) / 2
+
+            const extendedHeight = dims.y + 2.0
+
+            colDesc = RAPIER.ColliderDesc.cuboid(dims.x / 2, extendedHeight / 2, 0.2)
                 .setSensor(true)
+                .setTranslation(0, 1.0, 0) // Shift center up by 1.0 to cover the extra top range
+
             this.world.createCollider(colDesc, rigidBody)
         } else if (objectMesh.userData.shapeType === 'sphere' || objectMesh.userData.logicProperties?.shapeType === 'sphere') {
             // SPHERE

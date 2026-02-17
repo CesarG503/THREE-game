@@ -602,11 +602,16 @@ export class MapObjectItem extends Item {
             const halfH = height / 2
 
             // Local AABB
-            object3D.bounds.min.set(-halfW, 0, -0.5)
-            object3D.bounds.max.set(halfW, height, 0.5)
+            // FIX: Extend Top by +2.0 to allow player center (at Y+1) to stay in bounds
+            // while feet reach the top of the ladder.
+            // Center Y of ladder visual is at 0 (relative to group).
+            // Visual extent is -halfH to +halfH.
+            // We want max to be halfH + 2.0.
+            // Use same min.
 
-            // Apply World Position (Initial)
-            object3D.bounds.translate(position)
+            // We'll calculate bounds at the END of this function, 
+            // after transforms are applied, to ensure correct World Space AABB.
+            object3D.userData.needsBoundsUpdate = true
 
 
             // We'll attach it to userData so Main can extract it.
@@ -633,9 +638,27 @@ export class MapObjectItem extends Item {
             // A sensor is good for "entering" events if we switch to Rapier-based climbing later.
             // For now, let's create a Sensor Collider matching the size.
 
+            // SENSOR: Center for Climbing
             const col = RAPIER.ColliderDesc.cuboid(width / 2, height / 2, 0.2)
                 .setSensor(true)
             collidersDesc.push(col)
+
+            // SOLID RAILS: prevent walking through
+            // Rail size: 0.1 x height x 0.1
+            // Position: +/- width/2
+            // Note: Colliders are relative to RigidBody center (which is at Visual Center).
+
+            const railHalfW = 0.05
+            const railHalfH = height / 2
+            const railHalfD = 0.05
+
+            const leftRailCol = RAPIER.ColliderDesc.cuboid(railHalfW, railHalfH, railHalfD)
+                .setTranslation(-width / 2, 0, 0)
+            collidersDesc.push(leftRailCol)
+
+            const rightRailCol = RAPIER.ColliderDesc.cuboid(railHalfW, railHalfH, railHalfD)
+                .setTranslation(width / 2, 0, 0)
+            collidersDesc.push(rightRailCol)
 
 
         } else {
@@ -775,6 +798,33 @@ export class MapObjectItem extends Item {
             collidersDesc.forEach(col => {
                 world.createCollider(col, rigidBody)
             })
+        }
+
+        if (object3D.userData.needsBoundsUpdate) {
+            // Force Matrix Update to get World Position/Rotation
+            object3D.updateMatrix()
+
+            // Box3.setFromObject uses World Transforms. 
+            // Since we haven't added to scene yet, World = Local (if parent is scene/identity).
+            // We can assume Local Matrix is World Matrix for now.
+
+            // BUT `setFromObject` traverses children. Children need their world matrices too.
+            // `updateMatrixWorld(true)` does this.
+
+            // Temporarily work with local matrix as world
+            object3D.matrixWorld.copy(object3D.matrix)
+            const children = object3D.children
+            for (let i = 0, l = children.length; i < l; i++) {
+                children[i].updateMatrixWorld(true)
+            }
+
+            object3D.bounds.setFromObject(object3D)
+
+            // Extend Top Y
+            // Since we have the AABB, we just add to Max Y.
+            // This assumes "Top" aligns with World Y, which is usually true for ladders.
+            object3D.bounds.max.y += 2.0
+            object3D.bounds.expandByScalar(0.5) // Generosity
         }
 
         console.log(`Spawned ${this.type} at`, position)

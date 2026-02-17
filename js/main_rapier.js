@@ -480,9 +480,9 @@ class Game {
 
             const extendedHeight = dims.y + 2.0
 
-            colDesc = RAPIER.ColliderDesc.cuboid(dims.x / 2, extendedHeight / 2, 0.2)
+            colDesc = RAPIER.ColliderDesc.cuboid(dims.x / 2, (dims.y + 1.2) / 2, 0.2)
                 .setSensor(true)
-                .setTranslation(0, 1.0, 0) // Shift center up by 1.0 to cover the extra top range
+                .setTranslation(0, 0.6, 0)
 
             this.world.createCollider(colDesc, rigidBody)
         } else if (objectMesh.userData.shapeType === 'sphere' || objectMesh.userData.logicProperties?.shapeType === 'sphere') {

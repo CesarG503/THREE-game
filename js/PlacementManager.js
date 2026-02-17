@@ -649,6 +649,86 @@ export class PlacementManager {
 
                 this.lastValidPosition = hit.point;
                 return hit.point;
+            } else if (item.type === 'ladder') {
+                // --- LADDER WALL LOGIC ---
+                // Always Upright (Y), Face Wall Normal
+
+                this.placementGhost.visible = true
+                if (this.ghostLabelSprite) this.ghostLabelSprite.visible = false
+                this.ghostBaseMat.opacity = 0.3
+
+                // Set Size
+                const realSize = this.getRealSize(item, rotationIndex)
+
+                // Position
+                let targetPos = hit.point.clone()
+
+                if (hit.face) {
+                    const normal = hit.face.normal.clone().transformDirection(hit.object.matrixWorld).normalize()
+
+                    // Project normal to XZ plane (Horizontal)
+                    // If purely vertical floor/ceiling (normal.y ~ 1), fallback?
+                    // Ladders usually go on walls (normal.y ~ 0)
+
+                    if (Math.abs(normal.y) < 0.9) {
+                        // Wall Placement
+                        normal.y = 0
+                        normal.normalize()
+
+                        // Rotation: Look at Normal (Forward = Z)
+                        // Object is at Pos. LookAt(Pos + Normal).
+                        const lookTarget = targetPos.clone().add(normal)
+                        this.placementGhost.position.copy(targetPos)
+                        this.placementGhost.lookAt(lookTarget)
+
+                        // Offset to not be inside wall
+                        // Move OUT by half depth (Visual Rail 0.1? Bounds 0.5?)
+                        // RealSize.z might be bounds depth.
+                        // Let's use 0.1 (visual rail) + a bit?
+                        // Or realSize.z/2 if logic uses that.
+                        // MapObjectItem depth is typically 0.5 for collider, 0.1 visual.
+                        // Use 0.1
+                        const offset = normal.multiplyScalar(0.1)
+                        targetPos.add(offset)
+
+                        // Snap Y to Grid
+                        const gridSize = this.gridSize || 1
+                        // Ladder Bottom usually on ground?
+                        // Or step snapping?
+                        targetPos.y = Math.round(targetPos.y / gridSize) * gridSize
+
+                        // Snap X/Z along wall?
+                        // Too complex to calculate perpendicular grid.
+                        // Just use point.
+                    } else {
+                        // Floor/Ceiling? Vertical Ladder?
+                        // Just use standard rotation
+                        this.placementGhost.rotation.set(0, 0, 0)
+                    }
+                }
+
+                // Center Y Logic (MapObjectItem expects center position?)
+                // MapObjectItem `spawnObject` uses position as center? 
+                // `object3D.position.y += this.scale.y / 2` logic suggests origin is bottom.
+                // Wait. In `MapObjectItem.js`:
+                // `if (... !isCenterPosition) object3D.position.y += this.scale.y / 2`
+                // So if we pass P (on floor), it shifts UP.
+                // PlacementManager usually returns the "Ground" point (hit.point).
+                // But for Ghost, we need to match visual.
+                // MapObjectItem builds centered at 0,0,0.
+
+                // Let's apply targetPos
+                this.placementGhost.position.copy(targetPos)
+                if (hit.face && Math.abs(hit.face.normal.y) >= 0.9) {
+                    // Reset rotation if not wall
+                    this.placementGhost.rotation.set(0, 0, 0)
+                }
+
+                this.lastValidPosition = targetPos
+                // Save rotation for spawn?
+                this.lastValidQuaternion = this.placementGhost.quaternion.clone()
+
+                return targetPos
             }
 
             // Disable Label for others

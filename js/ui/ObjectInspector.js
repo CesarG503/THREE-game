@@ -708,7 +708,7 @@ export class ObjectInspector {
             // Box3 is in World Space. 
             // We can't easily know "Top" if rotated arbitrarily, 
             // but ladders are usually upright (Y-axis).
-            this.selectedObject.bounds.max.y += 2.0
+            this.selectedObject.bounds.max.y += 0.5
 
             this.selectedObject.bounds.expandByScalar(0.5)
 

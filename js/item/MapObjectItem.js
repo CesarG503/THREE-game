@@ -823,7 +823,7 @@ export class MapObjectItem extends Item {
             // Extend Top Y
             // Since we have the AABB, we just add to Max Y.
             // This assumes "Top" aligns with World Y, which is usually true for ladders.
-            object3D.bounds.max.y += 2.0
+            object3D.bounds.max.y += 0.5
             object3D.bounds.expandByScalar(0.5) // Generosity
         }
 

@@ -470,6 +470,11 @@ class Game {
                     .setTranslation(step.position.x, step.position.y, step.position.z)
                 this.world.createCollider(col, rigidBody)
             })
+        } else if (objectMesh.userData.mapObjectType === 'ladder') {
+            // Ladder (Sensor)
+            // Sensor for climbing detection/interaction area
+            colDesc = RAPIER.ColliderDesc.cuboid(dims.x / 2, dims.y / 2, 0.2)
+                .setSensor(true)
             this.world.createCollider(colDesc, rigidBody)
         } else if (objectMesh.userData.shapeType === 'sphere' || objectMesh.userData.logicProperties?.shapeType === 'sphere') {
             // SPHERE
@@ -1548,6 +1553,28 @@ class Game {
         }
 
         // if (consumed) this.inventoryManager.removeCurrentItem()
+
+        // Check for new ladders
+        if (consumed && this.character) {
+            if (item.type === 'ladder') {
+                // Optimization: Assume it's the last added object
+                const newObject = this.sceneManager.scene.children[this.sceneManager.scene.children.length - 1]
+                if (newObject && newObject.userData.isLadder) {
+                    this.character.ladders.push(newObject)
+                    console.log("Registered new ladder. Total:", this.character.ladders.length)
+
+                    // Force bounds update just in case
+                    if (newObject.bounds) {
+                        newObject.updateMatrixWorld(true)
+                        // Check if bounds empty, if so setFromObject
+                        if (newObject.bounds.isEmpty()) {
+                            newObject.bounds.setFromObject(newObject)
+                            newObject.bounds.expandByScalar(0.5)
+                        }
+                    }
+                }
+            }
+        }
     }
 
     setObjectBodyType(object, type) {

@@ -127,6 +127,17 @@ export class MapObjectItem extends Item {
             ctx.textBaseline = "middle"
             ctx.fillText("⚡", 32, 32)
 
+        } else if (this.type === 'ladder') {
+            // Ladder Icon (H-shape with rungs)
+            ctx.beginPath()
+            ctx.moveTo(20, 8); ctx.lineTo(20, 56) // Left Rail
+            ctx.moveTo(44, 8); ctx.lineTo(44, 56) // Right Rail
+            // Rungs
+            for (let i = 12; i <= 52; i += 8) {
+                ctx.moveTo(20, i); ctx.lineTo(44, i)
+            }
+            ctx.stroke()
+
         } else {
             // Wall / Default (Landscape Rect)
             ctx.fillRect(8, 20, 48, 24)
@@ -525,6 +536,107 @@ export class MapObjectItem extends Item {
             // Allow manual override in userData as well for easier access
             object3D.userData.shapeType = shapeType
             object3D.userData.radius = radius
+
+        } else if (this.type === 'ladder') {
+            // LADDER GENERATION
+            // Based on Ladder.js
+            const height = this.scale.y
+            const width = this.scale.x // Use X for width
+
+            const group = new THREE.Group()
+            const mat = new THREE.MeshStandardMaterial({ color: 0x555555, roughness: 0.7 })
+
+            // Rails
+            const railGeo = new THREE.BoxGeometry(0.1, height, 0.1)
+            const leftRail = new THREE.Mesh(railGeo, mat)
+            leftRail.position.set(-width / 2, 0, 0) // Centered Y
+
+            const rightRail = new THREE.Mesh(railGeo, mat)
+            rightRail.position.set(width / 2, 0, 0) // Centered Y
+
+            leftRail.castShadow = true; leftRail.receiveShadow = true
+            rightRail.castShadow = true; rightRail.receiveShadow = true
+
+            group.add(leftRail)
+            group.add(rightRail)
+
+            // Rungs
+            const rungCount = Math.floor(height / 0.4)
+            const rungGeo = new THREE.CylinderGeometry(0.04, 0.04, width, 8)
+            rungGeo.rotateZ(Math.PI / 2)
+
+            for (let i = 0; i < rungCount; i++) {
+                const rung = new THREE.Mesh(rungGeo, mat)
+                // Start from bottom (-height/2) + first step
+                rung.position.set(0, -height / 2 + (i + 1) * 0.4, 0)
+                rung.castShadow = true
+                group.add(rung)
+            }
+
+            object3D = group
+
+            // Bounds for Climbing Logic
+            object3D.bounds = new THREE.Box3()
+            // We need to compute bounds. Since it's a group at 0,0,0 (local), 
+            // and we added children, we can compute from children.
+            // But we want it in WORLD space for the check? CharacterController uses world bounds?
+            // "ladder.bounds.containsPoint(center)"
+            // Yes. Box3.containsPoint checks against the box coordinate system. 
+            // If the box is defined by min/max, it is axis aligned.
+            // If the object rotates, separate Box3 is not enough unless we recompute it constantly.
+            // Ladder.js does `this.bounds.setFromObject(group)`. This computes world AABB.
+            // It calls it in `build()`? 
+            // If `build` is called once, and object never moves, it works.
+            // MapObjectItem objects CAN be moved.
+            // So we need a way to auto-update bounds or update them when moved.
+            // For now, let's initialize it. Editor "Update Position" will need to update it.
+
+            // We set a flag to tell system to update it? 
+            // Or just compute local bounds and ApplyMatrix4?
+            // CharacterController check is simple AABB.
+            object3D.userData.isLadder = true
+
+            // We'll calculate initial bounds (approximate) or wait for first update.
+            // Let's set it to valid AABB centered at position
+            const halfW = width / 2 + 0.5 // Expand
+            const halfH = height / 2
+
+            // Local AABB
+            object3D.bounds.min.set(-halfW, 0, -0.5)
+            object3D.bounds.max.set(halfW, height, 0.5)
+
+            // Apply World Position (Initial)
+            object3D.bounds.translate(position)
+
+
+            // We'll attach it to userData so Main can extract it.
+            // But bounds need to be in WORLD space for checking? 
+            // Ladder.js does: `this.bounds.setFromObject(group)` after adding to scene.
+            // CharacterController uses `ladder.bounds.containsPoint`.
+
+            // We will calculate bounds relative to object and apply matrix? 
+            // No, Box3 is axis-aligned in World Space.
+            // If the object moves, the bounds need update.
+            // For static ladders, it's fine to compute once after placement.
+            // But if we move it in editor, we need to recompute.
+            // We'll mark it as "needsBoundsUpdate" or similar, or compute here purely for initial.
+
+            // Since MapObjectItem.js adds to scene at the end of this function: `scene.add(object3D)`,
+            // we can't compute world bounds accurately until it's in the scene and matrices updated.
+            // We'll add a flag `object3D.userData.isLadder = true`.
+
+            // Physics: We do NOT want a solid block.
+            // Maybe a sensor? Or no physics.
+            // If no physics, we can't click it easily with raycaster if raycaster used physics?
+            // Editor uses visual raycast, so it's fine.
+            // Let's Skip rigid body for ladder or use a sensor.
+            // A sensor is good for "entering" events if we switch to Rapier-based climbing later.
+            // For now, let's create a Sensor Collider matching the size.
+
+            const col = RAPIER.ColliderDesc.cuboid(width / 2, height / 2, 0.2)
+                .setSensor(true)
+            collidersDesc.push(col)
+
 
         } else {
             // BOX (Wall/Pillar)

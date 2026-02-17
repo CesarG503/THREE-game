@@ -655,6 +655,57 @@ export class ObjectInspector {
                 this.selectedObject.add(mesh)
             })
 
+        } else if (this.selectedObject.userData.mapObjectType === 'ladder') {
+            // Rebuild Ladder
+            const height = dims.y
+            const width = dims.x
+
+            // Remove old children (Rails/Rungs)
+            const toRemove = this.selectedObject.children.filter(c => c !== this.axesHelper)
+            toRemove.forEach(c => {
+                if (c.geometry) c.geometry.dispose()
+                this.selectedObject.remove(c)
+            })
+
+            const mat = new THREE.MeshStandardMaterial({ color: this.selectedObject.userData.color || 0x555555, roughness: 0.7 })
+
+            // Rails
+            const railGeo = new THREE.BoxGeometry(0.1, height, 0.1)
+            const leftRail = new THREE.Mesh(railGeo, mat)
+            leftRail.position.set(-width / 2, 0, 0)
+            leftRail.castShadow = true; leftRail.receiveShadow = true
+
+            const rightRail = new THREE.Mesh(railGeo, mat)
+            rightRail.position.set(width / 2, 0, 0)
+            rightRail.castShadow = true; rightRail.receiveShadow = true
+
+            this.selectedObject.add(leftRail)
+            this.selectedObject.add(rightRail)
+
+            // Rungs
+            const rungCount = Math.floor(height / 0.4)
+            const rungGeo = new THREE.CylinderGeometry(0.04, 0.04, width, 8)
+            rungGeo.rotateZ(Math.PI / 2)
+
+            for (let i = 0; i < rungCount; i++) {
+                const rung = new THREE.Mesh(rungGeo, mat)
+                // Start from bottom (-height/2) + first step
+                rung.position.set(0, -height / 2 + (i + 1) * 0.4, 0)
+                rung.castShadow = true
+                this.selectedObject.add(rung)
+            }
+
+            // Update Bounds (Approximation for AABB logic)
+            if (!this.selectedObject.bounds) this.selectedObject.bounds = new THREE.Box3()
+
+            // Recompute World Bounds
+            // Note: rotation makes loose AABB.
+            // We should use setFromObject(this.selectedObject) after updateMatrixWorld
+            this.selectedObject.updateMatrixWorld(true)
+            this.selectedObject.bounds.setFromObject(this.selectedObject)
+            this.selectedObject.bounds.expandByScalar(0.5)
+
+
         } else {
             // Default Box
             newGeo = new THREE.BoxGeometry(dims.x, dims.y, dims.z)

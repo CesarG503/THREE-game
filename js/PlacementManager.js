@@ -673,7 +673,7 @@ export class PlacementManager {
                 this.ghostBoxMesh.visible = true;
                 this.ghostBoxMesh.scale.copy(targetSize);
 
-                // Color Blue
+                // Color Blue for Logic Highlighting
                 this.ghostBaseMat.color.setHex(0x0000FF);
                 this.ghostBaseMat.opacity = 0.5
 
@@ -705,12 +705,21 @@ export class PlacementManager {
                 this.placementGhost.visible = true
                 if (this.ghostLabelSprite) this.ghostLabelSprite.visible = false
 
-                // Keep Custom Geometry
+                // Hide generic box, show ladder
                 this.ghostBoxMesh.visible = false
                 if (this.ghostStairsGroup) this.ghostStairsGroup.visible = false
+
+                // Update Material Color based on Item
+                if (item.color) {
+                    this.ghostBaseMat.color.setHex(item.color)
+                } else {
+                    this.ghostBaseMat.color.setHex(0xFFFFFF)
+                }
+
                 this.rebuildLadderGhost(item)
                 this.ghostLadderGroup.visible = true
-                this.ghostBaseMat.opacity = 0.3
+
+                this.ghostBaseMat.opacity = 0.5 // Slightly more opaque for visibility
 
                 // Set Size
                 const realSize = this.getRealSize(item, rotationIndex)
@@ -794,6 +803,13 @@ export class PlacementManager {
             // Disable Label for others
             if (this.ghostLabelSprite) this.ghostLabelSprite.visible = false;
             this.ghostBaseMat.opacity = 0.3 // Reset opacity
+
+            // Reset Color to White (Default)
+            if (item.color) {
+                this.ghostBaseMat.color.setHex(item.color)
+            } else {
+                this.ghostBaseMat.color.setHex(0xFFFFFF)
+            }
 
             this.placementGhost.visible = true
             if (this.ghostLadderGroup) this.ghostLadderGroup.visible = false

@@ -129,6 +129,7 @@ export class MapObjectItem extends Item {
 
         } else if (this.type === 'ladder') {
             // Ladder Icon (H-shape with rungs)
+            ctx.strokeStyle = ctx.fillStyle // Use Item Color for Lines
             ctx.beginPath()
             ctx.moveTo(20, 8); ctx.lineTo(20, 56) // Left Rail
             ctx.moveTo(44, 8); ctx.lineTo(44, 56) // Right Rail
@@ -544,7 +545,8 @@ export class MapObjectItem extends Item {
             const width = this.scale.x // Use X for width
 
             const group = new THREE.Group()
-            const mat = new THREE.MeshStandardMaterial({ color: 0x555555, roughness: 0.7 })
+            // Fix: Use item color instead of hardcoded gray
+            const mat = new THREE.MeshStandardMaterial({ color: this.color, roughness: 0.7 })
 
             // Rails
             const railGeo = new THREE.BoxGeometry(0.1, height, 0.1)

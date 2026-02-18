@@ -700,91 +700,95 @@ export class PlacementManager {
                 return hit.point;
             } else if (item.type === 'ladder') {
                 // --- LADDER WALL LOGIC ---
-                // Always Upright (Y), Face Wall Normal
+                // Supports Wall Alignment AND Rotation/Grid
 
                 this.placementGhost.visible = true
                 if (this.ghostLabelSprite) this.ghostLabelSprite.visible = false
 
-                // Hide generic box, show ladder
+                // Keep Custom Geometry
                 this.ghostBoxMesh.visible = false
                 if (this.ghostStairsGroup) this.ghostStairsGroup.visible = false
                 this.rebuildLadderGhost(item)
                 this.ghostLadderGroup.visible = true
-
                 this.ghostBaseMat.opacity = 0.3
 
-                // Set Size (not needed for ghost visuals as we rebuilt it, but good for logic)
+                // Set Size
                 const realSize = this.getRealSize(item, rotationIndex)
-
-                // Position
                 let targetPos = hit.point.clone()
 
-                if (hit.face) {
-                    const normal = hit.face.normal.clone().transformDirection(hit.object.matrixWorld).normalize()
+                // 1. Grid Snapping (If Active)
+                // We do this BEFORE Wall checks or AFTER? 
+                // Usually Grid determines the "base" point.
+                const gridSize = this.gridSize || 1
+                if (this.snapToGrid || this.aerialGridActive) { // aerialGrid uses grid snapping logic too
+                    targetPos.x = Math.round(targetPos.x / gridSize) * gridSize
+                    targetPos.y = Math.round(targetPos.y / gridSize) * gridSize
+                    targetPos.z = Math.round(targetPos.z / gridSize) * gridSize
+                }
 
-                    // Project normal to XZ plane (Horizontal)
-                    // If purely vertical floor/ceiling (normal.y ~ 1), fallback?
-                    // Ladders usually go on walls (normal.y ~ 0)
+                // 2. Orientation
+                if (hit.face && Math.abs(hit.face.normal.y) < 0.9) {
+                    // -- WALL PLACEMENT --
+                    // If we are snapping to grid, wall placement might be tricky (floating).
+                    // But user requested "Seguir Activar Construcción en Cuadrícula".
+                    // So we respect the grid position calculated above.
 
-                    if (Math.abs(normal.y) < 0.9) {
-                        // Wall Placement
-                        normal.y = 0
-                        normal.normalize()
+                    // If NOT snapping, we use exact wall point + offset
+                    if (!this.snapToGrid && !this.aerialGridActive) {
+                        const normal = hit.face.normal.clone().transformDirection(hit.object.matrixWorld).normalize()
+                        normal.y = 0; normal.normalize()
 
-                        // Rotation: Look at Normal (Forward = Z)
-                        // Object is at Pos. LookAt(Pos + Normal).
+                        // Align to wall
                         const lookTarget = targetPos.clone().add(normal)
                         this.placementGhost.position.copy(targetPos)
                         this.placementGhost.lookAt(lookTarget)
 
-                        // Offset to not be inside wall
-                        // Move OUT by half depth (Visual Rail 0.1? Bounds 0.5?)
-                        // RealSize.z might be bounds depth.
-                        // Let's use 0.1 (visual rail) + a bit?
-                        // Or realSize.z/2 if logic uses that.
-                        // MapObjectItem depth is typically 0.5 for collider, 0.1 visual.
-                        // Use 0.1
+                        // Offset
                         const offset = normal.multiplyScalar(0.1)
+                        // Apply offset to Ghost only? Or targetPos?
+                        // If we return targetPos, that's where it spawns.
+                        this.placementGhost.position.add(offset)
                         targetPos.add(offset)
-
-                        // Snap Y to Grid
-                        const gridSize = this.gridSize || 1
-                        // Ladder Bottom usually on ground?
-                        // Or step snapping?
-                        targetPos.y = Math.round(targetPos.y / gridSize) * gridSize
-
-                        // Snap X/Z along wall?
-                        // Too complex to calculate perpendicular grid.
-                        // Just use point.
                     } else {
-                        // Floor/Ceiling? Vertical Ladder?
-                        // Just use standard rotation
+                        // Grid Snap Active: Wall alignment is secondary to Grid?
+                        // Actually, rotating to face the wall is still good UX.
+                        // But 'R' should override or offset it? 
+                        // "Rotar con R normalmente". 
+                        // Let's allow R to set absolute rotation (0, 90, 180, 270).
+
+                        this.placementGhost.position.copy(targetPos)
+
+                        // Apply Rotation Index
                         this.placementGhost.rotation.set(0, 0, 0)
+                        if (rotationIndex === 1) this.placementGhost.rotation.y = -Math.PI / 2
+                        if (rotationIndex === 2) this.placementGhost.rotation.y = -Math.PI
+                        if (rotationIndex === 3) this.placementGhost.rotation.y = Math.PI / 2
                     }
-                }
+                } else {
+                    // -- FLOOR / CEILING --
+                    // Standard mechanics
 
-                // Center Y Logic (MapObjectItem expects center position?)
-                // MapObjectItem `spawnObject` uses position as center? 
-                // `object3D.position.y += this.scale.y / 2` logic suggests origin is bottom.
-                // Wait. In `MapObjectItem.js`:
-                // `if (... !isCenterPosition) object3D.position.y += this.scale.y / 2`
-                // So if we pass P (on floor), it shifts UP.
-                // PlacementManager usually returns the "Ground" point (hit.point).
-                // But for Ghost, we need to match visual.
-                // MapObjectItem builds centered at 0,0,0.
+                    // If grid was applied above, targetPos is already snapped.
 
-                // Let's apply targetPos
-                this.placementGhost.position.copy(targetPos)
-                if (hit.face && Math.abs(hit.face.normal.y) >= 0.9) {
-                    // Reset rotation if not wall
+                    this.placementGhost.position.copy(targetPos)
+
+                    // Apply Rotation
                     this.placementGhost.rotation.set(0, 0, 0)
+                    if (rotationIndex === 1) this.placementGhost.rotation.y = -Math.PI / 2
+                    if (rotationIndex === 2) this.placementGhost.rotation.y = -Math.PI
+                    if (rotationIndex === 3) this.placementGhost.rotation.y = Math.PI / 2
                 }
 
-                this.lastValidPosition = targetPos
-                // Save rotation for spawn?
+                this.lastValidPosition = this.placementGhost.position.clone() // Use ghost pos which handles logic
+
+                // Allow spawning at this pos/rot
                 this.lastValidQuaternion = this.placementGhost.quaternion.clone()
 
-                return targetPos
+                // We need to return the Rotation quaternion for the spawn logic if it differs from Index?
+                // SpawnObject uses rotationIndex if quaternion not passed?
+                // Actually `update` returns position.
+                // `MapObjectItem.use` gets position from `placementManager.getCurrentTarget()`
+                return this.lastValidPosition
             }
 
             // Disable Label for others

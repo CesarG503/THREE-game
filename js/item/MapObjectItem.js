@@ -774,7 +774,7 @@ export class MapObjectItem extends Item {
         object3D.userData.originalUUID = object3D.userData.uuid // Keep original if needed
         object3D.userData.color = this.color
         object3D.userData.opacity = (this.opacity !== undefined) ? this.opacity : 1.0 // Store opacity
-        object3D.userData.originalScale = this.scale
+        object3D.userData.originalScale = { x: this.scale.x, y: this.scale.y, z: this.scale.z } // Deep copy only
         object3D.userData.originalRotY = object3D.rotation.y // Store initial rotation for logic fallback
         object3D.userData.texturePath = this.texturePath // Store for serialization
 

@@ -419,7 +419,39 @@ export class CharacterController {
         let touchingLadder = false
 
         for (const ladder of this.ladders) {
-            if (ladder.bounds.containsPoint(center)) {
+            // FORCE Update Bounds if needed or just periodically
+            // Ideally we only do this if it moved, but for safety in this fix:
+            // We check if bounds exist. If not, create them.
+            if (!ladder.bounds) ladder.bounds = new THREE.Box3()
+
+            // If the ladder has been resized/moved, we need to ensure bounds are fresh in World Space.
+            // setFromObject calculates World AABB.
+            // Optimization: Only do this if we suspect change, but for now we do it
+            // because the user reported issues with "ghost" sizes.
+            // Using userData.needsBoundsUpdate flag if set by Editor.
+            if (ladder.userData.needsBoundsUpdate || !ladder.userData.boundsInitialized) {
+                ladder.updateMatrixWorld(true)
+                // ladder.bounds.setFromObject(ladder) // OLD: Included Gizmo
+
+                // NEW: Custom traversal to ignore Gizmo (AxesHelper)
+                ladder.bounds.makeEmpty()
+                ladder.traverse((child) => {
+                    // Skip AxesHelper or explicit Gizmos
+                    if (child.type === 'AxesHelper' || (child.userData && child.userData.isGizmo)) return
+
+                    if (child.geometry) {
+                        ladder.bounds.expandByObject(child)
+                    }
+                })
+
+                ladder.userData.needsBoundsUpdate = false
+                ladder.userData.boundsInitialized = true
+            }
+
+            // Check distance instead of strict containment.
+            // Player radius is approx 0.5. Solid rails keep player center ~0.55m away from ladder center.
+            // Distance 0 means inside. Distance < 0.7 allows touching + small buffer.
+            if (ladder.bounds.distanceToPoint(center) < 0.7) {
                 touchingLadder = true
                 break
             }

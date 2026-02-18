@@ -599,7 +599,21 @@ export class ObjectInspector {
 
         // Update userData dimensions
         if (!this.selectedObject.userData.originalScale) this.selectedObject.userData.originalScale = { x: 1, y: 1, z: 1 }
+
+        const oldVal = this.selectedObject.userData.originalScale[axis]
         this.selectedObject.userData.originalScale[axis] = value
+
+        // Anchor Logic: If resizing Height (Y) of a Ladder, keep bottom fixed.
+        // Ladder grows from center by default.
+        // If height increases by D, center moves up by D/2 to keep bottom fixed.
+        if (this.selectedObject.userData.mapObjectType === 'ladder' && axis === 'y') {
+            const diff = value - oldVal
+            this.selectedObject.position.y += diff / 2
+            // Update Input UI for Position if visible? 
+            if (this.inputPosY && this.inputPosY.input) {
+                this.inputPosY.input.value = this.selectedObject.position.y.toFixed(2)
+            }
+        }
 
         // We need to REGENERATE the geometry to match dimensions
         // This is complex because we need to know the type...
@@ -695,22 +709,8 @@ export class ObjectInspector {
                 this.selectedObject.add(rung)
             }
 
-            // Update Bounds (Approximation for AABB logic)
-            if (!this.selectedObject.bounds) this.selectedObject.bounds = new THREE.Box3()
-
-            // Recompute World Bounds
-            // Note: rotation makes loose AABB.
-            // We should use setFromObject(this.selectedObject) after updateMatrixWorld
-            this.selectedObject.updateMatrixWorld(true)
-            this.selectedObject.bounds.setFromObject(this.selectedObject)
-
-            // FIX: Manually extend the top of the AABB to allow climbing to top
-            // Box3 is in World Space. 
-            // We can't easily know "Top" if rotated arbitrarily, 
-            // but ladders are usually upright (Y-axis).
-            this.selectedObject.bounds.max.y += 0.5
-
-            this.selectedObject.bounds.expandByScalar(0.5)
+            // Delegate bounds update to CharacterController logic (cleaner & tighter)
+            this.selectedObject.userData.needsBoundsUpdate = true
 
 
         } else {

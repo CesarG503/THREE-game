@@ -435,6 +435,7 @@ class Game {
 
         // 1. Remove existing RigidBody
         if (objectMesh.userData.rigidBody) {
+            // console.log("Removing existing RigidBody for", objectMesh.userData.uuid)
             this.world.removeRigidBody(objectMesh.userData.rigidBody)
             objectMesh.userData.rigidBody = null
         }
@@ -471,20 +472,26 @@ class Game {
                 this.world.createCollider(col, rigidBody)
             })
         } else if (objectMesh.userData.mapObjectType === 'ladder') {
-            // Ladder (Sensor)
-            // Sensor for climbing detection/interaction area
-            // FIX: Extend sensor height by +2.0 (so +1.0 to half-height and offset center)
-            // Original: dims.y / 2
-            // New Center: dims.y / 2 + 1.0 (Shift up by 1)
-            // New HalfHeight: (dims.y + 2.0) / 2
-
-            const extendedHeight = dims.y + 2.0
-
-            colDesc = RAPIER.ColliderDesc.cuboid(dims.x / 2, (dims.y + 1.2) / 2, 0.2)
+            // Ladder (Sensor + Rails)
+            // 1. Center Sensor for Climbing
+            // Match visual magnitude exactly (dims.y / 2)
+            colDesc = RAPIER.ColliderDesc.cuboid(dims.x / 2, dims.y / 2, 0.2)
                 .setSensor(true)
-                .setTranslation(0, 0.6, 0)
-
             this.world.createCollider(colDesc, rigidBody)
+
+            // 2. Solid Rails (Left & Right)
+            // Rail thickness approx 0.1 (half 0.05)
+            const railHalfW = 0.05
+            const railHalfH = dims.y / 2
+            const railHalfD = 0.05
+
+            const leftRailCol = RAPIER.ColliderDesc.cuboid(railHalfW, railHalfH, railHalfD)
+                .setTranslation(-dims.x / 2, 0, 0)
+            this.world.createCollider(leftRailCol, rigidBody)
+
+            const rightRailCol = RAPIER.ColliderDesc.cuboid(railHalfW, railHalfH, railHalfD)
+                .setTranslation(dims.x / 2, 0, 0)
+            this.world.createCollider(rightRailCol, rigidBody)
         } else if (objectMesh.userData.shapeType === 'sphere' || objectMesh.userData.logicProperties?.shapeType === 'sphere') {
             // SPHERE
             // Use radius from userData or logicProperties (logicProperties preferred as it's the source of truth for edit)
@@ -1447,6 +1454,21 @@ class Game {
                         // Game Mode: Invisible
                         lastObj.visible = false
                     }
+                }
+            }
+
+            // FIX: Register Ladders with Character Controller
+            if (lastObj && lastObj.userData.isLadder && this.character) {
+                this.character.ladders.push(lastObj)
+
+                // Initialize bounds for climbing
+                if (lastObj.bounds) { // mapObjectItem creates .bounds
+                    lastObj.updateMatrixWorld(true)
+                    if (lastObj.bounds.isEmpty()) {
+                        lastObj.bounds.setFromObject(lastObj)
+                        // No expansion needed as we switched to distance check
+                    }
+                    lastObj.userData.boundsInitialized = true
                 }
             }
         })

@@ -587,7 +587,8 @@ export class PlacementManager {
         }
 
         // Si no hay item o no es de construcción, ocultar
-        if (!item || (!item.isImpulsePad && !item.type)) {
+        // Added ignore for 'weapon' type
+        if (!item || (!item.isImpulsePad && !item.type) || item.type === 'weapon') {
             this.placementGhost.visible = false
             this.currentHit = null
             if (this.aerialVisual) this.aerialVisual.visible = false

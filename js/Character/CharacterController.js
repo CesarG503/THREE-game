@@ -428,21 +428,34 @@ export class CharacterController {
             // setFromObject calculates World AABB.
             // Optimization: Only do this if we suspect change, but for now we do it
             // because the user reported issues with "ghost" sizes.
-            // Using userData.needsBoundsUpdate flag if set by Editor.
+            // using userData.needsBoundsUpdate flag if set by Editor.
+            if (!ladder.userData) ladder.userData = {}; // Safety init
+
             if (ladder.userData.needsBoundsUpdate || !ladder.userData.boundsInitialized) {
-                ladder.updateMatrixWorld(true)
-                // ladder.bounds.setFromObject(ladder) // OLD: Included Gizmo
+                // Fix: Check if ladder is a standard Object3D before calling updateMatrixWorld
+                if (typeof ladder.updateMatrixWorld === 'function') {
+                    ladder.updateMatrixWorld(true)
 
-                // NEW: Custom traversal to ignore Gizmo (AxesHelper)
-                ladder.bounds.makeEmpty()
-                ladder.traverse((child) => {
-                    // Skip AxesHelper or explicit Gizmos
-                    if (child.type === 'AxesHelper' || (child.userData && child.userData.isGizmo)) return
+                    // NEW: Custom traversal to ignore Gizmo (AxesHelper)
+                    ladder.bounds.makeEmpty()
 
-                    if (child.geometry) {
-                        ladder.bounds.expandByObject(child)
+                    if (typeof ladder.traverse === 'function') {
+                        ladder.traverse((child) => {
+                            // Skip AxesHelper or explicit Gizmos
+                            if (child.type === 'AxesHelper' || (child.userData && child.userData.isGizmo)) return
+
+                            if (child.geometry) {
+                                ladder.bounds.expandByObject(child)
+                            }
+                        })
+                    } else {
+                        // Fallback if no traverse (unlikely for Object3D)
+                        ladder.bounds.setFromObject(ladder)
                     }
-                })
+                }
+                // Else: It's a custom Ladder object or wrapper (LevelLoader/LevelBuilder) 
+                // that likely has bounds pre-calculated or managed internally. 
+                // We just mark it as initialized.
 
                 ladder.userData.needsBoundsUpdate = false
                 ladder.userData.boundsInitialized = true
@@ -512,6 +525,16 @@ export class CharacterController {
         }
 
         console.log("Stats Updated:", stats)
+    }
+
+    setHeldItem(item) {
+        // Validate type? For now just pass to skin
+        this.emit('itemEquipped', item); // Event for HUD or others?
+
+        // Delegate to active model
+        if (this.polygonModelSkin) {
+            this.polygonModelSkin.setHeldItem(item);
+        }
     }
 
     takeDamage(amount) {

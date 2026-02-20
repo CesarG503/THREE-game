@@ -364,6 +364,53 @@ export class PolygonModelSkin {
         this.fallAnimationType = type;
     }
 
+    setHeldItem(item) {
+        // Clear existing
+        if (this.heldItemMesh) {
+            this.rightArmGroup.remove(this.heldItemMesh);
+            this.heldItemMesh = null;
+        }
+
+        this.isHoldingWeapon = item !== null && item.type === "weapon";
+
+        if (!item) return;
+
+        // Check if item has a mesh for equipping
+        if (item.getEquipMesh) {
+            const mesh = item.getEquipMesh();
+            if (mesh) {
+                this.heldItemMesh = mesh;
+
+                // Align to hand
+                // Right Arm is 4x12x4. Pivot is at top.
+                // Hand is at bottom.
+                // 1 pixel = 1/16 * 0.9
+                const pixelScale = 1 / 16 * 0.9;
+
+                // Position at the end of the arm (hand position)
+                // Arm length is roughly 12 units (pixels). Pivot is at top.
+                // So bottom is at y = -12 * pixelScale.
+                // We'll positions slightly higher to be "in hand"
+                mesh.position.set(0, -10 * pixelScale, 2 * pixelScale);
+
+
+
+                // Rotate to align with arm pointing forward
+                // Arm rotates -90 deg on X to point forward.
+                // To align Gun Forward (-Z) with Arm Forward (Y), and Gun Up (Y) with Arm Up (Z):
+                // Rotate -90 on X? 
+                // Original was Y=PI (180).
+                // Let's try adjusting to get it upright. 
+                // X = -Math.PI / 2 aligns -Z to Y.
+                // If it ends up backwards, we might need Y rotation too.
+                mesh.rotation.set(-Math.PI / 2, Math.PI + 1.5, Math.PI);
+
+
+                this.rightArmGroup.add(mesh);
+            }
+        }
+    }
+
     update(dt, isMoving, isCrouching, isAttacking, isGrounded = true, verticalVelocity = 0) {
         if (!this.model || !this.isVisible) return
 
@@ -475,8 +522,31 @@ export class PolygonModelSkin {
             this.leftArmGroup.rotation.y = finalTwist
             this.rightArmGroup.rotation.y = finalTwist
 
+        } else if (this.isHoldingWeapon) {
+            // --- WEAPON HOLDING POSE ---
+            // Override right arm to point forward
+            // -Pi/2 points the arm "up" relative to body if body is -Y down? 
+            // Arm geometry: Y is length. Pivot top.
+            // Rotation X 0 = Down.
+            // Rotation X -PI/2 = Forward (assuming -Z is forward) or Back?
+            // Let's try -PI/2.
+            const pointAimAngle = -Math.PI / 2;
+
+            // Allow slight movement for breathing/walking but keep it focused forward
+            const aimBob = isMoving ? Math.sin(Date.now() / 100 * 0.5) * 0.05 : Math.sin(Date.now() / 500) * 0.02;
+
+            this.rightArmGroup.rotation.x = THREE.MathUtils.lerp(this.rightArmGroup.rotation.x, pointAimAngle + aimBob, 0.2);
+
+            // Left arm behaves normally or supports? For now normal walk.
+            this.leftArmGroup.rotation.x = THREE.MathUtils.lerp(this.leftArmGroup.rotation.x, baseLArmX, animLerp);
+
+            // Twist body slightly to right to aim?
+            const aimTwist = -0.2;
+            this.body.rotation.y = THREE.MathUtils.lerp(this.body.rotation.y, aimTwist, animLerp);
+            this.headGroup.rotation.y = THREE.MathUtils.lerp(this.headGroup.rotation.y, aimTwist * 0.5, animLerp);
+
         } else {
-            // No Attack
+            // No Attack & No Weapon
             this.leftArmGroup.rotation.x = THREE.MathUtils.lerp(this.leftArmGroup.rotation.x, baseLArmX, animLerp)
             this.rightArmGroup.rotation.x = THREE.MathUtils.lerp(this.rightArmGroup.rotation.x, baseRArmX, animLerp)
 

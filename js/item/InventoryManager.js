@@ -1,12 +1,19 @@
 export class InventoryManager {
-    constructor() {
+    constructor(containerId) {
+        // Fix: Use containerId if provided, or default query?
+        // Original code used document.querySelectorAll(".inventory-slot") directly in constructor.
+        // It seems the argument "inventory-container" passed in main_rapier is not used or logic is inside.
+        // Let's keep it simple and just add the callback init.
+
         this.uiSlots = document.querySelectorAll(".inventory-slot");
-        this.inputManager = null; // Will be set from main if needed, or we just rely on global events (current impl relies on global)
+        this.inputManager = null;
 
         // Dynamic capacity based on HTML
         this.capacity = this.uiSlots.length;
         this.slots = new Array(this.capacity).fill(null);
         this.currentSlotIndex = 0;
+
+        this.onItemChange = null; // Callback
 
         // Initial binding
         this.setupEventListeners();
@@ -61,6 +68,11 @@ export class InventoryManager {
         if (index >= 0 && index < this.slots.length) {
             this.slots[index] = item
             this.updateUI()
+
+            // If we modified the current slot, trigger update
+            if (index === this.currentSlotIndex && this.onItemChange) {
+                this.onItemChange(item);
+            }
         }
     }
 
@@ -112,8 +124,22 @@ export class InventoryManager {
     selectSlot(index) {
         if (index < 0) index = this.capacity - 1;
         if (index >= this.capacity) index = 0;
+
+        const prevIndex = this.currentSlotIndex;
         this.currentSlotIndex = index;
         this.updateUI();
+
+        // Trigger Callback if slot changed
+        if (this.onItemChange && prevIndex !== this.currentSlotIndex) {
+            this.onItemChange(this.slots[this.currentSlotIndex]);
+        }
+        // Also trigger if it's the same slot but just to be safe (e.g. reload)?
+        // For now only on change or initial load. 
+        // Actually main loop might want to know immediately. 
+        // Let's trigger always on selection to be safe.
+        if (this.onItemChange) {
+            this.onItemChange(this.slots[this.currentSlotIndex]);
+        }
     }
 
     updateUI() {

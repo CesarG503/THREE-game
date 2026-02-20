@@ -2,6 +2,7 @@ import { MapObjectItem } from "../item/MapObjectItem.js"
 import { LogicSystem } from "../managers/LogicSystem.js"
 import { GameConfigPanel } from "./GameConfigPanel.js"
 import { PlayerConfigPanel } from "./PlayerConfigPanel.js"
+import { GunItem } from "../item/GunItem.js"
 import * as THREE from "three"
 
 export class ConstructionMenu {
@@ -56,6 +57,10 @@ export class ConstructionMenu {
             )
             this.libraryItems.push(item)
         })
+
+        // Add Gun to Library
+        const gun = new GunItem();
+        this.libraryItems.push(gun);
     }
 
     generateLogicLibrary() {

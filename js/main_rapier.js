@@ -25,6 +25,7 @@ import { ObjectInspector } from "./ui/ObjectInspector.js"
 import { StairsUtils } from "./utils/StairsUtils.js"
 import { PlayerConfigManager } from "./managers/PlayerConfigManager.js"
 import { GameHUD } from "./ui/GameHUD.js"
+import { GunItem } from "./item/GunItem.js"
 
 class Game {
     constructor() {
@@ -239,6 +240,20 @@ class Game {
             this.inventoryManager.addItem(item2)
             this.inventoryManager.addItem(item3)
             this.inventoryManager.addItem(item4)
+
+            // Add Gun (Slot 6 -> Index 5)
+            const gunItem = new GunItem();
+            // this.inventoryManager.addItem(gunItem); // Auto-add
+            // Force Slot 6
+            this.inventoryManager.setItem(5, gunItem);
+        }
+
+        // Wiring Inventory to Character
+        if (this.inventoryManager && this.character) {
+            this.inventoryManager.onItemChange = (item) => {
+                console.log("Item Changed:", item ? item.name : "None");
+                this.character.setHeldItem(item);
+            };
         }
 
         // Enable DragDrop on Inventory
@@ -246,28 +261,39 @@ class Game {
             this.inventoryManager.enableDragAndDrop((slotIndex) => {
                 // Callback when item dropped on slot index
                 if (this.constructionMenu && this.constructionMenu.draggedItem) {
-                    // Clone the dragged item pattern to new unique item? 
-                    // Or reuse reference if infinite?
-                    // MapObjectItem logic doesn't store unique state other than ID/Color.
-                    // We should clone it to ensure independent lifecycle if needed.
                     const source = this.constructionMenu.draggedItem
-                    // Re-create new instance
-                    const newItem = new MapObjectItem(
-                        source.id, // Reuse ID prefix or make unique? 
-                        source.name,
-                        source.type,
-                        "",
-                        source.color,
-                        source.scale,
-                        source.texturePath
-                    )
-                    // Copy Logic properties
-                    if (source.logicProperties) {
-                        newItem.logicProperties = { ...source.logicProperties }
+
+                    let newItem;
+
+                    // Special Handling for Weapons / Gun
+                    if (source instanceof GunItem || source.type === 'weapon') {
+                        newItem = new GunItem(); // Create fresh gun instance
+                        // If gun had unique properties (unlikely from library), copy them here
                     }
-                    // Copy Opacity
-                    if (source.opacity !== undefined) {
-                        newItem.opacity = source.opacity
+                    // Special Handling for Impulse Items (if in library)
+                    else if (source instanceof ImpulseItem) {
+                        newItem = new ImpulseItem(source.id, source.name, source.iconPath, source.type, source.strength);
+                    }
+                    // Default: MapObjectItem (Building Blocks)
+                    else {
+                        // Re-create new instance for map objects
+                        newItem = new MapObjectItem(
+                            source.id,
+                            source.name,
+                            source.type,
+                            "",
+                            source.color,
+                            source.scale,
+                            source.texturePath
+                        )
+                        // Copy Logic properties
+                        if (source.logicProperties) {
+                            newItem.logicProperties = { ...source.logicProperties }
+                        }
+                        // Copy Opacity
+                        if (source.opacity !== undefined) {
+                            newItem.opacity = source.opacity
+                        }
                     }
 
                     this.inventoryManager.setItem(slotIndex, newItem)
@@ -1590,7 +1616,7 @@ class Game {
             if (item.type === 'ladder') {
                 // Optimization: Assume it's the last added object
                 const newObject = this.sceneManager.scene.children[this.sceneManager.scene.children.length - 1]
-                if (newObject && newObject.userData.isLadder) {
+                if (newObject && newObject.userData.isLadder && typeof newObject.updateMatrixWorld === 'function') {
                     this.character.ladders.push(newObject)
                     console.log("Registered new ladder. Total:", this.character.ladders.length)
 

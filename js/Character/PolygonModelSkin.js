@@ -417,7 +417,7 @@ export class PolygonModelSkin {
         // --- ATTACK SMOOTHING ---
         // Smoothly transition into and out of attack state
         const attackLerpSpeed = 15 * dt
-        const targetWeight = isAttacking ? 1.0 : 0.0
+        const targetWeight = (isAttacking && !this.isHoldingWeapon) ? 1.0 : 0.0
         this.attackWeight = THREE.MathUtils.lerp(this.attackWeight, targetWeight, attackLerpSpeed)
 
         // Calculate Attack Swing

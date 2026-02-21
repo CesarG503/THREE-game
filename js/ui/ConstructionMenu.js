@@ -233,19 +233,64 @@ export class ConstructionMenu {
             overflow: hidden; /* Manage overflow internally */
         `
 
-        // Left: Grid
-        this.libraryGrid = document.createElement('div')
-        this.libraryGrid.style.cssText = `
+        // Left: Scrollable List of Sections
+        this.libraryLeftCol = document.createElement('div')
+        this.libraryLeftCol.style.cssText = `
             flex: 2;
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-            grid-auto-rows: 120px;
-            gap: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
             overflow-y: auto;
             padding-right: 10px;
-            align-content: start;
         `
-        this.renderLibraryGrid(this.libraryGrid, this.libraryItems)
+
+        // Helper to create a collapsible section
+        const createCollapsibleSection = (title, itemsFiltFunc) => {
+            const details = document.createElement('details');
+            details.open = true; // Open by default
+            details.style.cssText = `
+                background: #2a2a2a;
+                border-radius: 8px;
+                padding: 10px;
+                border: 1px solid #444;
+            `;
+
+            const summary = document.createElement('summary');
+            summary.textContent = title;
+            summary.style.cssText = `
+                font-size: 18px;
+                font-weight: bold;
+                color: #fff;
+                cursor: pointer;
+                outline: none;
+                user-select: none;
+                padding-bottom: 5px;
+                border-bottom: 2px solid #555;
+                margin-bottom: 15px;
+            `;
+            details.appendChild(summary);
+
+            const grid = document.createElement('div');
+            grid.style.cssText = `
+                display: grid;
+                grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+                grid-auto-rows: 120px;
+                gap: 10px;
+            `;
+
+            const filteredItems = this.libraryItems.filter(itemsFiltFunc);
+            this.renderLibraryGrid(grid, filteredItems);
+
+            details.appendChild(grid);
+            return details;
+        };
+
+        // Create Sections
+        const sectionConstruction = createCollapsibleSection("Construcción", item => item.type !== 'weapon');
+        const sectionWeapons = createCollapsibleSection("Armas", item => item.type === 'weapon');
+
+        this.libraryLeftCol.appendChild(sectionConstruction);
+        this.libraryLeftCol.appendChild(sectionWeapons);
 
         // Right: Customizer Panel
         this.libraryPanel = document.createElement('div')
@@ -284,7 +329,7 @@ export class ConstructionMenu {
 
         this.renderLibraryPanel(this.libraryPanel)
 
-        this.contentLibrary.appendChild(this.libraryGrid)
+        this.contentLibrary.appendChild(this.libraryLeftCol)
         this.contentLibrary.appendChild(this.libraryPanel)
 
         // Logic Content
@@ -1201,6 +1246,81 @@ export class ConstructionMenu {
         dimContainer.appendChild(dimRow)
         this.panelEditor.appendChild(dimContainer)
 
+        // --- NEW: Weapon Controls
+        const weaponControlsContainer = document.createElement('div');
+        weaponControlsContainer.style.cssText = `
+            width: 100%;
+            display: none;
+            flex-direction: column;
+            gap: 10px;
+            border-top: 1px solid #444;
+            padding-top: 10px;
+        `;
+
+        const damageRow = document.createElement('div');
+        damageRow.style.display = "flex";
+        damageRow.style.alignItems = "center";
+        damageRow.style.justifyContent = "space-between";
+
+        const damageLabel = document.createElement('span');
+        damageLabel.textContent = "Daño:";
+
+        this.damageInput = document.createElement('input');
+        this.damageInput.type = "number";
+        this.damageInput.min = "0";
+        this.damageInput.style.cssText = `
+            width: 50px;
+            background: #333;
+            color: white;
+            border: 1px solid #555;
+            border-radius: 4px;
+            padding: 4px;
+        `;
+
+        this.damageInput.addEventListener('input', (e) => {
+            let val = parseFloat(e.target.value);
+            if (!isNaN(val) && this.currentDraftItem && this.currentDraftItem.type === 'weapon') {
+                this.currentDraftItem.damage = val;
+            }
+        });
+
+        damageRow.appendChild(damageLabel);
+        damageRow.appendChild(this.damageInput);
+
+        const cooldownRow = document.createElement('div');
+        cooldownRow.style.display = "flex";
+        cooldownRow.style.alignItems = "center";
+        cooldownRow.style.justifyContent = "space-between";
+
+        const cooldownLabel = document.createElement('span');
+        cooldownLabel.textContent = "Enfriamiento (s):";
+
+        this.cooldownInput = document.createElement('input');
+        this.cooldownInput.type = "number";
+        this.cooldownInput.step = "0.1";
+        this.cooldownInput.min = "0";
+        this.cooldownInput.style.cssText = this.damageInput.style.cssText;
+
+        this.cooldownInput.addEventListener('input', (e) => {
+            let val = parseFloat(e.target.value);
+            if (!isNaN(val) && this.currentDraftItem && this.currentDraftItem.type === 'weapon') {
+                this.currentDraftItem.cooldown = val;
+            }
+        });
+
+        cooldownRow.appendChild(cooldownLabel);
+        cooldownRow.appendChild(this.cooldownInput);
+
+        weaponControlsContainer.appendChild(damageRow);
+        weaponControlsContainer.appendChild(cooldownRow);
+
+        this.panelEditor.appendChild(weaponControlsContainer);
+
+        // Save References for toggling
+        this.editorConstructionControls = controlsContainer;
+        this.editorTextureContainer = textureContainer;
+        this.editorDimContainer = dimContainer;
+        this.editorWeaponControlsContainer = weaponControlsContainer;
 
         const dragHint = document.createElement('div')
         dragHint.textContent = "Arrastra la imagen superior a tu inventario"
@@ -1225,12 +1345,27 @@ export class ConstructionMenu {
 
         // Init Draft - CRITICAL: Copy scale object to avoid mutation
         const scaleCopy = { ...baseItem.scale }
-        this.createDraft(baseItem.id, baseItem.name, baseItem.type, baseItem.color, scaleCopy, baseItem.texturePath)
+        this.createDraft(baseItem.id, baseItem.name, baseItem.type, baseItem.color, scaleCopy, baseItem.texturePath, baseItem)
 
-        // Reset color picker
-        const hex = '#' + new THREE.Color(baseItem.color).getHexString()
-        this.colorPicker.value = hex
-        this.updateDraftColor(hex)
+        if (baseItem.type === 'weapon') {
+            this.editorConstructionControls.style.display = 'none';
+            this.editorTextureContainer.style.display = 'none';
+            this.editorDimContainer.style.display = 'none';
+            this.editorWeaponControlsContainer.style.display = 'flex';
+
+            this.damageInput.value = baseItem.damage !== undefined ? baseItem.damage : 10;
+            this.cooldownInput.value = baseItem.cooldown !== undefined ? baseItem.cooldown : 0.5;
+        } else {
+            this.editorConstructionControls.style.display = 'flex';
+            this.editorTextureContainer.style.display = 'flex';
+            this.editorDimContainer.style.display = 'flex';
+            this.editorWeaponControlsContainer.style.display = 'none';
+
+            // Reset color picker
+            const hex = baseItem.color !== undefined ? '#' + new THREE.Color(baseItem.color).getHexString() : '#ffffff';
+            this.colorPicker.value = hex
+            this.updateDraftColor(hex)
+        }
 
         // Reset Texture UI
         const allBtns = this.panelEditor.querySelectorAll('.texture-btn')
@@ -1250,10 +1385,12 @@ export class ConstructionMenu {
         if (this.inputDimz) this.inputDimz.value = scaleCopy.z
     }
 
-    createDraft(id, name, type, color, scale, texturePath = null) {
-        // Create a new MapObjectItem that acts as our "Modified" version
-        // We pass the color directly
-        this.currentDraftItem = new MapObjectItem(id, name, type, "", color, scale, texturePath)
+    createDraft(id, name, type, color, scale, texturePath = null, baseItem = null) {
+        if (type === 'weapon' && baseItem && baseItem.clone) {
+            this.currentDraftItem = baseItem.clone();
+        } else {
+            this.currentDraftItem = new MapObjectItem(id, name, type, "", color, scale, texturePath)
+        }
 
         // Init Image
         if (this.editorImg) {

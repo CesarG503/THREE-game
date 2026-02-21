@@ -128,4 +128,12 @@ export class GunItem extends Item {
     getEquipMesh() {
         return this.model ? this.model.clone() : null; // Clone to allow multiple instances/re-adding
     }
+
+    clone() {
+        // Cloning logic for passing configured item from Menu to Inventory
+        const cloned = new GunItem();
+        cloned.damage = this.damage;
+        cloned.cooldown = this.cooldown;
+        return cloned;
+    }
 }

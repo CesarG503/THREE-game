@@ -171,7 +171,7 @@ export class ConstructionMenu {
 
         // Header / Tabs
         const header = document.createElement('div')
-        header.style.cssText = `display: flex; gap: 20px; font-size: 24px; margin-bottom: 20px; border-bottom: 1px solid #555; padding-bottom: 10px; overflow-x: auto;`
+        header.style.cssText = `display: flex; gap: 20px; font-size: 24px; margin-bottom: 20px; border-bottom: 1px solid #555; padding-bottom: 10px; overflow-x: auto; flex-shrink: 0;`
 
         this.tabLibrary = document.createElement('div')
         this.tabLibrary.textContent = "Librería de Objetos"
@@ -448,13 +448,13 @@ export class ConstructionMenu {
         // Game Config Content
         this.contentGameConfig = document.createElement('div')
         this.contentGameConfig.style.cssText = `
-            flex: 1; display: none; /* Hidden */
+            flex: 1; display: none; flex-direction: column; overflow: hidden; min-height: 0;
         `
         this.gameConfigPanel.createUI(this.contentGameConfig)
 
         // Player Config Content
         this.contentPlayerConfig = document.createElement('div')
-        this.contentPlayerConfig.style.cssText = `flex: 1; display: none;`
+        this.contentPlayerConfig.style.cssText = `flex: 1; display: none; flex-direction: column; overflow: hidden; min-height: 0;`
         this.playerConfigPanel.createUI(this.contentPlayerConfig)
 
         this.container.appendChild(this.contentLibrary)

@@ -433,8 +433,12 @@ export class CharacterController {
       this.rigidBody.setNextKinematicRotation(this.currentGravityQuaternion);
     }
 
-    if (this.cameraController && typeof this.cameraController.setGravityUpVector === "function") {
-      this.cameraController.setGravityUpVector(this.getGravityUpVector());
+    if (this.cameraController) {
+      if (typeof this.cameraController.setGravityQuaternion === "function") {
+        this.cameraController.setGravityQuaternion(this.getGravityQuaternion());
+      } else if (typeof this.cameraController.setGravityUpVector === "function") {
+        this.cameraController.setGravityUpVector(this.getGravityUpVector());
+      }
     }
   }
 
@@ -445,14 +449,10 @@ export class CharacterController {
   }
 
   getGravityBasis() {
-    const up = this.getGravityUpVector();
-    let forward = new THREE.Vector3(0, 0, 1).projectOnPlane(up);
-    if (forward.lengthSq() < 0.0001) {
-      forward = new THREE.Vector3(1, 0, 0).projectOnPlane(up);
-    }
-    forward.normalize();
-
-    const right = forward.clone().cross(up).normalize();
+    const q = this.currentGravityQuaternion;
+    const up = new THREE.Vector3(0, 1, 0).applyQuaternion(q).normalize();
+    const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(q).normalize();
+    const right = new THREE.Vector3(-1, 0, 0).applyQuaternion(q).normalize();
     return { up, forward, right };
   }
 

@@ -267,8 +267,15 @@ class Game {
 
                     // Special Handling for Weapons / Gun
                     if (source instanceof GunItem || source.type === 'weapon') {
-                        newItem = new GunItem(); // Create fresh gun instance
-                        // If gun had unique properties (unlikely from library), copy them here
+                        if (source.clone) {
+                            newItem = source.clone();
+                        } else {
+                            // Fallback
+                            newItem = new GunItem();
+                            newItem.damage = source.damage;
+                            newItem.cooldown = source.cooldown;
+                            newItem.equippedHand = source.equippedHand;
+                        }
                     }
                     // Special Handling for Impulse Items (if in library)
                     else if (source instanceof ImpulseItem) {

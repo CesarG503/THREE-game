@@ -1311,8 +1311,46 @@ export class ConstructionMenu {
         cooldownRow.appendChild(cooldownLabel);
         cooldownRow.appendChild(this.cooldownInput);
 
+        const handRow = document.createElement('div');
+        handRow.style.display = "flex";
+        handRow.style.alignItems = "center";
+        handRow.style.justifyContent = "space-between";
+
+        const handLabel = document.createElement('span');
+        handLabel.textContent = "Mano Equipada:";
+
+        this.handSelect = document.createElement('select');
+        this.handSelect.style.cssText = `
+            width: 100px;
+            background: #333;
+            color: white;
+            border: 1px solid #555;
+            border-radius: 4px;
+            padding: 4px;
+        `;
+
+        const optionRight = document.createElement('option');
+        optionRight.value = "right";
+        optionRight.textContent = "Derecha";
+        const optionLeft = document.createElement('option');
+        optionLeft.value = "left";
+        optionLeft.textContent = "Izquierda";
+
+        this.handSelect.appendChild(optionRight);
+        this.handSelect.appendChild(optionLeft);
+
+        this.handSelect.addEventListener('change', (e) => {
+            if (this.currentDraftItem && this.currentDraftItem.type === 'weapon') {
+                this.currentDraftItem.equippedHand = e.target.value;
+            }
+        });
+
+        handRow.appendChild(handLabel);
+        handRow.appendChild(this.handSelect);
+
         weaponControlsContainer.appendChild(damageRow);
         weaponControlsContainer.appendChild(cooldownRow);
+        weaponControlsContainer.appendChild(handRow);
 
         this.panelEditor.appendChild(weaponControlsContainer);
 
@@ -1355,6 +1393,7 @@ export class ConstructionMenu {
 
             this.damageInput.value = baseItem.damage !== undefined ? baseItem.damage : 10;
             this.cooldownInput.value = baseItem.cooldown !== undefined ? baseItem.cooldown : 0.5;
+            this.handSelect.value = baseItem.equippedHand !== undefined ? baseItem.equippedHand : "right";
         } else {
             this.editorConstructionControls.style.display = 'flex';
             this.editorTextureContainer.style.display = 'flex';

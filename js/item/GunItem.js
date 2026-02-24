@@ -13,6 +13,7 @@ export class GunItem extends Item {
         this.type = "weapon";
         this.damage = 10;
         this.cooldown = 0.5; // Seconds
+        this.equippedHand = "right"; // "right" or "left" default
         this.lastShotTime = 0;
 
         this.isReloading = false;
@@ -260,6 +261,7 @@ export class GunItem extends Item {
         const cloned = new GunItem();
         cloned.damage = this.damage;
         cloned.cooldown = this.cooldown;
+        cloned.equippedHand = this.equippedHand;
         return cloned;
     }
 }

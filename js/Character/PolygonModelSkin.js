@@ -367,7 +367,11 @@ export class PolygonModelSkin {
     setHeldItem(item) {
         // Clear existing
         if (this.heldItemMesh) {
-            this.rightArmGroup.remove(this.heldItemMesh);
+            if (this.currentWeaponHand === 'left') {
+                this.leftArmGroup.remove(this.heldItemMesh);
+            } else {
+                this.rightArmGroup.remove(this.heldItemMesh);
+            }
             this.heldItemMesh = null;
         }
 
@@ -406,8 +410,13 @@ export class PolygonModelSkin {
                 // If it ends up backwards, we might need Y rotation too.
                 mesh.rotation.set(-Math.PI / 2, Math.PI + 1.5, Math.PI);
 
+                this.currentWeaponHand = item.equippedHand || 'right';
 
-                this.rightArmGroup.add(mesh);
+                if (this.currentWeaponHand === 'left') {
+                    this.leftArmGroup.add(mesh);
+                } else {
+                    this.rightArmGroup.add(mesh);
+                }
             }
         }
     }
@@ -514,6 +523,7 @@ export class PolygonModelSkin {
             const finalRArmX = THREE.MathUtils.lerp(baseRArmX, recoilRotX, blend)
             const finalTwist = THREE.MathUtils.lerp(0, targetTwist, blend)
 
+            // Adjust punch and recoil arms depending on handedness (if any) or just leave default
             this.leftArmGroup.rotation.x = finalLArmX
             this.rightArmGroup.rotation.x = finalRArmX
 
@@ -525,18 +535,17 @@ export class PolygonModelSkin {
 
         } else if (this.isHoldingWeapon) {
             // --- WEAPON HOLDING POSE ---
-            // Override right arm to point forward
-            // -Pi/2 points the arm "up" relative to body if body is -Y down? 
-            // Arm geometry: Y is length. Pivot top.
-            // Rotation X 0 = Down.
-            // Rotation X -PI/2 = Forward (assuming -Z is forward) or Back?
-            // Let's try -PI/2.
+            // Override active arm to point forward
             const pointAimAngle = -Math.PI / 2;
-
-            // Allow slight movement for breathing/walking but keep it focused forward
             const aimBob = isMoving ? Math.sin(Date.now() / 100 * 0.5) * 0.05 : Math.sin(Date.now() / 500) * 0.02;
 
-            this.rightArmGroup.rotation.x = THREE.MathUtils.lerp(this.rightArmGroup.rotation.x, pointAimAngle + aimBob, 0.2);
+            if (this.currentWeaponHand === 'left') {
+                this.leftArmGroup.rotation.x = THREE.MathUtils.lerp(this.leftArmGroup.rotation.x, pointAimAngle + aimBob, 0.2);
+                this.rightArmGroup.rotation.x = THREE.MathUtils.lerp(this.rightArmGroup.rotation.x, baseRArmX, animLerp);
+            } else {
+                this.rightArmGroup.rotation.x = THREE.MathUtils.lerp(this.rightArmGroup.rotation.x, pointAimAngle + aimBob, 0.2);
+                this.leftArmGroup.rotation.x = THREE.MathUtils.lerp(this.leftArmGroup.rotation.x, baseLArmX, animLerp);
+            }
 
             // --- ANIMACION PROCEDURAL DEL ARMA ---
             if (this.heldItemMesh && this.heldItem && this.heldItem.type === "weapon") {
@@ -557,11 +566,8 @@ export class PolygonModelSkin {
                 }
             }
 
-            // Left arm behaves normally or supports? For now normal walk.
-            this.leftArmGroup.rotation.x = THREE.MathUtils.lerp(this.leftArmGroup.rotation.x, baseLArmX, animLerp);
-
-            // Twist body slightly to right to aim?
-            const aimTwist = -0.2;
+            // Twist body slightly to right or left to aim
+            const aimTwist = this.currentWeaponHand === 'left' ? 0.2 : -0.2;
             this.body.rotation.y = THREE.MathUtils.lerp(this.body.rotation.y, aimTwist, animLerp);
             this.headGroup.rotation.y = THREE.MathUtils.lerp(this.headGroup.rotation.y, aimTwist * 0.5, animLerp);
 

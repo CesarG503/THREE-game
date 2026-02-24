@@ -654,6 +654,19 @@ class Game {
             }
         }
 
+        // --- ANIMACIONES DE ARMA (PROCEDURAL) ---
+        if (this.inventoryManager && this.character && this.cameraController) {
+            const currentItem = this.inventoryManager.getCurrentItem();
+            if (currentItem instanceof GunItem) {
+                const pitchDiff = currentItem.updateAnim(dt);
+                if (pitchDiff !== 0) {
+                    this.cameraController.fpPitch += pitchDiff;
+                    // Limitar el pitch máximo para no dar vueltas
+                    this.cameraController.fpPitch = Math.max(-this.cameraController.maxPitch, Math.min(this.cameraController.maxPitch, this.cameraController.fpPitch));
+                }
+            }
+        }
+
         // Dropped Items Update
         if (this.itemDropManager) {
             this.itemDropManager.update(dt, this.clock.getElapsedTime())
@@ -1269,6 +1282,14 @@ class Game {
                 if (statusEl) {
                     statusEl.textContent = isFixed ? "G: Suelo Fijado" : "G: Suelo No Fijado"
                     statusEl.style.color = isFixed ? "#FF0000" : "#00FF00"
+                }
+            }
+
+            // Recarga de Arma (R)
+            if (key === 'r') {
+                const currentItem = this.inventoryManager ? this.inventoryManager.getCurrentItem() : null;
+                if (currentItem && currentItem instanceof GunItem) {
+                    currentItem.reload();
                 }
             }
         })

@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { Item } from "./Item.js";
-import { OBJLoader } from "three/addons/loaders/OBJLoader.js";
+import { FBXLoader } from "three/addons/loaders/FBXLoader.js";
 import { Projectile } from "../weapons/Projectile.js";
 
 export class GunItem extends Item {
@@ -15,8 +15,26 @@ export class GunItem extends Item {
         this.cooldown = 0.5; // Seconds
         this.lastShotTime = 0;
 
+        this.isReloading = false;
+
+        // Animaciones Procedurales (Retroceso)
+        this.gunImpulse = 0;
+        this.gunRecoilRecovery = 0;
+
+        // Animaciones Procedurales (Resorte Recarga)
+        this.springReloadZ = 0;
+        this.springReloadVelocityZ = 0;
+        this.springReloadImpulseZ = 0;
+        this.SPRING_STIFFNESS = 0.1;
+        this.SPRING_DAMPING = 0.85;
+
         this.model = null;
+        this.equipGroup = new THREE.Group();
         this.isLoading = false;
+
+        this.mixer = null;
+        this.actionShoot = null;
+        this.actionReload = null;
 
         // Load Model immediately
         this.loadModel();
@@ -26,67 +44,87 @@ export class GunItem extends Item {
         if (this.model || this.isLoading) return;
         this.isLoading = true;
 
-        const loader = new OBJLoader();
+        const loader = new FBXLoader();
         const textureLoader = new THREE.TextureLoader();
 
         // Load Textures
-        const path = "./assets/gun/";
-        const mapD = textureLoader.load(path + "gun_d.png");
-        const mapN = textureLoader.load(path + "gun_n.png");
-        const mapS = textureLoader.load(path + "gun_m.png"); // Metallic/Specular? often _m is metallic/roughness
-        const mapAO = textureLoader.load(path + "gun_ao.png");
-        // const mapR = textureLoader.load(path + "gun_r.png"); // Roughness?
+        const path = "./assets/heavy_pistol_animated/";
+        const mapArmHandColor = textureLoader.load(path + "armhandcolor.jpg");
+        const mapTalonColor = textureLoader.load(path + "taloncolor.jpg");
+        const mapTalonNormal = textureLoader.load(path + "talonnormal.jpg");
+        const mapTalonMetallic = textureLoader.load(path + "talonmetallic.jpg");
 
         // Fix encoding
-        mapD.colorSpace = THREE.SRGBColorSpace;
+        mapArmHandColor.colorSpace = THREE.SRGBColorSpace;
+        mapTalonColor.colorSpace = THREE.SRGBColorSpace;
 
-        const material = new THREE.MeshStandardMaterial({
-            map: mapD,
-            normalMap: mapN,
-            roughnessMap: mapS, // Assuming m is roughness/metallic packed or simply roughness? 
-            // _m often means Metallic. _r means Roughness.
-            // Let's assume _m is Metallic and _r is Roughness.
-            roughness: 0.5,
-            metalness: 0.8,
-            aoMap: mapAO
+        const armMaterial = new THREE.MeshStandardMaterial({
+            map: mapArmHandColor,
+            roughness: 0.8
         });
 
-        // Load Roughness if available
-        const mapR = textureLoader.load(path + "gun_r.png");
-        material.roughnessMap = mapR;
-        material.metalnessMap = mapS; // Try this mapping
+        const gunMaterial = new THREE.MeshStandardMaterial({
+            map: mapTalonColor,
+            normalMap: mapTalonNormal,
+            metalnessMap: mapTalonMetallic,
+            roughness: 0.5,
+            metalness: 0.8
+        });
 
-        loader.load(path + "gun.obj", (obj) => {
+        loader.load(path + "arms_talon.fbx", (obj) => {
             this.model = obj;
 
-            // Apply Material
+            // Apply Material Based on Name
             obj.traverse(child => {
                 if (child.isMesh) {
-                    child.material = material;
                     child.castShadow = true;
+                    // Assign materials based on name
+                    const name = child.name.toLowerCase();
+                    if (name.includes("arm") || name.includes("hand")) {
+                        child.material = armMaterial;
+                        // Ocultar los brazos para que solo se vea el arma
+                        child.visible = false;
+                    } else {
+                        child.material = gunMaterial;
+                    }
                 }
             });
 
-            // Scale & Position adjustments for "Hand" local space
-            // Based on instructions: 
-            // mesh["player_gun"].scale.set(100, 100, 100); -> user said adjust this.
-            // Let's start with 10 or 100 as per instructions?
-            // "Adjust the 100 to 1 or 0.1 if it's too big"
-            // Let's try 20 first.
-            // Scaled up for visibility as requested
-            obj.scale.set(40, 40, 40);
+            // Scale & Position adjustments for the gun itself
+            // Escala 0.05 para ajustar al tamaño de la mano del jugador
+            obj.scale.set(0.05, 0.05, 0.05);
 
-            // Rotation corrections?
-            // OBJ often needs rotation.
-            // Adjust to point forward (-Z) when attached to hand.
-            // Hand usually points -Z or +X depending on rig. 
-            // We can tweak this in PolygonModelSkin `setHeldItem` or here.
+            // Ajuste de posición y rotación inicial
+            // 90 grados en el eje Y
+            obj.rotation.set(0, Math.PI / 2, 0);
+
+            // Adding to a wrapper group so PolygonModelSkin doesn't override these manual adjustments
+            this.equipGroup.add(obj);
+
+            // Setup Mixer & Animations
+            this.mixer = new THREE.AnimationMixer(obj);
+
+            if (obj.animations && obj.animations.length > 0) {
+                const anim = obj.animations[0];
+
+                // Shoot Clip (0-12)
+                let actionShootClip = THREE.AnimationUtils.subclip(anim, "disparo", 0, 12);
+                this.actionShoot = this.mixer.clipAction(actionShootClip);
+                this.actionShoot.timeScale = 2.0;
+                this.actionShoot.setLoop(THREE.LoopOnce);
+
+                // Reload Clip (14-85)
+                let actionReloadClip = THREE.AnimationUtils.subclip(anim, "recarga", 14, 85);
+                this.actionReload = this.mixer.clipAction(actionReloadClip);
+                this.actionReload.timeScale = 0.9;
+                this.actionReload.setLoop(THREE.LoopOnce);
+            }
 
             this.isLoading = false;
-            console.log("Gun Model Loaded");
+            console.log("Gun FBX Model Loaded");
             if (this.onLoadCallback) this.onLoadCallback();
         }, undefined, (err) => {
-            console.error("Error loading Gun OBJ:", err);
+            console.error("Error loading Gun FBX:", err);
             this.isLoading = false;
         });
     }
@@ -97,6 +135,8 @@ export class GunItem extends Item {
     }
 
     use(context) {
+        if (this.isReloading) return false;
+
         const now = Date.now() / 1000;
         if (now - this.lastShotTime < this.cooldown) return false;
 
@@ -104,6 +144,16 @@ export class GunItem extends Item {
         this.lastShotTime = now;
 
         console.log("Bang!");
+
+        // Shoot Animation
+        if (this.actionShoot && (!this.actionReload || !this.actionReload.isRunning())) {
+            this.actionShoot.enabled = true;
+            this.actionShoot.time = 0;
+            this.actionShoot.play();
+        }
+
+        // --- GOLPE DE RETROCESO (PROCEDURAL) ---
+        this.gunImpulse = 0.05;
 
         // Spawn Projectile
         if (context.registerProjectile) {
@@ -125,8 +175,84 @@ export class GunItem extends Item {
         return true; // Consumed action, but item not consumed (ammo logic future?)
     }
 
+    reload() {
+        if (this.isReloading) return;
+
+        console.log("🔄 Recargando...");
+        this.isReloading = true;
+
+        if (this.actionReload) {
+            if (this.actionShoot) this.actionShoot.stop();
+            this.actionReload.enabled = true;
+            this.actionReload.time = 0;
+            this.actionReload.play();
+        }
+
+        // Fase 1: Baja el arma
+        this.springReloadImpulseZ = 0.02;
+
+        // Fase 2: Mete cargador nuevo (1.3 segundos después)
+        setTimeout(() => {
+            this.springReloadImpulseZ = 0.04;
+        }, 1300);
+
+        // Fase 3: Sube el arma de golpe y lista para disparar
+        setTimeout(() => {
+            this.springReloadImpulseZ = 0.08;
+            console.log("✅ Lista!");
+        }, 2200);
+
+        // Termina la recarga
+        setTimeout(() => {
+            this.isReloading = false;
+        }, 2500);
+    }
+
+    updateAnim(dt) {
+        let pitchDiff = 0;
+
+        if (this.mixer) {
+            this.mixer.update(dt);
+        }
+
+        // === 1. ACTUALIZAR RETROCESO DE TIRO ===
+        if (this.gunImpulse > 0) {
+            // Reducimos el impulso gradualmente (0.005 en 60fps = 0.3/s)
+            this.gunImpulse -= 0.3 * dt;
+            if (this.gunImpulse < 0) this.gunImpulse = 0;
+
+            const kick = this.gunImpulse * 5;
+            pitchDiff += kick; // Positivo para que la cámara mire hacia arriba
+            this.gunRecoilRecovery += kick;
+        }
+        else if (this.gunRecoilRecovery > 0) {
+            // Recuperación (0.1 en 60fps = 6.0/s)
+            const recovery = Math.min(this.gunRecoilRecovery, 6.0 * dt);
+            this.gunRecoilRecovery -= recovery;
+            pitchDiff -= recovery; // Baja la cámara de regreso
+        }
+
+        // === 2. ACTUALIZAR RESORTE DE RECARGA ===
+        // Sumamos la velocidad a la posición Z
+        this.springReloadZ += this.springReloadVelocityZ;
+
+        // El resorte empuja en sentido contrario para volver al origen
+        let forceZ = -this.springReloadZ * this.SPRING_STIFFNESS;
+
+        // La aceleración altera la velocidad
+        this.springReloadVelocityZ += forceZ + this.springReloadImpulseZ;
+
+        // Fricción para que no rebote para siempre
+        this.springReloadVelocityZ *= this.SPRING_DAMPING;
+
+        // Limpiamos el impacto puntual
+        this.springReloadImpulseZ = 0;
+
+        return pitchDiff;
+    }
+
     getEquipMesh() {
-        return this.model ? this.model.clone() : null; // Clone to allow multiple instances/re-adding
+        return this.equipGroup; // Devolvemos el grupo contenedor para evitar que PolygonModelSkin sobrescriba la escala/rotación del FBX
     }
 
     clone() {

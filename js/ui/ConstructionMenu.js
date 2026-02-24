@@ -1293,7 +1293,7 @@ export class ConstructionMenu {
         cooldownRow.style.justifyContent = "space-between";
 
         const cooldownLabel = document.createElement('span');
-        cooldownLabel.textContent = "Enfriamiento (s):";
+        cooldownLabel.textContent = "Tiempo de Recarga (s):";
 
         this.cooldownInput = document.createElement('input');
         this.cooldownInput.type = "number";

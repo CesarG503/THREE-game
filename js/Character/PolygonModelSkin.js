@@ -372,6 +372,7 @@ export class PolygonModelSkin {
         }
 
         this.isHoldingWeapon = item !== null && item.type === "weapon";
+        this.heldItem = item;
 
         if (!item) return;
 
@@ -536,6 +537,25 @@ export class PolygonModelSkin {
             const aimBob = isMoving ? Math.sin(Date.now() / 100 * 0.5) * 0.05 : Math.sin(Date.now() / 500) * 0.02;
 
             this.rightArmGroup.rotation.x = THREE.MathUtils.lerp(this.rightArmGroup.rotation.x, pointAimAngle + aimBob, 0.2);
+
+            // --- ANIMACION PROCEDURAL DEL ARMA ---
+            if (this.heldItemMesh && this.heldItem && this.heldItem.type === "weapon") {
+                const recoil = this.heldItem.gunImpulse ? this.heldItem.gunImpulse * 2 : 0;
+                const reloadZ = this.heldItem.springReloadZ || 0;
+
+                const pixelScale = 1 / 16 * 0.9;
+                const initialZ = 2 * pixelScale;
+
+                // Movemos el arma hacia atrás/arriba visualmente
+                this.heldItemMesh.position.z = initialZ - reloadZ - recoil;
+
+                // Rotamos el arma si está recargando para simular la acción
+                if (this.heldItem.isReloading) {
+                    this.heldItemMesh.rotation.x = -Math.PI / 2 - (reloadZ * 3);
+                } else {
+                    this.heldItemMesh.rotation.x = -Math.PI / 2;
+                }
+            }
 
             // Left arm behaves normally or supports? For now normal walk.
             this.leftArmGroup.rotation.x = THREE.MathUtils.lerp(this.leftArmGroup.rotation.x, baseLArmX, animLerp);

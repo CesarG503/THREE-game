@@ -14,6 +14,8 @@ export class GunItem extends Item {
         this.damage = 10;
         this.cooldown = 0.5; // Seconds
         this.equippedHand = "right"; // "right" or "left" default
+        this.recoil = 5.0; // Retroceso de la cámara
+        this.isAuto = false; // Disparo automático
         this.lastShotTime = 0;
 
         this.isReloading = false;
@@ -222,7 +224,7 @@ export class GunItem extends Item {
             this.gunImpulse -= 0.3 * dt;
             if (this.gunImpulse < 0) this.gunImpulse = 0;
 
-            const kick = this.gunImpulse * 5;
+            const kick = this.gunImpulse * (this.recoil !== undefined ? this.recoil : 5.0);
             pitchDiff += kick; // Positivo para que la cámara mire hacia arriba
             this.gunRecoilRecovery += kick;
         }
@@ -262,6 +264,8 @@ export class GunItem extends Item {
         cloned.damage = this.damage;
         cloned.cooldown = this.cooldown;
         cloned.equippedHand = this.equippedHand;
+        cloned.recoil = this.recoil;
+        cloned.isAuto = this.isAuto;
         return cloned;
     }
 }

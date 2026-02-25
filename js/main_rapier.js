@@ -275,6 +275,8 @@ class Game {
                             newItem.damage = source.damage;
                             newItem.cooldown = source.cooldown;
                             newItem.equippedHand = source.equippedHand;
+                            newItem.recoil = source.recoil !== undefined ? source.recoil : 5.0;
+                            newItem.isAuto = source.isAuto !== undefined ? source.isAuto : false;
                         }
                     }
                     // Special Handling for Impulse Items (if in library)
@@ -658,6 +660,8 @@ class Game {
             const currentItem = this.inventoryManager.getCurrentItem()
             if (currentItem instanceof PelotaItem) {
                 this.useCurrentItem(currentItem) // Pass item directly optimization
+            } else if (currentItem instanceof GunItem && currentItem.isAuto) {
+                this.useCurrentItem(currentItem) // GunItem handles its own cooldown
             }
         }
 

@@ -1348,9 +1348,67 @@ export class ConstructionMenu {
         handRow.appendChild(handLabel);
         handRow.appendChild(this.handSelect);
 
+        // --- Recoil Row ---
+        const recoilRow = document.createElement('div');
+        recoilRow.style.display = "flex";
+        recoilRow.style.alignItems = "center";
+        recoilRow.style.justifyContent = "space-between";
+
+        const recoilLabel = document.createElement('span');
+        recoilLabel.textContent = "Retroceso:";
+
+        this.recoilInput = document.createElement('input');
+        this.recoilInput.type = "number";
+        this.recoilInput.min = "0";
+        this.recoilInput.step = "0.5";
+        this.recoilInput.style.cssText = `
+            width: 60px;
+            background: #333;
+            color: white;
+            border: 1px solid #555;
+            border-radius: 4px;
+            padding: 4px;
+        `;
+        this.recoilInput.addEventListener('input', (e) => {
+            let val = parseFloat(e.target.value);
+            if (!isNaN(val) && this.currentDraftItem && this.currentDraftItem.type === 'weapon') {
+                this.currentDraftItem.recoil = val;
+            }
+        });
+
+        recoilRow.appendChild(recoilLabel);
+        recoilRow.appendChild(this.recoilInput);
+
+        // --- Auto-Fire Row ---
+        const autoRow = document.createElement('div');
+        autoRow.style.display = "flex";
+        autoRow.style.alignItems = "center";
+        autoRow.style.justifyContent = "space-between";
+
+        const autoLabel = document.createElement('span');
+        autoLabel.textContent = "Automático:";
+
+        this.autoInput = document.createElement('input');
+        this.autoInput.type = "checkbox";
+        this.autoInput.style.cssText = `
+            cursor: pointer;
+            width: 18px;
+            height: 18px;
+        `;
+        this.autoInput.addEventListener('change', (e) => {
+            if (this.currentDraftItem && this.currentDraftItem.type === 'weapon') {
+                this.currentDraftItem.isAuto = e.target.checked;
+            }
+        });
+
+        autoRow.appendChild(autoLabel);
+        autoRow.appendChild(this.autoInput);
+
         weaponControlsContainer.appendChild(damageRow);
         weaponControlsContainer.appendChild(cooldownRow);
         weaponControlsContainer.appendChild(handRow);
+        weaponControlsContainer.appendChild(recoilRow);
+        weaponControlsContainer.appendChild(autoRow);
 
         this.panelEditor.appendChild(weaponControlsContainer);
 
@@ -1394,6 +1452,8 @@ export class ConstructionMenu {
             this.damageInput.value = baseItem.damage !== undefined ? baseItem.damage : 10;
             this.cooldownInput.value = baseItem.cooldown !== undefined ? baseItem.cooldown : 0.5;
             this.handSelect.value = baseItem.equippedHand !== undefined ? baseItem.equippedHand : "right";
+            this.recoilInput.value = baseItem.recoil !== undefined ? baseItem.recoil : 5.0;
+            this.autoInput.checked = baseItem.isAuto !== undefined ? baseItem.isAuto : false;
         } else {
             this.editorConstructionControls.style.display = 'flex';
             this.editorTextureContainer.style.display = 'flex';

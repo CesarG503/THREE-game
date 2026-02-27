@@ -656,7 +656,7 @@ class Game {
         this.updateButtonInteraction(dt) // Process Buttons
 
         // Weapon Auto-Fire Logic
-        if (this.isMouseDown && this.inventoryManager) {
+        if (this.inputManager && this.inputManager.keys.attack && this.inventoryManager) {
             const currentItem = this.inventoryManager.getCurrentItem()
             if (currentItem instanceof PelotaItem) {
                 this.useCurrentItem(currentItem) // Pass item directly optimization

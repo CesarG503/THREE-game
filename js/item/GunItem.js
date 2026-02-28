@@ -21,8 +21,13 @@ export class GunItem extends Item {
         this.isReloading = false;
 
         // Animaciones Procedurales (Retroceso)
-        this.gunImpulse = 0;
-        this.gunRecoilRecovery = 0;
+        this.gunImpulse = 0; // Visual gun recoil
+
+        // Retroceso de cámara (shake fluido y compensación)
+        this.cameraRecoilPitch = 0;
+        this.cameraRecoilTarget = 0;
+        this.cameraRecoilYaw = 0;
+        this.cameraRecoilYawTarget = 0;
 
         // Animaciones Procedurales (Resorte Recarga)
         this.springReloadZ = 0;
@@ -156,7 +161,15 @@ export class GunItem extends Item {
         }
 
         // --- GOLPE DE RETROCESO (PROCEDURAL) ---
-        this.gunImpulse = 0.05;
+        this.gunImpulse = 0.05; // Visual recoil
+
+        // Recoil de la cámara
+        const recoilVal = this.recoil !== undefined ? this.recoil : 5.0;
+        const kickPitch = recoilVal * 0.005; // Ajuste de fuerza
+        const kickYaw = (Math.random() - 0.5) * kickPitch * 0.8; // Oscilación horizontal aleatoria
+
+        this.cameraRecoilTarget += kickPitch;
+        this.cameraRecoilYawTarget += kickYaw;
 
         // Spawn Projectile
         if (context.registerProjectile) {
@@ -211,29 +224,61 @@ export class GunItem extends Item {
         }, 2500);
     }
 
-    updateAnim(dt) {
-        let pitchDiff = 0;
-
+    updateAnim(dt, manualPitchDelta = 0) {
         if (this.mixer) {
             this.mixer.update(dt);
         }
 
-        // === 1. ACTUALIZAR RETROCESO DE TIRO ===
+        // === 1. ACTUALIZAR RETROCESO VISUAL DEL ARMA ===
         if (this.gunImpulse > 0) {
-            // Reducimos el impulso gradualmente (0.005 en 60fps = 0.3/s)
             this.gunImpulse -= 0.3 * dt;
             if (this.gunImpulse < 0) this.gunImpulse = 0;
+        }
 
-            const kick = this.gunImpulse * (this.recoil !== undefined ? this.recoil : 5.0);
-            pitchDiff += kick; // Positivo para que la cámara mire hacia arriba
-            this.gunRecoilRecovery += kick;
+        // === 2. ACTUALIZAR RETROCESO FLUIDO DE LA CÁMARA ===
+
+        // A. Cancelar el objetivo de retroceso si el jugador bajó la mira manualmente
+        if (manualPitchDelta < 0 && this.cameraRecoilTarget > 0) {
+            this.cameraRecoilTarget += manualPitchDelta;
+            if (this.cameraRecoilTarget < 0) this.cameraRecoilTarget = 0;
+
+            // Ajustar el pitch actual para que no recupere desde más arriba de lo que el jugador canceló
+            if (this.cameraRecoilPitch > this.cameraRecoilTarget) {
+                this.cameraRecoilPitch = this.cameraRecoilTarget;
+            }
         }
-        else if (this.gunRecoilRecovery > 0) {
-            // Recuperación (0.1 en 60fps = 6.0/s)
-            const recovery = Math.min(this.gunRecoilRecovery, 6.0 * dt);
-            this.gunRecoilRecovery -= recovery;
-            pitchDiff -= recovery; // Baja la cámara de regreso
+
+        // B. Decadencia (Recovery) a la posición original si dejamos de disparar
+        const now = Date.now() / 1000;
+        const timeSinceShot = now - this.lastShotTime;
+        if (timeSinceShot > 0.08) { // Pequeño retraso antes de comenzar a centrar
+            const decay = 1.8 * dt; // Velocidad de recuperación
+
+            if (this.cameraRecoilTarget > 0) {
+                this.cameraRecoilTarget -= decay;
+                if (this.cameraRecoilTarget < 0) this.cameraRecoilTarget = 0;
+            }
+
+            if (this.cameraRecoilYawTarget > 0) {
+                this.cameraRecoilYawTarget -= decay;
+                if (this.cameraRecoilYawTarget < 0) this.cameraRecoilYawTarget = 0;
+            } else if (this.cameraRecoilYawTarget < 0) {
+                this.cameraRecoilYawTarget += decay;
+                if (this.cameraRecoilYawTarget > 0) this.cameraRecoilYawTarget = 0;
+            }
         }
+
+        // C. Interpolación fluida (Spring/Shake) del objetivo a la cámara
+        const oldPitch = this.cameraRecoilPitch;
+        const oldYaw = this.cameraRecoilYaw;
+
+        // Velocidad de interpolación (qué tan rígido o fluido es el shake)
+        const springSpeed = 25.0;
+        this.cameraRecoilPitch += (this.cameraRecoilTarget - this.cameraRecoilPitch) * Math.min(springSpeed * dt, 1.0);
+        this.cameraRecoilYaw += (this.cameraRecoilYawTarget - this.cameraRecoilYaw) * Math.min(springSpeed * dt, 1.0);
+
+        const pitchDiff = this.cameraRecoilPitch - oldPitch;
+        const yawDiff = this.cameraRecoilYaw - oldYaw;
 
         // === 2. ACTUALIZAR RESORTE DE RECARGA ===
         // Sumamos la velocidad a la posición Z
@@ -251,7 +296,7 @@ export class GunItem extends Item {
         // Limpiamos el impacto puntual
         this.springReloadImpulseZ = 0;
 
-        return pitchDiff;
+        return { pitchDiff, yawDiff };
     }
 
     getEquipMesh() {

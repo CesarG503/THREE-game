@@ -669,11 +669,24 @@ class Game {
         if (this.inventoryManager && this.character && this.cameraController) {
             const currentItem = this.inventoryManager.getCurrentItem();
             if (currentItem instanceof GunItem) {
-                const pitchDiff = currentItem.updateAnim(dt);
-                if (pitchDiff !== 0) {
-                    this.cameraController.fpPitch += pitchDiff;
-                    // Limitar el pitch máximo para no dar vueltas
-                    this.cameraController.fpPitch = Math.max(-this.cameraController.maxPitch, Math.min(this.cameraController.maxPitch, this.cameraController.fpPitch));
+                const manualPitchDelta = this.cameraController.consumeManualPitchDelta();
+                const diffs = currentItem.updateAnim(dt, manualPitchDelta);
+
+                if (diffs && diffs.pitchDiff !== undefined) {
+                    if (diffs.pitchDiff !== 0) {
+                        this.cameraController.fpPitch += diffs.pitchDiff;
+                        this.cameraController.fpPitch = Math.max(-this.cameraController.maxPitch, Math.min(this.cameraController.maxPitch, this.cameraController.fpPitch));
+                    }
+                    if (diffs.yawDiff !== 0) {
+                        this.cameraController.fpYaw += diffs.yawDiff;
+                    }
+                } else {
+                    // Fallback in case it's a number
+                    const pitchDiff = typeof diffs === 'number' ? diffs : 0;
+                    if (pitchDiff !== 0) {
+                        this.cameraController.fpPitch += pitchDiff;
+                        this.cameraController.fpPitch = Math.max(-this.cameraController.maxPitch, Math.min(this.cameraController.maxPitch, this.cameraController.fpPitch));
+                    }
                 }
             }
         }

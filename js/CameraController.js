@@ -43,6 +43,9 @@ export class CameraController {
         this.fpPitch = 0
         this.maxPitch = Math.PI / 2 - 0.35
 
+        // Track manual pitch changes to cancel recoil recovery
+        this.manualPitchDelta = 0;
+
         // Axis settings
         this.fpInvertAxisX = true
         this.fpInvertAxisY = true
@@ -99,9 +102,11 @@ export class CameraController {
 
             if (canRotate) {
                 if (this.isFirstPerson) {
+                    const oldPitch = this.fpPitch;
                     this.fpYaw += e.movementX * this.rotationSpeed * (this.fpInvertAxisX ? -1 : 1)
                     this.fpPitch -= e.movementY * this.rotationSpeed * (this.fpInvertAxisY ? -1 : 1)
                     this.fpPitch = Math.max(-this.maxPitch, Math.min(this.maxPitch, this.fpPitch))
+                    this.manualPitchDelta += (this.fpPitch - oldPitch);
                 } else {
                     this.theta += e.movementX * this.rotationSpeed * (this.tpInvertAxisX ? -1 : 1)
                     this.phi -= e.movementY * this.rotationSpeed * (this.tpInvertAxisY ? -1 : 1)
@@ -347,6 +352,12 @@ export class CameraController {
             // Same direction logic as first person, using theta
             return new THREE.Vector3(Math.sin(this.theta), 0, Math.cos(this.theta)).normalize()
         }
+    }
+
+    consumeManualPitchDelta() {
+        const delta = this.manualPitchDelta;
+        this.manualPitchDelta = 0;
+        return delta;
     }
 
     getRightDirection() {

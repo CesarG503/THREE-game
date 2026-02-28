@@ -472,6 +472,8 @@ export class PolygonModelSkin {
         let baseLArmX = 0
         let baseRLegX = 0
         let baseLLegX = 0
+        let baseRArmZ = 0
+        let baseLArmZ = 0
 
         if (isMoving) {
             const speed = isCrouching ? 5 : 10
@@ -490,8 +492,8 @@ export class PolygonModelSkin {
         } else {
             // Idle
             const time = Date.now() / 1000
-            this.rightArmGroup.rotation.z = Math.sin(time) * 0.05 + 0.05
-            this.leftArmGroup.rotation.z = -Math.sin(time) * 0.05 - 0.05
+            baseRArmZ = Math.sin(time) * 0.05 + 0.05
+            baseLArmZ = -Math.sin(time) * 0.05 - 0.05
 
             if (isCrouching) {
                 baseRArmX = 0.2
@@ -539,12 +541,65 @@ export class PolygonModelSkin {
             const pointAimAngle = -Math.PI / 2;
             const aimBob = isMoving ? Math.sin(Date.now() / 100 * 0.5) * 0.05 : Math.sin(Date.now() / 500) * 0.02;
 
+            let freeArmTargetRotX = this.currentWeaponHand === 'left' ? baseRArmX : baseLArmX;
+            let freeArmTargetRotZ = this.currentWeaponHand === 'left' ? baseRArmZ : baseLArmZ;
+
+            if (this.heldItem && this.heldItem.isReloading) {
+                if (!this.heldItem._reloadStartTime) {
+                    this.heldItem._reloadStartTime = Date.now();
+                }
+
+                const t = (Date.now() - this.heldItem._reloadStartTime) / 700;
+
+                // Animación sincronizada con recarga:
+                // Un solo movimiento suave de ir y volver
+                // En X (-Math.PI/2) levanta el brazo hacia adelante a la altura del arma
+                // En Z acerca el brazo hacia el centro del pecho (hacia el arma)
+                // Left arm (free when weapon is 'right') needs POSITIVE rotation to swing Right
+                // Right arm (free when weapon is 'left') needs NEGATIVE rotation to swing Left
+                const targetRotX = -Math.PI / 2;
+                const targetRotZ = this.currentWeaponHand === 'left' ? -0.8 : 0.8;
+
+                // Duración total de la recarga aparente ~ 2.2s
+                if (t < 1.0) {
+                    // 0 a 1.0s: El brazo sube y se acerca al arma
+                    const localLerp = t / 1.0;
+                    // Usar una función de suavizado (ease-in-out simple)
+                    const ease = localLerp * localLerp * (3 - 2 * localLerp);
+                    freeArmTargetRotX = THREE.MathUtils.lerp(freeArmTargetRotX, targetRotX, ease);
+                    freeArmTargetRotZ = THREE.MathUtils.lerp(freeArmTargetRotZ, targetRotZ, ease);
+                } else if (t < 1.5) {
+                    // 1.0s a 1.5s: Mantiene la mano cerca del arma tomando el cargador y volviéndolo a insertar
+                    const dipLerp = (t - 1.0) / 0.5;
+                    // Math.sin crea un movimiento hacia abajo y luego arriba
+                    // Positivo en X (+0.4) hace que el brazo baje un poco 
+                    const dip = Math.sin(dipLerp * Math.PI) * 0.4;
+                    freeArmTargetRotX = targetRotX + dip;
+                    freeArmTargetRotZ = targetRotZ;
+                } else if (t < 2.2) {
+                    // 1.5s a 2.2s: El brazo regresa a su posición original
+                    const localLerp = (t - 1.5) / 0.7;
+                    const ease = localLerp * localLerp * (3 - 2 * localLerp);
+                    freeArmTargetRotX = THREE.MathUtils.lerp(targetRotX, freeArmTargetRotX, ease);
+                    freeArmTargetRotZ = THREE.MathUtils.lerp(targetRotZ, (this.currentWeaponHand === 'left' ? baseRArmZ : baseLArmZ), ease);
+                } else {
+                    // Fin de la animación
+                    // Mantiene el baseZ
+                }
+            } else if (this.heldItem) {
+                this.heldItem._reloadStartTime = null; // reset
+            }
+
             if (this.currentWeaponHand === 'left') {
                 this.leftArmGroup.rotation.x = THREE.MathUtils.lerp(this.leftArmGroup.rotation.x, pointAimAngle + aimBob, 0.2);
-                this.rightArmGroup.rotation.x = THREE.MathUtils.lerp(this.rightArmGroup.rotation.x, baseRArmX, animLerp);
+                this.rightArmGroup.rotation.x = THREE.MathUtils.lerp(this.rightArmGroup.rotation.x, freeArmTargetRotX, animLerp);
+                this.rightArmGroup.rotation.z = THREE.MathUtils.lerp(this.rightArmGroup.rotation.z, freeArmTargetRotZ, animLerp);
+                this.rightArmGroup.rotation.y = THREE.MathUtils.lerp(this.rightArmGroup.rotation.y, 0, animLerp); // reset twist
             } else {
                 this.rightArmGroup.rotation.x = THREE.MathUtils.lerp(this.rightArmGroup.rotation.x, pointAimAngle + aimBob, 0.2);
-                this.leftArmGroup.rotation.x = THREE.MathUtils.lerp(this.leftArmGroup.rotation.x, baseLArmX, animLerp);
+                this.leftArmGroup.rotation.x = THREE.MathUtils.lerp(this.leftArmGroup.rotation.x, freeArmTargetRotX, animLerp);
+                this.leftArmGroup.rotation.z = THREE.MathUtils.lerp(this.leftArmGroup.rotation.z, freeArmTargetRotZ, animLerp);
+                this.leftArmGroup.rotation.y = THREE.MathUtils.lerp(this.leftArmGroup.rotation.y, 0, animLerp); // reset twist
             }
 
             // --- ANIMACION PROCEDURAL DEL ARMA ---
@@ -575,6 +630,9 @@ export class PolygonModelSkin {
             // No Attack & No Weapon
             this.leftArmGroup.rotation.x = THREE.MathUtils.lerp(this.leftArmGroup.rotation.x, baseLArmX, animLerp)
             this.rightArmGroup.rotation.x = THREE.MathUtils.lerp(this.rightArmGroup.rotation.x, baseRArmX, animLerp)
+
+            this.leftArmGroup.rotation.z = THREE.MathUtils.lerp(this.leftArmGroup.rotation.z, baseLArmZ, animLerp)
+            this.rightArmGroup.rotation.z = THREE.MathUtils.lerp(this.rightArmGroup.rotation.z, baseRArmZ, animLerp)
 
             // Reset Twist
             const resetTwist = 0

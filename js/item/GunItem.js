@@ -15,6 +15,7 @@ export class GunItem extends Item {
         this.cooldown = 0.5; // Seconds
         this.equippedHand = "right"; // "right" or "left" default
         this.recoil = 5.0; // Retroceso de la cámara
+        this.recoilMode = "hybrid"; // Modos: 'manual', 'recenter', 'hybrid'
         this.isAuto = false; // Disparo automático
         this.lastShotTime = 0;
 
@@ -251,9 +252,27 @@ export class GunItem extends Item {
         // B. Decadencia (Recovery) a la posición original si dejamos de disparar
         const now = Date.now() / 1000;
         const timeSinceShot = now - this.lastShotTime;
-        if (timeSinceShot > 0.08) { // Pequeño retraso antes de comenzar a centrar
-            const decay = 1.8 * dt; // Velocidad de recuperación
 
+        let decay = 0;
+        let shouldRecover = false;
+
+        if (this.recoilMode === "manual") {
+            // Manual: No hay recuperación automática. Sube y se queda.
+            decay = 0;
+            shouldRecover = false;
+        } else if (this.recoilMode === "recenter") {
+            // Auto-Centrado: Vuelve inmediatamente rápido al punto inicial en cada tiro
+            decay = 8.0 * dt;
+            shouldRecover = true;
+        } else {
+            // Híbrido: Si dispara rápido se acumula, si suelta vuelve gradualmente
+            if (timeSinceShot > 0.08) {
+                decay = 1.8 * dt;
+                shouldRecover = true;
+            }
+        }
+
+        if (shouldRecover) {
             if (this.cameraRecoilTarget > 0) {
                 this.cameraRecoilTarget -= decay;
                 if (this.cameraRecoilTarget < 0) this.cameraRecoilTarget = 0;
@@ -310,6 +329,7 @@ export class GunItem extends Item {
         cloned.cooldown = this.cooldown;
         cloned.equippedHand = this.equippedHand;
         cloned.recoil = this.recoil;
+        cloned.recoilMode = this.recoilMode;
         cloned.isAuto = this.isAuto;
         return cloned;
     }

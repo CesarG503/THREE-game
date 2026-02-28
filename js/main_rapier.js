@@ -276,6 +276,7 @@ class Game {
                             newItem.cooldown = source.cooldown;
                             newItem.equippedHand = source.equippedHand;
                             newItem.recoil = source.recoil !== undefined ? source.recoil : 5.0;
+                            newItem.recoilMode = source.recoilMode !== undefined ? source.recoilMode : "hybrid";
                             newItem.isAuto = source.isAuto !== undefined ? source.isAuto : false;
                         }
                     }

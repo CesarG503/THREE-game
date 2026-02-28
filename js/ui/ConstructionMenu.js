@@ -1379,6 +1379,48 @@ export class ConstructionMenu {
         recoilRow.appendChild(recoilLabel);
         recoilRow.appendChild(this.recoilInput);
 
+        // --- Recoil Mode Row ---
+        const recoilModeRow = document.createElement('div');
+        recoilModeRow.style.display = "flex";
+        recoilModeRow.style.alignItems = "center";
+        recoilModeRow.style.justifyContent = "space-between";
+
+        const recoilModeLabel = document.createElement('span');
+        recoilModeLabel.textContent = "Modo Retroceso:";
+
+        this.recoilModeSelect = document.createElement('select');
+        this.recoilModeSelect.style.cssText = `
+            width: 100px;
+            background: #333;
+            color: white;
+            border: 1px solid #555;
+            border-radius: 4px;
+            padding: 4px;
+        `;
+
+        const optionHybrid = document.createElement('option');
+        optionHybrid.value = "hybrid";
+        optionHybrid.textContent = "Híbrido";
+        const optionRecenter = document.createElement('option');
+        optionRecenter.value = "recenter";
+        optionRecenter.textContent = "Auto-Centrado";
+        const optionManual = document.createElement('option');
+        optionManual.value = "manual";
+        optionManual.textContent = "Manual";
+
+        this.recoilModeSelect.appendChild(optionHybrid);
+        this.recoilModeSelect.appendChild(optionRecenter);
+        this.recoilModeSelect.appendChild(optionManual);
+
+        this.recoilModeSelect.addEventListener('change', (e) => {
+            if (this.currentDraftItem && this.currentDraftItem.type === 'weapon') {
+                this.currentDraftItem.recoilMode = e.target.value;
+            }
+        });
+
+        recoilModeRow.appendChild(recoilModeLabel);
+        recoilModeRow.appendChild(this.recoilModeSelect);
+
         // --- Auto-Fire Row ---
         const autoRow = document.createElement('div');
         autoRow.style.display = "flex";
@@ -1408,6 +1450,7 @@ export class ConstructionMenu {
         weaponControlsContainer.appendChild(cooldownRow);
         weaponControlsContainer.appendChild(handRow);
         weaponControlsContainer.appendChild(recoilRow);
+        weaponControlsContainer.appendChild(recoilModeRow);
         weaponControlsContainer.appendChild(autoRow);
 
         this.panelEditor.appendChild(weaponControlsContainer);
@@ -1453,6 +1496,7 @@ export class ConstructionMenu {
             this.cooldownInput.value = baseItem.cooldown !== undefined ? baseItem.cooldown : 0.5;
             this.handSelect.value = baseItem.equippedHand !== undefined ? baseItem.equippedHand : "right";
             this.recoilInput.value = baseItem.recoil !== undefined ? baseItem.recoil : 5.0;
+            this.recoilModeSelect.value = baseItem.recoilMode !== undefined ? baseItem.recoilMode : "hybrid";
             this.autoInput.checked = baseItem.isAuto !== undefined ? baseItem.isAuto : false;
         } else {
             this.editorConstructionControls.style.display = 'flex';

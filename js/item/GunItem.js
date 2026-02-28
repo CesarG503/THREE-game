@@ -238,14 +238,26 @@ export class GunItem extends Item {
 
         // === 2. ACTUALIZAR RETROCESO FLUIDO DE LA CÁMARA ===
 
-        // A. Cancelar el objetivo de retroceso si el jugador bajó la mira manualmente
-        if (manualPitchDelta < 0 && this.cameraRecoilTarget > 0) {
-            this.cameraRecoilTarget += manualPitchDelta;
-            if (this.cameraRecoilTarget < 0) this.cameraRecoilTarget = 0;
+        // A. Ajustar el objetivo de retroceso según lo que el jugador mueva el mouse manualmente
+        if (manualPitchDelta < 0) {
+            // Solo nos importa si el jugador EMPUJA HACIA ABAJO (compensando el retroceso).
+            // Reducimos el objetivo máximo pendiente
+            if (this.cameraRecoilTarget > 0) {
+                this.cameraRecoilTarget += manualPitchDelta;
+                if (this.cameraRecoilTarget < 0) {
+                    this.cameraRecoilTarget = 0;
+                }
+            }
 
-            // Ajustar el pitch actual para que no recupere desde más arriba de lo que el jugador canceló
-            if (this.cameraRecoilPitch > this.cameraRecoilTarget) {
-                this.cameraRecoilPitch = this.cameraRecoilTarget;
+            // Reducimos el pitch visual acumulado
+            // CRÍTICO: Todo movimiento hacia abajo borra la deuda visual del retroceso,
+            // sin importar si está por encima del target o no, para que el "resorte"
+            // olvide que tenía que recuperar esa altura y no pegue un tirón al suelo al terminar.
+            if (this.cameraRecoilPitch > 0) {
+                this.cameraRecoilPitch += manualPitchDelta;
+                if (this.cameraRecoilPitch < 0) {
+                    this.cameraRecoilPitch = 0;
+                }
             }
         }
 

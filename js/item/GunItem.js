@@ -261,13 +261,21 @@ export class GunItem extends Item {
             decay = 0;
             shouldRecover = false;
         } else if (this.recoilMode === "recenter") {
-            // Auto-Centrado: Vuelve inmediatamente rápido al punto inicial en cada tiro
-            decay = 8.0 * dt;
-            shouldRecover = true;
-        } else {
-            // Híbrido: Si dispara rápido se acumula, si suelta vuelve gradualmente
+            // Auto-Centrado: Mismo comportamiento que el antiguo híbrido.
             if (timeSinceShot > 0.08) {
                 decay = 1.8 * dt;
+                shouldRecover = true;
+            }
+        } else {
+            // Híbrido: Vuelve al centro rápido solo en tiro único o al soltar,
+            // pero si dispara en ráfaga, simplemente sube (con muy poca recuperación o ninguna)
+            if (timeSinceShot > 0.2) {
+                // Tiro aislado finalizado / Dejamos de disparar totalmente
+                decay = 8.0 * dt; // Centro muy rápido
+                shouldRecover = true;
+            } else if (timeSinceShot > 0.08) {
+                // Ráfaga / Tap firing intermedio. Muy leve recuperación.
+                decay = 0.2 * dt;
                 shouldRecover = true;
             }
         }

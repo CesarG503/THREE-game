@@ -10,8 +10,24 @@ export class TargetLogic {
         if (props.rings === undefined) props.rings = 3
         if (props.baseDamage === undefined) props.baseDamage = 10
         if (props.pointsMode === undefined) props.pointsMode = false
-        if (!props.ringMultipliers) props.ringMultipliers = [1, 2, 3] // Outer to Inner
         if (props.radius === undefined) props.radius = 1.0
+        if (props.useProjectileDamage === undefined) props.useProjectileDamage = false
+
+        // Auto-calculate default multipliers if they don't match the rings or missing
+        if (!props.ringMultipliers || props.ringMultipliers.length !== props.rings) {
+            props.ringMultipliers = []
+            if (props.rings === 1) {
+                props.ringMultipliers = [1.0];
+            } else {
+                for (let i = 0; i < props.rings; i++) {
+                    // map i=0 (outer) to 0.1, and i=(rings-1) (inner) to 1.0
+                    // using linear interpolation
+                    const t = i / (props.rings - 1);
+                    const val = 0.1 + t * 0.9;
+                    props.ringMultipliers.push(Number(val.toFixed(2)));
+                }
+            }
+        }
 
         logicSystem.createInput(container, object, 'radius', props.radius, 'number', 'Radio (Tamaño)')
 
@@ -47,11 +63,16 @@ export class TargetLogic {
                 if (val > 10) val = 10
                 object.userData.logicProperties.rings = val
 
-                // Adjust multipliers array safely
-                const currentMults = object.userData.logicProperties.ringMultipliers || []
+                // Auto-calculate multipliers (Outer = 0.1, Center = 1.0)
                 const newMults = []
-                for (let i = 0; i < val; i++) {
-                    newMults.push(currentMults[i] !== undefined ? currentMults[i] : (i + 1))
+                if (val === 1) {
+                    newMults.push(1.0);
+                } else {
+                    for (let i = 0; i < val; i++) {
+                        const t = i / (val - 1);
+                        const v = 0.1 + t * 0.9;
+                        newMults.push(Number(v.toFixed(2)));
+                    }
                 }
                 object.userData.logicProperties.ringMultipliers = newMults
 
@@ -65,22 +86,25 @@ export class TargetLogic {
             })
         }
 
+        // Damage Source Toggle
+        logicSystem.createInput(container, object, 'useProjectileDamage', props.useProjectileDamage, 'checkbox', 'Usar Daño de Proyectil')
+        const projDmgRow = container.lastElementChild
+        const projDmgInp = projDmgRow.querySelector('input')
+        if (projDmgInp) {
+            projDmgInp.addEventListener('change', (e) => {
+                object.userData.logicProperties.useProjectileDamage = e.target.checked
+            })
+        }
+
         logicSystem.createInput(container, object, 'baseDamage', props.baseDamage, 'number', 'Daño Base (Referencia)')
 
-        // Ring Multipliers as text
+        // Ring Multipliers as text (read-only insight)
         const multsStr = props.ringMultipliers.join(', ')
         logicSystem.createInput(container, object, '_multsStr', multsStr, 'text', 'Multiplicadores (Ext -> Int)')
         const multsInputRow = container.lastElementChild
         const multsInput = multsInputRow.querySelector('input')
         if (multsInput) {
-            multsInput.addEventListener('change', (e) => {
-                const arr = e.target.value.split(',').map(s => parseFloat(s.trim())).filter(n => !isNaN(n))
-                if (arr.length > 0) {
-                    // Update multipliers, but keep length up to 'rings'
-                    const limit = object.userData.logicProperties.rings || 3
-                    object.userData.logicProperties.ringMultipliers = arr.slice(0, limit)
-                }
-            })
+            multsInput.disabled = true; // Auto-calculated now
         }
 
         const info = document.createElement('div')

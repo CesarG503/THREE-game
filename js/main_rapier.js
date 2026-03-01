@@ -684,15 +684,17 @@ class Game {
                                 // Map inner vs outer
                                 const mappedIdx = rings - 1 - ringIdxHit;
 
-                                const mults = props.ringMultipliers || [1, 2, 3];
+                                const mults = props.ringMultipliers || [0.25, 0.5, 1.0];
                                 const mult = mults[mappedIdx] !== undefined ? mults[mappedIdx] : 1;
 
-                                const finalDamage = Math.round(proj.damage * mult);
+                                const useProj = props.useProjectileDamage !== undefined ? props.useProjectileDamage : false;
+                                const baseDmg = useProj ? proj.damage : (props.baseDamage !== undefined ? props.baseDamage : 10);
+                                const finalDamage = Math.round(baseDmg * mult);
 
                                 // Optional text color scaling
                                 let color = "#FFFFFF";
-                                if (mult > 1) color = "#FFCC00";
-                                if (mappedIdx === rings - 1) color = "#FF2222";
+                                if (mappedIdx === rings - 1) color = "#FF2222"; // Bullseye
+                                else if (mult >= 0.5) color = "#FFCC00"; // Inner rings
 
                                 if (this.floatingTextManager) {
                                     this.floatingTextManager.spawnText(`-${finalDamage}`, proj.mesh.position.clone(), color, 1.5);

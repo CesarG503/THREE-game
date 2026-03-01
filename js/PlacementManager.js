@@ -314,9 +314,21 @@ export class PlacementManager {
         this.logicToolbar.appendChild(this.spawnInputsContainer)
 
         // --- TARGET OBJECT INPUTS ---
-        this.currentTargetProperties = { rings: 3, baseDamage: 10, ringMultipliers: [1, 2, 3], radius: 1.0 }
+        this.currentTargetProperties = { rings: 3, baseDamage: 10, ringMultipliers: [0.10, 0.55, 1.0], radius: 1.0, useProjectileDamage: false }
         this.targetInputsContainer = document.createElement('div')
         this.targetInputsContainer.style.cssText = "display:none; flex-direction:column; gap:5px;"
+
+        // Use Projectile Damage Input
+        const projDmgRowTarget = document.createElement('div')
+        projDmgRowTarget.style.cssText = "display:flex; justify-content:space-between; align-items:center; gap: 10px;"
+        const projDmgLblTarget = document.createElement('label'); projDmgLblTarget.textContent = "DAÑO DE BALA"
+        const projDmgInpTarget = document.createElement('input'); projDmgInpTarget.type = 'checkbox'; projDmgInpTarget.checked = false;
+        projDmgInpTarget.onchange = (e) => {
+            this.currentTargetProperties.useProjectileDamage = e.target.checked
+        }
+        projDmgInpTarget.onkeydown = (e) => e.stopPropagation()
+        projDmgRowTarget.appendChild(projDmgLblTarget); projDmgRowTarget.appendChild(projDmgInpTarget)
+        this.targetInputsContainer.appendChild(projDmgRowTarget)
 
         // Radius Input
         const radRowTarget = document.createElement('div')
@@ -345,10 +357,15 @@ export class PlacementManager {
             if (val > 10) val = 10
             this.currentTargetProperties.rings = val
 
-            const currentMults = this.currentTargetProperties.ringMultipliers || []
             const newMults = []
-            for (let i = 0; i < val; i++) {
-                newMults.push(currentMults[i] !== undefined ? currentMults[i] : (i + 1))
+            if (val === 1) {
+                newMults.push(1.0);
+            } else {
+                for (let i = 0; i < val; i++) {
+                    const t = i / (val - 1);
+                    const v = 0.1 + t * 0.9;
+                    newMults.push(Number(v.toFixed(2)));
+                }
             }
             this.currentTargetProperties.ringMultipliers = newMults
         }

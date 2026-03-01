@@ -143,7 +143,7 @@ export class ConstructionMenu {
             "target",
             "",
             0xFF8800, // Orange
-            { x: 2, y: 2, z: 0.2 } // 2x2 bounding box (diameter 2)
+            { x: 2, y: 0.2, z: 2 } // Y is thickness
         )
         // Default Logic
         target.logicProperties = {

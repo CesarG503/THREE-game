@@ -664,17 +664,17 @@ class Game {
                         const localPos = obj.worldToLocal(proj.mesh.position.clone());
                         const props = obj.userData.logicProperties || {};
                         const radius = props.radius !== undefined ? props.radius : (obj.userData.radius || 1.0);
-                        const thickness = obj.scale.z || 0.2;
+                        const thickness = obj.scale.y || 0.2;
 
-                        // Check if inside target bounds (local Z is thickness)
-                        if (Math.abs(localPos.z) < thickness && localPos.length() <= radius) {
+                        // Check if inside target bounds (local Y is thickness)
+                        if (Math.abs(localPos.y) < thickness && Math.sqrt(localPos.x * localPos.x + localPos.z * localPos.z) <= radius) {
                             // Hit confirmed!
                             if (!proj.hasHitTarget) {
                                 proj.hasHitTarget = true;
                                 hitTarget = true;
 
                                 // Calculate which ring was hit
-                                const dist = Math.sqrt(localPos.x * localPos.x + localPos.y * localPos.y);
+                                const dist = Math.sqrt(localPos.x * localPos.x + localPos.z * localPos.z);
                                 const rings = props.rings || 3;
                                 const ringWidth = radius / rings;
 

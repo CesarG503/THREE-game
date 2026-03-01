@@ -831,8 +831,8 @@ export class PlacementManager {
                 const isAerialHit = (hit.object === this.aerialCollider)
                 const isMapObject = hit.object.userData && hit.object.userData.isMapObject
 
-                if (item.type === 'interaction_button' && hit.face) {
-                    // --- BUTTON SURFACE LOGIC (GRID) ---
+                if ((item.type === 'interaction_button' || item.type === 'target') && hit.face) {
+                    // --- BUTTON/TARGET SURFACE LOGIC (GRID) ---
                     // Size is already set above
 
                     // Align to Normal
@@ -917,8 +917,8 @@ export class PlacementManager {
                 } else {
                     // --- GROUND / GLOBAL LOGIC (STATIC MAP & FALLBACK) ---
 
-                    // Special Handling for Buttons on Static Geometry (Walls/Floors)
-                    if (item.type === 'interaction_button' && hit.face) {
+                    // Special Handling for Buttons and Targets on Static Geometry (Walls/Floors)
+                    if ((item.type === 'interaction_button' || item.type === 'target') && hit.face) {
                         // Align to Normal
                         const normal = hit.face.normal.clone().transformDirection(hit.object.matrixWorld).normalize()
                         const quaternion = new THREE.Quaternion()
@@ -982,10 +982,12 @@ export class PlacementManager {
             } else {
                 // --- FREE PLACEMENT & SURFACE ALIGNMENT ---
 
-                // Special case: Interaction Buttons Align to Surface Normal
-                if (item.type === 'interaction_button' && hit.face) {
-                    // Custom Size override for free placement too
-                    realSize = new THREE.Vector3(0.6, 0.1, 0.6)
+                // Special case: Interaction Buttons and Targets Align to Surface Normal
+                if ((item.type === 'interaction_button' || item.type === 'target') && hit.face) {
+                    // Custom Size override for free placement too for buttons
+                    if (item.type === 'interaction_button') {
+                        realSize = new THREE.Vector3(0.6, 0.1, 0.6)
+                    }
                     const normal = hit.face.normal.clone().transformDirection(hit.object.matrixWorld).normalize()
 
                     // Align Y up to Normal
@@ -1012,7 +1014,7 @@ export class PlacementManager {
                 // We still want the object to sit ON the surface, not sink into it.
                 // Move center away from hit point by half extent along normal.
                 if (hit.face) {
-                    if (item.type !== 'interaction_button') {
+                    if (item.type !== 'interaction_button' && item.type !== 'target') {
                         // Generic surface offset logic
                         const normal = hit.face.normal.clone().transformDirection(hit.object.matrixWorld).normalize()
                         const yOffset = realSize.y / 2
@@ -1059,6 +1061,8 @@ export class PlacementManager {
                     this.ghostBoxMesh.visible = true
                     if (item.type === 'interaction_button') {
                         // Use correct visual size for ghost
+                        this.ghostBoxMesh.scale.set(realSize.x, realSize.y, realSize.z)
+                    } else if (item.type === 'target') {
                         this.ghostBoxMesh.scale.set(realSize.x, realSize.y, realSize.z)
                     } else {
                         this.ghostBoxMesh.scale.set(item.scale.x, item.scale.y, item.scale.z)

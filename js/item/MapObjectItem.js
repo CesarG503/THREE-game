@@ -563,7 +563,7 @@ export class MapObjectItem extends Item {
             // Extract properties
             const radius = (this.scale.x / 2) || 1.0;
             const ringsCount = (this.logicProperties && this.logicProperties.rings !== undefined) ? this.logicProperties.rings : 3;
-            const thickness = this.scale.z || 0.2;
+            const thickness = this.scale.y || 0.2;
 
             // Reusable update function attached to the group
             group.updateTargetVisuals = () => {
@@ -588,8 +588,7 @@ export class MapObjectItem extends Item {
                     const ringDepth = thickness + (i * 0.01);
 
                     const geo = new THREE.CylinderGeometry(ringRadius, ringRadius, ringDepth, 32);
-                    // Standard cylinder is along Y. We want it along Z (facing forward/backward).
-                    geo.rotateX(Math.PI / 2);
+                    // Standard cylinder is along Y. We keep it along Y to face outward.
 
                     // Material with slight emissive for visibility
                     const mat = new THREE.MeshStandardMaterial({
@@ -600,8 +599,8 @@ export class MapObjectItem extends Item {
 
                     const mesh = new THREE.Mesh(geo, mat);
                     mesh.castShadow = true;
-                    // Move slightly forward to avoid z-fighting on the front face
-                    mesh.position.z = i * 0.001;
+                    // Move slightly up along Y to avoid z-fighting on the flat face
+                    mesh.position.y = i * 0.001;
 
                     // Keep track of which ring this is (0 = outer, rings-1 = inner)
                     mesh.userData.ringIndex = i;
@@ -617,9 +616,8 @@ export class MapObjectItem extends Item {
             object3D = group;
 
             // Physics Collider for the WHOLE target (cylinder)
-            // Rapier cylinder is along Y axis, rotate it 90 deg around X to face Z just like the visual
-            const q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI / 2);
-            const col = RAPIER.ColliderDesc.cylinder(thickness / 2, radius).setRotation(q);
+            // Rapier cylinder is along Y axis, which matches our new visual
+            const col = RAPIER.ColliderDesc.cylinder(thickness / 2, radius);
             collidersDesc.push(col);
 
         } else if (this.type === 'ladder') {

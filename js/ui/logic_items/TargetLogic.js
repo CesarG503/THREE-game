@@ -87,7 +87,7 @@ export class TargetLogic {
         }
 
         // Damage Source Toggle
-        logicSystem.createInput(container, object, 'useProjectileDamage', props.useProjectileDamage, 'checkbox', 'Usar Daño de Proyectil')
+        logicSystem.createInput(container, object, 'useProjectileDamage', props.useProjectileDamage, 'boolean', 'Usar Daño de Proyectil')
         const projDmgRow = container.lastElementChild
         const projDmgInp = projDmgRow.querySelector('input')
 

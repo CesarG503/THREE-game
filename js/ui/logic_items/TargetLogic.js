@@ -35,7 +35,7 @@ export class TargetLogic {
                 object.userData.logicProperties.ringMultipliers = newMults
 
                 // Re-render UI to update the comma-separated string
-                logicSystem.renderPanel(container.parentElement, object)
+                logicSystem.renderPanel(container, object)
 
                 // Trigger visual update 
                 if (object.updateTargetVisuals) {

@@ -2,6 +2,7 @@ import * as THREE from "three"
 import { LogicToolbar } from "../ui/LogicToolbar.js"
 import { LogicSequenceEditor } from "../ui/LogicSequenceEditor.js"
 import { InteractiveCollisionLogic } from "../ui/logic_items/InteractiveCollisionLogic.js"
+import { TargetLogic } from "../ui/logic_items/TargetLogic.js"
 import { GameHUD } from "../ui/GameHUD.js"
 import { PlayerConfigManager } from "../managers/PlayerConfigManager.js"
 
@@ -221,11 +222,12 @@ export class LogicSystem {
                 const isSpawn = child.userData.mapObjectType === 'spawn_point'
                 const isButton = child.userData.mapObjectType === 'interaction_button'
                 const isCollision = child.userData.mapObjectType === 'interactive_collision'
+                const isTarget = child.userData.mapObjectType === 'target'
                 const hasWaypoints = child.userData.logicProperties &&
                     child.userData.logicProperties.waypoints // Allow empty array
 
                 // Add your own logic flags here
-                if (isSpawn || isButton || isCollision || hasWaypoints) {
+                if (isSpawn || isButton || isCollision || isTarget || hasWaypoints) {
                     logicObjects.push(child)
                 }
             }
@@ -279,6 +281,11 @@ export class LogicSystem {
         // 4. Interactive Collision Logic
         if (object.userData.mapObjectType === 'interactive_collision') {
             InteractiveCollisionLogic.setupUI(container, object, props, this)
+        }
+
+        // 5. Target Logic
+        if (object.userData.mapObjectType === 'target') {
+            TargetLogic.setupUI(container, object, props, this)
         }
     }
 
@@ -743,6 +750,7 @@ export class LogicSystem {
             case 'spawn_point': return "Punto de Spawn";
             case 'movement_object': return "Objetos con Movimiento";
             case 'interaction_button': return "Botones Interactivos";
+            case 'target': return "Diana Interactiva";
             case 'movement_controller': return "Animador"; // In case it appears as a type
             default: return type ? (type.charAt(0).toUpperCase() + type.slice(1)) : "Objeto";
         }

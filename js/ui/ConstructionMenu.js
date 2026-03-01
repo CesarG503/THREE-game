@@ -135,6 +135,23 @@ export class ConstructionMenu {
             triggerOnEnter: false
         }
         this.logicItems.push(collision)
+
+        // Target (Diana)
+        const target = new MapObjectItem(
+            "interactive_target",
+            "Diana Interactiva",
+            "target",
+            "",
+            0xFF8800, // Orange
+            { x: 2, y: 2, z: 0.2 } // 2x2 bounding box (diameter 2)
+        )
+        // Default Logic
+        target.logicProperties = {
+            rings: 3,
+            baseDamage: 10,
+            ringMultipliers: [1, 2, 3] // Outer, middle, inner
+        }
+        this.logicItems.push(target)
     }
 
     setupUI() {

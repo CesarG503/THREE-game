@@ -127,6 +127,24 @@ export class MapObjectItem extends Item {
             ctx.textBaseline = "middle"
             ctx.fillText("⚡", 32, 32)
 
+        } else if (this.type === 'target') {
+            // Target Icon (Concentric Circles)
+            ctx.fillStyle = "white"
+            ctx.beginPath()
+            ctx.arc(32, 32, 24, 0, Math.PI * 2)
+            ctx.fill()
+            ctx.stroke()
+
+            ctx.fillStyle = "red"
+            ctx.beginPath()
+            ctx.arc(32, 32, 16, 0, Math.PI * 2)
+            ctx.fill()
+
+            ctx.fillStyle = "white"
+            ctx.beginPath()
+            ctx.arc(32, 32, 8, 0, Math.PI * 2)
+            ctx.fill()
+
         } else if (this.type === 'ladder') {
             // Ladder Icon (H-shape with rungs)
             ctx.strokeStyle = ctx.fillStyle // Use Item Color for Lines
@@ -537,6 +555,72 @@ export class MapObjectItem extends Item {
             // Allow manual override in userData as well for easier access
             object3D.userData.shapeType = shapeType
             object3D.userData.radius = radius
+
+        } else if (this.type === 'target') {
+            // TARGET GENERATION (Concentric rings)
+            const group = new THREE.Group()
+
+            // Extract properties
+            const radius = (this.scale.x / 2) || 1.0;
+            const ringsCount = (this.logicProperties && this.logicProperties.rings !== undefined) ? this.logicProperties.rings : 3;
+            const thickness = this.scale.z || 0.2;
+
+            // Reusable update function attached to the group
+            group.updateTargetVisuals = () => {
+                // Clear existing rings
+                while (group.children.length > 0) {
+                    const child = group.children[0];
+                    group.remove(child);
+                    if (child.geometry) child.geometry.dispose();
+                    if (child.material) child.material.dispose();
+                }
+
+                const currentRings = (group.userData.logicProperties && group.userData.logicProperties.rings) ? group.userData.logicProperties.rings : 3;
+
+                for (let i = 0; i < currentRings; i++) {
+                    const ringRadius = radius * (1.0 - (i / currentRings));
+
+                    // Base color alternates (Outer: Red, then White, etc)
+                    const isRed = (i % 2 === 0);
+                    const ringColor = isRed ? 0xFF0000 : 0xFFFFFF;
+
+                    // We reduce thickness very slightly per inner ring to avoid z-fighting
+                    const ringDepth = thickness + (i * 0.01);
+
+                    const geo = new THREE.CylinderGeometry(ringRadius, ringRadius, ringDepth, 32);
+                    // Standard cylinder is along Y. We want it along Z (facing forward/backward).
+                    geo.rotateX(Math.PI / 2);
+
+                    // Material with slight emissive for visibility
+                    const mat = new THREE.MeshStandardMaterial({
+                        color: ringColor,
+                        roughness: 0.8,
+                        metalness: 0.1
+                    });
+
+                    const mesh = new THREE.Mesh(geo, mat);
+                    mesh.castShadow = true;
+                    // Move slightly forward to avoid z-fighting on the front face
+                    mesh.position.z = i * 0.001;
+
+                    // Keep track of which ring this is (0 = outer, rings-1 = inner)
+                    mesh.userData.ringIndex = i;
+
+                    group.add(mesh);
+                }
+            };
+
+            // Call it once to build initially
+            group.userData.logicProperties = this.logicProperties || {};
+            group.updateTargetVisuals();
+
+            object3D = group;
+
+            // Physics Collider for the WHOLE target (cylinder)
+            // Rapier cylinder is along Y axis, rotate it 90 deg around X to face Z just like the visual
+            const q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI / 2);
+            const col = RAPIER.ColliderDesc.cylinder(thickness / 2, radius).setRotation(q);
+            collidersDesc.push(col);
 
         } else if (this.type === 'ladder') {
             // LADDER GENERATION

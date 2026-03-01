@@ -26,6 +26,7 @@ import { StairsUtils } from "./utils/StairsUtils.js"
 import { PlayerConfigManager } from "./managers/PlayerConfigManager.js"
 import { GameHUD } from "./ui/GameHUD.js"
 import { GunItem } from "./item/GunItem.js"
+import { FloatingTextManager } from "./ui/FloatingTextManager.js"
 
 class Game {
     constructor() {
@@ -64,6 +65,8 @@ class Game {
         // Managers & UI
         this.playerConfigManager = new PlayerConfigManager(this)
         this.hud = new GameHUD() // Shared HUD
+
+        this.floatingTextManager = new FloatingTextManager(this.sceneManager)
 
         // Camera Controller
         this.cameraController = new CameraController(
@@ -645,10 +648,70 @@ class Game {
             for (let i = this.projectiles.length - 1; i >= 0; i--) {
                 const proj = this.projectiles[i]
                 proj.update(dt)
+
+                if (proj.isDead) {
+                    this.projectiles.splice(i, 1)
+                    continue
+                }
+
+                // --- CUSTOM TARGET HIT DETECTION ---
+                let hitTarget = false;
+
+                this.sceneManager.scene.children.forEach(obj => {
+                    if (hitTarget) return; // Optimize
+                    if (obj.userData.mapObjectType === 'target') {
+                        // Transform projectile to target's local space
+                        const localPos = obj.worldToLocal(proj.mesh.position.clone());
+                        const props = obj.userData.logicProperties || {};
+                        const radius = props.radius !== undefined ? props.radius : (obj.userData.radius || 1.0);
+                        const thickness = obj.scale.z || 0.2;
+
+                        // Check if inside target bounds (local Z is thickness)
+                        if (Math.abs(localPos.z) < thickness && localPos.length() <= radius) {
+                            // Hit confirmed!
+                            if (!proj.hasHitTarget) {
+                                proj.hasHitTarget = true;
+                                hitTarget = true;
+
+                                // Calculate which ring was hit
+                                const dist = Math.sqrt(localPos.x * localPos.x + localPos.y * localPos.y);
+                                const rings = props.rings || 3;
+                                const ringWidth = radius / rings;
+
+                                let ringIdxHit = Math.floor(dist / ringWidth);
+                                if (ringIdxHit >= rings) ringIdxHit = rings - 1;
+
+                                // Map inner vs outer
+                                const mappedIdx = rings - 1 - ringIdxHit;
+
+                                const mults = props.ringMultipliers || [1, 2, 3];
+                                const mult = mults[mappedIdx] !== undefined ? mults[mappedIdx] : 1;
+
+                                const finalDamage = Math.round(proj.damage * mult);
+
+                                // Optional text color scaling
+                                let color = "#FFFFFF";
+                                if (mult > 1) color = "#FFCC00";
+                                if (mappedIdx === rings - 1) color = "#FF2222";
+
+                                if (this.floatingTextManager) {
+                                    this.floatingTextManager.spawnText(`-${finalDamage}`, proj.mesh.position.clone(), color, 1.5);
+                                }
+
+                                proj.destroy();
+                            }
+                        }
+                    }
+                });
+
                 if (proj.isDead) {
                     this.projectiles.splice(i, 1)
                 }
             }
+        }
+
+        if (this.floatingTextManager) {
+            this.floatingTextManager.update(dt)
         }
 
         // Movement Logic Update

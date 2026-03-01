@@ -852,8 +852,9 @@ export class PlacementManager {
                             // Parallel to normal -> flush but OFFSET by half height
                             targetPos[ax] = hit.point[ax] + normal[ax] * (realSize.y / 2)
                         } else {
-                            // Perpendicular -> Snap to Grid Center
-                            const offset = gridSize / 2
+                            // Perpendicular -> Snap to Grid center or line based on size
+                            const s = realSize[ax]
+                            const offset = (Math.abs(s % 2) > 0.01) ? (gridSize / 2) : 0
                             targetPos[ax] = Math.round((hit.point[ax] - offset) / gridSize) * gridSize + offset
                         }
                     })
@@ -936,8 +937,9 @@ export class PlacementManager {
                                 // Parallel to normal -> flush but OFFSET by half height
                                 targetPos[ax] = hit.point[ax] + normal[ax] * (realSize.y / 2)
                             } else {
-                                // Perpendicular -> Snap to Grid Center
-                                const offset = gridSize / 2
+                                // Perpendicular -> Snap to Grid center or line based on size
+                                const s = realSize[ax]
+                                const offset = (Math.abs(s % 2) > 0.01) ? (gridSize / 2) : 0
                                 targetPos[ax] = Math.round((hit.point[ax] - offset) / gridSize) * gridSize + offset
                             }
                         })

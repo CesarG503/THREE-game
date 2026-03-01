@@ -253,6 +253,130 @@ export class PlacementManager {
         spawnShapeRow.appendChild(spawnShapeSelect)
         this.spawnInputsContainer.appendChild(spawnShapeRow)
 
+        // Circle Inputs (Radius)
+        this.spawnCircleInputs = document.createElement('div')
+        this.spawnCircleInputs.style.cssText = "display:flex; flex-direction:column; gap:5px;"
+
+        const scRow = document.createElement('div')
+        scRow.style.cssText = "display:flex; justify-content:space-between; align-items:center; gap: 10px;"
+        const scLbl = document.createElement('label'); scLbl.textContent = "RADIO"
+        const scInp = document.createElement('input'); scInp.type = 'number'; scInp.step = 0.5; scInp.value = 1.0;
+        scInp.style.width = "60px"; scInp.style.background = "#222"; scInp.style.color = "white"; scInp.style.border = "1px solid #555"; scInp.style.padding = "4px";
+        scInp.oninput = (e) => {
+            let val = parseFloat(e.target.value)
+            if (isNaN(val) || val < 0.1) val = 0.1
+            this.currentSpawnProperties.radius = val
+            // Sync square if needed? (Optional, let's keep separate)
+        }
+        scInp.onkeydown = (e) => e.stopPropagation()
+        scRow.appendChild(scLbl); scRow.appendChild(scInp);
+        this.spawnCircleInputs.appendChild(scRow)
+        this.spawnInputsContainer.appendChild(this.spawnCircleInputs)
+
+        // Square Inputs (X, Y, Z)
+        this.spawnSquareInputs = document.createElement('div')
+        this.spawnSquareInputs.style.cssText = "display:none; flex-direction:column; gap:5px;"
+
+        axes.forEach(axis => {
+            const row = document.createElement('div')
+            row.style.cssText = "display:flex; justify-content:space-between; align-items:center; gap: 10px;"
+            const lbl = document.createElement('label'); lbl.textContent = axis.toUpperCase()
+            const inp = document.createElement('input'); inp.type = 'number'; inp.step = 0.5;
+            inp.value = this.currentSpawnProperties[axis] || 2;
+            inp.style.width = "60px"; inp.style.background = "#222"; inp.style.color = "white"; inp.style.border = "1px solid #555"; inp.style.padding = "4px";
+
+            // Store ref and sync logic
+            if (!this.toolbarSpawnInputs) this.toolbarSpawnInputs = {}
+            this.toolbarSpawnInputs[axis] = inp
+
+            inp.oninput = (e) => {
+                let val = parseFloat(e.target.value)
+                if (isNaN(val) || val < 0.1) val = 0.1
+                this.currentSpawnProperties[axis] = val
+
+                // Circle Sync Logic
+                if (this.currentSpawnProperties.shapeType === 'circle') {
+                    if (axis === 'x' || axis === 'z') {
+                        this.currentSpawnProperties.x = val
+                        this.currentSpawnProperties.z = val
+                        this.currentSpawnProperties.radius = val / 2
+                    }
+                    this.updateSpawnInputsValues()
+                }
+            }
+            inp.onkeydown = (e) => e.stopPropagation()
+
+            row.appendChild(lbl); row.appendChild(inp);
+            this.spawnSquareInputs.appendChild(row)
+        })
+        this.spawnInputsContainer.appendChild(this.spawnSquareInputs)
+
+        this.logicToolbar.appendChild(this.spawnInputsContainer)
+
+        // --- TARGET OBJECT INPUTS ---
+        this.currentTargetProperties = { rings: 3, baseDamage: 10, ringMultipliers: [1, 2, 3], radius: 1.0 }
+        this.targetInputsContainer = document.createElement('div')
+        this.targetInputsContainer.style.cssText = "display:none; flex-direction:column; gap:5px;"
+
+        // Radius Input
+        const radRowTarget = document.createElement('div')
+        radRowTarget.style.cssText = "display:flex; justify-content:space-between; align-items:center; gap: 10px;"
+        const radLblTarget = document.createElement('label'); radLblTarget.textContent = "RADIO"
+        const radInpTarget = document.createElement('input'); radInpTarget.type = 'number'; radInpTarget.step = 0.5; radInpTarget.value = 1.0;
+        radInpTarget.style.width = "60px"; radInpTarget.style.background = "#222"; radInpTarget.style.color = "white"; radInpTarget.style.border = "1px solid #555"; radInpTarget.style.padding = "4px";
+        radInpTarget.oninput = (e) => {
+            let val = parseFloat(e.target.value)
+            if (isNaN(val) || val < 0.1) val = 0.1
+            this.currentTargetProperties.radius = val
+        }
+        radInpTarget.onkeydown = (e) => e.stopPropagation()
+        radRowTarget.appendChild(radLblTarget); radRowTarget.appendChild(radInpTarget)
+        this.targetInputsContainer.appendChild(radRowTarget)
+
+        // Rings Input
+        const ringsRow = document.createElement('div')
+        ringsRow.style.cssText = "display:flex; justify-content:space-between; align-items:center; gap: 10px;"
+        const ringsLbl = document.createElement('label'); ringsLbl.textContent = "ANILLOS"
+        const ringsInp = document.createElement('input'); ringsInp.type = 'number'; ringsInp.step = 1; ringsInp.value = 3;
+        ringsInp.style.width = "60px"; ringsInp.style.background = "#222"; ringsInp.style.color = "white"; ringsInp.style.border = "1px solid #555"; ringsInp.style.padding = "4px";
+        ringsInp.oninput = (e) => {
+            let val = parseInt(e.target.value)
+            if (isNaN(val) || val < 1) val = 1
+            if (val > 10) val = 10
+            this.currentTargetProperties.rings = val
+
+            const currentMults = this.currentTargetProperties.ringMultipliers || []
+            const newMults = []
+            for (let i = 0; i < val; i++) {
+                newMults.push(currentMults[i] !== undefined ? currentMults[i] : (i + 1))
+            }
+            this.currentTargetProperties.ringMultipliers = newMults
+        }
+        ringsInp.onkeydown = (e) => e.stopPropagation()
+        ringsRow.appendChild(ringsLbl); ringsRow.appendChild(ringsInp)
+        this.targetInputsContainer.appendChild(ringsRow)
+
+        // Base Damage Input
+        const dmgRow = document.createElement('div')
+        dmgRow.style.cssText = "display:flex; justify-content:space-between; align-items:center; gap: 10px;"
+        const dmgLbl = document.createElement('label'); dmgLbl.textContent = "DAÑO BASE"
+        const dmgInp = document.createElement('input'); dmgInp.type = 'number'; dmgInp.step = 1; dmgInp.value = 10;
+        dmgInp.style.width = "60px"; dmgInp.style.background = "#222"; dmgInp.style.color = "white"; dmgInp.style.border = "1px solid #555"; dmgInp.style.padding = "4px";
+        dmgInp.oninput = (e) => {
+            let val = parseFloat(e.target.value)
+            if (isNaN(val)) val = 10
+            this.currentTargetProperties.baseDamage = val
+        }
+        dmgInp.onkeydown = (e) => e.stopPropagation()
+        dmgRow.appendChild(dmgLbl); dmgRow.appendChild(dmgInp)
+        this.targetInputsContainer.appendChild(dmgRow)
+
+        this.logicToolbar.appendChild(this.targetInputsContainer)
+
+        spawnShapeRow.appendChild(spawnShapeLbl)
+        spawnShapeRow.appendChild(spawnShapeSelect)
+        this.spawnInputsContainer.appendChild(spawnShapeRow)
+
         // Circle Inputs (Radius, Rotation)
         this.spawnCircleInputs = document.createElement('div')
         this.spawnCircleInputs.style.cssText = "display:flex; flex-direction:column; gap:5px;"
@@ -330,6 +454,7 @@ export class PlacementManager {
             if (this.collisionShapeRow) this.collisionShapeRow.style.display = 'none'
             this.boxInputsContainer.style.display = 'none'
             this.sphereInputsContainer.style.display = 'none'
+            this.targetInputsContainer.style.display = 'none'
             this.spawnInputsContainer.style.display = 'flex'
 
             // Spawn Point Sub-logic
@@ -341,18 +466,28 @@ export class PlacementManager {
                 this.spawnSquareInputs.style.display = 'flex'
             }
 
+        } else if (this.currentItem && this.currentItem.type === 'target') {
+            // Target object properties
+            if (this.collisionShapeRow) this.collisionShapeRow.style.display = 'none'
+            this.boxInputsContainer.style.display = 'none'
+            this.sphereInputsContainer.style.display = 'none'
+            this.spawnInputsContainer.style.display = 'none'
+            this.targetInputsContainer.style.display = 'flex'
+
             // 2. Then check Collision Shape State (Implicitly for interactive_collision or defaults)
-        } else if (this.currentCollisionSize.shapeType === 'sphere') {
+        } else if (this.currentCollisionSize && this.currentCollisionSize.shapeType === 'sphere') {
             if (this.collisionShapeRow) this.collisionShapeRow.style.display = 'flex'
             this.boxInputsContainer.style.display = 'none'
+            this.targetInputsContainer.style.display = 'none'
             this.sphereInputsContainer.style.display = 'flex'
             this.spawnInputsContainer.style.display = 'none'
         } else {
             // Default: Box Collision
             if (this.collisionShapeRow) this.collisionShapeRow.style.display = 'flex'
-            this.boxInputsContainer.style.display = 'flex'
-            this.sphereInputsContainer.style.display = 'none'
-            this.spawnInputsContainer.style.display = 'none'
+            if (this.boxInputsContainer) this.boxInputsContainer.style.display = 'flex'
+            if (this.targetInputsContainer) this.targetInputsContainer.style.display = 'none'
+            if (this.sphereInputsContainer) this.sphereInputsContainer.style.display = 'none'
+            if (this.spawnInputsContainer) this.spawnInputsContainer.style.display = 'none'
         }
     }
 
@@ -471,6 +606,9 @@ export class PlacementManager {
             } else {
                 size.set(this.currentCollisionSize.x, this.currentCollisionSize.y, this.currentCollisionSize.z)
             }
+        } else if (item.type === 'target') {
+            const diameter = (this.currentTargetProperties && this.currentTargetProperties.radius) ? this.currentTargetProperties.radius * 2 : (item.scale.x || 2);
+            size.set(diameter, item.scale.y || 0.2, diameter)
         } else if (item.constructor.name === "MapObjectItem") {
             size.set(item.scale.x || 1, item.scale.y || 1, item.scale.z || 1)
         } else if (item.id.includes("pad")) {
@@ -579,7 +717,7 @@ export class PlacementManager {
         this.rotationIndex = rotationIndex
 
         // Toolbar Visibility Logic
-        if (item && (item.type === 'interactive_collision' || item.type === 'spawn_point')) {
+        if (item && (item.type === 'interactive_collision' || item.type === 'spawn_point' || item.type === 'target')) {
             this.logicToolbar.style.display = 'flex'
             this.updateToolbarVisibility() // Ensure correct sub-menu is shown
         } else {

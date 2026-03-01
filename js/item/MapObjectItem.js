@@ -236,6 +236,24 @@ export class MapObjectItem extends Item {
             }
         }
 
+        if (this.type === 'target') {
+            if (context.placementManager && context.placementManager.currentTargetProperties) {
+                // Ensure this.logicProperties exists and copy the customized properties
+                this.logicProperties = {
+                    ...(this.logicProperties || {}),
+                    ...context.placementManager.currentTargetProperties
+                }
+
+                // Map radius to scale
+                if (this.logicProperties.radius) {
+                    const diameter = this.logicProperties.radius * 2
+                    this.scale.x = diameter
+                    this.scale.z = diameter
+                    // Y is thickness, keep original or default
+                }
+            }
+        }
+
         if (this.type === 'movement_controller') {
             // TOOL BEHAVIOR: Apply logic to existing object
             // Raycast from Camera (or Origin/Direction provided in context)
@@ -576,9 +594,10 @@ export class MapObjectItem extends Item {
                 }
 
                 const currentRings = (group.userData.logicProperties && group.userData.logicProperties.rings) ? group.userData.logicProperties.rings : 3;
+                const dynamicRadius = (group.userData.logicProperties && group.userData.logicProperties.radius) ? group.userData.logicProperties.radius : radius;
 
                 for (let i = 0; i < currentRings; i++) {
-                    const ringRadius = radius * (1.0 - (i / currentRings));
+                    const ringRadius = dynamicRadius * (1.0 - (i / currentRings));
 
                     // Base color alternates (Outer: Red, then White, etc)
                     const isRed = (i % 2 === 0);
@@ -616,8 +635,10 @@ export class MapObjectItem extends Item {
             object3D = group;
 
             // Physics Collider for the WHOLE target (cylinder)
-            // Rapier cylinder is along Y axis, which matches our new visual
-            const col = RAPIER.ColliderDesc.cylinder(thickness / 2, radius);
+            // Note: Collider is created with the initial size. It will not dynamically scale without respawning.
+            // But hit detection in main_rapier.js handles the radius manually, so physical hits still register.
+            const initialRadius = (this.logicProperties && this.logicProperties.radius) ? this.logicProperties.radius : radius;
+            const col = RAPIER.ColliderDesc.cylinder(thickness / 2, initialRadius);
             collidersDesc.push(col);
 
         } else if (this.type === 'ladder') {

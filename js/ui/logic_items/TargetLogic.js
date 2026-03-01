@@ -11,6 +11,27 @@ export class TargetLogic {
         if (props.baseDamage === undefined) props.baseDamage = 10
         if (props.pointsMode === undefined) props.pointsMode = false
         if (!props.ringMultipliers) props.ringMultipliers = [1, 2, 3] // Outer to Inner
+        if (props.radius === undefined) props.radius = 1.0
+
+        logicSystem.createInput(container, object, 'radius', props.radius, 'number', 'Radio (Tamaño)')
+
+        // Listen and update mesh when radius changes
+        const radInputRow = container.lastElementChild
+        const radInput = radInputRow.querySelector('input')
+        if (radInput) {
+            radInput.step = 0.5
+            radInput.min = 0.5
+            radInput.addEventListener('change', (e) => {
+                let val = parseFloat(e.target.value)
+                if (isNaN(val) || val < 0.5) val = 0.5
+                object.userData.logicProperties.radius = val
+
+                // Trigger visual update 
+                if (object.updateTargetVisuals) {
+                    object.updateTargetVisuals()
+                }
+            })
+        }
 
         logicSystem.createInput(container, object, 'rings', props.rings, 'number', 'Cantidad de Anillos')
 

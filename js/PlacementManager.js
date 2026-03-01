@@ -323,9 +323,7 @@ export class PlacementManager {
         projDmgRowTarget.style.cssText = "display:flex; justify-content:space-between; align-items:center; gap: 10px;"
         const projDmgLblTarget = document.createElement('label'); projDmgLblTarget.textContent = "DAÑO DE BALA"
         const projDmgInpTarget = document.createElement('input'); projDmgInpTarget.type = 'checkbox'; projDmgInpTarget.checked = false;
-        projDmgInpTarget.onchange = (e) => {
-            this.currentTargetProperties.useProjectileDamage = e.target.checked
-        }
+        // The logic mapping happens after `dmgInpTarget` is created.
         projDmgInpTarget.onkeydown = (e) => e.stopPropagation()
         projDmgRowTarget.appendChild(projDmgLblTarget); projDmgRowTarget.appendChild(projDmgInpTarget)
         this.targetInputsContainer.appendChild(projDmgRowTarget)
@@ -387,6 +385,16 @@ export class PlacementManager {
         dmgInp.onkeydown = (e) => e.stopPropagation()
         dmgRow.appendChild(dmgLbl); dmgRow.appendChild(dmgInp)
         this.targetInputsContainer.appendChild(dmgRow)
+
+        // Map checkbox logic
+        dmgInp.disabled = this.currentTargetProperties.useProjectileDamage;
+        dmgInp.style.opacity = this.currentTargetProperties.useProjectileDamage ? "0.5" : "1.0";
+        projDmgInpTarget.onchange = (e) => {
+            const isChecked = e.target.checked;
+            this.currentTargetProperties.useProjectileDamage = isChecked;
+            dmgInp.disabled = isChecked;
+            dmgInp.style.opacity = isChecked ? "0.5" : "1.0";
+        }
 
         this.logicToolbar.appendChild(this.targetInputsContainer)
 

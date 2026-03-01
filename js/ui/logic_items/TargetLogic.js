@@ -90,13 +90,23 @@ export class TargetLogic {
         logicSystem.createInput(container, object, 'useProjectileDamage', props.useProjectileDamage, 'checkbox', 'Usar Daño de Proyectil')
         const projDmgRow = container.lastElementChild
         const projDmgInp = projDmgRow.querySelector('input')
-        if (projDmgInp) {
-            projDmgInp.addEventListener('change', (e) => {
-                object.userData.logicProperties.useProjectileDamage = e.target.checked
-            })
-        }
 
         logicSystem.createInput(container, object, 'baseDamage', props.baseDamage, 'number', 'Daño Base (Referencia)')
+        const dmgRow = container.lastElementChild
+        const dmgInp = dmgRow.querySelector('input')
+
+        if (projDmgInp && dmgInp) {
+            // Initial state
+            dmgInp.disabled = props.useProjectileDamage;
+            if (props.useProjectileDamage) dmgInp.style.opacity = "0.5";
+
+            projDmgInp.addEventListener('change', (e) => {
+                const isChecked = e.target.checked;
+                object.userData.logicProperties.useProjectileDamage = isChecked;
+                dmgInp.disabled = isChecked;
+                dmgInp.style.opacity = isChecked ? "0.5" : "1.0";
+            })
+        }
 
         // Ring Multipliers as text (read-only insight)
         const multsStr = props.ringMultipliers.join(', ')

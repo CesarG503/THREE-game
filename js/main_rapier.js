@@ -661,7 +661,11 @@ class Game {
                     if (hitTarget) return; // Optimize
                     if (obj.userData.mapObjectType === 'target') {
                         // Transform projectile to target's local space
-                        const localPos = obj.worldToLocal(proj.mesh.position.clone());
+                        // Bullets don't have a mesh, use physics translation
+                        const rbPos = proj.rigidBody.translation();
+                        const worldPos = new THREE.Vector3(rbPos.x, rbPos.y, rbPos.z);
+                        const localPos = obj.worldToLocal(worldPos.clone());
+
                         const props = obj.userData.logicProperties || {};
                         const radius = props.radius !== undefined ? props.radius : (obj.userData.radius || 1.0);
                         const thickness = obj.scale.y || 0.2;
@@ -697,7 +701,7 @@ class Game {
                                 else if (mult >= 0.5) color = "#FFCC00"; // Inner rings
 
                                 if (this.floatingTextManager) {
-                                    this.floatingTextManager.spawnText(`-${finalDamage}`, proj.mesh.position.clone(), color, 1.5);
+                                    this.floatingTextManager.spawnText(`-${finalDamage}`, worldPos, color, 1.5);
                                 }
 
                                 proj.destroy();
@@ -1707,6 +1711,7 @@ class Game {
             rotationIndex: this.placementRotationIndex,
             origin: origin,
             direction: direction,
+            camera: this.sceneManager.camera, // ADDED CAMERA FOR RAYCASTING
             registerProjectile: (proj) => {
                 this.projectiles.push(proj)
             },

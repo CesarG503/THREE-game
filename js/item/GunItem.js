@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { Item } from "./Item.js";
 import { FBXLoader } from "three/addons/loaders/FBXLoader.js";
 import { Projectile } from "../weapons/Projectile.js";
+import { BlasterSystem } from "../fx/BlasterSystem.js";
 
 export class GunItem extends Item {
     constructor() {
@@ -17,6 +18,7 @@ export class GunItem extends Item {
         this.recoil = 5.0; // Retroceso de la cámara
         this.recoilMode = "hybrid"; // Modos: 'manual', 'recenter', 'hybrid'
         this.isAuto = false; // Disparo automático
+        this.projectileType = "bullet"; // "bullet" or "ball"
         this.lastShotTime = 0;
 
         this.isReloading = false;
@@ -174,14 +176,100 @@ export class GunItem extends Item {
 
         // Spawn Projectile
         if (context.registerProjectile) {
+            // 1. Calcular posición real del cañón del arma (Start pos)
+            let startPos = new THREE.Vector3();
+
+            // Si el modelo está cargado y en escena, usamos su posición real en el mundo para que coincida en 1ra y 3ra persona
+            if (this.model) {
+                // El cañón suele estar al frente del arma (+Z localmente si la escala está orientada así, o el frente del grupo de arma)
+                // Obtenemos la posición del arma
+                this.model.getWorldPosition(startPos);
+
+                // Obtener hacia dónde apunta el arma realmente o la cámara
+                let forward = new THREE.Vector3();
+                if (context.camera) {
+                    context.camera.getWorldDirection(forward);
+                } else {
+                    forward.copy(context.direction).normalize();
+                }
+
+                // Ajustar un poco hacia adelante desde el centro del modelo del arma para simular la punta del cañón
+                startPos.add(forward.multiplyScalar(0.8)); // 0.8 unidades hacia adelante
+            } else {
+                // Fallback de offset fijo a la cámara
+                const offset = new THREE.Vector3(0.3, -0.3, -1.0);
+                if (this.equippedHand === "left") offset.x = -0.3;
+                startPos.copy(offset);
+
+                if (context.camera) {
+                    startPos.applyQuaternion(context.camera.quaternion);
+                    startPos.add(context.camera.position);
+                } else {
+                    startPos.add(context.origin);
+                }
+            }
+
+            // 2. Raycast estrictamente al centro de la mira
+            let targetPoint = new THREE.Vector3();
+            let hitTarget = false;
+
+            if (context.camera && context.scene) {
+                const raycaster = new THREE.Raycaster();
+                raycaster.setFromCamera(new THREE.Vector2(0, 0), context.camera);
+
+                // Ignoramos jugador si es necesario
+                const intersects = raycaster.intersectObjects(context.scene.children, true);
+
+                for (let hit of intersects) {
+                    if (hit.object === this.model || hit.object.userData.isPlayer) continue;
+                    targetPoint.copy(hit.point);
+                    hitTarget = true;
+                    break;
+                }
+
+                if (!hitTarget) {
+                    // Apuntar al infinito si no hay pared cerca
+                    targetPoint.copy(context.camera.position).add(raycaster.ray.direction.multiplyScalar(100));
+                }
+            } else {
+                targetPoint.copy(context.origin).add(context.direction.clone().multiplyScalar(100));
+            }
+
+            // 3. Dirección de corrección (De cañón a centro de mira)
+            const trajectoryDir = targetPoint.clone().sub(startPos).normalize();
+
+            // 4. Efecto de Estela (Solamente si es 'bullet')
+            const projType = this.projectileType || "bullet";
+
+            if (projType === "bullet" && context.scene) {
+                if (!this.blasterSystem) {
+                    this.blasterSystem = new BlasterSystem(context.scene);
+                }
+
+                const tracer = this.blasterSystem.CreateParticle();
+                tracer.Start.copy(startPos);
+
+                // Inicialmente avanza 10 unidades rápido para evitar glitch en cara del jugador
+                tracer.End = trajectoryDir.clone().multiplyScalar(10.0).add(startPos);
+                tracer.Velocity = trajectoryDir.clone().multiplyScalar(150.0); // Bala súper rápida visualmente
+
+                tracer.Colours = [new THREE.Color(0xffff88), new THREE.Color(0xffaa00)]; // Amarillo brillante a naranja
+                tracer.Length = 10.0;
+                tracer.Life = 0.5; // Desaparece rápido
+                tracer.TotalLife = 0.5;
+                tracer.Width = 0.05;
+            }
+
             const speed = 50;
             const proj = new Projectile(
                 context.scene,
                 context.world,
-                context.origin,
-                context.direction,
+                startPos, // Desde el cañón
+                trajectoryDir, // Hacia el punto central
                 speed,
-                this.damage
+                this.damage,
+                1.0, // bulletDrop base
+                projType // "bullet" o "ball"
             );
             context.registerProjectile(proj);
         }
@@ -228,6 +316,10 @@ export class GunItem extends Item {
     updateAnim(dt, manualPitchDelta = 0) {
         if (this.mixer) {
             this.mixer.update(dt);
+        }
+
+        if (this.blasterSystem) {
+            this.blasterSystem.Update(dt);
         }
 
         // === 1. ACTUALIZAR RETROCESO VISUAL DEL ARMA ===
@@ -351,6 +443,7 @@ export class GunItem extends Item {
         cloned.recoil = this.recoil;
         cloned.recoilMode = this.recoilMode;
         cloned.isAuto = this.isAuto;
+        cloned.projectileType = this.projectileType || "bullet";
         return cloned;
     }
 }

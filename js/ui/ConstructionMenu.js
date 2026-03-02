@@ -1463,12 +1463,51 @@ export class ConstructionMenu {
         autoRow.appendChild(autoLabel);
         autoRow.appendChild(this.autoInput);
 
+        // --- Projectile Type Row ---
+        const projectileTypeRow = document.createElement('div');
+        projectileTypeRow.style.display = "flex";
+        projectileTypeRow.style.alignItems = "center";
+        projectileTypeRow.style.justifyContent = "space-between";
+
+        const projectileTypeLabel = document.createElement('span');
+        projectileTypeLabel.textContent = "Tipo de Proyectil:";
+
+        this.projectileTypeSelect = document.createElement('select');
+        this.projectileTypeSelect.style.cssText = `
+            width: 100px;
+            background: #333;
+            color: white;
+            border: 1px solid #555;
+            border-radius: 4px;
+            padding: 4px;
+        `;
+
+        const optionBullet = document.createElement('option');
+        optionBullet.value = "bullet";
+        optionBullet.textContent = "Bala";
+        const optionBall = document.createElement('option');
+        optionBall.value = "ball";
+        optionBall.textContent = "Pelota";
+
+        this.projectileTypeSelect.appendChild(optionBullet);
+        this.projectileTypeSelect.appendChild(optionBall);
+
+        this.projectileTypeSelect.addEventListener('change', (e) => {
+            if (this.currentDraftItem && this.currentDraftItem.type === 'weapon') {
+                this.currentDraftItem.projectileType = e.target.value;
+            }
+        });
+
+        projectileTypeRow.appendChild(projectileTypeLabel);
+        projectileTypeRow.appendChild(this.projectileTypeSelect);
+
         weaponControlsContainer.appendChild(damageRow);
         weaponControlsContainer.appendChild(cooldownRow);
         weaponControlsContainer.appendChild(handRow);
         weaponControlsContainer.appendChild(recoilRow);
         weaponControlsContainer.appendChild(recoilModeRow);
         weaponControlsContainer.appendChild(autoRow);
+        weaponControlsContainer.appendChild(projectileTypeRow);
 
         this.panelEditor.appendChild(weaponControlsContainer);
 
@@ -1515,6 +1554,7 @@ export class ConstructionMenu {
             this.recoilInput.value = baseItem.recoil !== undefined ? baseItem.recoil : 5.0;
             this.recoilModeSelect.value = baseItem.recoilMode !== undefined ? baseItem.recoilMode : "hybrid";
             this.autoInput.checked = baseItem.isAuto !== undefined ? baseItem.isAuto : false;
+            this.projectileTypeSelect.value = baseItem.projectileType !== undefined ? baseItem.projectileType : "bullet";
         } else {
             this.editorConstructionControls.style.display = 'flex';
             this.editorTextureContainer.style.display = 'flex';

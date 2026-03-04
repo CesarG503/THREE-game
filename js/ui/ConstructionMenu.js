@@ -1548,6 +1548,48 @@ export class ConstructionMenu {
         projectileTypeRow.appendChild(projectileTypeLabel);
         projectileTypeRow.appendChild(this.projectileTypeSelect);
 
+        // --- Tracer Row ---
+        const tracerRow = document.createElement('div');
+        tracerRow.style.display = "flex";
+        tracerRow.style.alignItems = "center";
+        tracerRow.style.justifyContent = "space-between";
+
+        const tracerLabel = document.createElement('span');
+        tracerLabel.textContent = "Estela de Humo:";
+
+        this.tracerInput = document.createElement('input');
+        this.tracerInput.type = "checkbox";
+        this.tracerInput.style.cssText = this.autoInput.style.cssText;
+        this.tracerInput.addEventListener('change', (e) => {
+            if (this.currentDraftItem && this.currentDraftItem.type === 'weapon') {
+                this.currentDraftItem.hasTracer = e.target.checked;
+            }
+        });
+
+        tracerRow.appendChild(tracerLabel);
+        tracerRow.appendChild(this.tracerInput);
+
+        // --- Trajectory Line Row ---
+        const trajectoryRow = document.createElement('div');
+        trajectoryRow.style.display = "flex";
+        trajectoryRow.style.alignItems = "center";
+        trajectoryRow.style.justifyContent = "space-between";
+
+        const trajectoryLabel = document.createElement('span');
+        trajectoryLabel.textContent = "Línea de Trayectoria (Roja):";
+
+        this.trajectoryInput = document.createElement('input');
+        this.trajectoryInput.type = "checkbox";
+        this.trajectoryInput.style.cssText = this.autoInput.style.cssText;
+        this.trajectoryInput.addEventListener('change', (e) => {
+            if (this.currentDraftItem && this.currentDraftItem.type === 'weapon') {
+                this.currentDraftItem.hasTrajectoryLine = e.target.checked;
+            }
+        });
+
+        trajectoryRow.appendChild(trajectoryLabel);
+        trajectoryRow.appendChild(this.trajectoryInput);
+
         weaponControlsContainer.appendChild(damageRow);
         weaponControlsContainer.appendChild(cooldownRow);
         weaponControlsContainer.appendChild(handRow);
@@ -1557,6 +1599,8 @@ export class ConstructionMenu {
         weaponControlsContainer.appendChild(speedRow);
         weaponControlsContainer.appendChild(dropRow);
         weaponControlsContainer.appendChild(projectileTypeRow);
+        weaponControlsContainer.appendChild(tracerRow);
+        weaponControlsContainer.appendChild(trajectoryRow);
 
         this.panelEditor.appendChild(weaponControlsContainer);
 
@@ -1606,6 +1650,8 @@ export class ConstructionMenu {
             this.projectileTypeSelect.value = baseItem.projectileType !== undefined ? baseItem.projectileType : "bullet";
             this.speedInput.value = baseItem.shotSpeed !== undefined ? baseItem.shotSpeed : 50.0;
             this.dropInput.value = baseItem.bulletDrop !== undefined ? baseItem.bulletDrop : 1.0;
+            this.tracerInput.checked = baseItem.hasTracer !== undefined ? baseItem.hasTracer : false;
+            this.trajectoryInput.checked = baseItem.hasTrajectoryLine !== undefined ? baseItem.hasTrajectoryLine : false;
         } else {
             this.editorConstructionControls.style.display = 'flex';
             this.editorTextureContainer.style.display = 'flex';

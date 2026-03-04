@@ -10,6 +10,13 @@ export class Projectile {
         this.lifetime = 5.0; // Segundos antes de auto eliminar
         this.type = type;
 
+        this.hasTracer = false;
+        this.hasTrajectoryLine = false;
+        this.blasterSystem = null;
+        this.lastPosition = origin.clone();
+        this.trajectoryPoints = [origin.clone()];
+        this.trajectoryLine = null;
+
         // 1. Visuals
         if (this.type === "ball") {
             const geo = new THREE.SphereGeometry(0.1, 8, 8);
@@ -64,6 +71,43 @@ export class Projectile {
         if (this.rigidBody && this.mesh) {
             const pos = this.rigidBody.translation();
             this.mesh.position.set(pos.x, pos.y, pos.z);
+            
+            const currentPos = new THREE.Vector3(pos.x, pos.y, pos.z);
+
+            if (this.hasTrajectoryLine) {
+                if (!this.trajectoryLine) {
+                    const material = new THREE.LineBasicMaterial({ color: 0xff0000 });
+                    const geometry = new THREE.BufferGeometry().setFromPoints(this.trajectoryPoints);
+                    this.trajectoryLine = new THREE.Line(geometry, material);
+                    this.scene.add(this.trajectoryLine);
+                }
+                
+                // Add new point and update geometry if moved
+                if (currentPos.distanceToSquared(this.lastPosition) > 0.001) {
+                    this.trajectoryPoints.push(currentPos.clone());
+                    this.trajectoryLine.geometry.setFromPoints(this.trajectoryPoints);
+                }
+            }
+
+            if (this.hasTracer && this.blasterSystem) {
+                // Determine movement direction and distance
+                const dist = currentPos.distanceTo(this.lastPosition);
+                if (dist > 0.01) {
+                    const dir = currentPos.clone().sub(this.lastPosition).normalize();
+                    const tracer = this.blasterSystem.CreateParticle();
+                    tracer.Start.copy(this.lastPosition);
+                    tracer.End.copy(currentPos);
+                    tracer.Velocity = new THREE.Vector3(0, 0, 0); // static segment
+                    
+                    tracer.Colours = [new THREE.Color(0x888888), new THREE.Color(0x222222)]; // humo
+                    tracer.Length = dist;
+                    tracer.Life = 0.5;
+                    tracer.TotalLife = 0.5;
+                    tracer.Width = 0.05;
+                }
+            }
+
+            this.lastPosition.copy(currentPos);
         }
     }
 
@@ -81,6 +125,14 @@ export class Projectile {
         // Cleanup Rapier
         if (this.rigidBody) {
             this.world.removeRigidBody(this.rigidBody);
+        }
+
+        // Cleanup Line
+        if (this.trajectoryLine) {
+            this.scene.remove(this.trajectoryLine);
+            this.trajectoryLine.geometry.dispose();
+            this.trajectoryLine.material.dispose();
+            this.trajectoryLine = null;
         }
     }
 }

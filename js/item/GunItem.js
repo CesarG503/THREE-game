@@ -22,6 +22,8 @@ export class GunItem extends Item {
         this.shotSpeed = 50.0; // Velocidad del proyectil
         this.bulletDrop = 1.0; // Caída de bala (gravedad)
         this.lastShotTime = 0;
+        this.hasTracer = false;
+        this.hasTrajectoryLine = false;
 
         this.isReloading = false;
 
@@ -242,12 +244,15 @@ export class GunItem extends Item {
 
             // 4. Efecto de Estela (Solamente si es 'bullet')
             const projType = this.projectileType || "bullet";
-
-            if (projType === "bullet" && context.scene) {
+            
+            // Instanciar BlasterSystem si se requiere el efecto nativo o el nuevo recursivo
+            if ((projType === "bullet" || this.hasTracer) && context.scene) {
                 if (!this.blasterSystem) {
                     this.blasterSystem = new BlasterSystem(context.scene);
                 }
+            }
 
+            if (projType === "bullet" && context.scene) {
                 const tracer = this.blasterSystem.CreateParticle();
                 tracer.Start.copy(startPos);
 
@@ -274,6 +279,9 @@ export class GunItem extends Item {
                 drop, // bulletDrop base
                 projType // "bullet" o "ball"
             );
+            proj.hasTracer = this.hasTracer;
+            proj.hasTrajectoryLine = this.hasTrajectoryLine;
+            proj.blasterSystem = this.blasterSystem;
             context.registerProjectile(proj);
         }
 
@@ -449,6 +457,8 @@ export class GunItem extends Item {
         cloned.projectileType = this.projectileType || "bullet";
         cloned.shotSpeed = this.shotSpeed !== undefined ? this.shotSpeed : 50.0;
         cloned.bulletDrop = this.bulletDrop !== undefined ? this.bulletDrop : 1.0;
+        cloned.hasTracer = this.hasTracer || false;
+        cloned.hasTrajectoryLine = this.hasTrajectoryLine || false;
         return cloned;
     }
 }

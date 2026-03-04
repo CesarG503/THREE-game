@@ -1463,6 +1463,53 @@ export class ConstructionMenu {
         autoRow.appendChild(autoLabel);
         autoRow.appendChild(this.autoInput);
 
+        // --- Shot Speed Row ---
+        const speedRow = document.createElement('div');
+        speedRow.style.display = "flex";
+        speedRow.style.alignItems = "center";
+        speedRow.style.justifyContent = "space-between";
+
+        const speedLabel = document.createElement('span');
+        speedLabel.textContent = "Velocidad de Disparo:";
+
+        this.speedInput = document.createElement('input');
+        this.speedInput.type = "number";
+        this.speedInput.min = "1";
+        this.speedInput.step = "5";
+        this.speedInput.style.cssText = this.recoilInput.style.cssText;
+        this.speedInput.addEventListener('input', (e) => {
+            let val = parseFloat(e.target.value);
+            if (!isNaN(val) && this.currentDraftItem && this.currentDraftItem.type === 'weapon') {
+                this.currentDraftItem.shotSpeed = val;
+            }
+        });
+
+        speedRow.appendChild(speedLabel);
+        speedRow.appendChild(this.speedInput);
+
+        // --- Bullet Drop Row ---
+        const dropRow = document.createElement('div');
+        dropRow.style.display = "flex";
+        dropRow.style.alignItems = "center";
+        dropRow.style.justifyContent = "space-between";
+
+        const dropLabel = document.createElement('span');
+        dropLabel.textContent = "Gravedad (Caída):";
+
+        this.dropInput = document.createElement('input');
+        this.dropInput.type = "number";
+        this.dropInput.step = "0.1";
+        this.dropInput.style.cssText = this.recoilInput.style.cssText;
+        this.dropInput.addEventListener('input', (e) => {
+            let val = parseFloat(e.target.value);
+            if (!isNaN(val) && this.currentDraftItem && this.currentDraftItem.type === 'weapon') {
+                this.currentDraftItem.bulletDrop = val;
+            }
+        });
+
+        dropRow.appendChild(dropLabel);
+        dropRow.appendChild(this.dropInput);
+
         // --- Projectile Type Row ---
         const projectileTypeRow = document.createElement('div');
         projectileTypeRow.style.display = "flex";
@@ -1507,6 +1554,8 @@ export class ConstructionMenu {
         weaponControlsContainer.appendChild(recoilRow);
         weaponControlsContainer.appendChild(recoilModeRow);
         weaponControlsContainer.appendChild(autoRow);
+        weaponControlsContainer.appendChild(speedRow);
+        weaponControlsContainer.appendChild(dropRow);
         weaponControlsContainer.appendChild(projectileTypeRow);
 
         this.panelEditor.appendChild(weaponControlsContainer);
@@ -1555,6 +1604,8 @@ export class ConstructionMenu {
             this.recoilModeSelect.value = baseItem.recoilMode !== undefined ? baseItem.recoilMode : "hybrid";
             this.autoInput.checked = baseItem.isAuto !== undefined ? baseItem.isAuto : false;
             this.projectileTypeSelect.value = baseItem.projectileType !== undefined ? baseItem.projectileType : "bullet";
+            this.speedInput.value = baseItem.shotSpeed !== undefined ? baseItem.shotSpeed : 50.0;
+            this.dropInput.value = baseItem.bulletDrop !== undefined ? baseItem.bulletDrop : 1.0;
         } else {
             this.editorConstructionControls.style.display = 'flex';
             this.editorTextureContainer.style.display = 'flex';

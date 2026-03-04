@@ -19,6 +19,8 @@ export class GunItem extends Item {
         this.recoilMode = "hybrid"; // Modos: 'manual', 'recenter', 'hybrid'
         this.isAuto = false; // Disparo automático
         this.projectileType = "bullet"; // "bullet" or "ball"
+        this.shotSpeed = 50.0; // Velocidad del proyectil
+        this.bulletDrop = 1.0; // Caída de bala (gravedad)
         this.lastShotTime = 0;
 
         this.isReloading = false;
@@ -260,7 +262,8 @@ export class GunItem extends Item {
                 tracer.Width = 0.05;
             }
 
-            const speed = 50;
+            const speed = this.shotSpeed !== undefined ? this.shotSpeed : 50;
+            const drop = this.bulletDrop !== undefined ? this.bulletDrop : 1.0;
             const proj = new Projectile(
                 context.scene,
                 context.world,
@@ -268,7 +271,7 @@ export class GunItem extends Item {
                 trajectoryDir, // Hacia el punto central
                 speed,
                 this.damage,
-                1.0, // bulletDrop base
+                drop, // bulletDrop base
                 projType // "bullet" o "ball"
             );
             context.registerProjectile(proj);
@@ -444,6 +447,8 @@ export class GunItem extends Item {
         cloned.recoilMode = this.recoilMode;
         cloned.isAuto = this.isAuto;
         cloned.projectileType = this.projectileType || "bullet";
+        cloned.shotSpeed = this.shotSpeed !== undefined ? this.shotSpeed : 50.0;
+        cloned.bulletDrop = this.bulletDrop !== undefined ? this.bulletDrop : 1.0;
         return cloned;
     }
 }

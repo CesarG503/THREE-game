@@ -68,17 +68,20 @@ export class Projectile {
         }
 
         // Sync visual mesh with physics body
-        if (this.rigidBody && this.mesh) {
+        if (this.rigidBody) {
             const pos = this.rigidBody.translation();
-            this.mesh.position.set(pos.x, pos.y, pos.z);
-            
             const currentPos = new THREE.Vector3(pos.x, pos.y, pos.z);
 
+            if (this.mesh) {
+                this.mesh.position.copy(currentPos);
+            }
+            
             if (this.hasTrajectoryLine) {
                 if (!this.trajectoryLine) {
                     const material = new THREE.LineBasicMaterial({ color: 0xff0000 });
                     const geometry = new THREE.BufferGeometry().setFromPoints(this.trajectoryPoints);
                     this.trajectoryLine = new THREE.Line(geometry, material);
+                    this.trajectoryLine.userData.ignoreRaycast = true;
                     this.scene.add(this.trajectoryLine);
                 }
                 

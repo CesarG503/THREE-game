@@ -225,7 +225,7 @@ export class GunItem extends Item {
                 const intersects = raycaster.intersectObjects(context.scene.children, true);
 
                 for (let hit of intersects) {
-                    if (hit.object === this.model || hit.object.userData.isPlayer) continue;
+                    if (hit.object === this.model || hit.object.userData.isPlayer || hit.object.isLine || hit.object.userData.ignoreRaycast) continue;
                     targetPoint.copy(hit.point);
                     hitTarget = true;
                     break;

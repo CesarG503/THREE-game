@@ -9,10 +9,10 @@ export class CameraController {
         this.isFirstPerson = false
 
         // Third person settings
-        this.thirdPersonDistance = 8
+        this.thirdPersonDistance = 1.5 // Set closer default distance
         this.thirdPersonHeight = 2
         this.alwaysRotateThirdPerson = true // Added for TP tracking
-        this.minDistance = 2
+        this.minDistance = 1.5 // Allow zooming in closer
         this.maxDistance = 20
         this.minCameraHeight = 0.5
 
@@ -307,19 +307,37 @@ export class CameraController {
     updateThirdPerson(characterPosition, dt) {
         const targetCameraPos = new THREE.Vector3()
 
+        // Interpolate camera parameters based on zoom distance
+        // Min distance (close) = 1.5, Far distance reference = 8.0
+        const zoomFactor = Math.max(0, Math.min(1, (this.thirdPersonDistance - 1.5) / (8.0 - 1.5)))
+        
+        // Close parameters (torso up, character to the left)
+        const closeHeight = 1.4
+        const closeOffset = 0.7
+        const closeLookAtHeight = 1.4
+        
+        // Far parameters (current defaults)
+        const farHeight = this.thirdPersonHeight // 2.0
+        const farOffset = this.horizontalOffset // 0.4
+        const farLookAtHeight = 1.2
+        
+        const currentHeight = closeHeight + (farHeight - closeHeight) * zoomFactor
+        const currentOffset = closeOffset + (farOffset - closeOffset) * zoomFactor
+        const currentLookAtY = closeLookAtHeight + (farLookAtHeight - closeLookAtHeight) * zoomFactor
+
         // Calculate horizontal distance based on phi angle
         const horizontalDist = this.thirdPersonDistance * Math.cos(this.phi)
         const verticalDist = this.thirdPersonDistance * Math.sin(this.phi)
 
         targetCameraPos.x = characterPosition.x - horizontalDist * Math.sin(this.theta)
-        targetCameraPos.y = characterPosition.y + this.thirdPersonHeight + verticalDist
+        targetCameraPos.y = characterPosition.y + currentHeight + verticalDist
         targetCameraPos.z = characterPosition.z - horizontalDist * Math.cos(this.theta)
 
         // Apply horizontal offset (right vector)
         // Right vector is perpendicular to the look direction (theta)
         // Right vector x = -cos(theta), z = sin(theta) (based on getRightDirection logic)
-        const offsetX = -Math.cos(this.theta) * this.horizontalOffset
-        const offsetZ = Math.sin(this.theta) * this.horizontalOffset
+        const offsetX = -Math.cos(this.theta) * currentOffset
+        const offsetZ = Math.sin(this.theta) * currentOffset
 
         targetCameraPos.x += offsetX
         targetCameraPos.z += offsetZ
@@ -334,7 +352,7 @@ export class CameraController {
         this.camera.position.copy(this.currentPosition)
 
         const targetLookAt = characterPosition.clone()
-        targetLookAt.y += 1.2
+        targetLookAt.y += currentLookAtY
 
         // Also offset the look-at target so we look parallel to the character, 
         // effectively strafing the camera

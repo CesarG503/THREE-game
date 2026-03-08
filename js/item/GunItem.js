@@ -225,7 +225,20 @@ export class GunItem extends Item {
                 const intersects = raycaster.intersectObjects(context.scene.children, true);
 
                 for (let hit of intersects) {
-                    if (hit.object === this.model || hit.object.userData.isPlayer || hit.object.isLine || hit.object.userData.ignoreRaycast) continue;
+                    let isIgnored = false;
+                    let obj = hit.object;
+                    
+                    // Traverse up the hierarchy to see if this mesh belongs to the player or the gun
+                    while (obj) {
+                        if (obj === this.model || obj === this.equipGroup || obj.userData.isPlayer || obj.isLine || obj.userData.ignoreRaycast) {
+                            isIgnored = true;
+                            break;
+                        }
+                        obj = obj.parent;
+                    }
+                    
+                    if (isIgnored) continue;
+                    
                     targetPoint.copy(hit.point);
                     hitTarget = true;
                     break;

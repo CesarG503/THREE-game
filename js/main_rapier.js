@@ -744,18 +744,32 @@ class Game {
 
                 if (diffs && diffs.pitchDiff !== undefined) {
                     if (diffs.pitchDiff !== 0) {
-                        this.cameraController.fpPitch += diffs.pitchDiff;
-                        this.cameraController.fpPitch = Math.max(-this.cameraController.maxPitch, Math.min(this.cameraController.maxPitch, this.cameraController.fpPitch));
+                        if (this.cameraController.isFirstPerson) {
+                            this.cameraController.fpPitch += diffs.pitchDiff;
+                            this.cameraController.fpPitch = Math.max(-this.cameraController.maxPitch, Math.min(this.cameraController.maxPitch, this.cameraController.fpPitch));
+                        } else {
+                            this.cameraController.phi += diffs.pitchDiff;
+                            this.cameraController.phi = Math.max(this.cameraController.minPhi, Math.min(this.cameraController.maxPhi, this.cameraController.phi));
+                        }
                     }
                     if (diffs.yawDiff !== 0) {
-                        this.cameraController.fpYaw += diffs.yawDiff;
+                        if (this.cameraController.isFirstPerson) {
+                            this.cameraController.fpYaw += diffs.yawDiff;
+                        } else {
+                            this.cameraController.theta += diffs.yawDiff;
+                        }
                     }
                 } else {
                     // Fallback in case it's a number
                     const pitchDiff = typeof diffs === 'number' ? diffs : 0;
                     if (pitchDiff !== 0) {
-                        this.cameraController.fpPitch += pitchDiff;
-                        this.cameraController.fpPitch = Math.max(-this.cameraController.maxPitch, Math.min(this.cameraController.maxPitch, this.cameraController.fpPitch));
+                        if (this.cameraController.isFirstPerson) {
+                            this.cameraController.fpPitch += pitchDiff;
+                            this.cameraController.fpPitch = Math.max(-this.cameraController.maxPitch, Math.min(this.cameraController.maxPitch, this.cameraController.fpPitch));
+                        } else {
+                            this.cameraController.phi += pitchDiff;
+                            this.cameraController.phi = Math.max(this.cameraController.minPhi, Math.min(this.cameraController.maxPhi, this.cameraController.phi));
+                        }
                     }
                 }
             }

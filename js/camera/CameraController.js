@@ -108,9 +108,11 @@ export class CameraController {
                     this.fpPitch = Math.max(-this.maxPitch, Math.min(this.maxPitch, this.fpPitch))
                     this.manualPitchDelta += (this.fpPitch - oldPitch);
                 } else {
+                    const oldPhi = this.phi;
                     this.theta += e.movementX * this.rotationSpeed * (this.tpInvertAxisX ? -1 : 1)
                     this.phi -= e.movementY * this.rotationSpeed * (this.tpInvertAxisY ? -1 : 1)
                     this.phi = Math.max(this.minPhi, Math.min(this.maxPhi, this.phi))
+                    this.manualPitchDelta += (this.phi - oldPhi);
                 }
             }
         })

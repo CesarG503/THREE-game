@@ -748,7 +748,7 @@ class Game {
                             this.cameraController.fpPitch += diffs.pitchDiff;
                             this.cameraController.fpPitch = Math.max(-this.cameraController.maxPitch, Math.min(this.cameraController.maxPitch, this.cameraController.fpPitch));
                         } else {
-                            this.cameraController.phi += diffs.pitchDiff;
+                            this.cameraController.phi -= diffs.pitchDiff;
                             this.cameraController.phi = Math.max(this.cameraController.minPhi, Math.min(this.cameraController.maxPhi, this.cameraController.phi));
                         }
                     }
@@ -767,7 +767,7 @@ class Game {
                             this.cameraController.fpPitch += pitchDiff;
                             this.cameraController.fpPitch = Math.max(-this.cameraController.maxPitch, Math.min(this.cameraController.maxPitch, this.cameraController.fpPitch));
                         } else {
-                            this.cameraController.phi += pitchDiff;
+                            this.cameraController.phi -= pitchDiff;
                             this.cameraController.phi = Math.max(this.cameraController.minPhi, Math.min(this.cameraController.maxPhi, this.cameraController.phi));
                         }
                     }

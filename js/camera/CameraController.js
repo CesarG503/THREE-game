@@ -47,8 +47,8 @@ export class CameraController {
         this.manualPitchDelta = 0;
 
         // Axis settings
-        this.fpInvertAxisX = true
-        this.fpInvertAxisY = true
+        this.fpInvertAxisX = false
+        this.fpInvertAxisY = false
         this.tpInvertAxisX = true
         this.tpInvertAxisY = true
 
@@ -112,7 +112,7 @@ export class CameraController {
                     this.theta += e.movementX * this.rotationSpeed * (this.tpInvertAxisX ? -1 : 1)
                     this.phi -= e.movementY * this.rotationSpeed * (this.tpInvertAxisY ? -1 : 1)
                     this.phi = Math.max(this.minPhi, Math.min(this.maxPhi, this.phi))
-                    this.manualPitchDelta += (this.phi - oldPhi);
+                    this.manualPitchDelta -= (this.phi - oldPhi);
                 }
             }
         })

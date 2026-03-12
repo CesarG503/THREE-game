@@ -49,8 +49,8 @@ export class CameraController {
         // Axis settings
         this.fpInvertAxisX = false
         this.fpInvertAxisY = false
-        this.tpInvertAxisX = true
-        this.tpInvertAxisY = true
+        this.tpInvertAxisX = false
+        this.tpInvertAxisY = false
 
         this.isPaused = false
         this.isUIOpen = false // UI blocks pointer lock
@@ -103,14 +103,18 @@ export class CameraController {
             if (canRotate) {
                 if (this.isFirstPerson) {
                     const oldPitch = this.fpPitch;
-                    this.fpYaw += e.movementX * this.rotationSpeed * (this.fpInvertAxisX ? -1 : 1)
+                    // Eje X: movementX > 0 (derecha) -> Yaw disminuye para mirar a la derecha (Standard)
+                    this.fpYaw -= e.movementX * this.rotationSpeed * (this.fpInvertAxisX ? -1 : 1)
+                    // Eje Y: movementY < 0 (arriba) -> Pitch aumenta (Standard)
                     this.fpPitch -= e.movementY * this.rotationSpeed * (this.fpInvertAxisY ? -1 : 1)
                     this.fpPitch = Math.max(-this.maxPitch, Math.min(this.maxPitch, this.fpPitch))
                     this.manualPitchDelta += (this.fpPitch - oldPitch);
                 } else {
                     const oldPhi = this.phi;
-                    this.theta += e.movementX * this.rotationSpeed * (this.tpInvertAxisX ? -1 : 1)
-                    this.phi -= e.movementY * this.rotationSpeed * (this.tpInvertAxisY ? -1 : 1)
+                    // Eje X: movementX > 0 (derecha) -> Theta disminuye para orbitar (mirar a la derecha) (Standard)
+                    this.theta -= e.movementX * this.rotationSpeed * (this.tpInvertAxisX ? -1 : 1)
+                    // Eje Y: movementY < 0 (arriba) -> phi disminuye para bajar cámara (mirar arriba) (Standard)
+                    this.phi += e.movementY * this.rotationSpeed * (this.tpInvertAxisY ? -1 : 1)
                     this.phi = Math.max(this.minPhi, Math.min(this.maxPhi, this.phi))
                     this.manualPitchDelta -= (this.phi - oldPhi);
                 }

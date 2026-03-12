@@ -265,12 +265,15 @@ export class CameraController {
         if (this.isFirstPerson) {
             this.domElement.requestPointerLock()
             this.fpYaw = this.theta
-            this.fpPitch = 0
+            this.fpPitch = -this.phi
+            this.fpPitch = Math.max(-this.maxPitch, Math.min(this.maxPitch, this.fpPitch))
         } else {
             if (!this.alwaysRotateThirdPerson) {
                 document.exitPointerLock()
             }
             this.theta = this.fpYaw
+            this.phi = -this.fpPitch
+            this.phi = Math.max(this.minPhi, Math.min(this.maxPhi, this.phi))
         }
 
         const event = new CustomEvent("cameraModeChanged", {

@@ -314,6 +314,34 @@ export class CameraController {
     }
 
     updateThirdPerson(characterPosition, dt) {
+        // --- Dynamic Strafe Offset (Anti-crosshair block) ---
+        if (!this.lastCharacterPos) {
+            this.lastCharacterPos = characterPosition.clone();
+            this.dynamicOffset = 0;
+            this.smoothedStrafe = 0;
+        }
+
+        const deltaPos = characterPosition.clone().sub(this.lastCharacterPos);
+        this.lastCharacterPos.copy(characterPosition);
+        
+        // Velocity along the camera's right vector (positive = walking Right relative to screen)
+        const rightVector = new THREE.Vector3(-Math.cos(this.theta), 0, Math.sin(this.theta)).normalize();
+        const rawStrafeVelocity = deltaPos.dot(rightVector) / (dt || 0.016);
+        
+        // Smoothly read velocity to avoid physics spikes
+        this.smoothedStrafe += (rawStrafeVelocity - this.smoothedStrafe) * 15.0 * dt;
+
+        let offsetTarget = 0;
+        if (this.smoothedStrafe > 0.3) {
+            // Moving Right: Character leans towards center. Push them MORE left (+offset)
+            offsetTarget = Math.min(0.5, (this.smoothedStrafe - 0.3) * 0.1); 
+        } else if (this.smoothedStrafe < -0.3) {
+            // Moving Left: Character leans away from center. Pull them slight right (-offset)
+            offsetTarget = Math.max(-0.2, (this.smoothedStrafe + 0.3) * 0.1);
+        }
+
+        this.dynamicOffset += (offsetTarget - this.dynamicOffset) * 6.0 * dt; // Smooth camera reaction
+
         const targetCameraPos = new THREE.Vector3()
 
         // Interpolate camera parameters based on zoom distance
@@ -321,9 +349,9 @@ export class CameraController {
         const zoomFactor = Math.max(0, Math.min(1, (this.thirdPersonDistance - 1.5) / (8.0 - 1.5)))
         
         // Close parameters (torso up, character to the left)
-        const closeHeight = 1.4
+        const closeHeight = 1.6 // Ligeramente más arriba (espalda/hombros)
         const closeOffset = 0.7
-        const closeLookAtHeight = 1.4
+        const closeLookAtHeight = 1.6
         
         // Far parameters (current defaults)
         const farHeight = this.thirdPersonHeight // 2.0
@@ -331,7 +359,8 @@ export class CameraController {
         const farLookAtHeight = 1.2
         
         const currentHeight = closeHeight + (farHeight - closeHeight) * zoomFactor
-        const currentOffset = closeOffset + (farOffset - closeOffset) * zoomFactor
+        // We add dynamicOffset only when zoomed closely (1 - zoomFactor)
+        const currentOffset = closeOffset + (farOffset - closeOffset) * zoomFactor + (this.dynamicOffset * (1 - zoomFactor));
         const currentLookAtY = closeLookAtHeight + (farLookAtHeight - closeLookAtHeight) * zoomFactor
 
         // Calculate horizontal distance based on phi angle

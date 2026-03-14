@@ -1114,6 +1114,7 @@ class Game {
         const fpInvertY = document.getElementById("fp-invert-y")
         const tpInvertX = document.getElementById("tp-invert-x")
         const tpInvertY = document.getElementById("tp-invert-y")
+        const tpDynamicOffset = document.getElementById("tp-dynamic-offset")
         const tpTrackingCheckbox = document.getElementById("tp-tracking")
         const cameraModeText = document.getElementById("camera-mode-text")
 
@@ -1127,6 +1128,8 @@ class Game {
                 fpInvertY.checked = e.detail.fpInvertAxisY
                 tpInvertX.checked = e.detail.tpInvertAxisX
                 tpInvertY.checked = e.detail.tpInvertAxisY
+                
+                if (tpDynamicOffset) tpDynamicOffset.checked = this.cameraController.enableDynamicOffset
 
                 if (tpTrackingCheckbox) tpTrackingCheckbox.checked = this.cameraController.alwaysRotateThirdPerson
 
@@ -1152,11 +1155,16 @@ class Game {
             this.cameraController.togglePause()
         })
 
-        // Bind events
         fpInvertX.addEventListener("change", (e) => this.cameraController.setFpInvertAxisX(e.target.checked))
         fpInvertY.addEventListener("change", (e) => this.cameraController.setFpInvertAxisY(e.target.checked))
         tpInvertX.addEventListener("change", (e) => this.cameraController.setTpInvertAxisX(e.target.checked))
         tpInvertY.addEventListener("change", (e) => this.cameraController.setTpInvertAxisY(e.target.checked))
+        
+        if (tpDynamicOffset) {
+            tpDynamicOffset.addEventListener("change", (e) => {
+                this.cameraController.enableDynamicOffset = e.target.checked
+            })
+        }
 
         if (tpTrackingCheckbox) {
             tpTrackingCheckbox.addEventListener("change", (e) => {

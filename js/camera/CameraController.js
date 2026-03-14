@@ -37,6 +37,7 @@ export class CameraController {
 
         this.horizontalOffset = 0.4
         this.verticalOffset = 0
+        this.enableDynamicOffset = false // Default desactivado según petición
 
         // First person look direction
         this.fpYaw = 0
@@ -332,12 +333,14 @@ export class CameraController {
         this.smoothedStrafe += (rawStrafeVelocity - this.smoothedStrafe) * 15.0 * dt;
 
         let offsetTarget = 0;
-        if (this.smoothedStrafe > 0.3) {
-            // Moving Right: Character leans towards center. Push them MORE left (+offset)
-            offsetTarget = Math.min(0.5, (this.smoothedStrafe - 0.3) * 0.1); 
-        } else if (this.smoothedStrafe < -0.3) {
-            // Moving Left: Character leans away from center. Pull them slight right (-offset)
-            offsetTarget = Math.max(-0.2, (this.smoothedStrafe + 0.3) * 0.1);
+        if (this.enableDynamicOffset) {
+            if (this.smoothedStrafe > 0.3) {
+                // Moving Right: Character leans towards center. Push them MORE left (+offset)
+                offsetTarget = Math.min(0.5, (this.smoothedStrafe - 0.3) * 0.1); 
+            } else if (this.smoothedStrafe < -0.3) {
+                // Moving Left: Character leans away from center. Pull them slight right (-offset)
+                offsetTarget = Math.max(-0.2, (this.smoothedStrafe + 0.3) * 0.1);
+            }
         }
 
         this.dynamicOffset += (offsetTarget - this.dynamicOffset) * 6.0 * dt; // Smooth camera reaction

@@ -2,7 +2,7 @@ import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
 
 export class Projectile {
-    constructor(scene, world, origin, direction, speed, damage, bulletDrop = 1.0, type = "ball", rebote = false) {
+    constructor(scene, world, origin, direction, speed, damage, bulletDrop = 1.0, type = "ball", rebote = false, hasImpactEffect = false) {
         this.scene = scene;
         this.world = world;
         this.damage = damage;
@@ -10,6 +10,7 @@ export class Projectile {
         this.lifetime = 5.0; // Segundos antes de auto eliminar
         this.type = type;
         this.rebote = rebote;
+        this.hasImpactEffect = hasImpactEffect;
 
         this.hasTracer = false;
         this.hasTrajectoryLine = false;
@@ -117,9 +118,36 @@ export class Projectile {
         }
     }
 
-    destroy() {
+    destroy(hitPos = null) {
         if (this.isDead) return;
         this.isDead = true;
+
+        if (this.initialTracer && this.initialTracer.Alive) {
+            this.initialTracer.Life = 0; // stop piercing walls
+        }
+
+        // Impact Effect
+        if (hitPos && this.hasImpactEffect && this.blasterSystem) {
+            const vPos = new THREE.Vector3(hitPos.x, hitPos.y, hitPos.z);
+            for (let i = 0; i < 5; i++) {
+                const spark = this.blasterSystem.CreateParticle();
+                spark.Start.copy(vPos);
+                spark.End.copy(vPos).add(new THREE.Vector3(
+                    (Math.random()-0.5)*0.2, 
+                    (Math.random()-0.5)*0.2, 
+                    (Math.random()-0.5)*0.2
+                ));
+                spark.Velocity = new THREE.Vector3(
+                    (Math.random()-0.5)*5, 
+                    Math.random()*5, 
+                    (Math.random()-0.5)*5
+                );
+                spark.Colours = [new THREE.Color(0xffaa00), new THREE.Color(0x555555)]; // orange to smoke
+                spark.Length = 0.1;
+                spark.Life = 0.2 + Math.random()*0.2;
+                spark.TotalLife = spark.Life;
+            }
+        }
 
         // Cleanup ThreeJS
         if (this.mesh) {
@@ -135,9 +163,13 @@ export class Projectile {
 
         // Cleanup Line
         if (this.trajectoryLine) {
-            this.scene.remove(this.trajectoryLine);
-            this.trajectoryLine.geometry.dispose();
-            this.trajectoryLine.material.dispose();
+            const line = this.trajectoryLine;
+            // Dejar la línea 0.5s para que se vea al chocar, luego remover
+            setTimeout(() => {
+                this.scene.remove(line);
+                line.geometry.dispose();
+                line.material.dispose();
+            }, 500); 
             this.trajectoryLine = null;
         }
     }

@@ -25,6 +25,7 @@ export class GunItem extends Item {
         this.hasTracer = false;
         this.hasTrajectoryLine = false;
         this.rebote = false; // Por defecto las balas no rebotan
+        this.hasImpactEffect = false; // Humo al chocar
 
         this.isReloading = false;
 
@@ -266,6 +267,7 @@ export class GunItem extends Item {
                 }
             }
 
+            let tempTracer = null;
             if (projType === "bullet" && context.scene) {
                 const tracer = this.blasterSystem.CreateParticle();
                 tracer.Start.copy(startPos);
@@ -279,6 +281,7 @@ export class GunItem extends Item {
                 tracer.Life = 0.5; // Desaparece rápido
                 tracer.TotalLife = 0.5;
                 tracer.Width = 0.05;
+                tempTracer = tracer;
             }
 
             const speed = this.shotSpeed !== undefined ? this.shotSpeed : 50;
@@ -292,11 +295,13 @@ export class GunItem extends Item {
                 this.damage,
                 drop, // bulletDrop base
                 projType, // "bullet" o "ball"
-                this.rebote
+                this.rebote,
+                this.hasImpactEffect
             );
             proj.hasTracer = this.hasTracer;
             proj.hasTrajectoryLine = this.hasTrajectoryLine;
             proj.blasterSystem = this.blasterSystem;
+            proj.initialTracer = tempTracer;
             context.registerProjectile(proj);
         }
 
@@ -475,6 +480,7 @@ export class GunItem extends Item {
         cloned.hasTracer = this.hasTracer || false;
         cloned.hasTrajectoryLine = this.hasTrajectoryLine || false;
         cloned.rebote = this.rebote !== undefined ? this.rebote : false;
+        cloned.hasImpactEffect = this.hasImpactEffect || false;
         return cloned;
     }
 }

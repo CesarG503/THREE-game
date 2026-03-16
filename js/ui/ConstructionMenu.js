@@ -1611,6 +1611,27 @@ export class ConstructionMenu {
         reboteRow.appendChild(reboteLabel);
         reboteRow.appendChild(this.reboteInput);
 
+        // --- Impact Effect Row ---
+        const impactRow = document.createElement('div');
+        impactRow.style.display = "flex";
+        impactRow.style.alignItems = "center";
+        impactRow.style.justifyContent = "space-between";
+
+        const impactLabel = document.createElement('span');
+        impactLabel.textContent = "Impacto (Humo):";
+
+        this.impactInput = document.createElement('input');
+        this.impactInput.type = "checkbox";
+        this.impactInput.style.cssText = this.autoInput.style.cssText;
+        this.impactInput.addEventListener('change', (e) => {
+            if (this.currentDraftItem && this.currentDraftItem.type === 'weapon') {
+                this.currentDraftItem.hasImpactEffect = e.target.checked;
+            }
+        });
+
+        impactRow.appendChild(impactLabel);
+        impactRow.appendChild(this.impactInput);
+
         weaponControlsContainer.appendChild(damageRow);
         weaponControlsContainer.appendChild(cooldownRow);
         weaponControlsContainer.appendChild(handRow);
@@ -1623,6 +1644,7 @@ export class ConstructionMenu {
         weaponControlsContainer.appendChild(tracerRow);
         weaponControlsContainer.appendChild(trajectoryRow);
         weaponControlsContainer.appendChild(reboteRow);
+        weaponControlsContainer.appendChild(impactRow);
 
         this.panelEditor.appendChild(weaponControlsContainer);
 
@@ -1678,6 +1700,7 @@ export class ConstructionMenu {
             // Set rebote from item, defaulting to true if it's a "ball", otherwise false
             let defaultRebote = baseItem.projectileType === "ball" ? true : false;
             this.reboteInput.checked = baseItem.rebote !== undefined ? baseItem.rebote : defaultRebote;
+            this.impactInput.checked = baseItem.hasImpactEffect !== undefined ? baseItem.hasImpactEffect : false;
         } else {
             this.editorConstructionControls.style.display = 'flex';
             this.editorTextureContainer.style.display = 'flex';

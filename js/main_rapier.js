@@ -618,8 +618,9 @@ class Game {
                     const proj = this.projectiles[i];
                     if (!proj.isDead && !proj.rebote) {
                         if (proj.colliderHandle === handle1 || proj.colliderHandle === handle2) {
+                            const hitPos = proj.rigidBody.translation();
                             // Destruir proyectil (ej. bala) si choca y no tiene rebote
-                            proj.destroy();
+                            proj.destroy(hitPos);
                         }
                     }
                 }
@@ -720,7 +721,7 @@ class Game {
                                     this.floatingTextManager.spawnText(`-${finalDamage}`, worldPos, color, 1.5);
                                 }
 
-                                proj.destroy();
+                                proj.destroy(worldPos);
                             }
                         }
                     }

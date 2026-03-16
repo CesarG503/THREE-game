@@ -45,6 +45,7 @@ class Game {
         // Physics World
         let gravity = { x: 0.0, y: -20.0, z: 0.0 }
         this.world = new RAPIER.World(gravity)
+        this.eventQueue = new RAPIER.EventQueue(true)
 
         // Game Mode Check
         const urlParams = new URLSearchParams(window.location.search);
@@ -608,7 +609,22 @@ class Game {
         const dt = this.clock.getDelta()
 
         // Step Physics 
-        this.world.step()
+        this.world.step(this.eventQueue)
+
+        // Handle Projectile Collisions
+        this.eventQueue.drainCollisionEvents((handle1, handle2, started) => {
+            if (started && this.projectiles) {
+                for (let i = 0; i < this.projectiles.length; i++) {
+                    const proj = this.projectiles[i];
+                    if (!proj.isDead && !proj.rebote) {
+                        if (proj.colliderHandle === handle1 || proj.colliderHandle === handle2) {
+                            // Destruir proyectil (ej. bala) si choca y no tiene rebote
+                            proj.destroy();
+                        }
+                    }
+                }
+            }
+        });
 
         // Character Update
         this.character.update(dt, this.inputManager)

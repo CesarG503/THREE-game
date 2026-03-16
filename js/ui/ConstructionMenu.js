@@ -1590,6 +1590,27 @@ export class ConstructionMenu {
         trajectoryRow.appendChild(trajectoryLabel);
         trajectoryRow.appendChild(this.trajectoryInput);
 
+        // --- Rebote Row ---
+        const reboteRow = document.createElement('div');
+        reboteRow.style.display = "flex";
+        reboteRow.style.alignItems = "center";
+        reboteRow.style.justifyContent = "space-between";
+
+        const reboteLabel = document.createElement('span');
+        reboteLabel.textContent = "Rebote al chocar:";
+
+        this.reboteInput = document.createElement('input');
+        this.reboteInput.type = "checkbox";
+        this.reboteInput.style.cssText = this.autoInput.style.cssText;
+        this.reboteInput.addEventListener('change', (e) => {
+            if (this.currentDraftItem && this.currentDraftItem.type === 'weapon') {
+                this.currentDraftItem.rebote = e.target.checked;
+            }
+        });
+
+        reboteRow.appendChild(reboteLabel);
+        reboteRow.appendChild(this.reboteInput);
+
         weaponControlsContainer.appendChild(damageRow);
         weaponControlsContainer.appendChild(cooldownRow);
         weaponControlsContainer.appendChild(handRow);
@@ -1601,6 +1622,7 @@ export class ConstructionMenu {
         weaponControlsContainer.appendChild(projectileTypeRow);
         weaponControlsContainer.appendChild(tracerRow);
         weaponControlsContainer.appendChild(trajectoryRow);
+        weaponControlsContainer.appendChild(reboteRow);
 
         this.panelEditor.appendChild(weaponControlsContainer);
 
@@ -1652,6 +1674,10 @@ export class ConstructionMenu {
             this.dropInput.value = baseItem.bulletDrop !== undefined ? baseItem.bulletDrop : 1.0;
             this.tracerInput.checked = baseItem.hasTracer !== undefined ? baseItem.hasTracer : false;
             this.trajectoryInput.checked = baseItem.hasTrajectoryLine !== undefined ? baseItem.hasTrajectoryLine : false;
+            
+            // Set rebote from item, defaulting to true if it's a "ball", otherwise false
+            let defaultRebote = baseItem.projectileType === "ball" ? true : false;
+            this.reboteInput.checked = baseItem.rebote !== undefined ? baseItem.rebote : defaultRebote;
         } else {
             this.editorConstructionControls.style.display = 'flex';
             this.editorTextureContainer.style.display = 'flex';

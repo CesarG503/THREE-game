@@ -2,13 +2,14 @@ import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
 
 export class Projectile {
-    constructor(scene, world, origin, direction, speed, damage, bulletDrop = 1.0, type = "ball") {
+    constructor(scene, world, origin, direction, speed, damage, bulletDrop = 1.0, type = "ball", rebote = false) {
         this.scene = scene;
         this.world = world;
         this.damage = damage;
         this.isDead = false;
         this.lifetime = 5.0; // Segundos antes de auto eliminar
         this.type = type;
+        this.rebote = rebote;
 
         this.hasTracer = false;
         this.hasTrajectoryLine = false;
@@ -49,9 +50,11 @@ export class Projectile {
 
         let colliderDesc = RAPIER.ColliderDesc.ball(radius)
             .setRestitution(0.5) // Bounciness
-            .setDensity(5.0);   // Heavy enough to push small things?
+            .setDensity(5.0)   // Heavy enough to push small things?
+            .setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS);
 
         this.collider = this.world.createCollider(colliderDesc, this.rigidBody);
+        this.colliderHandle = this.collider.handle; // For collision detection
 
         // Note: For bullet, we want it to be sensor? No, let bullets push objects too for fun,
         // or just let them collide normally. We can make them sensors if we have a bullet-manager for hits, 

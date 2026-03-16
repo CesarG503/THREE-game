@@ -9,6 +9,7 @@ export class PelotaItem extends Item {
         this.fireRate = fireRate; // Shots per second
         this.bulletSpeed = bulletSpeed;
         this.bulletDrop = bulletDrop;
+        this.rebote = true; // Por defecto las pelotas rebotan
 
         this.lastShotTime = 0;
     }
@@ -50,7 +51,9 @@ export class PelotaItem extends Item {
             direction,
             this.bulletSpeed,
             this.damage,
-            this.bulletDrop
+            this.bulletDrop,
+            "ball",
+            this.rebote
         );
 
         // Register projectile in the world/game manager so it gets updated

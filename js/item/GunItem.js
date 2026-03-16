@@ -24,6 +24,7 @@ export class GunItem extends Item {
         this.lastShotTime = 0;
         this.hasTracer = false;
         this.hasTrajectoryLine = false;
+        this.rebote = false; // Por defecto las balas no rebotan
 
         this.isReloading = false;
 
@@ -290,7 +291,8 @@ export class GunItem extends Item {
                 speed,
                 this.damage,
                 drop, // bulletDrop base
-                projType // "bullet" o "ball"
+                projType, // "bullet" o "ball"
+                this.rebote
             );
             proj.hasTracer = this.hasTracer;
             proj.hasTrajectoryLine = this.hasTrajectoryLine;
@@ -472,6 +474,7 @@ export class GunItem extends Item {
         cloned.bulletDrop = this.bulletDrop !== undefined ? this.bulletDrop : 1.0;
         cloned.hasTracer = this.hasTracer || false;
         cloned.hasTrajectoryLine = this.hasTrajectoryLine || false;
+        cloned.rebote = this.rebote !== undefined ? this.rebote : false;
         return cloned;
     }
 }

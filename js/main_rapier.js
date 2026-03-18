@@ -92,12 +92,7 @@ class Game {
 
         // NPC
         if (this.gameMode !== 'editor') {
-            this.npc = new NPCRapier(
-                this.sceneManager.scene,
-                this.world,
-                new THREE.Vector3(0, 0, -15), // posicion inicial
-                [new THREE.Vector3(0, 0, -15), new THREE.Vector3(5, 0, -15), new THREE.Vector3(5, 0, -10), new THREE.Vector3(0, 0, -10)] // patron de movimiento
-            )
+            // NPC removido temporalmente para manejarlo en lógica de partida
         }
 
         // Impulse Platforms
@@ -105,27 +100,7 @@ class Game {
         this.projectiles = [] // Array for active projectiles
 
         if (this.gameMode !== 'editor') {
-            // 1. Forward Boost (Rotatable)
-            const forwardPad = new ImpulsePlatform(
-                this.sceneManager.scene,
-                this.world,
-                new THREE.Vector3(0, 0.1, 10), // Position
-                new THREE.Vector3(1, 0, 0),    // Direction (Forward Z+)
-                25.0,                          // Strength
-                "pad"
-            )
-            this.platforms.push(forwardPad)
-
-            // 2. Upward Jump Pad
-            const jumpPad = new ImpulsePlatform(
-                this.sceneManager.scene,
-                this.world,
-                new THREE.Vector3(5, 0.1, 10), // Side
-                new THREE.Vector3(0, 1, 0),    // Direction (Up)
-                25.0,                          // Strength (Needs high value to overcome gravity/mass?) 
-                "pad"
-            )
-            this.platforms.push(jumpPad)
+            // Plataformas removidas temporalmente para manejarlo en lógica de partida
         }
 
         // ... Code continue ...
@@ -172,27 +147,22 @@ class Game {
         // Farming Zone (Now that itemDropManager exists)
         this.fuegoCount = 0
         if (this.gameMode !== 'editor') {
-            this.farmingZone = new FarmingZone(
-                this.sceneManager.scene,
-                this.itemDropManager,
-                new THREE.Vector3(-5, 0.1, 10)
-            )
-            // Farming Settings
-            this.farmingSettings = new FarmingSettings(this.farmingZone)
-
-            // Move Logic State
-            this.fKeyHeldTime = 0
-            this.isMovingFarmingZone = false
-            this.isFKeyDown = false
-
-            // Ghost for Moving Farming Zone
-            this.moveGhost = new THREE.Mesh(
-                new THREE.BoxGeometry(3, 0.2, 3),
-                new THREE.MeshBasicMaterial({ color: 0xFF4500, transparent: true, opacity: 0.5, wireframe: true })
-            )
-            this.moveGhost.visible = false
-            this.sceneManager.scene.add(this.moveGhost)
+            // Farming Zone removida temporalmente
         }
+
+        // Create Basic Ground (For both Editor and Play modes)
+        const groundGeo = new THREE.BoxGeometry(100, 1, 100);
+        const groundMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.8 });
+        const groundMesh = new THREE.Mesh(groundGeo, groundMat);
+        groundMesh.position.y = -0.5; // Surface at 0
+        groundMesh.receiveShadow = true;
+        this.sceneManager.scene.add(groundMesh);
+
+        // Static Physics for Ground
+        const groundBodyDesc = RAPIER.RigidBodyDesc.fixed().setTranslation(0, -0.5, 0);
+        const groundBody = this.world.createRigidBody(groundBodyDesc);
+        const groundCollider = RAPIER.ColliderDesc.cuboid(50, 0.5, 50);
+        this.world.createCollider(groundCollider, groundBody);
 
         if (this.gameMode === 'editor') {
             // Editor Items (White default)
@@ -208,20 +178,6 @@ class Game {
             this.inventoryManager.addItem(ramp)
             this.inventoryManager.addItem(tall)
 
-            // Create Basic Editor Ground
-            const groundGeo = new THREE.BoxGeometry(100, 1, 100);
-            const groundMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.8 });
-            const groundMesh = new THREE.Mesh(groundGeo, groundMat);
-            groundMesh.position.y = -0.5; // Surface at 0
-            groundMesh.receiveShadow = true;
-            this.sceneManager.scene.add(groundMesh);
-
-            // Static Physics for Ground
-            const groundBodyDesc = RAPIER.RigidBodyDesc.fixed().setTranslation(0, -0.5, 0);
-            const groundBody = this.world.createRigidBody(groundBodyDesc);
-            const groundCollider = RAPIER.ColliderDesc.cuboid(50, 0.5, 50);
-            this.world.createCollider(groundCollider, groundBody);
-
             // Create Save/Load UI
             this.setupEditorUI();
 
@@ -234,22 +190,7 @@ class Game {
             this.objectInspector = new ObjectInspector(this)
 
         } else {
-            // Seed Inventory (Normal)
-            const item1 = new ImpulseItem("pad_lat", "Impulso Lateral", "./assets/textures/impulso.png", "lateral", 25.0)
-            const item2 = new ImpulseItem("pad_jump", "Salto Vertical", "./assets/textures/salto.png", "jump", 35.0)
-            const item3 = new TurretItem("pad_turret", "Torreta", "./assets/textures/impulso.png")
-            const item4 = new PelotaItem("pelota", "Lanzador de Pelotas", "./assets/textures/pelota.png", 10, 10, 30, 1.0)
-
-            this.inventoryManager.addItem(item1)
-            this.inventoryManager.addItem(item2)
-            this.inventoryManager.addItem(item3)
-            this.inventoryManager.addItem(item4)
-
-            // Add Gun (Slot 6 -> Index 5)
-            const gunItem = new GunItem();
-            // this.inventoryManager.addItem(gunItem); // Auto-add
-            // Force Slot 6
-            this.inventoryManager.setItem(5, gunItem);
+            // Seed Inventory (Normal) - Removido temporalmente para lógica de partida
         }
 
         // Wiring Inventory to Character
@@ -322,14 +263,7 @@ class Game {
         // Environment (Rapier Rigidbody + Three Mesh)
         // Only build default environment if NOT editor
         if (this.gameMode !== 'editor') {
-            this.buildEnvironment()
-
-            // Load Test Map (Offset by 30 units, Scale 0.01)
-            this.loadLevelFromFile(
-                "https://threejs.org/examples/models/gltf/LittlestTokyo.glb",
-                new THREE.Vector3(0, 8, 25),
-                new THREE.Vector3(0.04, 0.04, 0.04)
-            )
+            // Entorno y mapa de prueba removidos temporalmente para lógica de partida
         }
 
         // Debug

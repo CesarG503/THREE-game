@@ -14,8 +14,25 @@ export class GameConfigPanel {
         // Ensure LogicSystem has Config Data
         if (!this.logicSystem.gameConfig) {
             this.logicSystem.gameConfig = {
-                sequences: [] // [{ type: 'emit_signal', signal: 'start' }, { type: 'time', duration: 10 }]
+                sequences: [], // [{ type: 'emit_signal', signal: 'start' }, { type: 'time', duration: 10 }]
+                serverSettings: {
+                    matchName: "Mi Partida",
+                    maxPlayers: 10,
+                    lobbyMode: false,
+                    allowLateJoin: true,
+                    defaultSpawn: "auto",
+                    globalGravity: 9.8
+                }
             }
+        } else if (!this.logicSystem.gameConfig.serverSettings) {
+             this.logicSystem.gameConfig.serverSettings = {
+                matchName: "Mi Partida",
+                maxPlayers: 10,
+                lobbyMode: false,
+                allowLateJoin: true,
+                defaultSpawn: "auto",
+                globalGravity: 9.8
+             }
         }
     }
 
@@ -81,6 +98,47 @@ export class GameConfigPanel {
         header.appendChild(clearBtn)
         this.container.appendChild(header)
 
+        // Tabs
+        const tabContainer = document.createElement('div')
+        tabContainer.style.cssText = "display: flex; gap: 20px; border-bottom: 2px solid #444; margin-bottom: 10px; padding-bottom: 5px; margin-top: 5px;"
+        
+        const tabSeq = document.createElement('button')
+        tabSeq.textContent = "Secuencias Lógicas"
+        tabSeq.style.cssText = "background: none; border: none; color: white; font-weight: bold; font-size: 16px; cursor: pointer; border-bottom: 2px solid white; padding: 5px;"
+        
+        const tabServer = document.createElement('button')
+        tabServer.textContent = "Ajustes de Servidor"
+        tabServer.style.cssText = "background: none; border: none; color: #888; font-size: 16px; cursor: pointer; padding: 5px;"
+        
+        tabContainer.appendChild(tabSeq)
+        tabContainer.appendChild(tabServer)
+        this.container.appendChild(tabContainer)
+
+        // Content Containers
+        this.contentSequences = document.createElement('div')
+        this.contentSequences.style.cssText = "display: flex; flex-direction: column; gap: 10px; flex: 1; min-height: 0;"
+
+        this.contentServerSettings = document.createElement('div')
+        this.contentServerSettings.style.cssText = "display: none; flex-direction: column; gap: 15px; flex: 1; overflow-y: auto; padding: 10px; background: #1a1a1a; border-radius: 8px; border: 1px solid #333;"
+        
+        this.container.appendChild(this.contentSequences)
+        this.container.appendChild(this.contentServerSettings)
+
+        // Tab Switching Logic
+        tabSeq.onclick = () => {
+            tabSeq.style.color = "white"; tabSeq.style.fontWeight = "bold"; tabSeq.style.borderBottom = "2px solid white";
+            tabServer.style.color = "#888"; tabServer.style.fontWeight = "normal"; tabServer.style.borderBottom = "none";
+            this.contentSequences.style.display = "flex";
+            this.contentServerSettings.style.display = "none";
+        }
+        tabServer.onclick = () => {
+            tabServer.style.color = "white"; tabServer.style.fontWeight = "bold"; tabServer.style.borderBottom = "2px solid white";
+            tabSeq.style.color = "#888"; tabSeq.style.fontWeight = "normal"; tabSeq.style.borderBottom = "none";
+            this.contentSequences.style.display = "none";
+            this.contentServerSettings.style.display = "flex";
+            this.renderServerSettings();
+        }
+
         // Toolbar (Add Blocks)
         const toolbar = document.createElement('div')
         toolbar.style.cssText = "display: flex; gap: 10px; flex-wrap: wrap;"
@@ -91,10 +149,10 @@ export class GameConfigPanel {
         this.createAddBtn(toolbar, "+ Fin Partida", "#aa0000", () => this.addBlock('end_game'))
         this.createAddBtn(toolbar, "+ Loop (Reiniciar)", "#880088", () => this.addBlock('loop_game'))
 
-        this.container.appendChild(toolbar)
+        this.contentSequences.appendChild(toolbar)
 
         // Simulation Controls
-        this.createSimulationControls(this.container)
+        this.createSimulationControls(this.contentSequences)
 
         // Sequence List Area
         this.sequenceList = document.createElement('div')
@@ -104,10 +162,124 @@ export class GameConfigPanel {
             background: #1a1a1a; border: 1px solid #333; border-radius: 8px;
             padding: 10px; display: flex; flex-direction: column; gap: 5px;
         `
-        this.container.appendChild(this.sequenceList)
+        this.contentSequences.appendChild(this.sequenceList)
 
         parentContainer.appendChild(this.container)
         this.render()
+        
+        // Build the Server Settings UI initially
+        this.buildServerSettingsUI()
+    }
+
+    buildServerSettingsUI() {
+        this.serverSettingsControls = {}
+        const container = this.contentServerSettings
+        const settings = this.logicSystem.gameConfig.serverSettings
+
+        const title = document.createElement('h4')
+        title.textContent = "Ajustes del Servidor"
+        title.style.margin = "0 0 10px 0"
+        title.style.color = "#0ff"
+        title.style.borderBottom = "1px solid #333"
+        title.style.paddingBottom = "5px"
+        container.appendChild(title)
+
+        // Live Stats Panel
+        this.statsPanel = document.createElement('div')
+        this.statsPanel.style.cssText = "background: #252525; padding: 10px; border-radius: 6px; border-left: 4px solid #0ff; font-size: 13px; margin-bottom: 10px; color: #ddd;"
+        container.appendChild(this.statsPanel)
+
+        const refreshStatsBtn = document.createElement('button')
+        refreshStatsBtn.textContent = "↻ Refrescar Estadísticas del Mapa"
+        refreshStatsBtn.style.cssText = "background: #333; border: 1px solid #555; color: white; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; margin-bottom: 20px; align-self: flex-start;"
+        refreshStatsBtn.onclick = () => this.renderServerSettings()
+        container.appendChild(refreshStatsBtn)
+
+        // Settings Fields
+        this.createSettingInput(container, settings, 'matchName', "Nombre de la Partida", "text")
+        this.createSettingInput(container, settings, 'maxPlayers', "Jugadores Máximos", "number", { min: 1, max: 100 })
+        this.createSettingInput(container, settings, 'lobbyMode', "Modo Sala (Esperar que se llene)", "boolean")
+        this.createSettingInput(container, settings, 'allowLateJoin', "Permitir unión iniciada la partida (Late Join)", "boolean")
+        
+        // Default Spawn Dropdown (Auto vs xyz, etc. just text for now)
+        this.createSettingInput(container, settings, 'defaultSpawn', "Punto de Aparición Default (si no hay Spawns)", "select", ["auto", "cielo", "origen"])
+        
+        this.createSettingInput(container, settings, 'globalGravity', "Gravedad Global", "number", { step: 0.1 })
+    }
+
+    createSettingInput(container, settingsObj, key, labelText, type, extraOptions = {}) {
+        const row = document.createElement('div')
+        row.style.cssText = "display: flex; justify-content: space-between; align-items: center; background: #222; padding: 8px 12px; border-radius: 6px; border: 1px solid #444;"
+
+        const label = document.createElement('label')
+        label.textContent = labelText
+        label.style.color = "#ccc"
+        label.style.fontSize = "14px"
+        label.style.flex = "1"
+
+        row.appendChild(label)
+
+        let input
+        if (type === 'boolean') {
+            input = document.createElement('input')
+            input.type = "checkbox"
+            input.checked = settingsObj[key]
+            input.style.transform = "scale(1.2)"
+            input.style.cursor = "pointer"
+            input.onchange = (e) => settingsObj[key] = e.target.checked
+        } else if (type === 'select') {
+            input = document.createElement('select')
+            input.style.cssText = "background: #111; color: white; border: 1px solid #555; padding: 5px; border-radius: 4px; min-width: 120px;"
+            extraOptions.forEach(opt => {
+                const optEl = document.createElement('option')
+                optEl.value = opt
+                optEl.textContent = opt.charAt(0).toUpperCase() + opt.slice(1)
+                if (settingsObj[key] === opt) optEl.selected = true
+                input.appendChild(optEl)
+            })
+            input.onchange = (e) => settingsObj[key] = e.target.value
+        } else {
+            input = document.createElement('input')
+            input.type = type
+            input.value = settingsObj[key]
+            input.style.cssText = "background: #111; color: white; border: 1px solid #555; padding: 5px; border-radius: 4px; width: 150px;"
+            if (extraOptions.min !== undefined) input.min = extraOptions.min
+            if (extraOptions.max !== undefined) input.max = extraOptions.max
+            if (extraOptions.step !== undefined) input.step = extraOptions.step
+            
+            input.onchange = (e) => {
+                if (type === 'number') {
+                    settingsObj[key] = parseFloat(e.target.value) || 0
+                } else {
+                    settingsObj[key] = e.target.value
+                }
+            }
+        }
+
+        row.appendChild(input)
+        container.appendChild(row)
+        this.serverSettingsControls[key] = input
+    }
+
+    renderServerSettings() {
+        if (!this.statsPanel) return
+        
+        let spawnCount = 0
+        let interactiveCount = 0
+        
+        if (this.game && this.game.sceneManager && this.game.sceneManager.scene) {
+            const objs = this.logicSystem.scanScene(this.game.sceneManager.scene)
+            objs.forEach(obj => {
+                if (obj.userData.mapObjectType === 'spawn_point') spawnCount++
+                else interactiveCount++
+            })
+        }
+
+        this.statsPanel.innerHTML = `
+            <strong>Estadísticas del Mapa:</strong><br/>
+            <span style="color:#0f0;">• Puntos de Aparición (Spawn):</span> ${spawnCount}<br/>
+            <span style="color:#fa0;">• Objetos Inteligentes/Colisiones:</span> ${interactiveCount}
+        `
     }
 
     createSimulationControls(container) {

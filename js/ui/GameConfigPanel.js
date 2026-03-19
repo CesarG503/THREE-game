@@ -184,20 +184,23 @@ export class GameConfigPanel {
         title.style.paddingBottom = "5px"
         container.appendChild(title)
 
-        // Live Stats Panel
+        // Live Stats Panel (Auto-Updating)
         this.statsPanel = document.createElement('div')
-        this.statsPanel.style.cssText = "background: #252525; padding: 10px; border-radius: 6px; border-left: 4px solid #0ff; font-size: 13px; margin-bottom: 10px; color: #ddd;"
+        this.statsPanel.style.cssText = "font-size: 13px; margin-bottom: 10px; color: #ddd;"
         container.appendChild(this.statsPanel)
 
-        const refreshStatsBtn = document.createElement('button')
-        refreshStatsBtn.textContent = "↻ Refrescar Estadísticas del Mapa"
-        refreshStatsBtn.style.cssText = "background: #333; border: 1px solid #555; color: white; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; margin-bottom: 20px; align-self: flex-start;"
-        refreshStatsBtn.onclick = () => this.renderServerSettings()
-        container.appendChild(refreshStatsBtn)
+        // Auto-update stats every 1s if visible
+        setInterval(() => {
+            if (this.contentServerSettings && this.contentServerSettings.style.display !== "none") {
+                this.renderServerSettings()
+            }
+        }, 1000)
 
         // Settings Fields
         this.createSettingInput(container, settings, 'matchName', "Nombre de la Partida", "text")
-        this.createSettingInput(container, settings, 'maxPlayers', "Jugadores Máximos", "number", { min: 1, max: 100 })
+        
+        this.renderMaxPlayersConfig(container, settings)
+
         this.createSettingInput(container, settings, 'lobbyMode', "Modo Sala (Esperar que se llene)", "boolean")
         this.createSettingInput(container, settings, 'allowLateJoin', "Permitir unión iniciada la partida (Late Join)", "boolean")
         
@@ -205,6 +208,93 @@ export class GameConfigPanel {
         this.createSettingInput(container, settings, 'defaultSpawn', "Punto de Aparición Default (si no hay Spawns)", "select", ["auto", "cielo", "origen"])
         
         this.createSettingInput(container, settings, 'globalGravity', "Gravedad Global", "number", { step: 0.1 })
+    }
+
+    renderMaxPlayersConfig(container, settings) {
+        const row = document.createElement('div')
+        row.style.cssText = "display: flex; flex-direction: column; gap: 5px; background: #222; padding: 8px 12px; border-radius: 6px; border: 1px solid #444;"
+
+        const topRow = document.createElement('div')
+        topRow.style.cssText = "display: flex; justify-content: space-between; align-items: center;"
+
+        const label = document.createElement('label')
+        label.textContent = "Límite de Jugadores"
+        label.style.color = "#ccc"
+        label.style.fontSize = "14px"
+        label.style.flex = "1"
+
+        const modeSelect = document.createElement('select')
+        modeSelect.style.cssText = "background: #111; color: white; border: 1px solid #555; padding: 5px; border-radius: 4px; min-width: 150px;"
+        
+        const modes = [
+            { id: "unlimited", text: "Sin límite" },
+            { id: "manual", text: "Manual" },
+            { id: "spawnpoints", text: "Según Spawnpoints" }
+        ]
+
+        if (!settings.maxPlayersMode) settings.maxPlayersMode = "unlimited"
+        if (!settings.maxPlayersManualValue) settings.maxPlayersManualValue = 10
+
+        modes.forEach(m => {
+            const opt = document.createElement('option')
+            opt.value = m.id
+            opt.textContent = m.text
+            if (settings.maxPlayersMode === m.id) opt.selected = true
+            modeSelect.appendChild(opt)
+        })
+
+        topRow.appendChild(label)
+        topRow.appendChild(modeSelect)
+        row.appendChild(topRow)
+
+        // Options sub-container for manual mode
+        const manualContainer = document.createElement('div')
+        manualContainer.style.cssText = "display: flex; justify-content: space-between; align-items: center; margin-top: 5px; padding-top: 5px; border-top: 1px dashed #555;"
+        
+        const manualLabel = document.createElement('label')
+        manualLabel.textContent = "Cantidad Máxima:"
+        manualLabel.style.color = "#aaa"
+        manualLabel.style.fontSize = "12px"
+        
+        const manualInput = document.createElement('input')
+        manualInput.type = "number"
+        manualInput.min = 1
+        manualInput.value = settings.maxPlayersManualValue
+        manualInput.style.cssText = "background: #111; color: white; border: 1px solid #555; padding: 3px; border-radius: 4px; width: 60px; text-align: center;"
+        
+        manualContainer.appendChild(manualLabel)
+        manualContainer.appendChild(manualInput)
+        
+        row.appendChild(manualContainer)
+        container.appendChild(row)
+
+        const updateUI = () => {
+            if (settings.maxPlayersMode === "manual") {
+                manualContainer.style.display = "flex"
+                settings.maxPlayers = settings.maxPlayersManualValue // sync
+            } else if (settings.maxPlayersMode === "unlimited") {
+                manualContainer.style.display = "none"
+                settings.maxPlayers = 0 // represents unlimited
+            } else if (settings.maxPlayersMode === "spawnpoints") {
+                manualContainer.style.display = "none"
+                settings.maxPlayers = "auto_spawns" // token to specify server behavior
+            }
+        }
+
+        modeSelect.onchange = (e) => {
+            settings.maxPlayersMode = e.target.value
+            updateUI()
+        }
+
+        manualInput.onchange = (e) => {
+            const val = parseInt(e.target.value) || 1
+            settings.maxPlayersManualValue = val
+            if (settings.maxPlayersMode === "manual") {
+                settings.maxPlayers = val
+            }
+        }
+
+        updateUI() // Initialize visibility
     }
 
     createSettingInput(container, settingsObj, key, labelText, type, extraOptions = {}) {
@@ -266,19 +356,24 @@ export class GameConfigPanel {
         
         let spawnCount = 0
         let interactiveCount = 0
+        let totalSpawnCapacity = 0
         
         if (this.game && this.game.sceneManager && this.game.sceneManager.scene) {
             const objs = this.logicSystem.scanScene(this.game.sceneManager.scene)
             objs.forEach(obj => {
-                if (obj.userData.mapObjectType === 'spawn_point') spawnCount++
+                if (obj.userData.mapObjectType === 'spawn_point') {
+                    spawnCount++
+                    const cap = (obj.userData.logicProperties && obj.userData.logicProperties.capacity) || 1
+                    totalSpawnCapacity += cap
+                }
                 else interactiveCount++
             })
         }
 
         this.statsPanel.innerHTML = `
-            <strong>Estadísticas del Mapa:</strong><br/>
-            <span style="color:#0f0;">• Puntos de Aparición (Spawn):</span> ${spawnCount}<br/>
-            <span style="color:#fa0;">• Objetos Inteligentes/Colisiones:</span> ${interactiveCount}
+            <strong style="color: #fff;">Estadísticas del Mapa:</strong><br/>
+            <span style="color:#0f0; margin-left: 5px;">• Puntos de Aparición (Spawn):</span> ${spawnCount} (Capacidad total: ${totalSpawnCapacity})<br/>
+            <span style="color:#fa0; margin-left: 5px;">• Objetos Inteligentes/Colisiones:</span> ${interactiveCount}
         `
     }
 

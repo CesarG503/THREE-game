@@ -204,10 +204,103 @@ export class GameConfigPanel {
         this.createSettingInput(container, settings, 'lobbyMode', "Modo Sala (Esperar que se llene)", "boolean")
         this.createSettingInput(container, settings, 'allowLateJoin', "Permitir unión iniciada la partida (Late Join)", "boolean")
         
-        // Default Spawn Dropdown (Auto vs xyz, etc. just text for now)
-        this.createSettingInput(container, settings, 'defaultSpawn', "Punto de Aparición Default (si no hay Spawns)", "select", ["auto", "cielo", "origen"])
+        // Default Spawn Custom Logic
+        this.renderDefaultSpawnConfig(container, settings)
         
         this.createSettingInput(container, settings, 'globalGravity', "Gravedad Global", "number", { step: 0.1 })
+    }
+
+    renderDefaultSpawnConfig(container, settings) {
+        const row = document.createElement('div')
+        row.style.cssText = "display: flex; flex-direction: column; gap: 5px; background: #222; padding: 8px 12px; border-radius: 6px; border: 1px solid #444;"
+
+        const topRow = document.createElement('div')
+        topRow.style.cssText = "display: flex; justify-content: space-between; align-items: center;"
+
+        const label = document.createElement('label')
+        label.textContent = "Punto de Aparición Default (si no hay Spawns)"
+        label.style.color = "#ccc"
+        label.style.fontSize = "14px"
+        label.style.flex = "1"
+
+        const modeSelect = document.createElement('select')
+        modeSelect.style.cssText = "background: #111; color: white; border: 1px solid #555; padding: 5px; border-radius: 4px; min-width: 150px; max-width: 250px;"
+        
+        const modes = [
+            { id: "auto", text: "Automático en cualquier parte del suelo" },
+            { id: "origen", text: "Origen 0,0,0 (El Centro)" },
+            { id: "personalizado", text: "Punto de Spawn Personalizado" }
+        ]
+
+        if (!settings.defaultSpawn || settings.defaultSpawn === "cielo") {
+             settings.defaultSpawn = "auto"
+        }
+
+        modes.forEach(m => {
+            const opt = document.createElement('option')
+            opt.value = m.id
+            opt.textContent = m.text
+            if (settings.defaultSpawn === m.id) opt.selected = true
+            modeSelect.appendChild(opt)
+        })
+
+        topRow.appendChild(label)
+        topRow.appendChild(modeSelect)
+        row.appendChild(topRow)
+
+        // Custom config button (only for personalizado)
+        const customContainer = document.createElement('div')
+        customContainer.style.cssText = "display: flex; justify-content: center; align-items: center; margin-top: 5px; padding-top: 5px; border-top: 1px dashed #555;"
+        
+        const spawnBtn = document.createElement('button')
+        spawnBtn.textContent = "+ Colocar Objeto Spawnpoint Default"
+        spawnBtn.style.cssText = "background: #33a; border: 1px solid #55f; color: white; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 13px; width: 100%; font-weight: bold;"
+        
+        spawnBtn.onclick = () => {
+            if (this.game && this.game.sceneManager && this.game.constructionMenu && this.game.constructionMenu.logicItems) {
+                const spawnItemTemplate = this.game.constructionMenu.logicItems.find(i => i.type === 'spawn_point')
+                if (spawnItemTemplate) {
+                    try {
+                        let clonePos;
+                        if (this.game.cameraController && this.game.cameraController.camera) {
+                            clonePos = this.game.cameraController.camera.position.clone()
+                            clonePos.y = Math.max(0.05, clonePos.y - 2) // Place it a bit below camera but on floor
+                        } else {
+                            clonePos = { x: 0, y: 0.05, z: 0 } 
+                        }
+
+                        spawnItemTemplate.spawnObject(
+                            this.game.sceneManager.scene,
+                            this.game.sceneManager.world,
+                            clonePos,
+                            0
+                        )
+                        this.renderServerSettings()
+                        alert("Punto de Aparición Personalizado colocado con éxito cerca de ti.\n\nCierra este panel (tecla E) y podrás seleccionarlo físicamente en el mapa para moverlo y ajustarlo a tus necesidades.")
+                    } catch(e) {
+                        console.error("Error creating spawn:", e)
+                        alert("Hubo un error al colocar el Punto de Aparición.")
+                    }
+                } else {
+                    alert("Error: No se encontró la plantilla de Spawn en la librería.")
+                }
+            }
+        }
+        
+        customContainer.appendChild(spawnBtn)
+        row.appendChild(customContainer)
+        container.appendChild(row)
+
+        const updateUI = () => {
+             customContainer.style.display = (settings.defaultSpawn === "personalizado") ? "flex" : "none"
+        }
+
+        modeSelect.onchange = (e) => {
+            settings.defaultSpawn = e.target.value
+            updateUI()
+        }
+
+        updateUI() // Init
     }
 
     renderMaxPlayersConfig(container, settings) {

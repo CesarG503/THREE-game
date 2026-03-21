@@ -262,12 +262,20 @@ export class GameConfigPanel {
                 if (spawnItemTemplate) {
                     try {
                         let clonePos;
-                        if (this.game.cameraController && this.game.cameraController.camera) {
+                        if (this.game.character && this.game.character.getPosition) {
+                            clonePos = this.game.character.getPosition().clone()
+                            clonePos.y += 0.05 // Adjust above ground slightly
+                        } else if (this.game.cameraController && this.game.cameraController.camera) {
                             clonePos = this.game.cameraController.camera.position.clone()
-                            clonePos.y = Math.max(0.05, clonePos.y - 2) // Place it a bit below camera but on floor
+                            clonePos.y = Math.max(0.05, clonePos.y - 1.5) // Approximate feet
                         } else {
                             clonePos = { x: 0, y: 0.05, z: 0 } 
                         }
+
+                        // Temporarily mark the template so the spawned object gets flag
+                        const originalLogic = { ...(spawnItemTemplate.logicProperties || {}) }
+                        if (!spawnItemTemplate.logicProperties) spawnItemTemplate.logicProperties = {}
+                        spawnItemTemplate.logicProperties.isDefault = true
 
                         spawnItemTemplate.spawnObject(
                             this.game.sceneManager.scene,
@@ -275,8 +283,12 @@ export class GameConfigPanel {
                             clonePos,
                             0
                         )
+
+                        // Restore template to not affect other spawn placements
+                        spawnItemTemplate.logicProperties = originalLogic
+
                         this.renderServerSettings()
-                        alert("Punto de Aparición Personalizado colocado con éxito cerca de ti.\n\nCierra este panel (tecla E) y podrás seleccionarlo físicamente en el mapa para moverlo y ajustarlo a tus necesidades.")
+                        alert("Punto de Aparición Personalizado colocado con éxito a tus pies.\n\nCierra este panel (tecla E) y podrás seleccionarlo físicamente en el mapa para moverlo.")
                     } catch(e) {
                         console.error("Error creating spawn:", e)
                         alert("Hubo un error al colocar el Punto de Aparición.")
@@ -291,11 +303,39 @@ export class GameConfigPanel {
         row.appendChild(customContainer)
         container.appendChild(row)
 
+        const deleteDefaultSpawnObj = () => {
+            if (!this.game || !this.game.sceneManager || !this.logicSystem) return
+            const existings = this.logicSystem.scanScene(this.game.sceneManager.scene)
+                .filter(o => o.userData.mapObjectType === 'spawn_point' && o.userData.logicProperties && o.userData.logicProperties.isDefault)
+            
+            existings.forEach(obj => {
+                this.game.sceneManager.scene.remove(obj)
+                obj.traverse(child => {
+                    if (child.geometry) child.geometry.dispose()
+                    if (child.material) {
+                        if (Array.isArray(child.material)) child.material.forEach(m => m.dispose())
+                        else child.material.dispose()
+                    }
+                })
+                if (obj.userData.rigidBody) {
+                    this.game.sceneManager.world.removeRigidBody(obj.userData.rigidBody)
+                }
+            })
+
+            if (existings.length > 0) {
+                this.renderServerSettings() // Update stats summary
+            }
+        }
+
         const updateUI = () => {
              customContainer.style.display = (settings.defaultSpawn === "personalizado") ? "flex" : "none"
         }
 
         modeSelect.onchange = (e) => {
+            // Delete if changing AWAY from personalizado
+            if (settings.defaultSpawn === "personalizado" && e.target.value !== "personalizado") {
+                deleteDefaultSpawnObj()
+            }
             settings.defaultSpawn = e.target.value
             updateUI()
         }

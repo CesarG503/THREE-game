@@ -161,6 +161,7 @@ export class LogicSystem {
 
             // --- 2. Interval Signals ---
             if (block.intervalSignals) {
+
                 block.intervalSignals.forEach(sig => {
                     if (prevTime < sig.time && currTime >= sig.time) {
                         console.log("Broadcasting Interval Signal:", sig.signal)
@@ -301,6 +302,12 @@ export class LogicSystem {
     }
 
     renderSpawnUI(container, object, props) {
+        if (props.isDefault) {
+            const tag = document.createElement('div')
+            tag.textContent = "Punto de Aparición Default"
+            tag.style.cssText = "color: #ffcc00; font-size: 11px; padding: 5px; background: #332200; border: 1px solid #aa8800; border-radius: 4px; text-align: center; margin-bottom: 8px; font-weight: bold;"
+            container.appendChild(tag)
+        }
         this.createInput(container, object, 'team', props.team || 1, 'number', 'Equipo')
         this.createInput(container, object, 'capacity', props.capacity || 1, 'number', 'Capacidad')
         this.createInput(container, object, 'order', props.order || 1, 'number', 'Orden')

@@ -92,7 +92,7 @@ export class NetworkManager {
             case "playerUpdate":
                 // Update remote player position
                 if (message.playerId !== this.playerId) {
-                    this.updateRemotePlayer(message.playerId, message.position, message.rotation, message.animation)
+                    this.updateRemotePlayer(message.playerId, message.position, message.rotation, message.state)
                 }
                 break
 
@@ -103,7 +103,7 @@ export class NetworkManager {
                         if (!this.remotePlayers.has(playerData.id)) {
                             this.addRemotePlayer(playerData.id, playerData.position, playerData.rotation)
                         } else {
-                            this.updateRemotePlayer(playerData.id, playerData.position, playerData.rotation, playerData.animation)
+                            this.updateRemotePlayer(playerData.id, playerData.position, playerData.rotation, playerData.state)
                         }
                     }
                 })
@@ -142,7 +142,7 @@ export class NetworkManager {
         }
     }
 
-    updateRemotePlayer(playerId, position, rotation, animation) {
+    updateRemotePlayer(playerId, position, rotation, state) {
         let player = this.remotePlayers.get(playerId)
 
         if (!player) {
@@ -154,13 +154,13 @@ export class NetworkManager {
         if (player) {
             player.setTargetPosition(position.x, position.y, position.z)
             player.setRotation(rotation)
-            if (animation) {
-                player.switchAnimation(animation)
+            if (state) {
+                player.setState(state)
             }
         }
     }
 
-    sendPlayerUpdate(position, rotation, animation) {
+    sendPlayerUpdate(position, rotation, state) {
         if (!this.isConnected || !this.socket || this.socket.readyState !== WebSocket.OPEN) return
 
         const now = Date.now()
@@ -175,7 +175,7 @@ export class NetworkManager {
                 z: position.z,
             },
             rotation: rotation,
-            animation: animation,
+            state: state,
         }
 
         this.socket.send(JSON.stringify(message))

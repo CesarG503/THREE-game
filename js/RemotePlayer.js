@@ -1,17 +1,31 @@
 import * as THREE from "three"
-import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js"
 import RAPIER from "@dimforge/rapier3d-compat"
+import { GLBModel } from "./Character/GLBModel.js"
+import { PolygonModel } from "./Character/PolygonModel.js"
+import { PolygonModelSkin } from "./Character/PolygonModelSkin.js"
 
 export class RemotePlayer {
     constructor(scene, world, playerId, position = new THREE.Vector3(0, 0, 0)) {
         this.scene = scene
         this.world = world
         this.playerId = playerId
-        this.model = null
-        this.mixer = null
-        this.animations = {}
-        this.currentAction = null
-        this.currentAnimation = "Idle"
+
+        // Models
+        this.glbModel = new GLBModel(scene)
+        this.polygonModel = new PolygonModel(scene)
+        this.polygonModelSkin = new PolygonModelSkin(scene)
+        this.currentType = 'skin'
+
+        // State Tracking
+        this.state = {
+            modelType: 'skin',
+            isMoving: false,
+            isCrouching: false,
+            isAttacking: false,
+            isGrounded: true,
+            verticalVelocity: 0,
+            action: "Idle"
+        }
 
         this.currentPosition = position.clone()
         this.targetPosition = position.clone()
@@ -19,62 +33,45 @@ export class RemotePlayer {
 
         this.currentRotation = 0
         this.targetRotation = 0
-        this.rotationOffset = Math.PI
+        this.rotationOffset = Math.PI // Matches GLBModel rotation offset expectation
 
         this.label = null
         this.labelVisible = true
 
         this.collider = null
+        this.rigidBody = null
 
-        this.loadModel()
+        this.initPhysics()
+        this.createLabel()
+        this.setModelType(this.currentType)
     }
 
-    loadModel() {
-        const loader = new GLTFLoader()
-        loader.load(
-            "https://threejs.org/examples/models/gltf/Soldier.glb",
-            (gltf) => {
-                this.model = gltf.scene
-                this.model.position.copy(this.currentPosition)
-                this.model.rotation.y = this.rotationOffset
-                this.scene.add(this.model)
+    initPhysics() {
+        // Rapier Collider (Kinematic)
+        let bodyDesc = RAPIER.RigidBodyDesc.kinematicPositionBased()
+            .setTranslation(this.currentPosition.x, this.currentPosition.y, this.currentPosition.z)
+        this.rigidBody = this.world.createRigidBody(bodyDesc)
 
-                this.model.traverse((object) => {
-                    if (object.isMesh) {
-                        object.castShadow = true
-                        if (object.material) {
-                            object.material = object.material.clone()
-                            object.material.color.setHex(this.getPlayerColor())
-                        }
-                    }
-                })
+        let colliderDesc = RAPIER.ColliderDesc.capsule(0.5, 0.4).setTranslation(0, 0.9, 0)
+        this.collider = this.world.createCollider(colliderDesc, this.rigidBody)
+    }
 
-                this.mixer = new THREE.AnimationMixer(this.model)
-                const clips = gltf.animations
+    setModelType(type) {
+        if (!type) return;
+        this.currentType = type
 
-                this.animations["Idle"] = this.mixer.clipAction(THREE.AnimationClip.findByName(clips, "Idle"))
-                this.animations["Run"] = this.mixer.clipAction(THREE.AnimationClip.findByName(clips, "Run"))
-                this.animations["Walk"] = this.mixer.clipAction(THREE.AnimationClip.findByName(clips, "Walk"))
+        // Reset all
+        this.glbModel.setVisible(false)
+        this.polygonModel.setVisible(false)
+        this.polygonModelSkin.setVisible(false)
 
-                this.switchAnimation("Idle")
-
-                this.createLabel()
-
-                this.createLabel()
-
-                // Rapier Collider (Kinematic)
-                let bodyDesc = RAPIER.RigidBodyDesc.kinematicPositionBased()
-                    .setTranslation(this.currentPosition.x, this.currentPosition.y, this.currentPosition.z)
-                this.rigidBody = this.world.createRigidBody(bodyDesc)
-
-                let colliderDesc = RAPIER.ColliderDesc.capsule(0.5, 0.4).setTranslation(0, 0.9, 0)
-                this.collider = this.world.createCollider(colliderDesc, this.rigidBody)
-            },
-            undefined,
-            (error) => {
-                console.error(`[RemotePlayer ${this.playerId}] Error loading model:`, error)
-            },
-        )
+        if (type === 'glb') {
+            this.glbModel.setVisible(true)
+        } else if (type === 'polygon') {
+            this.polygonModel.setVisible(true)
+        } else if (type === 'skin') {
+            this.polygonModelSkin.setVisible(true)
+        }
     }
 
     getPlayerColor() {
@@ -106,9 +103,7 @@ export class RemotePlayer {
         this.label.position.y = 2.2
         this.label.visible = this.labelVisible
 
-        if (this.model) {
-            this.model.add(this.label)
-        }
+        this.scene.add(this.label)
     }
 
     setLabelVisibility(visible) {
@@ -126,25 +121,25 @@ export class RemotePlayer {
         this.targetRotation = rotation
     }
 
-    switchAnimation(name) {
-        if (!this.animations[name]) return
-        if (this.currentAnimation === name) return
+    setState(state) {
+        if (!state) return;
+        this.state = state;
 
-        const action = this.animations[name]
-
-        if (this.currentAction) {
-            this.currentAction.fadeOut(0.2)
+        if (state.modelType && state.modelType !== this.currentType) {
+            this.setModelType(state.modelType);
         }
-        action.reset().fadeIn(0.2).play()
-        this.currentAction = action
-        this.currentAnimation = name
     }
 
     update(dt) {
-        if (!this.model) return
-
+        // Interpolate Position
         this.currentPosition.lerp(this.targetPosition, this.interpolationSpeed * dt)
-        this.model.position.copy(this.currentPosition)
+
+        // Update Label Position
+        if (this.label) {
+            this.label.position.x = this.currentPosition.x
+            this.label.position.y = this.currentPosition.y + 2.2
+            this.label.position.z = this.currentPosition.z
+        }
 
         // Update Physics Body
         if (this.rigidBody) {
@@ -155,39 +150,63 @@ export class RemotePlayer {
             })
         }
 
+        // Interpolate Rotation smoothly
         let diff = this.targetRotation - this.currentRotation
         while (diff > Math.PI) diff -= Math.PI * 2
         while (diff < -Math.PI) diff += Math.PI * 2
         this.currentRotation += diff * 0.15
-        this.model.rotation.y = this.currentRotation + this.rotationOffset
 
-        if (this.mixer) {
-            this.mixer.update(dt)
-        }
+        // Dispatch state to models
+        this.glbModel.setPosition(this.currentPosition)
+        this.glbModel.setRotation(this.currentRotation)
 
-        const distance = this.currentPosition.distanceTo(this.targetPosition)
-        if (distance > 0.1) {
-            this.switchAnimation("Run")
-        } else {
-            this.switchAnimation("Idle")
-        }
+        this.polygonModel.setPosition(this.currentPosition)
+        this.polygonModel.setRotation(this.currentRotation)
+
+        this.polygonModelSkin.setPosition(this.currentPosition)
+        this.polygonModelSkin.setRotation(this.currentRotation)
+
+        // Animate based on state
+        // If local distance movement is significant, player is moving as fallback precaution
+        const isLocallyMoving = (this.currentPosition.distanceTo(this.targetPosition) > 0.05)
+        const hasInput = this.state.isMoving || isLocallyMoving
+
+        this.glbModel.update(dt, hasInput)
+        this.polygonModel.update(dt, hasInput)
+        this.polygonModelSkin.update(
+            dt,
+            hasInput,
+            this.state.isCrouching,
+            this.state.isAttacking,
+            this.state.isGrounded,
+            this.state.verticalVelocity
+        )
     }
 
     dispose() {
-        if (this.model) {
-            this.scene.remove(this.model)
-            this.model.traverse((object) => {
-                if (object.geometry) object.geometry.dispose()
-                if (object.material) {
-                    if (Array.isArray(object.material)) {
-                        object.material.forEach((m) => m.dispose())
-                    } else {
-                        object.material.dispose()
+        // GLBModel handles its own dispose nicely if needed, but lets clean up what we can
+        const removeMesh = (modelObj) => {
+            if (modelObj && modelObj.model) {
+                this.scene.remove(modelObj.model)
+                modelObj.model.traverse((object) => {
+                    if (object.geometry) object.geometry.dispose()
+                    if (object.material) {
+                        if (Array.isArray(object.material)) {
+                            object.material.forEach((m) => m.dispose())
+                        } else {
+                            object.material.dispose()
+                        }
                     }
-                }
-            })
+                })
+            }
         }
+
+        removeMesh(this.glbModel)
+        removeMesh(this.polygonModel)
+        removeMesh(this.polygonModelSkin)
+
         if (this.label) {
+            this.scene.remove(this.label)
             if (this.label.material.map) this.label.material.map.dispose()
             this.label.material.dispose()
         }

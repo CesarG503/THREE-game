@@ -58,7 +58,15 @@ wss.on("connection", (ws) => {
         id: playerId,
         position: spawnPosition,
         rotation: 0,
-        animation: "Idle",
+        state: { 
+            modelType: 'skin', 
+            isMoving: false, 
+            isCrouching: false, 
+            isAttacking: false, 
+            isGrounded: true, 
+            verticalVelocity: 0, 
+            action: "Idle" 
+        },
     })
 
     console.log(`Player connected: ${playerId} (Total: ${players.size})`)
@@ -105,7 +113,7 @@ wss.on("connection", (ws) => {
                     if (player) {
                         player.position = message.position
                         player.rotation = message.rotation
-                        player.animation = message.animation
+                        player.state = message.state
                     }
 
                     // Broadcast to other players
@@ -115,7 +123,7 @@ wss.on("connection", (ws) => {
                             playerId: playerId,
                             position: message.position,
                             rotation: message.rotation,
-                            animation: message.animation,
+                            state: message.state,
                         },
                         playerId,
                     )

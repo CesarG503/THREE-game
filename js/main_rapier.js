@@ -573,26 +573,39 @@ class Game {
 
             // Send local state
             if (this.character) {
+                // Latch attack to ensure fast clicks are captured between 50ms network ticks
+                if (!this._netAttackLatch && this.inputManager && this.inputManager.keys.attack) {
+                    this._netAttackLatch = true;
+                }
+
                 const isMoving = this.inputManager ? (this.inputManager.keys.forward || this.inputManager.keys.backward || this.inputManager.keys.left || this.inputManager.keys.right) : false;
                 const isCrouching = this.inputManager ? this.inputManager.keys.crouch : false;
                 const isAttacking = this.inputManager ? this.inputManager.keys.attack : false;
                 const isGrounded = this.character.characterController ? this.character.characterController.computedGrounded() : true;
                 
+                // If latched true, use true.
+                const sendAttacking = isAttacking || this._netAttackLatch;
+
                 const playerState = {
                     modelType: this.character.currentType || 'skin',
                     isMoving: isMoving,
                     isCrouching: isCrouching,
-                    isAttacking: isAttacking,
+                    isAttacking: sendAttacking,
                     isGrounded: isGrounded,
                     verticalVelocity: this.character.verticalVelocity || 0,
                     action: this.character.currentAction ? this.character.currentAction.getClip().name : "Idle"
                 };
 
-                this.networkManager.sendPlayerUpdate(
+                const updateSent = this.networkManager.sendPlayerUpdate(
                     this.character.getPosition(),
                     this.character.getRotation(),
                     playerState
-                )
+                );
+                
+                // Clear the latch ONLY if the packet was successfully sent right now
+                if (updateSent === true) {
+                    this._netAttackLatch = false;
+                }
             }
 
             // Update Player Count UI

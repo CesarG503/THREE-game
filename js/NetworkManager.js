@@ -161,10 +161,10 @@ export class NetworkManager {
     }
 
     sendPlayerUpdate(position, rotation, state) {
-        if (!this.isConnected || !this.socket || this.socket.readyState !== WebSocket.OPEN) return
+        if (!this.isConnected || !this.socket || this.socket.readyState !== WebSocket.OPEN) return false
 
         const now = Date.now()
-        if (now - this.lastUpdateTime < this.updateRate) return
+        if (now - this.lastUpdateTime < this.updateRate) return false
         this.lastUpdateTime = now
 
         const message = {
@@ -179,6 +179,7 @@ export class NetworkManager {
         }
 
         this.socket.send(JSON.stringify(message))
+        return true;
     }
 
     update(dt) {

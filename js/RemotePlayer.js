@@ -123,6 +123,12 @@ export class RemotePlayer {
 
     setState(state) {
         if (!state) return;
+
+        // Sustain attack trigger for visual completion (Minecraft style swing takes ~200-300ms)
+        if (state.isAttacking) {
+            this.attackEndTime = Date.now() + 300;
+        }
+
         this.state = state;
 
         if (state.modelType && state.modelType !== this.currentType) {
@@ -171,15 +177,18 @@ export class RemotePlayer {
         const isLocallyMoving = (this.currentPosition.distanceTo(this.targetPosition) > 0.05)
         const hasInput = this.state.isMoving || isLocallyMoving
 
+        // Force sustained attack to bypass missing 50ms ticks
+        const effectivelyAttacking = this.state.isAttacking || (Date.now() < this.attackEndTime);
+
         this.glbModel.update(dt, hasInput)
         this.polygonModel.update(dt, hasInput)
         this.polygonModelSkin.update(
             dt,
             hasInput,
-            this.state.isCrouching,
-            this.state.isAttacking,
-            this.state.isGrounded,
-            this.state.verticalVelocity
+            this.state.isCrouching === true,
+            effectivelyAttacking,
+            this.state.isGrounded !== false,
+            Number(this.state.verticalVelocity) || 0
         )
     }
 

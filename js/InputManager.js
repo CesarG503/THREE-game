@@ -25,11 +25,11 @@ export class InputManager {
 
         document.addEventListener("mousedown", (e) => {
             if (this.isPaused || !this.enabled) return
-            if (e.button === 0) this.keys.attack = true
+            if (e.button === 0 || e.button === 2) this.keys.attack = true
         })
 
         document.addEventListener("mouseup", (e) => {
-            if (e.button === 0) this.keys.attack = false
+            if (e.button === 0 || e.button === 2) this.keys.attack = false
         })
     }
 

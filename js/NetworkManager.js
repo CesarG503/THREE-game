@@ -2,9 +2,10 @@ import * as THREE from "three"
 import { RemotePlayer } from "./RemotePlayer.js"
 
 export class NetworkManager {
-    constructor(scene, world, onConnected) {
+    constructor(scene, world, roomId, onConnected) {
         this.scene = scene
         this.world = world
+        this.roomId = roomId
         this.socket = null
         this.playerId = null
         this.remotePlayers = new Map() // Map<playerId, RemotePlayer>
@@ -27,8 +28,11 @@ export class NetworkManager {
             this.socket = new WebSocket(serverUrl)
 
             this.socket.onopen = () => {
-                console.log("[Network] Connected to server")
+                console.log(`[Network] Connected to server. Joining room: ${this.roomId}`)
                 this.isConnected = true
+                if (this.roomId) {
+                    this.socket.send(JSON.stringify({ type: "joinRoom", roomId: this.roomId }))
+                }
             }
 
             this.socket.onmessage = (event) => {

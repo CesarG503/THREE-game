@@ -23,6 +23,7 @@ import { PelotaItem } from "./item/PelotaItem.js"
 import { MapObjectItem } from "./item/MapObjectItem.js"
 import { ObjectInspector } from "./ui/ObjectInspector.js"
 import { StairsUtils } from "./utils/StairsUtils.js"
+import { RouteManager } from "./managers/RouteManager.js"
 import { PlayerConfigManager } from "./managers/PlayerConfigManager.js"
 import { GameHUD } from "./ui/GameHUD.js"
 import { GunItem } from "./item/GunItem.js"
@@ -47,9 +48,11 @@ class Game {
         this.world = new RAPIER.World(gravity)
         this.eventQueue = new RAPIER.EventQueue(true)
 
-        // Game Mode Check
-        const urlParams = new URLSearchParams(window.location.search);
-        this.gameMode = urlParams.get('mode') || 'play'; // 'play' or 'editor'
+        // Game Mode Check via Router
+        this.routeManager = new RouteManager();
+        this.gameMode = this.routeManager.getMode();
+        this.roomId = this.routeManager.getRoomId();
+        console.log(`[Game] Empezando en modo ${this.gameMode} - Sala: ${this.roomId}`);
 
         // Local Character
         this.character = new CharacterController(
@@ -80,7 +83,7 @@ class Game {
         this.character.cameraController = this.cameraController
 
         // Network & UI
-        this.networkManager = new NetworkManager(this.sceneManager.scene, this.world, (id) => {
+        this.networkManager = new NetworkManager(this.sceneManager.scene, this.world, this.roomId, (id) => {
             console.log("Player joined", id)
             this.updateConnectionStatus(true, id)
         })

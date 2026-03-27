@@ -24,7 +24,7 @@ export class NPC {
     loadModel() {
         const loader = new GLTFLoader()
         loader.load(
-            "./assets/Xbot.glb",
+            "/assets/Xbot.glb",
             (gltf) => {
                 this.model = gltf.scene
                 this.model.position.copy(this.position)

@@ -57,7 +57,7 @@ export class NPCRapier {
 
     loadModel() {
         const loader = new GLTFLoader()
-        loader.load("./assets/Xbot.glb", (gltf) => {
+        loader.load("/assets/Xbot.glb", (gltf) => {
             if (this.placeholder) {
                 this.scene.remove(this.placeholder)
                 this.placeholder = null

@@ -67,7 +67,7 @@ export class ImpulsePlatform {
 
         // Indicator Texture
         const textureLoader = new THREE.TextureLoader()
-        const texturePath = isJump ? 'assets/textures/salto.png' : 'assets/textures/impulso.png'
+        const texturePath = isJump ? '/assets/textures/salto.png' : '/assets/textures/impulso.png'
         const texture = textureLoader.load(texturePath)
 
         // Create a plane for the indicator

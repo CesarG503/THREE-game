@@ -67,7 +67,7 @@ export class PelotaItem extends Item {
         // Ball mesh for ground
         const geo = new THREE.SphereGeometry(0.3, 16, 16);
         const textureLoader = new THREE.TextureLoader();
-        const texture = textureLoader.load("./assets/textures/pelota.png");
+        const texture = textureLoader.load("/assets/textures/pelota.png");
         const mat = new THREE.MeshStandardMaterial({
             map: texture,
             roughness: 0.5

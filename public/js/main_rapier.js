@@ -169,11 +169,11 @@ class Game {
 
         if (this.gameMode === 'editor') {
             // Editor Items (White default)
-            const wall = new MapObjectItem("wall", "Pared", "wall", "./assets/textures/impulso.png", 0xFFFFFF, { x: 5, y: 3, z: 0.5 })
-            const pillar = new MapObjectItem("pillar", "Pilar", "pillar", "./assets/textures/salto.png", 0xFFFFFF, { x: 1, y: 4, z: 1 })
-            const floor = new MapObjectItem("floor", "Suelo", "wall", "./assets/textures/impulso.png", 0xFFFFFF, { x: 5, y: 0.5, z: 5 })
-            const ramp = new MapObjectItem("stairs", "Gradas", "stairs", "./assets/textures/impulso.png", 0xFFFFFF, { x: 4, y: 2, z: 4 })
-            const tall = new MapObjectItem("tall", "Torre", "pillar", "./assets/textures/salto.png", 0xFFFFFF, { x: 2, y: 10, z: 2 })
+            const wall = new MapObjectItem("wall", "Pared", "wall", "/assets/textures/impulso.png", 0xFFFFFF, { x: 5, y: 3, z: 0.5 })
+            const pillar = new MapObjectItem("pillar", "Pilar", "pillar", "/assets/textures/salto.png", 0xFFFFFF, { x: 1, y: 4, z: 1 })
+            const floor = new MapObjectItem("floor", "Suelo", "wall", "/assets/textures/impulso.png", 0xFFFFFF, { x: 5, y: 0.5, z: 5 })
+            const ramp = new MapObjectItem("stairs", "Gradas", "stairs", "/assets/textures/impulso.png", 0xFFFFFF, { x: 4, y: 2, z: 4 })
+            const tall = new MapObjectItem("tall", "Torre", "pillar", "/assets/textures/salto.png", 0xFFFFFF, { x: 2, y: 10, z: 2 })
 
             this.inventoryManager.addItem(wall)
             this.inventoryManager.addItem(pillar)
@@ -1210,7 +1210,7 @@ class Game {
                 crosshair.classList.remove("crosshair-dot", "crosshair-plus")
 
                 if (type === "image") {
-                    crosshair.style.backgroundImage = "url('./assets/ui/pointer.png')"
+                    crosshair.style.backgroundImage = "url('/assets/ui/pointer.png')"
                 } else if (type === "dot") {
                     crosshair.classList.add("crosshair-dot")
                 } else if (type === "plus") {

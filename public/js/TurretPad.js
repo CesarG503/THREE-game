@@ -58,7 +58,7 @@ export class TurretPad {
 
         // Load Turret Model
         const loader = new GLTFLoader()
-        loader.load('./assets/torreta.glb', (gltf) => {
+        loader.load('/assets/torreta.glb', (gltf) => {
             this.model = gltf.scene
 
             // Adjust scale if necessary - assuming generic size for now, might need tweaking

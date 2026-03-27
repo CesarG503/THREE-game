@@ -14,24 +14,26 @@ export class RouteManager {
     }
 
     parseHash() {
-        // e.g. game.html#/play/ROOM-XYZ or game.html#/edit
+        // e.g. /play/#ROOM-XYZ or /editor/#ROOM-XYZ
+        const pathname = window.location.pathname;
         const hash = window.location.hash.replace('#', '');
-        const parts = hash.split('/').filter(p => p.length > 0);
         
-        if (parts.length > 0) {
-            this.currentMode = parts[0] === 'edit' ? 'editor' : 'play';
+        // Determinar modo basado en la carpeta actual
+        if (pathname.includes('editor')) {
+            this.currentMode = 'editor';
+        } else {
+            // Default to 'play' mode
+            this.currentMode = 'play';
         }
 
-        if (parts.length > 1) {
-            this.roomId = parts[1];
+        if (hash.length > 0) {
+            this.roomId = hash;
         } else {
-            // If they just entered #/play or #/edit without a code, generate a random one
-            // so they immediately become the host of a shareable room!
+            // Generar código de sala si el hash está vacío
             this.roomId = this.generateId();
             
-            // Replace the URL instantly so they can copy-paste to friends
-            const modePath = this.currentMode === 'editor' ? 'edit' : 'play';
-            window.history.replaceState(null, null, `#/${modePath}/${this.roomId}`);
+            // Actualizar URL sin recargar
+            window.history.replaceState(null, null, `#${this.roomId}`);
         }
 
         console.log(`[Route] Mode: ${this.currentMode} | Room: ${this.roomId}`);

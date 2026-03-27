@@ -3,7 +3,7 @@ import { Item } from "./Item.js";
 
 export class FuegoItem extends Item {
     constructor() {
-        super("fuego", "Fuego", "./assets/textures/fuego.png");
+        super("fuego", "Fuego", "/assets/textures/fuego.png");
         this.type = "collectible"; 
     }
 

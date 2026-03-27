@@ -6,7 +6,7 @@ import { BlasterSystem } from "../fx/BlasterSystem.js";
 
 export class GunItem extends Item {
     constructor() {
-        super("gun", "Pistola", "./assets/gun/gun_d.png"); // Using diff texture as icon for now, or maybe create a snapshot?
+        super("gun", "Pistola", "/assets/gun/gun_d.png"); // Using diff texture as icon for now, or maybe create a snapshot?
         // Actually, let's use a generic gun icon if available, or just the side view texture locally if it looks ok.
         // User provided assets/gun/*.png are textures.
         // We'll use gun_d.png for icon for now, it might be the diffuse map.
@@ -65,7 +65,7 @@ export class GunItem extends Item {
         const textureLoader = new THREE.TextureLoader();
 
         // Load Textures
-        const path = "./assets/heavy_pistol_animated/";
+        const path = "/assets/heavy_pistol_animated/";
         const mapArmHandColor = textureLoader.load(path + "armhandcolor.jpg");
         const mapTalonColor = textureLoader.load(path + "taloncolor.jpg");
         const mapTalonNormal = textureLoader.load(path + "talonnormal.jpg");

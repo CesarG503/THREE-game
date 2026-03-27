@@ -42,8 +42,8 @@ export class PlacementManager {
     init() {
         // Cargar texturas
         const loader = new THREE.TextureLoader()
-        this.texImpulso = loader.load('./assets/textures/impulso.png')
-        this.texSalto = loader.load('./assets/textures/salto.png')
+        this.texImpulso = loader.load('/assets/textures/impulso.png')
+        this.texSalto = loader.load('/assets/textures/salto.png')
 
         // Crear grupo fantasma
         this.placementGhost = new THREE.Group()

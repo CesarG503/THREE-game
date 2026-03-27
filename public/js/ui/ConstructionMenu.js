@@ -1125,10 +1125,10 @@ export class ConstructionMenu {
         // Texture Options
         const textures = [
             { name: "Ninguna", path: null, color: "#333" },
-            { name: "Ladrillo", path: "assets/textures/obj/brick.png", img: "assets/textures/obj/brick.png" },
-            { name: "Concreto", path: "assets/textures/obj/concrete.png", img: "assets/textures/obj/concrete.png" },
-            { name: "Madera", path: "assets/textures/obj/wood.png", img: "assets/textures/obj/wood.png" },
-            { name: "Hierro", path: "assets/textures/obj/hierro.png", img: "assets/textures/obj/hierro.png" }
+            { name: "Ladrillo", path: "/assets/textures/obj/brick.png", img: "/assets/textures/obj/brick.png" },
+            { name: "Concreto", path: "/assets/textures/obj/concrete.png", img: "/assets/textures/obj/concrete.png" },
+            { name: "Madera", path: "/assets/textures/obj/wood.png", img: "/assets/textures/obj/wood.png" },
+            { name: "Hierro", path: "/assets/textures/obj/hierro.png", img: "/assets/textures/obj/hierro.png" }
         ]
 
         textures.forEach(tex => {

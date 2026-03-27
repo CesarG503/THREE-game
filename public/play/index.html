@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>Veta</title>
+    <link rel="stylesheet" href="/resources/style/main.css">
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+</head>
+
+<body>
+    <div id="loading">Cargando...</div>
+    <div id="game-container"></div>
+
+    <!-- Fuego Counter -->
+    <div id="fuego-counter" style="
+        position: absolute;
+        top: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        font-size: 24px;
+        font-weight: bold;
+        color: #ff4500;
+        text-shadow: 2px 2px 0px #000;
+        pointer-events: none;
+        user-select: none;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        z-index: 1000;
+    ">
+        <img src="/assets/textures/fuego.png" style="width: 32px; height: 32px;">
+        <span id="fuego-count">0</span>
+    </div>
+
+    <!-- Crosshair -->
+    <div id="crosshair" style="
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 40px;
+        height: 40px;
+        pointer-events: none;
+        user-select: none;
+        z-index: 1000;
+        opacity: 0.8;
+        background-image: url('/assets/ui/pointer.png');
+        background-size: contain;
+        background-repeat: no-repeat;
+        background-position: center;
+    "></div>
+
+    <!-- Interaction Prompt -->
+    <div id="interaction-prompt" class="interaction-prompt" style="display: none;">
+        <span class="key-hint">F</span> <span id="prompt-text">Recoger Item</span>
+    </div>
+
+    <!-- Button Interaction Prompt (Floating) -->
+    <div id="button-interaction-prompt" style="
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        display: none;
+        flex-direction: column;
+        align-items: center;
+        pointer-events: none;
+        z-index: 1000;
+        transform: translate(-50%, -50%);
+    ">
+        <!-- Circular Progress Container -->
+        <div
+            style="position: relative; width: 60px; height: 60px; display: flex; align-items: center; justify-content: center;">
+            <!-- Background Circle -->
+            <svg width="60" height="60" style="position: absolute; transform: rotate(-90deg);">
+                <circle id="btn-bg-circle" cx="30" cy="30" r="26" stroke="rgba(0,0,0,0.5)" stroke-width="4"
+                    fill="rgba(0,0,0,0.3)" />
+                <!-- Progress Circle -->
+                <circle id="btn-progress-circle" cx="30" cy="30" r="26" stroke="#00ff00" stroke-width="4" fill="none"
+                    stroke-dasharray="163" stroke-dashoffset="163" stroke-linecap="round" />
+            </svg>
+            <!-- Key Hint -->
+            <span id="btn-key-hint" style="
+                color: white; 
+                font-family: sans-serif; 
+                font-weight: bold; 
+                font-size: 20px;
+                text-shadow: 1px 1px 2px black;
+                z-index: 1;
+            ">F</span>
+        </div>
+        <!-- Text Label -->
+        <div style="
+            margin-top: 5px; 
+            background: rgba(0,0,0,0.6); 
+            padding: 4px 8px; 
+            border-radius: 4px; 
+            color: white; 
+            font-family: sans-serif; 
+            font-size: 14px; 
+            text-shadow: 1px 1px 1px black;
+            white-space: nowrap;
+        ">Interactuar</div>
+    </div>
+
+    <!-- Move Prompt & Progress -->
+    <div id="move-prompt-container" style="
+        position: absolute;
+        top: 60%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        display: none;
+        flex-direction: column;
+        align-items: center;
+        pointer-events: none;
+        z-index: 1000;
+    ">
+        <div
+            style="font-family: sans-serif; font-size: 18px; color: white; text-shadow: 1px 1px 2px black; margin-bottom: 8px;">
+            Mover Zona (Mantener F)
+        </div>
+        <div style="
+            width: 200px;
+            height: 10px;
+            background: rgba(0,0,0,0.5);
+            border: 2px solid white;
+            border-radius: 5px;
+            overflow: hidden;
+        ">
+            <div id="move-progress-bar" style="
+                width: 0%;
+                height: 100%;
+                background: linear-gradient(90deg, #ff4500, #ff8c00);
+                transition: width 0.1s linear;
+            "></div>
+        </div>
+    </div>
+
+    <!-- Settings Panel -->
+    <div id="overlay"></div>
+    <div id="settings-panel">
+        <h2>Configuracion</h2>
+
+        <div class="tabs">
+            <div class="tab-btn active" data-tab="fp-settings">Primera Persona</div>
+            <div class="tab-btn" data-tab="tp-settings">Tercera Persona</div>
+            <div class="tab-btn" data-tab="ch-settings">Puntero</div>
+            <div class="tab-btn" data-tab="farming-settings">Zona Farmeo</div>
+            <div class="tab-btn" data-tab="char-settings">Personaje</div>
+        </div>
+
+        <div class="settings-content active" id="fp-settings">
+            <h3>Configuracion Primera Persona</h3>
+            <div class="setting-row">
+                <span class="setting-label">Invertir eje X</span>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="fp-invert-x" checked>
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+            <div class="setting-row">
+                <span class="setting-label">Invertir eje Y</span>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="fp-invert-y" checked>
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+        </div>
+
+        <div class="settings-content" id="tp-settings">
+            <h3>Configuracion Tercera Persona</h3>
+            <div class="setting-row">
+                <span class="setting-label">Desvio Dinamico de Camara</span>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="tp-dynamic-offset">
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+            <div class="setting-row">
+                <span class="setting-label">Invertir eje X</span>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="tp-invert-x" checked>
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+            <div class="setting-row">
+                <span class="setting-label">Invertir eje Y</span>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="tp-invert-y" checked>
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+            <div class="setting-row">
+                <div class="setting-item">
+                    <label for="tp-tracking">
+                        <input type="checkbox" id="tp-tracking" checked>
+                        Seguimiento Automatico del puntero
+                    </label>
+                </div>
+            </div>
+            <div class="setting-row">
+                <div class="setting-item">
+                    <label>Desplazamiento Horizontal</label>
+                    <div class="slider-container">
+                        <input type="range" id="cam-horizontal-offset" min="-0.4" max="0.4" step="0.01" value="0.4">
+                        <span id="cam-horizontal-offset-val">0.40</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="settings-content" id="ch-settings">
+            <h3>Configuracion Puntero</h3>
+            <div class="setting-row">
+                <span class="setting-label">Color Dinamico</span>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="ch-dynamic">
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+            <div class="setting-row">
+                <span class="setting-label">Tipo</span>
+                <select id="ch-type" class="settings-select">
+                    <option value="image">Imagen</option>
+                    <option value="dot">Punto</option>
+                    <option value="plus">Cruz</option>
+                </select>
+            </div>
+            <div class="setting-row">
+                <span class="setting-label">Tamaño</span>
+                <div class="slider-container">
+                    <input type="range" id="ch-size" min="10" max="100" value="40">
+                    <span id="ch-size-val">40px</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="settings-content" id="farming-settings">
+            <h3>Configuracion Zona Farmeo</h3>
+            <div class="setting-row">
+                <div class="setting-item">
+                    <label>Tiempo de aparición (seg)</label>
+                    <div class="slider-container">
+                        <input type="number" id="farming-interval" min="1" max="60" step="1" value="1"
+                            style="width: 60px; padding: 5px; color: black;">
+                        <span id="farming-interval-val" style="display:none;">1</span>
+                    </div>
+                </div>
+            </div>
+            <div class="setting-row">
+                <div class="setting-item">
+                    <label>Cantidad por aparición</label>
+                    <div class="slider-container">
+                        <input type="number" id="farming-count" min="1" max="100" step="1" value="1"
+                            style="width: 60px; padding: 5px; color: black;">
+                        <span id="farming-count-val" style="display:none;">1</span>
+                    </div>
+                </div>
+            </div>
+            <div class="setting-row">
+                <div class="setting-item">
+                    <label>Valor por Item</label>
+                    <div class="slider-container">
+                        <input type="number" id="farming-value" min="1" max="1000" step="1" value="1"
+                            style="width: 60px; padding: 5px; color: black;">
+                        <span id="farming-value-val" style="display:none;">1</span>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <div class="settings-content" id="char-settings">
+            <h3>Configuracion Personaje</h3>
+            <div class="setting-row">
+                <span class="setting-label">Tipo de Modelo</span>
+                <select id="char-model-type" class="settings-select">
+                    <option value="glb">Modelo (GLB)</option>
+                    <option value="polygon">Polígonos</option>
+                    <option value="skin">Poligono Skin</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="settings-section">
+            <div class="setting-row">
+                <span class="setting-label">Modo de camara</span>
+                <span class="camera-mode-display" id="camera-mode-text">Tercera Persona</span>
+            </div>
+            <label class="mp-checkbox">
+                <input type="checkbox" id="show-names" checked>
+                <span>Mostrar nombres</span>
+            </label>
+            <label class="mp-checkbox">
+                <input type="checkbox" id="debug-collisions"> Mostrar Colliders
+            </label>
+        </div>
+
+        <button id="resume-btn">Configurar</button>
+
+        <div class="controls-hint">
+            Presiona ESC para alternar el menu | TAB para cambiar la cámara | Click derecho para rotar
+        </div>
+    </div>
+
+    <!-- Inventory System -->
+    <div id="inventory-container">
+        <div class="inventory-slot active">
+            <span class="slot-number">1</span>
+            <img src="/assets/textures/impulso.png" alt="Impulso Lateral"
+                style="width: 70%; height: 70%; object-fit: contain;">
+        </div>
+        <div class="inventory-slot">
+            <span class="slot-number">2</span>
+            <img src="/assets/textures/salto.png" alt="Salto Vertical"
+                style="width: 70%; height: 70%; object-fit: contain;">
+        </div>
+        <div class="inventory-slot">
+            <span class="slot-number">3</span>
+        </div>
+        <div class="inventory-slot">
+            <span class="slot-number">4</span>
+        </div>
+        <div class="inventory-slot">
+            <span class="slot-number">5</span>
+        </div>
+        <div class="inventory-slot">
+            <span class="slot-number">6</span>
+        </div>
+        <div class="inventory-slot">
+            <span class="slot-number">7</span>
+        </div>
+        <div class="inventory-slot">
+            <span class="slot-number">8</span>
+        </div>
+        <div class="inventory-slot">
+            <span class="slot-number">9</span>
+        </div>
+    </div>
+
+    <script type="module" src="/js/main_rapier.js"></script>
+</body>
+
+</html>

@@ -129,6 +129,43 @@ wss.on("connection", (ws) => {
                         message: message.text,
                     }, null) // Null to broadcast to everyone including sender
                     break
+
+                // ── Editor Colaborativo ──────────────────────────────────
+                case "editorPlace":
+                    // Un editor colocó un objeto; retransmitir a todos salvo el emisor
+                    if (message.data) {
+                        broadcastToRoom(roomId, {
+                            type: "editorPlace",
+                            playerId: playerId,
+                            data: message.data,
+                        }, playerId)
+                        console.log(`[Room ${roomId}] Editor place by ${playerId}`)
+                    }
+                    break
+
+                case "editorRemove":
+                    // Un editor eliminó un objeto; retransmitir por UUID
+                    if (message.uuid) {
+                        broadcastToRoom(roomId, {
+                            type: "editorRemove",
+                            playerId: playerId,
+                            uuid: message.uuid,
+                        }, playerId)
+                        console.log(`[Room ${roomId}] Editor remove ${message.uuid} by ${playerId}`)
+                    }
+                    break
+
+                case "editorUpdate":
+                    // Un editor movió/redimensionó un objeto existente
+                    if (message.uuid && message.transform) {
+                        broadcastToRoom(roomId, {
+                            type: "editorUpdate",
+                            playerId: playerId,
+                            uuid: message.uuid,
+                            transform: message.transform,
+                        }, playerId)
+                    }
+                    break
             }
         } catch (error) {
             console.error("Error parsing message:", error)

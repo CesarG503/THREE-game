@@ -19,6 +19,12 @@ export class NetworkManager {
 
         this.onChatMessage = null
         this.showPlayerNames = true
+
+        // ── Callbacks colaborativos del editor ────────────────────────
+        this.onEditorPlace = null   // (data) => void
+        this.onEditorRemove = null  // (uuid) => void
+        this.onEditorUpdate = null  // (uuid, transform) => void
+        this.collaborativeMode = false
     }
 
     connect(serverUrl) {
@@ -118,6 +124,25 @@ export class NetworkManager {
                     this.onChatMessage(message.playerId, message.message)
                 }
                 break
+
+            // ── Editor Colaborativo ───────────────────────────────────
+            case "editorPlace":
+                if (this.onEditorPlace && message.data) {
+                    this.onEditorPlace(message.data)
+                }
+                break
+
+            case "editorRemove":
+                if (this.onEditorRemove && message.uuid) {
+                    this.onEditorRemove(message.uuid)
+                }
+                break
+
+            case "editorUpdate":
+                if (this.onEditorUpdate && message.uuid && message.transform) {
+                    this.onEditorUpdate(message.uuid, message.transform)
+                }
+                break
         }
     }
 
@@ -214,6 +239,25 @@ export class NetworkManager {
             text: text,
         }
         this.socket.send(JSON.stringify(message))
+    }
+
+    // ── Métodos colaborativos del editor ─────────────────────────────
+    sendEditorPlace(objectData) {
+        if (!this.isConnected || !this.collaborativeMode) return
+        if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return
+        this.socket.send(JSON.stringify({ type: "editorPlace", data: objectData }))
+    }
+
+    sendEditorRemove(uuid) {
+        if (!this.isConnected || !this.collaborativeMode) return
+        if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return
+        this.socket.send(JSON.stringify({ type: "editorRemove", uuid }))
+    }
+
+    sendEditorUpdate(uuid, transform) {
+        if (!this.isConnected || !this.collaborativeMode) return
+        if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return
+        this.socket.send(JSON.stringify({ type: "editorUpdate", uuid, transform }))
     }
 
     setShowPlayerNames(show) {

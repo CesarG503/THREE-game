@@ -453,12 +453,14 @@ export class ConstructionMenu {
         this.contentSaveLoad = document.createElement('div')
         this.contentSaveLoad.style.cssText = `
             flex: 1;
-            display: none; /* Hidden by default */
-            flex-direction: column;
+            display: none;
+            flex-direction: row;
+            flex-wrap: wrap;
             gap: 15px;
             overflow-y: auto;
             padding: 10px;
-            align-items: center; /* Center content */
+            align-items: flex-start;
+            align-content: flex-start;
         `
         this.renderSaveLoad(this.contentSaveLoad)
 
@@ -728,7 +730,7 @@ export class ConstructionMenu {
         const saveSection = document.createElement('div')
         saveSection.style.cssText = `
             width: 100%;
-            max-width: 400px;
+            max-width: 340px;
             background: #222;
             padding: 20px;
             border-radius: 8px;
@@ -736,6 +738,7 @@ export class ConstructionMenu {
             flex-direction: column;
             gap: 15px;
             border: 1px solid #444;
+            box-sizing: border-box;
         `
 
         const saveTitle = document.createElement('h3')
@@ -793,7 +796,7 @@ export class ConstructionMenu {
         const loadSection = document.createElement('div')
         loadSection.style.cssText = `
             width: 100%;
-            max-width: 400px;
+            max-width: 340px;
             background: #222;
             padding: 20px;
             border-radius: 8px;
@@ -801,7 +804,7 @@ export class ConstructionMenu {
             flex-direction: column;
             gap: 15px;
             border: 1px solid #444;
-            margin-top: 20px;
+            box-sizing: border-box;
         `
 
         const loadTitle = document.createElement('h3')
@@ -868,7 +871,140 @@ export class ConstructionMenu {
 
         container.appendChild(saveSection)
         container.appendChild(loadSection)
+
+        // ── Sección Editor Colaborativo (mismo estilo que Guardar/Cargar) ─────────
+        const collabSection = document.createElement('div')
+        collabSection.style.cssText = `
+            width: 100%;
+            max-width: 340px;
+            background: #222;
+            padding: 20px;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            border: 1px solid #444;
+            box-sizing: border-box;
+        `
+
+        const collabTitle = document.createElement('h3')
+        collabTitle.textContent = 'Edición Colaborativa'
+        collabTitle.style.cssText = `margin: 0; border-bottom: 1px solid #555; padding-bottom: 10px;`
+        collabSection.appendChild(collabTitle)
+
+
+
+        // Indicador de estado
+        const statusRow = document.createElement('div')
+        statusRow.style.cssText = `display: flex; align-items: center; gap: 8px;`
+
+        const statusDot = document.createElement('span')
+        statusDot.style.cssText = `
+            width: 9px; height: 9px; border-radius: 50%;
+            background: #555; display: inline-block; flex-shrink: 0;
+            transition: background 0.3s;
+        `
+        const statusText = document.createElement('span')
+        statusText.style.cssText = `font-size: 13px; color: #888; transition: color 0.3s;`
+        statusText.textContent = 'Desactivado'
+
+        statusRow.appendChild(statusDot)
+        statusRow.appendChild(statusText)
+        collabSection.appendChild(statusRow)
+
+        // Botón toggle — mismo estilo que botones guardar/cargar
+        const collabBtn = document.createElement('button')
+        collabBtn.textContent = 'Abrir Colaborativo'
+        collabBtn.style.cssText = `
+            background: #545454ff;
+            color: white; border: none; padding: 12px;
+            border-radius: 6px; cursor: pointer; font-size: 16px;
+            font-weight: bold; transition: background 0.2s;
+        `
+        collabBtn.onmouseover = () => collabBtn.style.background = '#656565ff'
+        collabSection.appendChild(collabBtn)
+
+        // Bloque del link (oculto inicialmente)
+        const linkBlock = document.createElement('div')
+        linkBlock.style.cssText = `display: none; flex-direction: column; gap: 8px; border-top: 1px solid #555; padding-top: 12px;`
+
+        const linkLabel = document.createElement('label')
+        linkLabel.textContent = 'Link para compartir con colaboradores:'
+        linkLabel.style.cssText = `font-size: 13px; color: #aaa;`
+
+        const linkInput = document.createElement('input')
+        linkInput.type = 'text'
+        linkInput.readOnly = true
+        linkInput.style.cssText = `
+            background: #1a1a1a; color: #ccc;
+            border: 1px solid #555; border-radius: 4px;
+            padding: 8px 10px; font-size: 12px; font-family: monospace;
+            cursor: pointer; outline: none; width: 100%; box-sizing: border-box;
+        `
+        linkInput.onfocus = () => linkInput.select()
+
+        const copyBtn = document.createElement('button')
+        copyBtn.textContent = 'Copiar Link'
+        copyBtn.style.cssText = `
+            background: #545454ff; color: white;
+            border: none; padding: 10px;
+            border-radius: 6px; cursor: pointer; font-size: 14px;
+            font-weight: bold; transition: background 0.2s;
+        `
+        copyBtn.onmouseover = () => copyBtn.style.background = '#656565ff'
+        copyBtn.onmouseout = () => copyBtn.style.background = '#545454ff'
+        copyBtn.onclick = () => {
+            navigator.clipboard.writeText(linkInput.value).then(() => {
+                copyBtn.textContent = '¡Copiado!'
+                setTimeout(() => { copyBtn.textContent = 'Copiar Link' }, 2000)
+            }).catch(() => {
+                linkInput.select(); document.execCommand('copy')
+                copyBtn.textContent = '¡Copiado!'
+                setTimeout(() => { copyBtn.textContent = 'Copiar Link' }, 2000)
+            })
+        }
+
+
+        linkBlock.appendChild(linkLabel)
+        linkBlock.appendChild(linkInput)
+        linkBlock.appendChild(copyBtn)
+
+        collabSection.appendChild(linkBlock)
+
+        // Lógica del toggle
+        let collabActive = false
+        const buildLink = () => {
+            const proto = window.location.protocol === 'https:' ? 'https:' : 'http:'
+            return `${proto}//${window.location.host}/editor/#${this.game.roomId || ''}`
+        }
+        const applyCollabState = (active) => {
+            statusDot.style.background = active ? '#22c55e' : '#555'
+            statusText.textContent = active ? 'Colaborativo ACTIVO' : 'Desactivado'
+            statusText.style.color = active ? '#22c55e' : '#888'
+            collabBtn.textContent = active ? 'Cerrar Colaborativo' : 'Abrir Colaborativo'
+            collabBtn.style.background = active ? '#1d4d1d' : '#545454ff'
+            collabBtn.onmouseout = () => collabBtn.style.background = active ? '#1d4d1d' : '#545454ff'
+            linkBlock.style.display = active ? 'flex' : 'none'
+        }
+
+        collabBtn.onclick = () => {
+            collabActive = !collabActive
+            if (this.game.networkManager) this.game.networkManager.collaborativeMode = collabActive
+            if (collabActive) linkInput.value = buildLink()
+            applyCollabState(collabActive)
+        }
+
+        // Restaurar estado si ya estaba activo al re-abrir el panel
+        if (this.game.networkManager && this.game.networkManager.collaborativeMode) {
+            collabActive = true
+            linkInput.value = buildLink()
+            applyCollabState(true)
+        }
+
+        container.appendChild(collabSection)
     }
+
+
 
     renderLibraryGrid(container, items) {
         // Populate Grid
@@ -1696,7 +1832,7 @@ export class ConstructionMenu {
             this.dropInput.value = baseItem.bulletDrop !== undefined ? baseItem.bulletDrop : 1.0;
             this.tracerInput.checked = baseItem.hasTracer !== undefined ? baseItem.hasTracer : false;
             this.trajectoryInput.checked = baseItem.hasTrajectoryLine !== undefined ? baseItem.hasTrajectoryLine : false;
-            
+
             // Set rebote from item, defaulting to true if it's a "ball", otherwise false
             let defaultRebote = baseItem.projectileType === "ball" ? true : false;
             this.reboteInput.checked = baseItem.rebote !== undefined ? baseItem.rebote : defaultRebote;

@@ -113,6 +113,25 @@ class Game {
             this.chatManager.addChatMessage(playerId, msg)
         }
 
+        // ── Callbacks colaborativos del editor ────────────────────────
+        this._isApplyingRemoteEdit = false
+
+        this.networkManager.onEditorPlace = (data) => {
+            if (this.gameMode !== 'editor') return
+            this._isApplyingRemoteEdit = true
+            this._loadSingleMapObject(data)
+            if (this.constructionMenu) this.constructionMenu.refreshLogicList()
+            this._isApplyingRemoteEdit = false
+        }
+
+        this.networkManager.onEditorRemove = (uuid) => {
+            if (this.gameMode !== 'editor') return
+            this._isApplyingRemoteEdit = true
+            this.deleteObjectByUuid(uuid)
+            if (this.constructionMenu) this.constructionMenu.refreshLogicList()
+            this._isApplyingRemoteEdit = false
+        }
+
         document.addEventListener("chatFocus", () => {
             this.inputManager.enabled = false
         })
@@ -122,9 +141,8 @@ class Game {
         })
 
         this.setupSettingsPanel()
-        if (this.gameMode !== 'editor') {
-            this.setupMultiplayerUI()
-        }
+        // El panel de multijugador se necesita en AMBOS modos (editor colaborativo + juego normal)
+        this.setupMultiplayerUI()
 
         // --- HUD & Player Init ---
         const profile = this.playerConfigManager.getCurrentProfile()
@@ -585,7 +603,7 @@ class Game {
                 const isCrouching = this.inputManager ? this.inputManager.keys.crouch : false;
                 const isAttacking = this.inputManager ? this.inputManager.keys.attack : false;
                 const isGrounded = this.character.characterController ? this.character.characterController.computedGrounded() : true;
-                
+
                 // If latched true, use true.
                 const sendAttacking = isAttacking || this._netAttackLatch;
 
@@ -604,7 +622,7 @@ class Game {
                     this.character.getRotation(),
                     playerState
                 );
-                
+
                 // Clear the latch ONLY if the packet was successfully sent right now
                 if (updateSent === true) {
                     this._netAttackLatch = false;
@@ -1129,7 +1147,7 @@ class Game {
                 fpInvertY.checked = e.detail.fpInvertAxisY
                 tpInvertX.checked = e.detail.tpInvertAxisX
                 tpInvertY.checked = e.detail.tpInvertAxisY
-                
+
                 if (tpDynamicOffset) tpDynamicOffset.checked = this.cameraController.enableDynamicOffset
 
                 if (tpTrackingCheckbox) tpTrackingCheckbox.checked = this.cameraController.alwaysRotateThirdPerson
@@ -1160,7 +1178,7 @@ class Game {
         fpInvertY.addEventListener("change", (e) => this.cameraController.setFpInvertAxisY(e.target.checked))
         tpInvertX.addEventListener("change", (e) => this.cameraController.setTpInvertAxisX(e.target.checked))
         tpInvertY.addEventListener("change", (e) => this.cameraController.setTpInvertAxisY(e.target.checked))
-        
+
         if (tpDynamicOffset) {
             tpDynamicOffset.addEventListener("change", (e) => {
                 this.cameraController.enableDynamicOffset = e.target.checked
@@ -1771,6 +1789,90 @@ class Game {
                 }
             }
         }
+
+        // ── Emisión colaborativa: broadcast si modo cooperativo activo ──────────
+        if (consumed && this.gameMode === 'editor' && !this._isApplyingRemoteEdit
+            && this.networkManager && this.networkManager.collaborativeMode) {
+
+            // El objeto recién colocado es el último de la escena con isEditableMapObject
+            const children = this.sceneManager.scene.children
+            for (let i = children.length - 1; i >= 0; i--) {
+                const obj = children[i]
+                if (obj.userData && obj.userData.isEditableMapObject) {
+                    const data = {
+                        type: obj.userData.mapObjectType,
+                        color: obj.userData.color,
+                        originalScale: obj.userData.originalScale,
+                        pos: { x: obj.position.x, y: obj.position.y, z: obj.position.z },
+                        rot: { x: obj.rotation.x, y: obj.rotation.y, z: obj.rotation.z },
+                        logicProperties: obj.userData.logicProperties,
+                        uuid: obj.userData.uuid,
+                        invisible: obj.userData.invisible,
+                        opacity: obj.userData.opacity
+                    }
+                    this.networkManager.sendEditorPlace(data)
+                    break
+                }
+            }
+        }
+    }
+
+    // ── Helpers colaborativos del editor ────────────────────────────────────
+    /** Carga UNO SOLO objeto serializado en la escena (para recepci\u00f3n colaborativa) */
+    _loadSingleMapObject(data) {
+        if (!data || !data.type) return
+        const tempItem = new MapObjectItem(
+            "collab_" + Math.random(),
+            "Collab Obj",
+            data.type,
+            "",
+            data.color,
+            data.originalScale
+        )
+        if (data.logicProperties) tempItem.logicProperties = data.logicProperties
+        if (data.opacity !== undefined) tempItem.opacity = data.opacity
+
+        tempItem.spawnObjectFromData(this.sceneManager.scene, this.world, data.pos, data.rot)
+
+        const lastObj = this.sceneManager.scene.children[this.sceneManager.scene.children.length - 1]
+        if (data.opacity !== undefined && lastObj) {
+            lastObj.userData.opacity = data.opacity
+            const op = data.opacity
+            const applyOp = (mesh) => {
+                if (mesh.material) {
+                    mesh.material.transparent = op < 1.0
+                    mesh.material.opacity = op
+                    mesh.material.needsUpdate = true
+                }
+            }
+            if (lastObj.isGroup) lastObj.children.forEach(applyOp)
+            else applyOp(lastObj)
+        }
+        if (data.uuid && lastObj) {
+            lastObj.userData.uuid = data.uuid
+            if (data.invisible) {
+                lastObj.userData.invisible = true
+                lastObj.visible = false
+            }
+        }
+    }
+
+    /** Elimina un objeto de la escena por UUID (para recepci\u00f3n colaborativa) */
+    deleteObjectByUuid(uuid) {
+        if (!uuid) return
+        const obj = this.sceneManager.scene.children.find(
+            c => c.userData && c.userData.uuid === uuid
+        )
+        if (!obj) return
+        // Liberar f\u00edsica si existe
+        if (obj.userData.rigidBody) {
+            try { this.world.removeRigidBody(obj.userData.rigidBody) } catch (e) { /* ignore */ }
+        }
+        this.sceneManager.scene.remove(obj)
+        if (this.objectInspector && this.objectInspector.selectedObject === obj) {
+            this.objectInspector.hide()
+        }
+        console.log(`[Collab] Removed object ${uuid}`)
     }
 
     setObjectBodyType(object, type) {

@@ -3,6 +3,8 @@ import RAPIER from "@dimforge/rapier3d-compat"
 import { GLBModel } from "./Character/GLBModel.js"
 import { PolygonModel } from "./Character/PolygonModel.js"
 import { PolygonModelSkin } from "./Character/PolygonModelSkin.js"
+import { GunItem } from "./item/GunItem.js"
+import { PelotaItem } from "./item/PelotaItem.js"
 
 export class RemotePlayer {
     constructor(scene, world, playerId, position = new THREE.Vector3(0, 0, 0)) {
@@ -24,8 +26,12 @@ export class RemotePlayer {
             isAttacking: false,
             isGrounded: true,
             verticalVelocity: 0,
-            action: "Idle"
+            action: "Idle",
+            equippedWeapon: null
         }
+
+        this.equippedWeaponName = null
+        this.currentWeaponInstance = null
 
         this.currentPosition = position.clone()
         this.targetPosition = position.clone()
@@ -134,6 +140,30 @@ export class RemotePlayer {
         if (state.modelType && state.modelType !== this.currentType) {
             this.setModelType(state.modelType);
         }
+
+        if (state.equippedWeapon !== this.equippedWeaponName) {
+            this.equippedWeaponName = state.equippedWeapon;
+            
+            if (state.equippedWeapon === "gun") {
+                this.currentWeaponInstance = new GunItem();
+                this.glbModel.setHeldItem(this.currentWeaponInstance);
+                this.polygonModel.setHeldItem(this.currentWeaponInstance);
+                this.polygonModelSkin.setHeldItem(this.currentWeaponInstance);
+            } else if (state.equippedWeapon === "pelota") {
+                this.currentWeaponInstance = new PelotaItem();
+                this.glbModel.setHeldItem(this.currentWeaponInstance);
+                this.polygonModel.setHeldItem(this.currentWeaponInstance);
+                this.polygonModelSkin.setHeldItem(this.currentWeaponInstance);
+            } else {
+                this.currentWeaponInstance = null;
+                this.glbModel.setHeldItem(null);
+                this.polygonModel.setHeldItem(null);
+                this.polygonModelSkin.setHeldItem(null);
+            }
+        }
+
+        // Forward reload/shoot signals to currentWeaponInstance if needed
+        // (Visual bullets are handled by handleRemoteShoot in main_rapier, but we keep this instance around for future state)
     }
 
     update(dt) {

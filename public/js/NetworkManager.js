@@ -143,6 +143,36 @@ export class NetworkManager {
                     this.onEditorUpdate(message.uuid, message.transform)
                 }
                 break
+
+            // ── Map Sync (Late Joiners) ───────────────────────────────
+            case "requestMapSync":
+                if (this.onRequestMapSync) {
+                    this.onRequestMapSync(message.targetId)
+                }
+                break
+
+            case "mapSyncData":
+                if (this.onMapSyncData && message.mapData) {
+                    this.onMapSyncData(message.mapData)
+                }
+                break
+
+            // ── Shooting Sync ────────────────────────────────────────
+            case "playerShoot":
+                if (this.onPlayerShoot && message.playerId !== this.playerId) {
+                    this.onPlayerShoot(
+                        message.playerId, 
+                        message.startPos, 
+                        message.direction, 
+                        message.projectileType, 
+                        message.speed, 
+                        message.damage, 
+                        message.drop, 
+                        message.rebote, 
+                        message.hasImpactEffect
+                    )
+                }
+                break
         }
     }
 
@@ -258,6 +288,30 @@ export class NetworkManager {
         if (!this.isConnected || !this.collaborativeMode) return
         if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return
         this.socket.send(JSON.stringify({ type: "editorUpdate", uuid, transform }))
+    }
+
+    sendMapSyncData(targetId, mapData) {
+        if (!this.isConnected || !this.socket || this.socket.readyState !== WebSocket.OPEN) return
+        this.socket.send(JSON.stringify({
+            type: "mapSyncData",
+            targetId: targetId,
+            mapData: mapData
+        }))
+    }
+
+    sendPlayerShoot(startPos, direction, type, speed, damage, drop, rebote, hasImpactEffect) {
+        if (!this.isConnected || !this.socket || this.socket.readyState !== WebSocket.OPEN) return
+        this.socket.send(JSON.stringify({
+            type: "playerShoot",
+            startPos: { x: startPos.x, y: startPos.y, z: startPos.z },
+            direction: { x: direction.x, y: direction.y, z: direction.z },
+            projectileType: type,
+            speed: speed,
+            damage: damage,
+            drop: drop,
+            rebote: rebote,
+            hasImpactEffect: hasImpactEffect
+        }))
     }
 
     setShowPlayerNames(show) {

@@ -28,6 +28,8 @@ import { PlayerConfigManager } from "./managers/PlayerConfigManager.js"
 import { GameHUD } from "./ui/GameHUD.js"
 import { GunItem } from "./item/GunItem.js"
 import { FloatingTextManager } from "./ui/FloatingTextManager.js"
+import { Projectile } from "./weapons/Projectile.js"
+import { BlasterSystem } from "./fx/BlasterSystem.js"
 
 class Game {
     constructor() {
@@ -130,6 +132,34 @@ class Game {
             this.deleteObjectByUuid(uuid)
             if (this.constructionMenu) this.constructionMenu.refreshLogicList()
             this._isApplyingRemoteEdit = false
+        }
+
+        // ── Map Sync (Late Joiners) ──────────────────────────────
+        this.networkManager.onRequestMapSync = (targetId) => {
+            if (this.gameMode !== 'editor') return
+            console.log(`[Collab] Servidor pidió mi mapa para sincronizar al jugador ${targetId}. Generando...`)
+            const mapJson = this.saveMap()
+            this.networkManager.sendMapSyncData(targetId, JSON.stringify(mapJson))
+        }
+
+        this.networkManager.onMapSyncData = (mapDataString) => {
+            if (this.gameMode !== 'editor') return
+            console.log("[Collab] Recibiendo estado de mapa completo (Late Joiner Sync)...")
+            try {
+                const mapJson = JSON.parse(mapDataString)
+                this._isApplyingRemoteEdit = true
+                this.loadMap(mapJson)
+                this._isApplyingRemoteEdit = false
+                console.log("[Collab] Mapa sincronizado exitosamente.")
+            } catch(e) {
+                console.error("[Collab] Error parseando mapa recibido:", e)
+            }
+        }
+
+        // ── Sincronización de Proyectiles (Shoot) ──────────────────
+        this.networkManager.onPlayerShoot = (playerId, startPos, direction, type, speed, damage, drop, rebote, hasImpactEffect) => {
+            console.log(`[Collab] Player ${playerId} disparó un ${type}!`)
+            this.handleRemoteShoot(startPos, direction, type, speed, damage, drop, rebote, hasImpactEffect)
         }
 
         document.addEventListener("chatFocus", () => {
@@ -607,6 +637,9 @@ class Game {
                 // If latched true, use true.
                 const sendAttacking = isAttacking || this._netAttackLatch;
 
+                const currentItem = this.inventoryManager ? this.inventoryManager.getCurrentItem() : null;
+                const equippedWeapon = (currentItem && currentItem.type === "weapon") ? currentItem.id : null;
+
                 const playerState = {
                     modelType: this.character.currentType || 'skin',
                     isMoving: isMoving,
@@ -614,7 +647,8 @@ class Game {
                     isAttacking: sendAttacking,
                     isGrounded: isGrounded,
                     verticalVelocity: this.character.verticalVelocity || 0,
-                    action: this.character.currentAction ? this.character.currentAction.getClip().name : "Idle"
+                    action: this.character.currentAction ? this.character.currentAction.getClip().name : "Idle",
+                    equippedWeapon: equippedWeapon
                 };
 
                 const updateSent = this.networkManager.sendPlayerUpdate(
@@ -1496,7 +1530,8 @@ class Game {
                     logicProperties: obj.userData.logicProperties, // Create if exists
                     uuid: obj.userData.uuid, // Save UUID for references
                     invisible: obj.userData.invisible, // Save visibility state
-                    opacity: obj.userData.opacity // Save opacity
+                    opacity: obj.userData.opacity, // Save opacity
+                    authorId: obj.userData.authorId // Guardar quién creó el objeto
                 })
             }
         })
@@ -1601,6 +1636,11 @@ class Game {
             tempItem.spawnObjectFromData(this.sceneManager.scene, this.world, data.pos, data.rot)
 
             const lastObj = this.sceneManager.scene.children[this.sceneManager.scene.children.length - 1]
+
+            // Assign External Author ID if available
+            if (lastObj && data.authorId) {
+                lastObj.userData.authorId = data.authorId
+            }
 
             // Apply Opacity Material (if not invisible overridden later)
             if (data.opacity !== undefined && lastObj) {
@@ -1753,6 +1793,7 @@ class Game {
             origin: origin,
             direction: direction,
             camera: this.sceneManager.camera, // ADDED CAMERA FOR RAYCASTING
+            networkManager: this.networkManager, // ADDED NETWORK TO RELAY SHOOTING
             registerProjectile: (proj) => {
                 this.projectiles.push(proj)
             },
@@ -1808,13 +1849,59 @@ class Game {
                         logicProperties: obj.userData.logicProperties,
                         uuid: obj.userData.uuid,
                         invisible: obj.userData.invisible,
-                        opacity: obj.userData.opacity
+                        opacity: obj.userData.opacity,
+                        authorId: this.networkManager.playerId || "local"
                     }
+                    obj.userData.authorId = data.authorId // Asignar localmente también
                     this.networkManager.sendEditorPlace(data)
                     break
                 }
             }
         }
+    }
+
+    // ── Gesti\u00f3n de Disparos Remotos ───────────────────────────────────────
+    handleRemoteShoot(startPos, direction, type, speed, damage, drop, rebote, hasImpactEffect) {
+        if (!this.sceneManager || !this.world) return
+
+        let tempTracer = null
+        let blaster = null
+
+        if ((type === "bullet") && this.sceneManager.scene) {
+            blaster = new BlasterSystem(this.sceneManager.scene)
+            const tracer = blaster.CreateParticle()
+            tracer.Start.copy(startPos)
+            
+            const dirVec = new THREE.Vector3(direction.x, direction.y, direction.z).normalize()
+            tracer.End = dirVec.clone().multiplyScalar(10.0).add(startPos)
+            tracer.Velocity = dirVec.clone().multiplyScalar(150.0)
+            
+            tracer.Colours = [new THREE.Color(0xffff88), new THREE.Color(0xffaa00)]
+            tracer.Length = 10.0
+            tracer.Life = 0.5
+            tracer.TotalLife = 0.5
+            tracer.Width = 0.05
+            tempTracer = tracer
+        }
+
+        const proj = new Projectile(
+            this.sceneManager.scene,
+            this.world,
+            new THREE.Vector3(startPos.x, startPos.y, startPos.z),
+            new THREE.Vector3(direction.x, direction.y, direction.z),
+            speed || 50,
+            damage || 10,
+            drop || 1.0,
+            type || "bullet",
+            rebote || false,
+            hasImpactEffect || false
+        )
+        proj.blasterSystem = blaster
+        proj.initialTracer = tempTracer
+        // We do not set isRemote flag conceptually, because projectile does physics and stops locally
+        // Alternatively, you could tag it to apply no damage locally.
+        
+        this.projectiles.push(proj)
     }
 
     // ── Helpers colaborativos del editor ────────────────────────────────────
@@ -1835,6 +1922,11 @@ class Game {
         tempItem.spawnObjectFromData(this.sceneManager.scene, this.world, data.pos, data.rot)
 
         const lastObj = this.sceneManager.scene.children[this.sceneManager.scene.children.length - 1]
+        
+        if (lastObj && data.authorId) {
+            lastObj.userData.authorId = data.authorId
+        }
+
         if (data.opacity !== undefined && lastObj) {
             lastObj.userData.opacity = data.opacity
             const op = data.opacity

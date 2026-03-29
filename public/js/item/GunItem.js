@@ -303,6 +303,20 @@ export class GunItem extends Item {
             proj.blasterSystem = this.blasterSystem;
             proj.initialTracer = tempTracer;
             context.registerProjectile(proj);
+
+            // Transmitir disparo a otros clientes
+            if (context.networkManager) {
+                context.networkManager.sendPlayerShoot(
+                    startPos,
+                    trajectoryDir,
+                    projType,
+                    speed,
+                    this.damage,
+                    drop,
+                    this.rebote,
+                    this.hasImpactEffect
+                );
+            }
         }
 
         // Play Sound?

@@ -85,6 +85,16 @@ wss.on("connection", (ws) => {
                         type: "gameState",
                         players: existingPlayers,
                     }))
+
+                    // Solicitar el mapa actual al primer jugador existente para sincronizar al recién llegado
+                    const firstPlayerId = existingPlayers[0].id
+                    const firstPlayerClient = Array.from(wss.clients).find(c => c.playerId === firstPlayerId && c.roomId === roomId)
+                    if (firstPlayerClient && firstPlayerClient.readyState === 1) {
+                        firstPlayerClient.send(JSON.stringify({
+                            type: "requestMapSync",
+                            targetId: playerId
+                        }))
+                    }
                 }
 
                 // Notify others in room
@@ -128,6 +138,36 @@ wss.on("connection", (ws) => {
                         playerId: playerId,
                         message: message.text,
                     }, null) // Null to broadcast to everyone including sender
+                    break
+
+                // ── Map Sync (Late Joiners) ──────────────────────────────
+                case "mapSyncData":
+                    if (message.targetId && message.mapData) {
+                        const targetClient = Array.from(wss.clients).find(c => c.playerId === message.targetId && c.roomId === roomId)
+                        if (targetClient && targetClient.readyState === 1) {
+                            targetClient.send(JSON.stringify({
+                                type: "mapSyncData",
+                                mapData: message.mapData
+                            }))
+                            console.log(`[Room ${roomId}] Map sync delivered to ${message.targetId}`)
+                        }
+                    }
+                    break
+
+                // ── Shooting Sync ────────────────────────────────────────
+                case "playerShoot":
+                    broadcastToRoom(roomId, {
+                        type: "playerShoot",
+                        playerId: playerId,
+                        startPos: message.startPos,
+                        direction: message.direction,
+                        projectileType: message.projectileType,
+                        speed: message.speed,
+                        damage: message.damage,
+                        drop: message.drop,
+                        rebote: message.rebote,
+                        hasImpactEffect: message.hasImpactEffect
+                    }, playerId)
                     break
 
                 // ── Editor Colaborativo ──────────────────────────────────

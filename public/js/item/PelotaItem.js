@@ -61,6 +61,19 @@ export class PelotaItem extends Item {
         if (context.registerProjectile) {
             context.registerProjectile(projectile);
         }
+
+        if (context.networkManager) {
+            context.networkManager.sendPlayerShoot(
+                spawnPos,
+                direction,
+                "ball",
+                this.bulletSpeed,
+                this.damage,
+                this.bulletDrop,
+                this.rebote,
+                false
+            );
+        }
     }
 
     getDisplayMesh() {

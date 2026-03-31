@@ -726,11 +726,63 @@ export class ConstructionMenu {
     }
 
     renderSaveLoad(container) {
+        // Change container layout to support split view
+        container.style.flexWrap = "nowrap"
+        container.style.alignItems = "stretch"
+
+        const leftColumn = document.createElement('div')
+        leftColumn.style.cssText = `
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            width: 100%;
+            max-width: 340px;
+        `
+
+        const rightColumn = document.createElement('div')
+        rightColumn.style.cssText = `
+            flex: 1;
+            min-width: 300px;
+            background: #222;
+            padding: 20px;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            border: 1px solid #444;
+            box-sizing: border-box;
+        `
+
+        const rightTitle = document.createElement('h3')
+        rightTitle.textContent = "Visualizador de Mapa (JSON)"
+        rightTitle.style.margin = "0"
+        rightTitle.style.borderBottom = "1px solid #555"
+        rightTitle.style.paddingBottom = "10px"
+
+        const jsonTextArea = document.createElement('textarea')
+        jsonTextArea.style.cssText = `
+            flex: 1;
+            width: 100%;
+            min-height: 400px;
+            background: #111;
+            color: #4ade80;
+            font-family: monospace;
+            font-size: 13px;
+            border: 1px solid #555;
+            border-radius: 6px;
+            padding: 12px;
+            resize: none;
+            box-sizing: border-box;
+        `
+        jsonTextArea.readOnly = true
+        jsonTextArea.placeholder = "Haz clic en 'Ver JSON del Mapa' para visualizar la configuración actual antes de guardar..."
+
+        rightColumn.appendChild(rightTitle)
+        rightColumn.appendChild(jsonTextArea)
+
         // Save Map Section
         const saveSection = document.createElement('div')
         saveSection.style.cssText = `
-            width: 100%;
-            max-width: 340px;
             background: #222;
             padding: 20px;
             border-radius: 8px;
@@ -748,14 +800,15 @@ export class ConstructionMenu {
         saveTitle.style.paddingBottom = "10px"
 
         const saveInfo = document.createElement('p')
-        saveInfo.textContent = "Descarga el archivo JSON de tu mapa actual para guardarlo en tu computadora."
+        saveInfo.textContent = "Revisa el mapa actual o descarga el archivo JSON para guardarlo en tu computadora."
         saveInfo.style.color = "#aaa"
         saveInfo.style.fontSize = "14px"
         saveInfo.style.margin = "0"
 
-        const saveBtn = document.createElement('button')
-        saveBtn.textContent = "Guardar Mapa (JSON)"
-        saveBtn.style.cssText = `
+        const btnContainer = document.createElement('div')
+        btnContainer.style.cssText = `display: flex; flex-direction: column; gap: 10px;`
+
+        const baseBtnStyle = `
             background: #545454ff;
             color: white;
             border: none;
@@ -766,12 +819,31 @@ export class ConstructionMenu {
             font-weight: bold;
             transition: background 0.2s;
         `
+
+        const viewJsonBtn = document.createElement('button')
+        viewJsonBtn.textContent = "Ver JSON del Mapa"
+        viewJsonBtn.style.cssText = baseBtnStyle
+        viewJsonBtn.onmouseover = () => viewJsonBtn.style.background = "#656565ff"
+        viewJsonBtn.onmouseout = () => viewJsonBtn.style.background = "#545454ff"
+        viewJsonBtn.onclick = () => {
+            if (this.game.saveMap) {
+                const mapData = this.game.saveMap()
+                jsonTextArea.value = JSON.stringify(mapData, null, 2)
+            } else {
+                alert("Error: Función saveMap no encontrada en el juego.")
+            }
+        }
+
+        const saveBtn = document.createElement('button')
+        saveBtn.textContent = "Guardar Mapa (JSON)"
+        saveBtn.style.cssText = baseBtnStyle
         saveBtn.onmouseover = () => saveBtn.style.background = "#656565ff"
         saveBtn.onmouseout = () => saveBtn.style.background = "#545454ff"
         saveBtn.onclick = () => {
             if (this.game.saveMap) {
                 const mapData = this.game.saveMap()
                 const json = JSON.stringify(mapData, null, 2)
+                jsonTextArea.value = json // Also update the view just in case
 
                 // Download
                 const blob = new Blob([json], { type: "application/json" })
@@ -788,15 +860,16 @@ export class ConstructionMenu {
             }
         }
 
+        btnContainer.appendChild(viewJsonBtn)
+        btnContainer.appendChild(saveBtn)
+
         saveSection.appendChild(saveTitle)
         saveSection.appendChild(saveInfo)
-        saveSection.appendChild(saveBtn)
+        saveSection.appendChild(btnContainer)
 
         // Load Map Section
         const loadSection = document.createElement('div')
         loadSection.style.cssText = `
-            width: 100%;
-            max-width: 340px;
             background: #222;
             padding: 20px;
             border-radius: 8px;
@@ -826,17 +899,7 @@ export class ConstructionMenu {
 
         const loadBtn = document.createElement('button')
         loadBtn.textContent = "Cargar Mapa"
-        loadBtn.style.cssText = `
-            background: #545454ff;
-            color: white;
-            border: none;
-            padding: 12px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 16px;
-            font-weight: bold;
-            transition: background 0.2s;
-        `
+        loadBtn.style.cssText = baseBtnStyle
         loadBtn.onmouseover = () => loadBtn.style.background = "#656565ff"
         loadBtn.onmouseout = () => loadBtn.style.background = "#545454ff"
         loadBtn.onclick = () => {
@@ -848,8 +911,9 @@ export class ConstructionMenu {
                         const json = JSON.parse(e.target.result)
                         if (this.game.loadMap) {
                             this.game.loadMap(json)
-                            // Close menu after successful load? Maybe optional.
-                            this.toggle()
+                            // Update the preview if right side is visible
+                            jsonTextArea.value = JSON.stringify(json, null, 2)
+                            
                             alert("Mapa cargado correctamente!")
                         } else {
                             alert("Error: Función loadMap no encontrada en el juego.")
@@ -869,14 +933,9 @@ export class ConstructionMenu {
         loadSection.appendChild(fileInput)
         loadSection.appendChild(loadBtn)
 
-        container.appendChild(saveSection)
-        container.appendChild(loadSection)
-
-        // ── Sección Editor Colaborativo (mismo estilo que Guardar/Cargar) ─────────
+        // Collab Section
         const collabSection = document.createElement('div')
         collabSection.style.cssText = `
-            width: 100%;
-            max-width: 340px;
             background: #222;
             padding: 20px;
             border-radius: 8px;
@@ -891,8 +950,6 @@ export class ConstructionMenu {
         collabTitle.textContent = 'Edición Colaborativa'
         collabTitle.style.cssText = `margin: 0; border-bottom: 1px solid #555; padding-bottom: 10px;`
         collabSection.appendChild(collabTitle)
-
-
 
         // Indicador de estado
         const statusRow = document.createElement('div')
@@ -912,19 +969,14 @@ export class ConstructionMenu {
         statusRow.appendChild(statusText)
         collabSection.appendChild(statusRow)
 
-        // Botón toggle — mismo estilo que botones guardar/cargar
+        // Botón toggle
         const collabBtn = document.createElement('button')
         collabBtn.textContent = 'Abrir Colaborativo'
-        collabBtn.style.cssText = `
-            background: #545454ff;
-            color: white; border: none; padding: 12px;
-            border-radius: 6px; cursor: pointer; font-size: 16px;
-            font-weight: bold; transition: background 0.2s;
-        `
+        collabBtn.style.cssText = baseBtnStyle
         collabBtn.onmouseover = () => collabBtn.style.background = '#656565ff'
         collabSection.appendChild(collabBtn)
 
-        // Bloque del link (oculto inicialmente)
+        // Bloque del link
         const linkBlock = document.createElement('div')
         linkBlock.style.cssText = `display: none; flex-direction: column; gap: 8px; border-top: 1px solid #555; padding-top: 12px;`
 
@@ -964,7 +1016,6 @@ export class ConstructionMenu {
             })
         }
 
-
         linkBlock.appendChild(linkLabel)
         linkBlock.appendChild(linkInput)
         linkBlock.appendChild(copyBtn)
@@ -1001,7 +1052,12 @@ export class ConstructionMenu {
             applyCollabState(true)
         }
 
-        container.appendChild(collabSection)
+        leftColumn.appendChild(saveSection)
+        leftColumn.appendChild(loadSection)
+        leftColumn.appendChild(collabSection)
+
+        container.appendChild(leftColumn)
+        container.appendChild(rightColumn)
     }
 
 

@@ -90,6 +90,10 @@ class Game {
             this.updateConnectionStatus(true, id)
         })
 
+        if (this.gameMode === 'editor') {
+            this.networkManager.collaborativeMode = true; // Activar siempre para modo editor (Single o Multi)
+        }
+
         this.chatManager = new ChatManager(this.networkManager)
 
         // Manager de colocación

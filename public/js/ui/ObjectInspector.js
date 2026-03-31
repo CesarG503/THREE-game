@@ -331,7 +331,15 @@ export class ObjectInspector {
             section.appendChild(row)
         })
 
-        // 5. Logic Properties (Dynamic)
+        // 4.6 Danger Zone
+        this.createSection("Acciones", (section) => {
+            const btnDelete = document.createElement('button')
+            btnDelete.textContent = "Eliminar Objeto"
+            btnDelete.style.cssText = `width: 100%; padding: 8px; cursor: pointer; background: #cc3333; color: white; border: none; border-radius: 4px; font-weight: bold;`
+            btnDelete.onclick = () => this.deleteSelected()
+            section.appendChild(btnDelete)
+        })
+
         // 5. Logic Properties (Dynamic)
         this.logicSectionWrapper = this.createSection("Lógica de Juego", (section) => {
             this.logicContainer = document.createElement('div')
@@ -740,6 +748,10 @@ export class ObjectInspector {
                 if (c.material) c.material.color.set(hex)
             })
         }
+        
+        if (this.game && this.game.broadcastObjectUpdate) {
+            this.game.broadcastObjectUpdate(this.selectedObject);
+        }
     }
 
     updateTexture(pathOrDataUrl) {
@@ -786,6 +798,10 @@ export class ObjectInspector {
                 remove(this.selectedObject)
             }
         }
+        
+        if (this.game && this.game.broadcastObjectUpdate) {
+            this.game.broadcastObjectUpdate(this.selectedObject);
+        }
     }
 
     updateTransparency(opacity) {
@@ -809,6 +825,10 @@ export class ObjectInspector {
             this.selectedObject.children.forEach(apply)
         } else {
             apply(this.selectedObject)
+        }
+        
+        if (this.game && this.game.broadcastObjectUpdate) {
+            this.game.broadcastObjectUpdate(this.selectedObject);
         }
     }
 
@@ -851,6 +871,10 @@ export class ObjectInspector {
                 })
             }
         }
+
+        if (this.game && this.game.broadcastObjectUpdate) {
+            this.game.broadcastObjectUpdate(this.selectedObject);
+        }
     }
 
     refreshPhysicsAndVisuals() {
@@ -859,6 +883,10 @@ export class ObjectInspector {
         // Calls a method in Game to regenerate body
         if (this.game.regenerateObjectPhysics) {
             this.game.regenerateObjectPhysics(this.selectedObject)
+        }
+        
+        if (this.game && this.game.broadcastObjectUpdate) {
+            this.game.broadcastObjectUpdate(this.selectedObject);
         }
     }
 
@@ -871,6 +899,10 @@ export class ObjectInspector {
             if (this.selectedObject && this.selectedObject.userData.logicProperties) {
                 this.selectedObject.userData.logicProperties[key] = value
                 console.log(`Updated Logic Prop [${key}]:`, value)
+                
+                if (this.game && this.game.broadcastObjectUpdate) {
+                    this.game.broadcastObjectUpdate(this.selectedObject);
+                }
             }
         }
 
@@ -891,5 +923,19 @@ export class ObjectInspector {
         }
 
         this.game.constructionMenu.selectLogicObject(target)
+    }
+
+    deleteSelected() {
+        if (!this.selectedObject || !this.game) return
+
+        const uuid = this.selectedObject.userData.uuid
+        
+        // Red
+        if (this.game.networkManager && this.game.gameMode === 'editor') {
+            this.game.networkManager.sendEditorRemove(uuid)
+        }
+        
+        // Destrucción local
+        this.game.deleteObjectByUuid(uuid)
     }
 }

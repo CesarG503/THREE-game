@@ -1912,6 +1912,12 @@ class Game {
     /** Carga UNO SOLO objeto serializado en la escena (para recepci\u00f3n colaborativa) */
     _loadSingleMapObject(data) {
         if (!data || !data.type) return
+
+        // Upsert: Si ya existe un objeto con este UUID, se elimina físicamente del mundo antes
+        if (data.uuid) {
+            this.deleteObjectByUuid(data.uuid);
+        }
+
         const tempItem = new MapObjectItem(
             "collab_" + Math.random(),
             "Collab Obj",
@@ -1969,6 +1975,27 @@ class Game {
             this.objectInspector.hide()
         }
         console.log(`[Collab] Removed object ${uuid}`)
+    }
+
+    /** Helper para despachar actualizaciones desde el ObjectInspector en tiempo real */
+    broadcastObjectUpdate(obj) {
+        if (!obj || !obj.userData || !obj.userData.isEditableMapObject) return
+        if (this.gameMode !== 'editor' || !this.networkManager) return
+
+        const data = {
+            type: obj.userData.mapObjectType,
+            color: obj.userData.color,
+            originalScale: obj.userData.originalScale,
+            pos: { x: obj.position.x, y: obj.position.y, z: obj.position.z },
+            rot: { x: obj.rotation.x, y: obj.rotation.y, z: obj.rotation.z },
+            logicProperties: obj.userData.logicProperties,
+            uuid: obj.userData.uuid,
+            invisible: obj.userData.invisible,
+            opacity: obj.userData.opacity,
+            authorId: obj.userData.authorId || this.networkManager.playerId || "local"
+        }
+        
+        this.networkManager.sendEditorPlace(data)
     }
 
     setObjectBodyType(object, type) {

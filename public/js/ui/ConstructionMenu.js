@@ -753,32 +753,197 @@ export class ConstructionMenu {
             box-sizing: border-box;
         `
 
+        const rightTitleRow = document.createElement('div')
+        rightTitleRow.style.cssText = `display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #555; padding-bottom: 10px;`
+        
         const rightTitle = document.createElement('h3')
         rightTitle.textContent = "Visualizador de Mapa (JSON)"
         rightTitle.style.margin = "0"
-        rightTitle.style.borderBottom = "1px solid #555"
-        rightTitle.style.paddingBottom = "10px"
+        
+        // State for JSON logic
+        let filters = {
+            gameVersion: true,
+            timestamp: true,
+            objects: true,
+            gameConfig: true,
+            playerConfig: true
+        }
+        let isEditing = false;
 
-        const jsonTextArea = document.createElement('textarea')
-        jsonTextArea.style.cssText = `
+        // Edit Checkbox
+        const editLabel = document.createElement('label')
+        editLabel.style.cssText = `font-size: 13px; color: #facc15; display: flex; align-items: center; gap: 5px; cursor: pointer; font-weight: bold;`
+        const editCb = document.createElement('input')
+        editCb.type = 'checkbox'
+        editCb.onchange = (e) => {
+             isEditing = e.target.checked;
+             if (isEditing) {
+                 jsonPre.style.display = 'none';
+                 jsonTextArea.style.display = 'block';
+                 applyBtn.style.display = 'block';
+                 filtersContainer.style.opacity = '0.5';
+                 filtersContainer.style.pointerEvents = 'none';
+             } else {
+                 jsonPre.style.display = 'block';
+                 jsonTextArea.style.display = 'none';
+                 applyBtn.style.display = 'none';
+                 filtersContainer.style.opacity = '1';
+                 filtersContainer.style.pointerEvents = 'auto';
+                 updateJson();
+             }
+        }
+        editLabel.appendChild(editCb)
+        editLabel.appendChild(document.createTextNode("Habilitar Edición Manual"))
+        
+        rightTitleRow.appendChild(rightTitle)
+        rightTitleRow.appendChild(editLabel)
+
+        const jsonPre = document.createElement('pre')
+        jsonPre.style.cssText = `
             flex: 1;
             width: 100%;
             min-height: 400px;
             background: #111;
-            color: #4ade80;
+            color: #d1d5db;
             font-family: monospace;
             font-size: 13px;
             border: 1px solid #555;
             border-radius: 6px;
             padding: 12px;
+            overflow-y: auto;
+            margin: 0;
+            box-sizing: border-box;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        `
+        
+        const jsonTextArea = document.createElement('textarea')
+        jsonTextArea.style.cssText = `
+            flex: 1;
+            width: 100%;
+            min-height: 400px;
+            background: #1e1b4b;
+            color: #fbbf24;
+            font-family: monospace;
+            font-size: 13px;
+            border: 1px solid #6366f1;
+            border-radius: 6px;
+            padding: 12px;
             resize: none;
             box-sizing: border-box;
+            display: none;
         `
-        jsonTextArea.readOnly = true
-        jsonTextArea.placeholder = "Haz clic en 'Ver JSON del Mapa' para visualizar la configuración actual antes de guardar..."
+        jsonTextArea.spellcheck = false
 
-        rightColumn.appendChild(rightTitle)
+        const applyBtn = document.createElement('button')
+        applyBtn.textContent = "Aplicar Cambios del JSON"
+        applyBtn.style.cssText = `
+            background: #15803d;
+            color: white;
+            border: none;
+            padding: 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            display: none;
+        `
+        applyBtn.onclick = () => {
+             try {
+                 const newJson = JSON.parse(jsonTextArea.value);
+                 if (this.game.loadMap) {
+                     this.game.loadMap(newJson);
+                     editCb.checked = false;
+                     editCb.dispatchEvent(new Event('change'));
+                     alert("¡Cambios aplicados al mapa exitosamente!");
+                 }
+             } catch(err) {
+                 alert("Error de sintaxis JSON: " + err.message);
+             }
+        }
+
+        // Filters UI
+        const filtersContainer = document.createElement('div')
+        filtersContainer.style.cssText = `display: flex; gap: 15px; flex-wrap: wrap; margin-top: 5px;`
+        
+        const createFilter = (key, label) => {
+             const lbl = document.createElement('label')
+             lbl.style.cssText = `font-size: 12px; color: #cbd5e1; display: flex; align-items: center; gap: 4px; cursor: pointer;`
+             const cb = document.createElement('input')
+             cb.type = 'checkbox'
+             cb.checked = true
+             cb.onchange = () => {
+                 filters[key] = cb.checked;
+                 if(!isEditing) updateJson();
+             }
+             lbl.appendChild(cb)
+             lbl.appendChild(document.createTextNode(label))
+             filtersContainer.appendChild(lbl)
+        }
+        
+        createFilter('gameVersion', 'Versión')
+        createFilter('timestamp', 'Fecha/Hora')
+        createFilter('gameConfig', 'Game Config')
+        createFilter('playerConfig', 'Player Config')
+        createFilter('objects', 'Objetos 3D')
+
+        rightColumn.appendChild(rightTitleRow)
+        rightColumn.appendChild(jsonPre)
         rightColumn.appendChild(jsonTextArea)
+        rightColumn.appendChild(applyBtn)
+        rightColumn.appendChild(filtersContainer)
+
+        const syntaxHighlight = (json) => {
+            if (!json) return "";
+            json = json.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            return json.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, function (match) {
+                let cls = 'color: #fca5a5;'; // number
+                if (/^"/.test(match)) {
+                    if (/:$/.test(match)) {
+                        cls = 'color: #93c5fd; font-weight: bold; font-style: normal;'; // key
+                    } else {
+                        cls = 'color: #86efac;'; // string
+                    }
+                } else if (/true|false/.test(match)) {
+                    cls = 'color: #fcd34d; font-weight: bold;'; // boolean
+                } else if (/null/.test(match)) {
+                    cls = 'color: #f87171; font-weight: bold;'; // null
+                }
+                return '<span style="' + cls + '">' + match + '</span>';
+            });
+        }
+
+        const updateJson = () => {
+            if (!this.game || !this.game.saveMap || isEditing) return;
+            try {
+                const mapData = this.game.saveMap();
+                const filteredData = {};
+                
+                if (filters.gameVersion && mapData.gameVersion !== undefined) filteredData.gameVersion = mapData.gameVersion;
+                if (filters.timestamp && mapData.timestamp !== undefined) filteredData.timestamp = mapData.timestamp;
+                if (filters.objects && mapData.objects !== undefined) filteredData.objects = mapData.objects;
+                if (filters.gameConfig && mapData.gameConfig !== undefined) filteredData.gameConfig = mapData.gameConfig;
+                if (filters.playerConfig && mapData.playerConfig !== undefined) filteredData.playerConfig = mapData.playerConfig;
+                
+                for(let key in mapData) {
+                    if(!['gameVersion', 'timestamp', 'objects', 'gameConfig', 'playerConfig'].includes(key)) {
+                        filteredData[key] = mapData[key];
+                    }
+                }
+
+                const rawJson = JSON.stringify(filteredData, null, 2);
+                jsonPre.innerHTML = syntaxHighlight(rawJson);
+                jsonTextArea.value = rawJson;
+            } catch(e) {}
+        }
+
+        // Auto update interval
+        if (this._jsonUpdateInterval) clearInterval(this._jsonUpdateInterval);
+        this._jsonUpdateInterval = setInterval(() => {
+            if (container.offsetWidth > 0 && !isEditing) {
+                updateJson();
+            }
+        }, 1000)
 
         // Save Map Section
         const saveSection = document.createElement('div')
@@ -800,7 +965,7 @@ export class ConstructionMenu {
         saveTitle.style.paddingBottom = "10px"
 
         const saveInfo = document.createElement('p')
-        saveInfo.textContent = "Revisa el mapa actual o descarga el archivo JSON para guardarlo en tu computadora."
+        saveInfo.textContent = "Revisa el mapa en el panel derecho o descarga el archivo JSON para guardarlo en tu computadora."
         saveInfo.style.color = "#aaa"
         saveInfo.style.fontSize = "14px"
         saveInfo.style.margin = "0"
@@ -820,22 +985,8 @@ export class ConstructionMenu {
             transition: background 0.2s;
         `
 
-        const viewJsonBtn = document.createElement('button')
-        viewJsonBtn.textContent = "Ver JSON del Mapa"
-        viewJsonBtn.style.cssText = baseBtnStyle
-        viewJsonBtn.onmouseover = () => viewJsonBtn.style.background = "#656565ff"
-        viewJsonBtn.onmouseout = () => viewJsonBtn.style.background = "#545454ff"
-        viewJsonBtn.onclick = () => {
-            if (this.game.saveMap) {
-                const mapData = this.game.saveMap()
-                jsonTextArea.value = JSON.stringify(mapData, null, 2)
-            } else {
-                alert("Error: Función saveMap no encontrada en el juego.")
-            }
-        }
-
         const saveBtn = document.createElement('button')
-        saveBtn.textContent = "Guardar Mapa (JSON)"
+        saveBtn.textContent = "Guardar Mapa (Descargar)"
         saveBtn.style.cssText = baseBtnStyle
         saveBtn.onmouseover = () => saveBtn.style.background = "#656565ff"
         saveBtn.onmouseout = () => saveBtn.style.background = "#545454ff"
@@ -843,7 +994,6 @@ export class ConstructionMenu {
             if (this.game.saveMap) {
                 const mapData = this.game.saveMap()
                 const json = JSON.stringify(mapData, null, 2)
-                jsonTextArea.value = json // Also update the view just in case
 
                 // Download
                 const blob = new Blob([json], { type: "application/json" })
@@ -860,7 +1010,6 @@ export class ConstructionMenu {
             }
         }
 
-        btnContainer.appendChild(viewJsonBtn)
         btnContainer.appendChild(saveBtn)
 
         saveSection.appendChild(saveTitle)
@@ -911,9 +1060,8 @@ export class ConstructionMenu {
                         const json = JSON.parse(e.target.result)
                         if (this.game.loadMap) {
                             this.game.loadMap(json)
-                            // Update the preview if right side is visible
-                            jsonTextArea.value = JSON.stringify(json, null, 2)
-                            
+                            // Interval updates preview normally
+                            setTimeout(updateJson, 100)
                             alert("Mapa cargado correctamente!")
                         } else {
                             alert("Error: Función loadMap no encontrada en el juego.")
@@ -1058,6 +1206,9 @@ export class ConstructionMenu {
 
         container.appendChild(leftColumn)
         container.appendChild(rightColumn)
+        
+        // Initial setup
+        setTimeout(updateJson, 50);
     }
 
 

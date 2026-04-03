@@ -778,15 +778,17 @@ export class ConstructionMenu {
         editCb.onchange = (e) => {
              isEditing = e.target.checked;
              if (isEditing) {
-                 jsonPre.style.display = 'none';
-                 jsonTextArea.style.display = 'block';
-                 applyBtn.style.display = 'block';
+                 jsonTextArea.style.pointerEvents = 'auto';
+                 jsonTextArea.style.caretColor = 'white';
+                 editorContainer.style.border = '1px solid #6366f1';
+                 applyBtn.style.visibility = 'visible';
                  filtersContainer.style.opacity = '0.5';
                  filtersContainer.style.pointerEvents = 'none';
              } else {
-                 jsonPre.style.display = 'block';
-                 jsonTextArea.style.display = 'none';
-                 applyBtn.style.display = 'none';
+                 jsonTextArea.style.pointerEvents = 'none';
+                 jsonTextArea.style.caretColor = 'transparent';
+                 editorContainer.style.border = '1px solid transparent';
+                 applyBtn.style.visibility = 'hidden';
                  filtersContainer.style.opacity = '1';
                  filtersContainer.style.pointerEvents = 'auto';
                  updateJson();
@@ -798,11 +800,20 @@ export class ConstructionMenu {
         rightTitleRow.appendChild(rightTitle)
         rightTitleRow.appendChild(editLabel)
 
-        const jsonPre = document.createElement('pre')
-        jsonPre.style.cssText = `
+        const editorContainer = document.createElement('div')
+        editorContainer.style.cssText = `
+            position: relative;
             flex: 1;
             width: 100%;
             min-height: 400px;
+            border: 1px solid transparent;
+            border-radius: 6px;
+        `
+
+        const jsonPre = document.createElement('pre')
+        jsonPre.style.cssText = `
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
             background: #111;
             color: #d1d5db;
             font-family: monospace;
@@ -819,21 +830,42 @@ export class ConstructionMenu {
         
         const jsonTextArea = document.createElement('textarea')
         jsonTextArea.style.cssText = `
-            flex: 1;
-            width: 100%;
-            min-height: 400px;
-            background: #1e1b4b;
-            color: #fbbf24;
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: transparent;
+            color: transparent;
+            caret-color: transparent;
             font-family: monospace;
             font-size: 13px;
-            border: 1px solid #6366f1;
+            border: 1px solid transparent;
             border-radius: 6px;
             padding: 12px;
             resize: none;
+            overflow-y: auto;
+            margin: 0;
             box-sizing: border-box;
-            display: none;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            outline: none;
+            pointer-events: none;
+            z-index: 2;
         `
         jsonTextArea.spellcheck = false
+
+        // Synchronize scroll and formatting while typing
+        jsonTextArea.addEventListener('scroll', () => {
+            jsonPre.scrollTop = jsonTextArea.scrollTop;
+            jsonPre.scrollLeft = jsonTextArea.scrollLeft;
+        });
+
+        jsonTextArea.addEventListener('input', () => {
+            if (isEditing) {
+                jsonPre.innerHTML = syntaxHighlight(jsonTextArea.value);
+            }
+        });
+
+        editorContainer.appendChild(jsonPre)
+        editorContainer.appendChild(jsonTextArea)
 
         const applyBtn = document.createElement('button')
         applyBtn.textContent = "Aplicar Cambios del JSON"
@@ -846,7 +878,7 @@ export class ConstructionMenu {
             cursor: pointer;
             font-size: 14px;
             font-weight: bold;
-            display: none;
+            visibility: hidden;
         `
         applyBtn.onclick = () => {
              try {
@@ -888,8 +920,7 @@ export class ConstructionMenu {
         createFilter('objects', 'Objetos 3D')
 
         rightColumn.appendChild(rightTitleRow)
-        rightColumn.appendChild(jsonPre)
-        rightColumn.appendChild(jsonTextArea)
+        rightColumn.appendChild(editorContainer)
         rightColumn.appendChild(applyBtn)
         rightColumn.appendChild(filtersContainer)
 

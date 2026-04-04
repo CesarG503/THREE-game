@@ -55,8 +55,11 @@ wss.on("connection", (ws) => {
                     z: Math.random() * 10 - 5,
                 }
 
+                const playerName = message.playerName || playerId.slice(-4)
+
                 room.set(playerId, {
                     id: playerId,
+                    name: playerName,
                     position: spawnPosition,
                     rotation: 0,
                     state: { 
@@ -70,12 +73,13 @@ wss.on("connection", (ws) => {
                     },
                 })
 
-                console.log(`[Room ${roomId}] Player joined: ${playerId} (Total: ${room.size})`)
+                console.log(`[Room ${roomId}] Player joined: ${playerId} as ${playerName} (Total: ${room.size})`)
 
                 // Send welcome message
                 ws.send(JSON.stringify({
                     type: "welcome",
                     playerId: playerId,
+                    playerName: playerName,
                 }))
 
                 // Send current game state of the room
@@ -101,6 +105,7 @@ wss.on("connection", (ws) => {
                 broadcastToRoom(roomId, {
                     type: "playerJoined",
                     playerId: playerId,
+                    name: playerName,
                     position: spawnPosition,
                     rotation: 0,
                 }, playerId)

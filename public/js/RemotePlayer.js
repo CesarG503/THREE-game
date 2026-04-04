@@ -7,10 +7,11 @@ import { GunItem } from "./item/GunItem.js"
 import { PelotaItem } from "./item/PelotaItem.js"
 
 export class RemotePlayer {
-    constructor(scene, world, playerId, position = new THREE.Vector3(0, 0, 0)) {
+    constructor(scene, world, playerId, playerName, position = new THREE.Vector3(0, 0, 0)) {
         this.scene = scene
         this.world = world
         this.playerId = playerId
+        this.playerName = playerName || playerId.slice(-4)
 
         // Models
         this.glbModel = new GLBModel(scene)
@@ -101,7 +102,7 @@ export class RemotePlayer {
         ctx.font = "bold 16px Arial"
         ctx.textAlign = "center"
         ctx.textBaseline = "middle"
-        ctx.fillText(`${this.playerId.slice(-4)}`, 64, 16)
+        ctx.fillText(`${this.playerName}`, 64, 16)
 
         const texture = new THREE.CanvasTexture(canvas)
         const material = new THREE.SpriteMaterial({ map: texture })

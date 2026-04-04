@@ -1,5 +1,6 @@
 import * as THREE from "three"
 import { RemotePlayer } from "./RemotePlayer.js"
+import { randomPlayerNames } from "./playerNames.js"
 
 export class NetworkManager {
     constructor(scene, world, roomId, onConnected) {
@@ -37,7 +38,13 @@ export class NetworkManager {
                 console.log(`[Network] Connected to server. Joining room: ${this.roomId}`)
                 this.isConnected = true
                 if (this.roomId) {
-                    this.socket.send(JSON.stringify({ type: "joinRoom", roomId: this.roomId }))
+                    let playerName = localStorage.getItem("playerName") || sessionStorage.getItem("tempPlayerName");
+                    if (!playerName) {
+                        const randomIndex = Math.floor(Math.random() * randomPlayerNames.length);
+                        playerName = randomPlayerNames[randomIndex];
+                        sessionStorage.setItem("tempPlayerName", playerName);
+                    }
+                    this.socket.send(JSON.stringify({ type: "joinRoom", roomId: this.roomId, playerName: playerName }))
                 }
             }
 
@@ -79,7 +86,8 @@ export class NetworkManager {
             case "welcome":
                 // Server assigned us an ID
                 this.playerId = message.playerId
-                console.log(`[Network] Assigned player ID: ${this.playerId}`)
+                this.playerName = message.playerName
+                console.log(`[Network] Assigned player ID: ${this.playerId}, Name: ${this.playerName}`)
                 if (this.onConnected) {
                     this.onConnected(this.playerId)
                 }
@@ -88,8 +96,8 @@ export class NetworkManager {
             case "playerJoined":
                 // A new player joined
                 if (message.playerId !== this.playerId) {
-                    this.addRemotePlayer(message.playerId, message.position, message.rotation)
-                    console.log(`[Network] Player ${message.playerId} joined`)
+                    this.addRemotePlayer(message.playerId, message.name, message.position, message.rotation)
+                    console.log(`[Network] Player ${message.name || message.playerId} joined`)
                 }
                 break
 
@@ -111,7 +119,7 @@ export class NetworkManager {
                 message.players.forEach((playerData) => {
                     if (playerData.id !== this.playerId) {
                         if (!this.remotePlayers.has(playerData.id)) {
-                            this.addRemotePlayer(playerData.id, playerData.position, playerData.rotation)
+                            this.addRemotePlayer(playerData.id, playerData.name, playerData.position, playerData.rotation)
                         } else {
                             this.updateRemotePlayer(playerData.id, playerData.position, playerData.rotation, playerData.state)
                         }
@@ -184,7 +192,7 @@ export class NetworkManager {
         }
     }
 
-    addRemotePlayer(playerId, position, rotation) {
+    addRemotePlayer(playerId, playerName, position, rotation) {
         if (this.remotePlayers.has(playerId)) return
 
         const spawnPosition = new THREE.Vector3(
@@ -193,7 +201,7 @@ export class NetworkManager {
             position?.z || Math.random() * 10 - 5,
         )
 
-        const remotePlayer = new RemotePlayer(this.scene, this.world, playerId, spawnPosition)
+        const remotePlayer = new RemotePlayer(this.scene, this.world, playerId, playerName, spawnPosition)
         if (rotation !== undefined) {
             remotePlayer.setRotation(rotation)
         }
@@ -213,8 +221,8 @@ export class NetworkManager {
         let player = this.remotePlayers.get(playerId)
 
         if (!player) {
-            // Player doesn't exist yet, create them
-            this.addRemotePlayer(playerId, position, rotation)
+            // Player doesn't exist yet, create them with fallback name
+            this.addRemotePlayer(playerId, playerId.slice(-4), position, rotation)
             player = this.remotePlayers.get(playerId)
         }
 

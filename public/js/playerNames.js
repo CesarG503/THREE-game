@@ -1,0 +1,22 @@
+export const randomPlayerNames = [
+    "Swag",
+    "Viper",
+    "KingViper",
+    "Snoop",
+    "TheDog",
+    "Chango",
+    "Moncho",
+    "MrBondadoso",
+    "SwagwiCoin",
+    "SnoopTheDog",
+    "ChangoMaster",
+    "ViperShadow",
+    "TheDogSniper",
+    "SwagChango",
+    "Jebus",
+    "JhonWick",
+    "Moik",
+    "Luffy",
+    "WW",
+    "Mewing"
+];

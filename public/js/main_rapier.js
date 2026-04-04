@@ -107,6 +107,9 @@ class Game {
         // Impulse Platforms
         this.platforms = []
         this.projectiles = [] // Array for active projectiles
+        
+        // Global visual effects system for remote weapon impacts & tracers
+        this.fxBlasterSystem = new BlasterSystem(this.sceneManager.scene)
 
         if (this.gameMode !== 'editor') {
             // Plataformas removidas temporalmente para manejarlo en lógica de partida
@@ -161,9 +164,9 @@ class Game {
         }
 
         // ── Sincronización de Proyectiles (Shoot) ──────────────────
-        this.networkManager.onPlayerShoot = (playerId, startPos, direction, type, speed, damage, drop, rebote, hasImpactEffect) => {
+        this.networkManager.onPlayerShoot = (playerId, startPos, direction, type, speed, damage, drop, rebote, hasImpactEffect, hasTracer, hasTrajectoryLine) => {
             console.log(`[Collab] Player ${playerId} disparó un ${type}!`)
-            this.handleRemoteShoot(startPos, direction, type, speed, damage, drop, rebote, hasImpactEffect)
+            this.handleRemoteShoot(startPos, direction, type, speed, damage, drop, rebote, hasImpactEffect, hasTracer, hasTrajectoryLine)
         }
 
         document.addEventListener("chatFocus", () => {
@@ -643,6 +646,7 @@ class Game {
 
                 const currentItem = this.inventoryManager ? this.inventoryManager.getCurrentItem() : null;
                 const equippedWeapon = (currentItem && currentItem.type === "weapon") ? currentItem.id : null;
+                const equippedHand = (currentItem && currentItem.equippedHand) ? currentItem.equippedHand : "right";
 
                 const playerState = {
                     modelType: this.character.currentType || 'skin',
@@ -652,7 +656,8 @@ class Game {
                     isGrounded: isGrounded,
                     verticalVelocity: this.character.verticalVelocity || 0,
                     action: this.character.currentAction ? this.character.currentAction.getClip().name : "Idle",
-                    equippedWeapon: equippedWeapon
+                    equippedWeapon: equippedWeapon,
+                    equippedHand: equippedHand
                 };
 
                 const updateSent = this.networkManager.sendPlayerUpdate(
@@ -756,6 +761,10 @@ class Game {
 
         if (this.floatingTextManager) {
             this.floatingTextManager.update(dt)
+        }
+
+        if (this.fxBlasterSystem) {
+            this.fxBlasterSystem.Update(dt)
         }
 
         // Movement Logic Update
@@ -1864,15 +1873,14 @@ class Game {
         }
     }
 
-    // ── Gesti\u00f3n de Disparos Remotos ───────────────────────────────────────
-    handleRemoteShoot(startPos, direction, type, speed, damage, drop, rebote, hasImpactEffect) {
+    // ── Gestión de Disparos Remotos ───────────────────────────────────────
+    handleRemoteShoot(startPos, direction, type, speed, damage, drop, rebote, hasImpactEffect, hasTracer = false, hasTrajectoryLine = false) {
         if (!this.sceneManager || !this.world) return
 
         let tempTracer = null
-        let blaster = null
+        const blaster = this.fxBlasterSystem
 
-        if ((type === "bullet") && this.sceneManager.scene) {
-            blaster = new BlasterSystem(this.sceneManager.scene)
+        if ((type === "bullet" || hasTracer) && this.sceneManager.scene && blaster) {
             const tracer = blaster.CreateParticle()
             tracer.Start.copy(startPos)
             
@@ -1900,6 +1908,8 @@ class Game {
             rebote || false,
             hasImpactEffect || false
         )
+        proj.hasTracer = hasTracer
+        proj.hasTrajectoryLine = hasTrajectoryLine
         proj.blasterSystem = blaster
         proj.initialTracer = tempTracer
         proj.isRemoteBlaster = true

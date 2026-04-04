@@ -31,6 +31,7 @@ export class RemotePlayer {
         }
 
         this.equippedWeaponName = null
+        this.equippedHandName = null
         this.currentWeaponInstance = null
 
         this.currentPosition = position.clone()
@@ -141,16 +142,19 @@ export class RemotePlayer {
             this.setModelType(state.modelType);
         }
 
-        if (state.equippedWeapon !== this.equippedWeaponName) {
+        if (state.equippedWeapon !== this.equippedWeaponName || state.equippedHand !== this.equippedHandName) {
             this.equippedWeaponName = state.equippedWeapon;
+            this.equippedHandName = state.equippedHand;
             
             if (state.equippedWeapon === "gun") {
                 this.currentWeaponInstance = new GunItem();
+                this.currentWeaponInstance.equippedHand = state.equippedHand || "right";
                 this.glbModel.setHeldItem(this.currentWeaponInstance);
                 this.polygonModel.setHeldItem(this.currentWeaponInstance);
                 this.polygonModelSkin.setHeldItem(this.currentWeaponInstance);
             } else if (state.equippedWeapon === "pelota") {
                 this.currentWeaponInstance = new PelotaItem();
+                this.currentWeaponInstance.equippedHand = state.equippedHand || "right";
                 this.glbModel.setHeldItem(this.currentWeaponInstance);
                 this.polygonModel.setHeldItem(this.currentWeaponInstance);
                 this.polygonModelSkin.setHeldItem(this.currentWeaponInstance);

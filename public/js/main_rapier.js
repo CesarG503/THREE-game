@@ -1902,6 +1902,7 @@ class Game {
         )
         proj.blasterSystem = blaster
         proj.initialTracer = tempTracer
+        proj.isRemoteBlaster = true
         // We do not set isRemote flag conceptually, because projectile does physics and stops locally
         // Alternatively, you could tag it to apply no damage locally.
         

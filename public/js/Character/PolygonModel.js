@@ -147,6 +147,10 @@ export class PolygonModel {
         return this.model ? this.model.position.clone() : new THREE.Vector3()
     }
 
+    setHeldItem(item) {
+        // Not implemented for PolygonModel yet, placeholder to prevent crashes
+    }
+
     update(dt, isMoving) {
         if (!this.model || !this.isVisible) return
 

@@ -65,6 +65,10 @@ export class GLBModel {
         return this.model ? this.model.position.clone() : new THREE.Vector3()
     }
 
+    setHeldItem(item) {
+        // Not implemented for GLBModel yet, placeholder to prevent crashes
+    }
+
     switchAnimation(name) {
         if (!this.mixer || !this.animations[name]) return
         const action = this.animations[name]

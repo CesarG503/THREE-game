@@ -3,8 +3,9 @@ import { Projectile } from "../weapons/Projectile.js";
 import * as THREE from "three";
 
 export class PelotaItem extends Item {
-    constructor(id, name, iconPath, damage, fireRate, bulletSpeed, bulletDrop = 1.0) {
+    constructor(id = "pelota", name = "Pelota", iconPath = "/assets/textures/pelota.png", damage = 5, fireRate = 2, bulletSpeed = 20, bulletDrop = 1.0) {
         super(id, name, iconPath);
+        this.type = "weapon";
         this.damage = damage;
         this.fireRate = fireRate; // Shots per second
         this.bulletSpeed = bulletSpeed;
@@ -74,6 +75,16 @@ export class PelotaItem extends Item {
                 false
             );
         }
+    }
+
+    getEquipMesh() {
+        if (!this.equipGroup) {
+            this.equipGroup = new THREE.Group();
+            const mesh = this.getDisplayMesh();
+            mesh.scale.set(0.5, 0.5, 0.5); // Adjust size for hand
+            this.equipGroup.add(mesh);
+        }
+        return this.equipGroup;
     }
 
     getDisplayMesh() {

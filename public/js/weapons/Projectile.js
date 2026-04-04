@@ -114,6 +114,10 @@ export class Projectile {
                 }
             }
 
+            if (this.isRemoteBlaster && this.blasterSystem) {
+                this.blasterSystem.Update(dt);
+            }
+
             this.lastPosition.copy(currentPos);
         }
     }

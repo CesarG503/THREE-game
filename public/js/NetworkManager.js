@@ -175,6 +175,12 @@ export class NetworkManager {
                     )
                 }
                 break
+                
+            case "playerAction":
+                if (this.onPlayerAction && message.playerId !== this.playerId) {
+                    this.onPlayerAction(message.playerId, message.actionType, message.data)
+                }
+                break
         }
     }
 
@@ -315,6 +321,15 @@ export class NetworkManager {
             hasImpactEffect: hasImpactEffect,
             hasTracer: hasTracer,
             hasTrajectoryLine: hasTrajectoryLine
+        }))
+    }
+
+    sendPlayerAction(actionType, data) {
+        if (!this.isConnected || !this.socket || this.socket.readyState !== WebSocket.OPEN) return
+        this.socket.send(JSON.stringify({
+            type: "playerAction",
+            actionType: actionType,
+            data: data
         }))
     }
 

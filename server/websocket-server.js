@@ -166,7 +166,18 @@ wss.on("connection", (ws) => {
                         damage: message.damage,
                         drop: message.drop,
                         rebote: message.rebote,
-                        hasImpactEffect: message.hasImpactEffect
+                        hasImpactEffect: message.hasImpactEffect,
+                        hasTracer: message.hasTracer,
+                        hasTrajectoryLine: message.hasTrajectoryLine
+                    }, playerId)
+                    break
+
+                case "playerAction":
+                    broadcastToRoom(roomId, {
+                        type: "playerAction",
+                        playerId: playerId,
+                        actionType: message.actionType,
+                        data: message.data
                     }, playerId)
                     break
 

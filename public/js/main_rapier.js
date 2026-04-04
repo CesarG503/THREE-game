@@ -169,6 +169,16 @@ class Game {
             this.handleRemoteShoot(startPos, direction, type, speed, damage, drop, rebote, hasImpactEffect, hasTracer, hasTrajectoryLine)
         }
 
+        // ── Sincronización de Acciones (Doble Salto, etc) ──────────────────
+        this.networkManager.onPlayerAction = (playerId, actionType, data) => {
+            if (actionType === "air-jump") {
+                if (this.character && this.character.particleSystem && data) {
+                    const pos = new THREE.Vector3(data.x, data.y, data.z);
+                    this.character.particleSystem.spawnJumpEffect(pos);
+                }
+            }
+        }
+
         document.addEventListener("chatFocus", () => {
             this.inputManager.enabled = false
         })
@@ -196,6 +206,15 @@ class Game {
         })
         this.character.on('jumpChanged', (data) => {
             this.hud.updateJump(data.current, data.max)
+            // Broadcast Air Jump Event
+            if (data.type === 'air-jump' && this.networkManager) {
+                const pos = this.character.getPosition();
+                this.networkManager.sendPlayerAction("air-jump", {
+                    x: pos.x,
+                    y: pos.y,
+                    z: pos.z
+                });
+            }
         })
 
         // --- New Inventory System ---
@@ -657,7 +676,8 @@ class Game {
                     verticalVelocity: this.character.verticalVelocity || 0,
                     action: this.character.currentAction ? this.character.currentAction.getClip().name : "Idle",
                     equippedWeapon: equippedWeapon,
-                    equippedHand: equippedHand
+                    equippedHand: equippedHand,
+                    jumpAnimationType: this.character.polygonModelSkin ? this.character.polygonModelSkin.jumpAnimationType : 'none'
                 };
 
                 const updateSent = this.networkManager.sendPlayerUpdate(

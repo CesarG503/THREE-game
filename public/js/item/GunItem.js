@@ -347,7 +347,9 @@ export class GunItem extends Item {
                     this.damage,
                     drop,
                     this.rebote,
-                    this.hasImpactEffect
+                    this.hasImpactEffect,
+                    this.hasTracer,
+                    this.hasTrajectoryLine
                 );
             }
         }

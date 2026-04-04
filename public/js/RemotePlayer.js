@@ -142,6 +142,10 @@ export class RemotePlayer {
             this.setModelType(state.modelType);
         }
 
+        if (state.jumpAnimationType !== undefined) {
+            this.polygonModelSkin.setJumpAnimationType(state.jumpAnimationType);
+        }
+
         if (state.equippedWeapon !== this.equippedWeaponName || state.equippedHand !== this.equippedHandName) {
             this.equippedWeaponName = state.equippedWeapon;
             this.equippedHandName = state.equippedHand;

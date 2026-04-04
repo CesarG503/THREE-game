@@ -727,7 +727,7 @@ export class ConstructionMenu {
 
     renderSaveLoad(container) {
         // Change container layout to support split view
-        container.style.flexWrap = "nowrap"
+        container.style.flexWrap = "wrap" // Changed to wrap for responsiveness
         container.style.alignItems = "stretch"
 
         const leftColumn = document.createElement('div')
@@ -735,14 +735,13 @@ export class ConstructionMenu {
             display: flex;
             flex-direction: column;
             gap: 15px;
-            width: 100%;
-            max-width: 340px;
+            flex: 1 1 300px;
         `
 
         const rightColumn = document.createElement('div')
         rightColumn.style.cssText = `
-            flex: 1;
-            min-width: 300px;
+            flex: 2 1 300px;
+            min-width: 280px;
             background: #222;
             padding: 20px;
             border-radius: 8px;
@@ -751,10 +750,11 @@ export class ConstructionMenu {
             gap: 15px;
             border: 1px solid #444;
             box-sizing: border-box;
+            overflow: hidden;
         `
 
         const rightTitleRow = document.createElement('div')
-        rightTitleRow.style.cssText = `display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #555; padding-bottom: 10px;`
+        rightTitleRow.style.cssText = `display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #555; padding-bottom: 10px; flex-wrap: wrap; gap: 10px;`
         
         const rightTitle = document.createElement('h3')
         rightTitle.textContent = "Visualizador de Mapa (JSON)"
@@ -851,6 +851,11 @@ export class ConstructionMenu {
             z-index: 2;
         `
         jsonTextArea.spellcheck = false
+
+        // Prevent typing from triggering global game inputs (like T for chat)
+        jsonTextArea.addEventListener('keydown', (e) => e.stopPropagation());
+        jsonTextArea.addEventListener('keyup', (e) => e.stopPropagation());
+        jsonTextArea.addEventListener('keypress', (e) => e.stopPropagation());
 
         // Synchronize scroll and formatting while typing
         jsonTextArea.addEventListener('scroll', () => {

@@ -3,8 +3,14 @@ import { Item } from "./Item.js";
 import { FBXLoader } from "three/addons/loaders/FBXLoader.js";
 import { Projectile } from "../weapons/Projectile.js";
 import { BlasterSystem } from "../fx/BlasterSystem.js";
+import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
 
 export class GunItem extends Item {
+    static cachedModel = null;
+    static cachedAnimations = null;
+    static isLoadingCache = false;
+    static cacheCallbacks = [];
+
     constructor() {
         super("gun", "Pistola", "/assets/gun/gun_d.png"); // Using diff texture as icon for now, or maybe create a snapshot?
         // Actually, let's use a generic gun icon if available, or just the side view texture locally if it looks ok.
@@ -61,6 +67,18 @@ export class GunItem extends Item {
         if (this.model || this.isLoading) return;
         this.isLoading = true;
 
+        if (GunItem.cachedModel) {
+            this.setupFromCache();
+            return;
+        }
+
+        if (GunItem.isLoadingCache) {
+            GunItem.cacheCallbacks.push(() => this.setupFromCache());
+            return;
+        }
+
+        GunItem.isLoadingCache = true;
+
         const loader = new FBXLoader();
         const textureLoader = new THREE.TextureLoader();
 
@@ -89,9 +107,7 @@ export class GunItem extends Item {
         });
 
         loader.load(path + "arms_talon.fbx", (obj) => {
-            this.model = obj;
-
-            // Apply Material Based on Name
+            // Apply Material Based on Name to the cached original
             obj.traverse(child => {
                 if (child.isMesh) {
                     child.castShadow = true;
@@ -107,43 +123,60 @@ export class GunItem extends Item {
                 }
             });
 
-            // Scale & Position adjustments for the gun itself
-            // Escala 0.05 para ajustar al tamaño de la mano del jugador
-            obj.scale.set(0.05, 0.05, 0.05);
+            // Cache it
+            GunItem.cachedModel = obj;
+            GunItem.cachedAnimations = obj.animations;
 
-            // Ajuste de posición y rotación inicial
-            // 90 grados en el eje Y
-            obj.rotation.set(0, Math.PI / 2, 0);
+            GunItem.isLoadingCache = false;
+            
+            this.setupFromCache();
 
-            // Adding to a wrapper group so PolygonModelSkin doesn't override these manual adjustments
-            this.equipGroup.add(obj);
-
-            // Setup Mixer & Animations
-            this.mixer = new THREE.AnimationMixer(obj);
-
-            if (obj.animations && obj.animations.length > 0) {
-                const anim = obj.animations[0];
-
-                // Shoot Clip (0-12)
-                let actionShootClip = THREE.AnimationUtils.subclip(anim, "disparo", 0, 12);
-                this.actionShoot = this.mixer.clipAction(actionShootClip);
-                this.actionShoot.timeScale = 2.0;
-                this.actionShoot.setLoop(THREE.LoopOnce);
-
-                // Reload Clip (14-85)
-                let actionReloadClip = THREE.AnimationUtils.subclip(anim, "recarga", 14, 85);
-                this.actionReload = this.mixer.clipAction(actionReloadClip);
-                this.actionReload.timeScale = 0.9;
-                this.actionReload.setLoop(THREE.LoopOnce);
-            }
-
-            this.isLoading = false;
-            console.log("Gun FBX Model Loaded");
-            if (this.onLoadCallback) this.onLoadCallback();
+            GunItem.cacheCallbacks.forEach(cb => cb());
+            GunItem.cacheCallbacks = [];
         }, undefined, (err) => {
             console.error("Error loading Gun FBX:", err);
             this.isLoading = false;
+            GunItem.isLoadingCache = false;
         });
+    }
+
+    setupFromCache() {
+        // Clone the FBX properly preserving Skeleton
+        this.model = SkeletonUtils.clone(GunItem.cachedModel);
+
+        // Scale & Position adjustments for the gun itself
+        // Escala 0.05 para ajustar al tamaño de la mano del jugador
+        this.model.scale.set(0.05, 0.05, 0.05);
+
+        // Ajuste de posición y rotación inicial
+        // 90 grados en el eje Y
+        this.model.rotation.set(0, Math.PI / 2, 0);
+
+        // Adding to a wrapper group so PolygonModelSkin doesn't override these manual adjustments
+        this.equipGroup.add(this.model);
+
+        // Setup Mixer & Animations
+        this.mixer = new THREE.AnimationMixer(this.model);
+
+        if (GunItem.cachedAnimations && GunItem.cachedAnimations.length > 0) {
+            const anim = GunItem.cachedAnimations[0];
+
+            // Shoot Clip (0-12)
+            let actionShootClip = THREE.AnimationUtils.subclip(anim, "disparo", 0, 12);
+            this.actionShoot = this.mixer.clipAction(actionShootClip);
+            this.actionShoot.timeScale = 2.0;
+            this.actionShoot.setLoop(THREE.LoopOnce);
+
+            // Reload Clip (14-85)
+            let actionReloadClip = THREE.AnimationUtils.subclip(anim, "recarga", 14, 85);
+            this.actionReload = this.mixer.clipAction(actionReloadClip);
+            this.actionReload.timeScale = 0.9;
+            this.actionReload.setLoop(THREE.LoopOnce);
+        }
+
+        this.isLoading = false;
+        console.log("Gun FBX Model Loaded (from cache)");
+        if (this.onLoadCallback) this.onLoadCallback();
     }
 
     setOnLoad(callback) {

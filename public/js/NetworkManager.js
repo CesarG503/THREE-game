@@ -129,7 +129,7 @@ export class NetworkManager {
 
             case "chat":
                 if (this.onChatMessage) {
-                    this.onChatMessage(message.playerId, message.message)
+                    this.onChatMessage(message.playerId, message.playerName, message.message)
                 }
                 break
 

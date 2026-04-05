@@ -18,5 +18,7 @@ export const randomPlayerNames = [
     "Moik",
     "Luffy",
     "WW",
-    "Mewing"
+    "Mewing",
+    "NoobMaster69",
+    "BugViviente"
 ];

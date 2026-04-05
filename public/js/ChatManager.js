@@ -82,17 +82,17 @@ export class ChatManager {
         this.closeChat();
     }
 
-    addChatMessage(playerId, message) {
+    addChatMessage(playerId, playerName, message) {
         const chatMessages = document.getElementById("chat-messages");
         const isOwnMessage = playerId === this.networkManager.playerId;
 
         const msgEl = document.createElement("div");
         msgEl.className = "chat-message";
 
-        const shortId = playerId.slice(-4);
+        const displayName = playerName || playerId.slice(-4);
         const color = this.getPlayerColor(playerId);
 
-        msgEl.innerHTML = `<span class="sender" style="color: ${color}">${isOwnMessage ? "Tu" : shortId}:</span>${this.escapeHtml(message)}`;
+        msgEl.innerHTML = `<span class="sender" style="color: ${color}">${isOwnMessage ? "Tu" : this.escapeHtml(displayName)}:</span> ${this.escapeHtml(message)}`;
 
         chatMessages.appendChild(msgEl);
         chatMessages.scrollTop = chatMessages.scrollHeight;

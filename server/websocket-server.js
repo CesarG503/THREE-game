@@ -141,6 +141,7 @@ wss.on("connection", (ws) => {
                     broadcastToRoom(roomId, {
                         type: "chat",
                         playerId: playerId,
+                        playerName: room.get(playerId)?.name || playerId.slice(-4),
                         message: message.text,
                     }, null) // Null to broadcast to everyone including sender
                     break

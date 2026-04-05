@@ -118,8 +118,8 @@ class Game {
         // ... Code continue ...
 
         // Wire up Chat Events
-        this.networkManager.onChatMessage = (playerId, msg) => {
-            this.chatManager.addChatMessage(playerId, msg)
+        this.networkManager.onChatMessage = (playerId, playerName, msg) => {
+            this.chatManager.addChatMessage(playerId, playerName, msg)
         }
 
         // ── Callbacks colaborativos del editor ────────────────────────

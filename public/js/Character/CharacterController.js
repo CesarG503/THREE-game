@@ -210,36 +210,20 @@ export class CharacterController {
             desiredTranslation.normalize().multiplyScalar(this.speed * dt)
 
             // Rotation Logic
-            let targetRotation = 0
             if (this.cameraController.isFirstPerson) {
-                targetRotation = this.cameraController.fpYaw + Math.PI
+                this.currentRotation = this.cameraController.fpYaw + Math.PI
             } else {
-                targetRotation = Math.atan2(desiredTranslation.x, desiredTranslation.z) + Math.PI
+                let targetRotation = Math.atan2(desiredTranslation.x, desiredTranslation.z) + Math.PI
+                let rotDiff = targetRotation - this.currentRotation
+                while (rotDiff > Math.PI) rotDiff -= Math.PI * 2
+                while (rotDiff < -Math.PI) rotDiff += Math.PI * 2
+                this.currentRotation += rotDiff * this.rotationSmoothness
             }
 
-            let rotDiff = targetRotation - this.currentRotation
-            while (rotDiff > Math.PI) rotDiff -= Math.PI * 2
-            while (rotDiff < -Math.PI) rotDiff += Math.PI * 2
-            this.currentRotation += rotDiff * this.rotationSmoothness
-
         } else {
-            // Idle Logic with Deadzone
+            // Idle Logic
             if (this.cameraController && this.cameraController.isFirstPerson) {
-                const cameraYaw = this.cameraController.fpYaw
-                const offset = Math.PI
-                const limit = Math.PI / 2
-
-                let angleDiff = (cameraYaw + offset) - this.currentRotation
-                while (angleDiff > Math.PI) angleDiff -= Math.PI * 2
-                while (angleDiff < -Math.PI) angleDiff += Math.PI * 2
-
-                if (Math.abs(angleDiff) > limit) {
-                    const targetBody = (cameraYaw + offset) - (Math.sign(angleDiff) * limit)
-                    let correction = targetBody - this.currentRotation
-                    while (correction > Math.PI) correction -= Math.PI * 2
-                    while (correction < -Math.PI) correction += Math.PI * 2
-                    this.currentRotation += correction * 5.0 * dt
-                }
+                this.currentRotation = this.cameraController.fpYaw + Math.PI
             }
         }
 

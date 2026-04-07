@@ -17,7 +17,7 @@ export class CameraController {
         this.minCameraHeight = 0.5
 
         // First person settings
-        this.firstPersonHeight = 1.7
+        this.firstPersonHeight = 1.5
         this.firstPersonForwardOffset = 0.3
 
         this.theta = 0 // Horizontal angle

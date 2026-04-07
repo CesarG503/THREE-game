@@ -356,6 +356,12 @@ export class PolygonModelSkin {
         return this.model ? this.model.position.clone() : new THREE.Vector3()
     }
 
+    setHeadRotation(pitch, yaw) {
+        if (!this.headGroup) return;
+        this.targetHeadPitch = pitch;
+        this.targetHeadYaw = yaw;
+    }
+
     setJumpAnimationType(type) {
         this.jumpAnimationType = type;
     }
@@ -464,7 +470,10 @@ export class PolygonModelSkin {
         // Body Angle (Lean forward when crouching)
         const targetBodyRotX = isCrouching ? 0.2 : 0
         this.body.rotation.x = THREE.MathUtils.lerp(this.body.rotation.x, targetBodyRotX, lerpSpeed)
-        this.headGroup.rotation.x = THREE.MathUtils.lerp(this.headGroup.rotation.x, targetBodyRotX, lerpSpeed)
+        
+        // headGroup.rotation.x: Body lean minus pitch (because pitch up is positive, and x positive is down)
+        const targetHeadRotX = targetBodyRotX - (this.targetHeadPitch || 0)
+        this.headGroup.rotation.x = THREE.MathUtils.lerp(this.headGroup.rotation.x, targetHeadRotX, lerpSpeed * 2.0)
 
 
         // --- BASE MOVEMENT ANIMATION ---
@@ -531,7 +540,7 @@ export class PolygonModelSkin {
 
             // Apply Twist to upper body
             this.body.rotation.y = finalTwist
-            this.headGroup.rotation.y = finalTwist
+            this.headGroup.rotation.y = finalTwist + (this.targetHeadYaw || 0)
             this.leftArmGroup.rotation.y = finalTwist
             this.rightArmGroup.rotation.y = finalTwist
 
@@ -624,7 +633,7 @@ export class PolygonModelSkin {
             // Twist body slightly to right or left to aim
             const aimTwist = this.currentWeaponHand === 'left' ? 0.2 : -0.2;
             this.body.rotation.y = THREE.MathUtils.lerp(this.body.rotation.y, aimTwist, animLerp);
-            this.headGroup.rotation.y = THREE.MathUtils.lerp(this.headGroup.rotation.y, aimTwist * 0.5, animLerp);
+            this.headGroup.rotation.y = THREE.MathUtils.lerp(this.headGroup.rotation.y, aimTwist * 0.5 + (this.targetHeadYaw || 0), animLerp * 2.0);
 
         } else {
             // No Attack & No Weapon
@@ -637,7 +646,7 @@ export class PolygonModelSkin {
             // Reset Twist
             const resetTwist = 0
             this.body.rotation.y = THREE.MathUtils.lerp(this.body.rotation.y, resetTwist, animLerp)
-            this.headGroup.rotation.y = THREE.MathUtils.lerp(this.headGroup.rotation.y, resetTwist, animLerp)
+            this.headGroup.rotation.y = THREE.MathUtils.lerp(this.headGroup.rotation.y, resetTwist + (this.targetHeadYaw || 0), animLerp * 2.0)
             this.leftArmGroup.rotation.y = THREE.MathUtils.lerp(this.leftArmGroup.rotation.y, resetTwist, animLerp)
             this.rightArmGroup.rotation.y = THREE.MathUtils.lerp(this.rightArmGroup.rotation.y, resetTwist, animLerp)
         }

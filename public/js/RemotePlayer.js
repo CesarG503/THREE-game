@@ -210,6 +210,10 @@ export class RemotePlayer {
 
         this.polygonModelSkin.setPosition(this.currentPosition)
         this.polygonModelSkin.setRotation(this.currentRotation)
+        
+        if (this.polygonModelSkin.setHeadRotation) {
+            this.polygonModelSkin.setHeadRotation(this.state.headPitch || 0, this.state.headYaw || 0)
+        }
 
         // Animate based on state
         // If local distance movement is significant, player is moving as fallback precaution

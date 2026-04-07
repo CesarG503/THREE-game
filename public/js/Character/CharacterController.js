@@ -33,6 +33,8 @@ export class CharacterController {
 
         this.rotationSmoothness = 0.15
         this.currentRotation = 0
+        this.headPitch = 0;
+        this.headYaw = 0;
 
         // Flight / Editor Mode
         this.canFly = false
@@ -211,8 +213,26 @@ export class CharacterController {
 
             // Rotation Logic
             if (this.cameraController.isFirstPerson) {
-                this.currentRotation = this.cameraController.fpYaw + Math.PI
+                this.headPitch = this.cameraController.fpPitch;
+                
+                let targetBodyRot = this.cameraController.fpYaw + Math.PI;
+                let angleDiff = targetBodyRot - this.currentRotation;
+                while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+                while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+                
+                const deadzone = Math.PI / 3; // 60 degrees max head turn
+                if (Math.abs(angleDiff) > deadzone) {
+                    let correction = Math.sign(angleDiff) * (Math.abs(angleDiff) - deadzone);
+                    this.currentRotation += correction;
+                    angleDiff = targetBodyRot - this.currentRotation;
+                    while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+                    while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+                }
+                this.headYaw = angleDiff;
+
             } else {
+                this.headPitch = 0;
+                this.headYaw = 0;
                 let targetRotation = Math.atan2(desiredTranslation.x, desiredTranslation.z) + Math.PI
                 let rotDiff = targetRotation - this.currentRotation
                 while (rotDiff > Math.PI) rotDiff -= Math.PI * 2
@@ -223,7 +243,30 @@ export class CharacterController {
         } else {
             // Idle Logic
             if (this.cameraController && this.cameraController.isFirstPerson) {
-                this.currentRotation = this.cameraController.fpYaw + Math.PI
+                this.headPitch = this.cameraController.fpPitch;
+                
+                let targetBodyRot = this.cameraController.fpYaw + Math.PI;
+                let angleDiff = targetBodyRot - this.currentRotation;
+                while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+                while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+                
+                const deadzone = Math.PI / 3;
+                if (Math.abs(angleDiff) > deadzone) {
+                    let correction = targetBodyRot - (Math.sign(angleDiff) * deadzone);
+                    let diff = correction - this.currentRotation;
+                    while (diff > Math.PI) diff -= Math.PI * 2;
+                    while (diff < -Math.PI) diff += Math.PI * 2;
+                    // Smoothly rotate the body to follow
+                    this.currentRotation += diff * 15.0 * dt;
+                    
+                    angleDiff = targetBodyRot - this.currentRotation;
+                    while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+                    while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+                }
+                this.headYaw = angleDiff;
+            } else {
+                this.headPitch = 0;
+                this.headYaw = 0;
             }
         }
 
@@ -476,6 +519,9 @@ export class CharacterController {
 
         this.polygonModelSkin.setPosition(position)
         this.polygonModelSkin.setRotation(this.currentRotation)
+        if (this.polygonModelSkin.setHeadRotation) {
+            this.polygonModelSkin.setHeadRotation(this.headPitch, this.headYaw)
+        }
     }
 
     getPosition() {

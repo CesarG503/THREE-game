@@ -677,7 +677,9 @@ class Game {
                     action: this.character.currentAction ? this.character.currentAction.getClip().name : "Idle",
                     equippedWeapon: equippedWeapon,
                     equippedHand: equippedHand,
-                    jumpAnimationType: this.character.polygonModelSkin ? this.character.polygonModelSkin.jumpAnimationType : 'none'
+                    jumpAnimationType: this.character.polygonModelSkin ? this.character.polygonModelSkin.jumpAnimationType : 'none',
+                    headPitch: this.character.headPitch || 0,
+                    headYaw: this.character.headYaw || 0
                 };
 
                 const updateSent = this.networkManager.sendPlayerUpdate(

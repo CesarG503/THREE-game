@@ -363,9 +363,19 @@ export class PolygonModelSkin {
     }
 
     setFirstPerson(isFirstPerson) {
-        if (this.headGroup) {
-            this.headGroup.visible = !isFirstPerson;
-        }
+        if (!this.headGroup) return;
+
+        this.headGroup.traverse((child) => {
+            if (child.isMesh) {
+                if (!child.userData.originalMaterial) {
+                    child.userData.originalMaterial = child.material;
+                    child.userData.invisibleMaterial = child.material.clone();
+                    child.userData.invisibleMaterial.colorWrite = false;
+                    child.userData.invisibleMaterial.depthWrite = false;
+                }
+                child.material = isFirstPerson ? child.userData.invisibleMaterial : child.userData.originalMaterial;
+            }
+        });
     }
 
     setJumpAnimationType(type) {

@@ -362,6 +362,12 @@ export class PolygonModelSkin {
         this.targetHeadYaw = yaw;
     }
 
+    setFirstPerson(isFirstPerson) {
+        if (this.headGroup) {
+            this.headGroup.visible = !isFirstPerson;
+        }
+    }
+
     setJumpAnimationType(type) {
         this.jumpAnimationType = type;
     }

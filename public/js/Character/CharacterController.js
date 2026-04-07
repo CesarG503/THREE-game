@@ -522,6 +522,11 @@ export class CharacterController {
         if (this.polygonModelSkin.setHeadRotation) {
             this.polygonModelSkin.setHeadRotation(this.headPitch, this.headYaw)
         }
+        
+        const isFP = this.cameraController ? this.cameraController.isFirstPerson : false;
+        if (this.polygonModelSkin.setFirstPerson) {
+            this.polygonModelSkin.setFirstPerson(isFP)
+        }
     }
 
     getPosition() {

@@ -20,5 +20,21 @@ export const randomPlayerNames = [
     "WW",
     "Mewing",
     "NoobMaster69",
-    "BugViviente"
+    "BugViviente",
+    "IcardiLopez",
+    "Ricardo",
+    "WOS",
+    "CROY",
+    "GOTY",
+    "OneDGoad",
+    "Quevedo",
+    "Aparecio",
+    "Consuelo",
+    "DonBool",
+    "Machete",
+    "GodValley",
+    "ElBicho",
+    "ScopperGaban",
+    "Crocus",
+    "Rayleigh"
 ];

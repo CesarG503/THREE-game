@@ -26,6 +26,8 @@ export class NetworkManager {
         this.onEditorRemove = null  // (uuid) => void
         this.onEditorUpdate = null  // (uuid, transform) => void
         this.collaborativeMode = false
+        
+        this.onGameConfigUpdate = null // (configData) => void
     }
 
     connect(serverUrl) {
@@ -149,6 +151,12 @@ export class NetworkManager {
             case "editorUpdate":
                 if (this.onEditorUpdate && message.uuid && message.transform) {
                     this.onEditorUpdate(message.uuid, message.transform)
+                }
+                break
+                
+            case "gameConfigUpdate":
+                if (this.onGameConfigUpdate && message.configData) {
+                    this.onGameConfigUpdate(message.configData)
                 }
                 break
 
@@ -304,6 +312,15 @@ export class NetworkManager {
         if (!this.isConnected || !this.collaborativeMode) return
         if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return
         this.socket.send(JSON.stringify({ type: "editorUpdate", uuid, transform }))
+    }
+    
+    sendGameConfigUpdate(configData) {
+        if (!this.isConnected || !this.collaborativeMode) return
+        if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return
+        this.socket.send(JSON.stringify({
+            type: "gameConfigUpdate",
+            configData: configData
+        }))
     }
 
     sendMapSyncData(targetId, mapData) {

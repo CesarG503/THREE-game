@@ -162,6 +162,24 @@ class Game {
                 console.error("[Collab] Error parseando mapa recibido:", e)
             }
         }
+        
+        // ── Sincronización de Configuración Global ──────────────────
+        this.networkManager.onGameConfigUpdate = (configData) => {
+            console.log("[Collab] Actualización de configuración global recibida", configData)
+            
+            // Actualizar el estado local
+            if (this.constructionMenu && this.constructionMenu.logicSystem) {
+                this.constructionMenu.logicSystem.gameConfig = configData;
+                
+                // Actualizar la UI si está abierta
+                if (this.constructionMenu.gameConfigPanel) {
+                    this.constructionMenu.gameConfigPanel.render();
+                    if (this.constructionMenu.gameConfigPanel.contentServerSettings.style.display !== "none") {
+                        this.constructionMenu.gameConfigPanel.renderServerSettings();
+                    }
+                }
+            }
+        }
 
         // ── Sincronización de Proyectiles (Shoot) ──────────────────
         this.networkManager.onPlayerShoot = (playerId, startPos, direction, type, speed, damage, drop, rebote, hasImpactEffect, hasTracer, hasTrajectoryLine) => {

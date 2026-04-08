@@ -36,7 +36,11 @@ export class GameConfigPanel {
         }
     }
 
-
+    syncConfig() {
+        if (this.game && this.game.networkManager && typeof this.game.networkManager.sendGameConfigUpdate === 'function') {
+            this.game.networkManager.sendGameConfigUpdate(this.logicSystem.gameConfig)
+        }
+    }
 
     getReadablePosition(pos) {
         if (!pos) return "Top Center"
@@ -92,6 +96,7 @@ export class GameConfigPanel {
         clearBtn.onclick = () => {
             if (confirm("¿Borrar toda la configuración de la partida?")) {
                 this.logicSystem.gameConfig.sequences = []
+                this.syncConfig()
                 this.render()
             }
         }
@@ -287,6 +292,7 @@ export class GameConfigPanel {
                         // Restore template to not affect other spawn placements
                         spawnItemTemplate.logicProperties = originalLogic
 
+                        this.syncConfig()
                         this.renderServerSettings()
                         alert("Punto de Aparición Personalizado colocado con éxito a tus pies.\n\nCierra este panel (tecla E) y podrás seleccionarlo físicamente en el mapa para moverlo.")
                     } catch(e) {
@@ -323,6 +329,7 @@ export class GameConfigPanel {
             })
 
             if (existings.length > 0) {
+                this.syncConfig()
                 this.renderServerSettings() // Update stats summary
             }
         }
@@ -337,6 +344,7 @@ export class GameConfigPanel {
                 deleteDefaultSpawnObj()
             }
             settings.defaultSpawn = e.target.value
+            this.syncConfig()
             updateUI()
         }
 
@@ -416,6 +424,7 @@ export class GameConfigPanel {
 
         modeSelect.onchange = (e) => {
             settings.maxPlayersMode = e.target.value
+            this.syncConfig()
             updateUI()
         }
 
@@ -425,6 +434,7 @@ export class GameConfigPanel {
             if (settings.maxPlayersMode === "manual") {
                 settings.maxPlayers = val
             }
+            this.syncConfig()
         }
 
         updateUI() // Initialize visibility
@@ -449,7 +459,7 @@ export class GameConfigPanel {
             input.checked = settingsObj[key]
             input.style.transform = "scale(1.2)"
             input.style.cursor = "pointer"
-            input.onchange = (e) => settingsObj[key] = e.target.checked
+            input.onchange = (e) => { settingsObj[key] = e.target.checked; this.syncConfig() }
         } else if (type === 'select') {
             input = document.createElement('select')
             input.style.cssText = "background: #111; color: white; border: 1px solid #555; padding: 5px; border-radius: 4px; min-width: 120px;"
@@ -460,7 +470,7 @@ export class GameConfigPanel {
                 if (settingsObj[key] === opt) optEl.selected = true
                 input.appendChild(optEl)
             })
-            input.onchange = (e) => settingsObj[key] = e.target.value
+            input.onchange = (e) => { settingsObj[key] = e.target.value; this.syncConfig() }
         } else {
             input = document.createElement('input')
             input.type = type
@@ -476,6 +486,7 @@ export class GameConfigPanel {
                 } else {
                     settingsObj[key] = e.target.value
                 }
+                this.syncConfig()
             }
         }
 
@@ -638,6 +649,7 @@ export class GameConfigPanel {
         }
 
         this.logicSystem.gameConfig.sequences.push(block)
+        this.syncConfig()
         this.render()
     }
 
@@ -773,6 +785,7 @@ export class GameConfigPanel {
                 chk.checked = block.showTimer || false
                 chk.onchange = (e) => {
                     block.showTimer = e.target.checked
+                    this.syncConfig()
                     this.render() // Re-render to show/hide style select potentially
                 }
                 chkLabel.appendChild(chk)
@@ -811,7 +824,7 @@ export class GameConfigPanel {
                         sel.appendChild(opt)
                     })
 
-                    sel.onchange = (e) => block.timerStyle = e.target.value
+                    sel.onchange = (e) => { block.timerStyle = e.target.value; this.syncConfig(); }
                     selLabel.appendChild(sel)
                     optionsRow.appendChild(selLabel)
 
@@ -822,6 +835,7 @@ export class GameConfigPanel {
                     posBtn.onclick = () => {
                         this.positionSelector.open(block.timerPosition, (newPos) => {
                             block.timerPosition = newPos
+                            this.syncConfig()
                             this.render()
                         })
                     }
@@ -849,6 +863,7 @@ export class GameConfigPanel {
                 upBtn.textContent = "▲"
                 upBtn.onclick = () => {
                     [seq[idx], seq[idx - 1]] = [seq[idx - 1], seq[idx]]
+                    this.syncConfig()
                     this.render()
                 }
                 this.styleActionBtn(upBtn)
@@ -861,6 +876,7 @@ export class GameConfigPanel {
                 downBtn.textContent = "▼"
                 downBtn.onclick = () => {
                     [seq[idx], seq[idx + 1]] = [seq[idx + 1], seq[idx]]
+                    this.syncConfig()
                     this.render()
                 }
                 this.styleActionBtn(downBtn)
@@ -872,6 +888,7 @@ export class GameConfigPanel {
             delBtn.textContent = "✕"
             delBtn.onclick = () => {
                 seq.splice(idx, 1)
+                this.syncConfig()
                 this.render()
             }
             this.styleActionBtn(delBtn, true)
@@ -887,7 +904,7 @@ export class GameConfigPanel {
         input.type = 'text'
         input.value = val
         input.style.cssText = "background: #222; border: 1px solid #555; color: white; padding: 2px 5px; width: 120px;"
-        input.onchange = (e) => onChange(e.target.value)
+        input.onchange = (e) => { onChange(e.target.value); this.syncConfig(); }
         return input
     }
 
@@ -898,7 +915,7 @@ export class GameConfigPanel {
         input.min = 0
         input.placeholder = placeholder
         input.style.cssText = `background: #222; border: 1px solid #555; color: white; padding: 2px 5px; width: ${width}px; text-align: center;`
-        input.onchange = (e) => onChange(parseFloat(e.target.value) || 0)
+        input.onchange = (e) => { onChange(parseFloat(e.target.value) || 0); this.syncConfig(); }
         return input
     }
 
@@ -926,6 +943,7 @@ export class GameConfigPanel {
             inp.onchange = (e) => {
                 setVal(parseFloat(e.target.value) || 0)
                 updateTime()
+                this.syncConfig()
             }
             return inp
         }
@@ -1071,7 +1089,7 @@ export class GameConfigPanel {
                     if (intSig.mode === m) opt.selected = true
                     modeSel.appendChild(opt)
                 })
-                modeSel.onchange = (e) => intSig.mode = e.target.value
+                modeSel.onchange = (e) => { intSig.mode = e.target.value; this.syncConfig(); }
                 if (isSelectionMode) modeSel.disabled = true;
 
                 // Signal Name
@@ -1087,6 +1105,7 @@ export class GameConfigPanel {
                 del.style.cssText = "background: #422; color: #fcc; border: none; padding: 5px; border-radius: 4px; cursor: pointer;"
                 del.onclick = () => {
                     block.intervalSignals.splice(idx, 1)
+                    this.syncConfig()
                     renderIntervals()
                 }
                 if (isSelectionMode) del.style.display = "none"
@@ -1130,6 +1149,7 @@ export class GameConfigPanel {
             btn.onmouseleave = () => btn.style.background = "#333"
             btn.onclick = () => {
                 block.intervalSignals.push({ time: Math.floor((block.duration || 0) / 2), signal: "signal_event", mode: "Activar al transcurrir" })
+                this.syncConfig()
                 renderIntervals()
             }
             row.appendChild(btn)

@@ -223,6 +223,18 @@ wss.on("connection", (ws) => {
                         }, playerId)
                     }
                     break
+                    
+                case "gameConfigUpdate":
+                    // Un editor actualizó la configuración global de la partida (secuencias/servidor)
+                    if (message.configData) {
+                        broadcastToRoom(roomId, {
+                            type: "gameConfigUpdate",
+                            playerId: playerId,
+                            configData: message.configData,
+                        }, playerId)
+                        console.log(`[Room ${roomId}] Game config updated by ${playerId}`)
+                    }
+                    break
             }
         } catch (error) {
             console.error("Error parsing message:", error)

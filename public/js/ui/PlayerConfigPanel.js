@@ -280,7 +280,7 @@ export class PlayerConfigPanel {
             }
             if (this.game.networkManager.remotePlayers) {
                 this.game.networkManager.remotePlayers.forEach((p, id) => {
-                    players.push({ id: id, name: p.name, isLocal: false });
+                    players.push({ id: id, name: p.playerName, isLocal: false });
                 });
             }
         } else {

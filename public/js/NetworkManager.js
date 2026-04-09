@@ -28,6 +28,7 @@ export class NetworkManager {
         this.collaborativeMode = false
         
         this.onGameConfigUpdate = null // (configData) => void
+        this.onSimulationControl = null // (action, state) => void
     }
 
     connect(serverUrl) {
@@ -157,6 +158,12 @@ export class NetworkManager {
             case "gameConfigUpdate":
                 if (this.onGameConfigUpdate && message.configData) {
                     this.onGameConfigUpdate(message.configData)
+                }
+                break
+
+            case "simulationControl":
+                if (this.onSimulationControl && message.action) {
+                    this.onSimulationControl(message.action, message.state)
                 }
                 break
 
@@ -320,6 +327,16 @@ export class NetworkManager {
         this.socket.send(JSON.stringify({
             type: "gameConfigUpdate",
             configData: configData
+        }))
+    }
+
+    sendSimulationControl(action, state = null) {
+        if (!this.isConnected || !this.collaborativeMode) return
+        if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return
+        this.socket.send(JSON.stringify({
+            type: "simulationControl",
+            action: action,
+            state: state
         }))
     }
 

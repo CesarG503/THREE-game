@@ -235,6 +235,16 @@ wss.on("connection", (ws) => {
                         console.log(`[Room ${roomId}] Game config updated by ${playerId}`)
                     }
                     break
+
+                case "simulationControl":
+                    broadcastToRoom(roomId, {
+                        type: "simulationControl",
+                        playerId: playerId,
+                        action: message.action,
+                        state: message.state
+                    }, playerId)
+                    console.log(`[Room ${roomId}] Simulation control (${message.action}) by ${playerId}`)
+                    break
             }
         } catch (error) {
             console.error("Error parsing message:", error)

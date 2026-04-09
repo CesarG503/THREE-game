@@ -181,6 +181,14 @@ class Game {
             }
         }
 
+        // ── Sincronización de Simulación Global ──────────────────
+        this.networkManager.onSimulationControl = (action, state) => {
+            console.log(`[Collab] Control de Simulación Global recibido: ${action}`, state);
+            if (this.constructionMenu && this.constructionMenu.logicSystem) {
+                this.constructionMenu.logicSystem.handleSimulationControlMessage(action, state);
+            }
+        }
+
         // ── Sincronización de Proyectiles (Shoot) ──────────────────
         this.networkManager.onPlayerShoot = (playerId, startPos, direction, type, speed, damage, drop, rebote, hasImpactEffect, hasTracer, hasTrajectoryLine) => {
             console.log(`[Collab] Player ${playerId} disparó un ${type}!`)

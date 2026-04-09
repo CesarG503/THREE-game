@@ -54,7 +54,7 @@ export class LogicSystem {
 
     // --- SIMULATION CONTROLS ---
 
-    playConfig() {
+    playConfig(isFromNetwork = false) {
         if (this.gameConfig.sequences.length === 0) return
         if (!this.configRuntime.hasStarted) {
             // First Start
@@ -67,18 +67,35 @@ export class LogicSystem {
         this.configRuntime.isPlaying = true
         this.configRuntime.isPaused = false
         if (this.configPanel) this.configPanel.updatePlayState(true, false)
+
+        if (!isFromNetwork && this.game.networkManager) {
+            this.game.networkManager.sendSimulationControl('play', {
+                hasStarted: this.configRuntime.hasStarted,
+                currentIndex: this.configRuntime.currentIndex,
+                timer: this.configRuntime.timer,
+                totalTime: this.configRuntime.totalTime
+            })
+        }
     }
 
-    pauseConfig() {
-        if (this.configRuntime.isPlaying) {
+    pauseConfig(isFromNetwork = false) {
+        if (this.configRuntime.isPlaying || isFromNetwork) {
             this.configRuntime.isPlaying = false // Stop update loop logic
             this.configRuntime.isPaused = true // Mark as paused (not stopped)
             console.log("Simulation Paused")
             if (this.configPanel) this.configPanel.updatePlayState(true, true) // Playing but Paused
+
+            if (!isFromNetwork && this.game.networkManager) {
+                this.game.networkManager.sendSimulationControl('pause', {
+                    currentIndex: this.configRuntime.currentIndex,
+                    timer: this.configRuntime.timer,
+                    totalTime: this.configRuntime.totalTime
+                })
+            }
         }
     }
 
-    stopConfig() {
+    stopConfig(isFromNetwork = false) {
         this.configRuntime.isPlaying = false
         this.configRuntime.hasStarted = false
         this.configRuntime.currentIndex = 0
@@ -91,9 +108,13 @@ export class LogicSystem {
             this.configPanel.updatePlayState(false, false)
         }
         console.log("Simulation Stopped")
+
+        if (!isFromNetwork && this.game.networkManager) {
+            this.game.networkManager.sendSimulationControl('stop', null)
+        }
     }
 
-    stepConfig(dir) {
+    stepConfig(dir, isFromNetwork = false) {
         if (this.gameConfig.sequences.length === 0) return
 
         // If HUD was showing, hide it when stepping away from the block?
@@ -108,6 +129,38 @@ export class LogicSystem {
         this.configRuntime.timer = 0 // Reset timer for new block
 
         if (this.configPanel) this.configPanel.highlightBlock(this.configRuntime.currentIndex)
+
+        if (!isFromNetwork && this.game.networkManager) {
+            this.game.networkManager.sendSimulationControl('step', { dir: dir, currentIndex: this.configRuntime.currentIndex })
+        }
+    }
+
+    handleSimulationControlMessage(action, state) {
+        if (state) {
+            if (state.hasStarted !== undefined) this.configRuntime.hasStarted = state.hasStarted
+            if (state.currentIndex !== undefined) this.configRuntime.currentIndex = state.currentIndex
+            if (state.timer !== undefined) this.configRuntime.timer = state.timer
+            if (state.totalTime !== undefined) {
+                this.configRuntime.totalTime = state.totalTime
+                if (this.configPanel) this.configPanel.updateTotalTime(this.configRuntime.totalTime)
+            }
+        }
+        
+        switch(action) {
+            case 'play':
+                this.playConfig(true)
+                break
+            case 'pause':
+                this.pauseConfig(true)
+                break
+            case 'stop':
+                this.stopConfig(true)
+                break
+            case 'step':
+                this.stepConfig(0, true) // Force update UI position (dir=0 as index is already synced via state if we wanted, or we could just recalculate)
+                if (this.configPanel) this.configPanel.highlightBlock(this.configRuntime.currentIndex)
+                break
+        }
     }
 
     updateGameLogic(dt) {

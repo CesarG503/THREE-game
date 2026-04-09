@@ -189,6 +189,7 @@ export class PlayerConfigManager {
             }
         };
         this.profiles.push(newProfile);
+        this.broadcastUpdate();
         return newProfile;
     }
 
@@ -201,6 +202,7 @@ export class PlayerConfigManager {
             if (this.assignments.defaultProfileId === id) {
                 this.assignments.defaultProfileId = 'default';
             }
+            this.broadcastUpdate();
             return true;
         }
         return false;
@@ -211,17 +213,20 @@ export class PlayerConfigManager {
         if (profile) {
             Object.assign(profile, data);
             this.applyConfiguration(); // Auto-apply changes if live?
+            this.broadcastUpdate();
         }
     }
 
     setTeamProfile(teamId, profileId) {
         this.assignments.teamProfiles[teamId] = profileId;
         console.log(`Team ${teamId} assigned to profile ${profileId}`);
+        this.broadcastUpdate();
     }
 
     setDefaultProfile(profileId) {
         this.assignments.defaultProfileId = profileId;
         console.log(`Default profile assigned to ${profileId}`);
+        this.broadcastUpdate();
     }
 
     getAssignments() {
@@ -304,5 +309,11 @@ export class PlayerConfigManager {
         if (data.profiles) this.profiles = data.profiles;
         if (data.assignments) this.assignments = data.assignments;
         console.log("Player Config Loaded", this.profiles);
+    }
+
+    broadcastUpdate() {
+        if (this.game && this.game.networkManager) {
+            this.game.networkManager.sendPlayerConfigUpdate(this.saveData());
+        }
     }
 }

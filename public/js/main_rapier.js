@@ -181,6 +181,21 @@ class Game {
             }
         }
 
+        this.networkManager.onPlayerConfigUpdate = (configData) => {
+            console.log("[Collab] Actualización de configuración de jugador recibida", configData)
+            this.playerConfigManager.loadData(configData);
+            
+            // Actualizar la UI de roles si está abierta
+            if (this.constructionMenu && this.constructionMenu.playerConfigPanel) {
+                if(this.constructionMenu.playerConfigPanel.container) {
+                     this.constructionMenu.playerConfigPanel.render();
+                }
+            }
+            
+            // Re-apply para asegurarse de que el jugador local refleje los cambios si aplican
+            this.playerConfigManager.applyConfiguration();
+        }
+
         // ── Sincronización de Simulación Global ──────────────────
         this.networkManager.onSimulationControl = (action, state) => {
             console.log(`[Collab] Control de Simulación Global recibido: ${action}`, state);

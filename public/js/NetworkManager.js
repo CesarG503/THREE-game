@@ -161,6 +161,12 @@ export class NetworkManager {
                 }
                 break
 
+            case "playerConfigUpdate":
+                if (this.onPlayerConfigUpdate && message.configData) {
+                    this.onPlayerConfigUpdate(message.configData)
+                }
+                break
+
             case "simulationControl":
                 if (this.onSimulationControl && message.action) {
                     this.onSimulationControl(message.action, message.state)
@@ -326,6 +332,15 @@ export class NetworkManager {
         if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return
         this.socket.send(JSON.stringify({
             type: "gameConfigUpdate",
+            configData: configData
+        }))
+    }
+
+    sendPlayerConfigUpdate(configData) {
+        if (!this.isConnected || !this.collaborativeMode) return
+        if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return
+        this.socket.send(JSON.stringify({
+            type: "playerConfigUpdate",
             configData: configData
         }))
     }

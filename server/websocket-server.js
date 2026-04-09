@@ -236,6 +236,18 @@ wss.on("connection", (ws) => {
                     }
                     break
 
+                case "playerConfigUpdate":
+                    // Un editor actualizó los roles
+                    if (message.configData) {
+                        broadcastToRoom(roomId, {
+                            type: "playerConfigUpdate",
+                            playerId: playerId,
+                            configData: message.configData,
+                        }, playerId)
+                        console.log(`[Room ${roomId}] Player config updated by ${playerId}`)
+                    }
+                    break
+
                 case "simulationControl":
                     broadcastToRoom(roomId, {
                         type: "simulationControl",

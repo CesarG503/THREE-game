@@ -63,6 +63,7 @@ export class PlayerConfigPanel {
 
         tabHeader.appendChild(createTab('roles', 'Roles de Jugador'));
         tabHeader.appendChild(createTab('spawns', 'Puntos de Aparición'));
+        tabHeader.appendChild(createTab('apply', 'Test Aplicar'));
         this.container.appendChild(tabHeader);
 
         // Content Container
@@ -73,8 +74,10 @@ export class PlayerConfigPanel {
 
         if (this.activeTab === 'roles') {
             this.renderRolesTab(content);
-        } else {
+        } else if (this.activeTab === 'spawns') {
             this.renderSpawnPanel(content);
+        } else if (this.activeTab === 'apply') {
+            this.renderApplyTab(content);
         }
     }
 
@@ -245,6 +248,95 @@ export class PlayerConfigPanel {
         }
 
         parentContainer.appendChild(teamSection);
+    }
+
+    renderApplyTab(parentContainer) {
+        parentContainer.className = 'player-config-scroll';
+        parentContainer.style.flexDirection = 'column';
+        parentContainer.style.padding = '20px';
+        parentContainer.style.overflowY = 'auto';
+
+        const title = document.createElement('h2');
+        title.textContent = "Aplicar Roles en Tiempo Real";
+        title.style.borderBottom = "1px solid #555";
+        title.style.paddingBottom = "10px";
+        parentContainer.appendChild(title);
+
+        const listContainer = document.createElement('div');
+        listContainer.style.display = 'flex';
+        listContainer.style.flexDirection = 'column';
+        listContainer.style.gap = '10px';
+        parentContainer.appendChild(listContainer);
+
+        // Gather players
+        const players = [];
+        if (this.game.networkManager) {
+            if (this.game.networkManager.playerId) {
+                players.push({ 
+                    id: this.game.networkManager.playerId, 
+                    name: "Tu (" + (this.game.networkManager.playerName || "Jugador") + ")",
+                    isLocal: true 
+                });
+            }
+            if (this.game.networkManager.remotePlayers) {
+                this.game.networkManager.remotePlayers.forEach((p, id) => {
+                    players.push({ id: id, name: p.name, isLocal: false });
+                });
+            }
+        } else {
+            // Fallback for offline testing
+            players.push({ id: 'local', name: "Tu (Offline)", isLocal: true });
+        }
+
+        if (players.length === 0) {
+            listContainer.innerHTML = "<p style='color:#aaa;'>No hay jugadores conectados.</p>";
+            return;
+        }
+
+        players.forEach(player => {
+            const row = document.createElement('div');
+            row.style.cssText = "background:#222; padding:15px; border-radius:4px; display:flex; justify-content:space-between; align-items:center; border:1px solid #444;";
+
+            const infoBox = document.createElement('div');
+            const nameEl = document.createElement('div');
+            nameEl.innerHTML = `<strong>${player.name}</strong>`;
+            if (player.isLocal) {
+                nameEl.innerHTML += ` <span style='background:#00aa00; padding:2px 5px; border-radius:3px; font-size:10px; margin-left:5px;'>Local</span>`;
+            }
+            infoBox.appendChild(nameEl);
+
+            const actionsBox = document.createElement('div');
+            actionsBox.style.display = 'flex';
+            actionsBox.style.gap = '10px';
+            actionsBox.style.alignItems = 'center';
+
+            // Determine current assignment
+            let currentProfileId = this.manager.assignments.defaultProfileId; // fallback
+            if (this.manager.assignments.playerProfiles && this.manager.assignments.playerProfiles[player.id]) {
+                currentProfileId = this.manager.assignments.playerProfiles[player.id];
+            }
+
+            const sel = this.createProfileSelector(currentProfileId);
+
+            const btn = document.createElement('button');
+            btn.textContent = "Aplicar Rol";
+            btn.style.cssText = "padding:8px 15px; cursor:pointer; background:#0066cc; color:white; border:none; border-radius:3px; font-weight:bold;";
+            btn.onclick = () => {
+                this.manager.setPlayerProfile(player.id, sel.value);
+                // Si es el jugador local, forzamos aplicar cambios inmediatamente
+                if (player.isLocal) {
+                    this.manager.applyConfiguration();
+                }
+                alert(`Rol aplicado a ${player.name}`);
+            };
+
+            actionsBox.appendChild(sel);
+            actionsBox.appendChild(btn);
+
+            row.appendChild(infoBox);
+            row.appendChild(actionsBox);
+            listContainer.appendChild(row);
+        });
     }
 
     createProfileSelector(selectedId) {

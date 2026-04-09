@@ -115,7 +115,8 @@ export class PlayerConfigManager {
         this.assignments = {
             mode: 'all', // 'all', 'random', 'team'
             defaultProfileId: 'admin_tester',
-            teamProfiles: {} // teamId -> profileId
+            teamProfiles: {}, // teamId -> profileId
+            playerProfiles: {} // playerId -> profileId
         };
 
         // Auto-apply on potential reload or late load
@@ -229,6 +230,13 @@ export class PlayerConfigManager {
         this.broadcastUpdate();
     }
 
+    setPlayerProfile(playerId, profileId) {
+        if (!this.assignments.playerProfiles) this.assignments.playerProfiles = {};
+        this.assignments.playerProfiles[playerId] = profileId;
+        console.log(`Player ${playerId} assigned to profile ${profileId}`);
+        this.broadcastUpdate();
+    }
+
     getAssignments() {
         return this.assignments;
     }
@@ -242,6 +250,16 @@ export class PlayerConfigManager {
             if (p) profileToApply = p;
         } else if (this.assignments.mode === 'random') {
             profileToApply = this.profiles[Math.floor(Math.random() * this.profiles.length)];
+        }
+
+        // Override using player ID assignment
+        if (this.assignments.playerProfiles && this.game && this.game.networkManager && this.game.networkManager.playerId) {
+            const myId = this.game.networkManager.playerId;
+            const explicitProfileId = this.assignments.playerProfiles[myId];
+            if (explicitProfileId) {
+                const explicitP = this.getProfile(explicitProfileId);
+                if (explicitP) profileToApply = explicitP;
+            }
         }
 
         return profileToApply;

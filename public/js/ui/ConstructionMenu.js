@@ -780,6 +780,9 @@ export class ConstructionMenu {
              if (isEditing) {
                  jsonTextArea.style.pointerEvents = 'auto';
                  jsonTextArea.style.caretColor = 'white';
+                 jsonTextArea.style.overflow = 'auto';
+                 jsonPre.style.pointerEvents = 'none';
+                 jsonPre.style.overflow = 'hidden';
                  editorContainer.style.border = '1px solid #6366f1';
                  applyBtn.style.visibility = 'visible';
                  filtersContainer.style.opacity = '0.5';
@@ -787,6 +790,9 @@ export class ConstructionMenu {
              } else {
                  jsonTextArea.style.pointerEvents = 'none';
                  jsonTextArea.style.caretColor = 'transparent';
+                 jsonTextArea.style.overflow = 'hidden';
+                 jsonPre.style.pointerEvents = 'auto';
+                 jsonPre.style.overflow = 'auto';
                  editorContainer.style.border = '1px solid transparent';
                  applyBtn.style.visibility = 'hidden';
                  filtersContainer.style.opacity = '1';
@@ -808,49 +814,85 @@ export class ConstructionMenu {
             min-height: 400px;
             border: 1px solid transparent;
             border-radius: 6px;
+            background: #111;
+        `
+
+        const lineNumbersDiv = document.createElement('div')
+        lineNumbersDiv.style.cssText = `
+            position: absolute;
+            top: 0; left: 0; width: 45px; height: 100%;
+            background: #1a1a1a;
+            color: #666;
+            font-family: monospace;
+            font-size: 13px;
+            line-height: 1.5;
+            text-align: right;
+            padding: 12px 10px 12px 0;
+            box-sizing: border-box;
+            border-right: 1px solid #444;
+            border-radius: 6px 0 0 6px;
+            overflow: hidden;
+            user-select: none;
+            white-space: pre;
         `
 
         const jsonPre = document.createElement('pre')
         jsonPre.style.cssText = `
             position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: #111;
+            top: 0; left: 45px; width: calc(100% - 45px); height: 100%;
+            background: transparent;
             color: #d1d5db;
             font-family: monospace;
             font-size: 13px;
+            line-height: 1.5;
             border: 1px solid #555;
-            border-radius: 6px;
+            border-left: none;
+            border-radius: 0 6px 6px 0;
             padding: 12px;
-            overflow-y: auto;
+            overflow: auto;
             margin: 0;
             box-sizing: border-box;
-            white-space: pre-wrap;
-            word-wrap: break-word;
+            white-space: pre;
+            pointer-events: auto;
         `
         
         const jsonTextArea = document.createElement('textarea')
         jsonTextArea.style.cssText = `
             position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
+            top: 0; left: 45px; width: calc(100% - 45px); height: 100%;
             background: transparent;
             color: transparent;
             caret-color: transparent;
             font-family: monospace;
             font-size: 13px;
+            line-height: 1.5;
             border: 1px solid transparent;
-            border-radius: 6px;
+            border-left: none;
+            border-radius: 0 6px 6px 0;
             padding: 12px;
             resize: none;
-            overflow-y: auto;
+            overflow: hidden;
             margin: 0;
             box-sizing: border-box;
-            white-space: pre-wrap;
-            word-wrap: break-word;
+            white-space: pre;
             outline: none;
             pointer-events: none;
             z-index: 2;
         `
         jsonTextArea.spellcheck = false
+
+        const updateLineNumbers = (text) => {
+            if (!text) {
+                lineNumbersDiv.textContent = '1\n';
+                return;
+            }
+            const linesCount = text.split('\n').length;
+            let numbersStr = '';
+            for (let i = 1; i <= linesCount; i++) {
+                numbersStr += i + '\n';
+            }
+            lineNumbersDiv.textContent = numbersStr;
+        }
 
         // Prevent typing from triggering global game inputs (like T for chat)
         jsonTextArea.addEventListener('keydown', (e) => e.stopPropagation());
@@ -859,16 +901,29 @@ export class ConstructionMenu {
 
         // Synchronize scroll and formatting while typing
         jsonTextArea.addEventListener('scroll', () => {
-            jsonPre.scrollTop = jsonTextArea.scrollTop;
-            jsonPre.scrollLeft = jsonTextArea.scrollLeft;
+            if (isEditing) {
+                jsonPre.scrollTop = jsonTextArea.scrollTop;
+                jsonPre.scrollLeft = jsonTextArea.scrollLeft;
+                lineNumbersDiv.scrollTop = jsonTextArea.scrollTop;
+            }
+        });
+
+        jsonPre.addEventListener('scroll', () => {
+            if (!isEditing) {
+                jsonTextArea.scrollTop = jsonPre.scrollTop;
+                jsonTextArea.scrollLeft = jsonPre.scrollLeft;
+                lineNumbersDiv.scrollTop = jsonPre.scrollTop;
+            }
         });
 
         jsonTextArea.addEventListener('input', () => {
             if (isEditing) {
                 jsonPre.innerHTML = syntaxHighlight(jsonTextArea.value);
+                updateLineNumbers(jsonTextArea.value);
             }
         });
 
+        editorContainer.appendChild(lineNumbersDiv)
         editorContainer.appendChild(jsonPre)
         editorContainer.appendChild(jsonTextArea)
 
@@ -970,6 +1025,7 @@ export class ConstructionMenu {
                 const rawJson = JSON.stringify(filteredData, null, 2);
                 jsonPre.innerHTML = syntaxHighlight(rawJson);
                 jsonTextArea.value = rawJson;
+                updateLineNumbers(rawJson);
             } catch(e) {}
         }
 

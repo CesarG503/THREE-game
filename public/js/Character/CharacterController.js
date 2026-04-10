@@ -129,14 +129,12 @@ export class CharacterController {
         if (!this.collider) return;
 
         let membership = 0x0002; // Player
-        let filter = 0xFFFF; // Default: Collide with all
+        let filter = 0xFFFD; // Default: Ignorar a otros jugadores en Rapier (0x0002)
         let isSensor = false;
 
-        if (this.playerCollision === 'none' || this.playerCollision === 'push') {
-            filter = 0xFFFD; // Ignore other players in Rapier to handle them manually
-        } else if (this.playerCollision === 'no-push') {
-            filter = 0xFFFF; // Completely block each other
-        }
+        // Note: Independientemente del modo, Rapier ignora la colisión de jugadores
+        // para evitar que el solver cause "drift" o tirones inesperados. 
+        // Todas las colisiones entre jugadores ahora se resuelven manualmente en update().
 
         let groups = (membership << 16) | filter;
         this.collider.setCollisionGroups(groups);
@@ -392,8 +390,8 @@ export class CharacterController {
                 const rpCollision = (rp.state && rp.state.playerCollision) || 'push';
                 if (rpCollision === 'none') return;
                 
-                // If both are 'no-push', Rapier handles it via collision groups.
-                if (this.playerCollision === 'no-push' && rpCollision === 'no-push') return;
+                // Ignore collision if both are 'none' (though 'none' is already skipped above for rp, and for this player earlier)
+                // Remove the returning for both 'no-push' so they don't traverse each other.
 
                 // Vertical check
                 const dy = Math.abs((myPos.y + 0.9) - (rp.currentPosition.y + 0.9));
@@ -407,22 +405,27 @@ export class CharacterController {
                 if (distSq > 0.0001 && distSq < maxDist * maxDist) {
                     const dist = Math.sqrt(distSq);
                     const overlap = maxDist - dist;
-                    
-                    let pushStrength = 0;
-                    if (this.playerCollision === 'push' && rpCollision === 'push') {
-                        // Soft push each other, strong enough to prevent pass-through at max walking speed
-                        pushStrength = 30 * overlap;
-                    } else if (this.playerCollision === 'push' && rpCollision === 'no-push') {
-                        // Soft push strongly against the wall to not penetrate it
-                        pushStrength = 60 * overlap;
-                    } else if (this.playerCollision === 'no-push' && rpCollision === 'push') {
-                        // I am wall, he pushes himself away softly. I don't move.
-                        pushStrength = 0; 
-                    }
 
-                    if (pushStrength > 0) {
-                        desiredTranslation.x += (dx / dist) * pushStrength * dt;
-                        desiredTranslation.z += (dz / dist) * pushStrength * dt;
+                    // Vector normal apuntando desde EL OTRO hacia MÍ
+                    const nx = dx / dist;
+                    const nz = dz / dist;
+                    
+                    if (this.playerCollision === 'no-push' || rpCollision === 'no-push') {
+                        // Al menos uno es 'no-push' (colisión seca sin empujes).
+                        
+                        // Solo cancelamos nuestra velocidad proyectada hacia el otro jugador para no atravesarlo.
+                        // Eliminamos la expulsión por solapamiento (overlap) para que chocar se sienta como
+                        // golpear una pared inamovible, sin ningún tipo de rebote, temblor o empuje.
+                        const dot = desiredTranslation.x * nx + desiredTranslation.z * nz;
+                        if (dot < 0) { 
+                            desiredTranslation.x -= dot * nx;
+                            desiredTranslation.z -= dot * nz;
+                        }
+                    } else if (this.playerCollision === 'push' && rpCollision === 'push') {
+                        // Ambos somos suaves ('push'). Repulsión mutua ligera y contínua.
+                        const pushStrength = 30 * overlap;
+                        desiredTranslation.x += nx * pushStrength * dt;
+                        desiredTranslation.z += nz * pushStrength * dt;
                     }
                 }
             });

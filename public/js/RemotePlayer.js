@@ -70,16 +70,13 @@ export class RemotePlayer {
         if (!this.collider) return;
 
         let membership = 0x0002; // Player
-        let filter = 0xFFFF; // Default: Collide with all
+        let filter = 0xFFFD; // Default: Ignorar a otros jugadores (0x0002) en Rapier
+
+        // Note: Ya no cambiamos a 0xFFFF para 'no-push'. 
+        // Todas las colisiones de jugadores se manejan manualmente en CharacterController.js
+        // para evitar el efecto magnético o "drift" de Rapier.
+
         let isSensor = false;
-
-        let playerCollision = this.state.playerCollision || 'push';
-
-        if (playerCollision === 'none' || playerCollision === 'push') {
-            filter = 0xFFFD; // Ignore other players (0x0002) in Rapier, to fix magnet effect
-        } else if (playerCollision === 'no-push') {
-            filter = 0xFFFF; // Block each other completely
-        }
 
         let groups = (membership << 16) | filter;
         this.collider.setCollisionGroups(groups);

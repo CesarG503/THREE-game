@@ -75,10 +75,10 @@ export class RemotePlayer {
 
         let playerCollision = this.state.playerCollision || 'push';
 
-        if (playerCollision === 'none') {
-            filter = 0xFFFD; // Ignore other players (0x0002)
+        if (playerCollision === 'none' || playerCollision === 'push') {
+            filter = 0xFFFD; // Ignore other players (0x0002) in Rapier, to fix magnet effect
         } else if (playerCollision === 'no-push') {
-            isSensor = true; // Act as sensor
+            filter = 0xFFFF; // Block each other completely
         }
 
         let groups = (membership << 16) | filter;

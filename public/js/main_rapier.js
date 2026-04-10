@@ -680,7 +680,8 @@ class Game {
         });
 
         // Character Update
-        this.character.update(dt, this.inputManager)
+        const remotePlayers = this.networkManager ? this.networkManager.remotePlayers : null;
+        this.character.update(dt, this.inputManager, remotePlayers)
 
         // Camera Update
         this.cameraController.update(this.character.getPosition(), this.character.getRotation(), dt)

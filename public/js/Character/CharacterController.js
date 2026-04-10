@@ -132,10 +132,10 @@ export class CharacterController {
         let filter = 0xFFFF; // Default: Collide with all
         let isSensor = false;
 
-        if (this.playerCollision === 'none') {
-            filter = 0xFFFD; // Ignore other players (0x0002)
+        if (this.playerCollision === 'none' || this.playerCollision === 'push') {
+            filter = 0xFFFD; // Ignore other players in Rapier to handle them manually
         } else if (this.playerCollision === 'no-push') {
-            isSensor = true; // Act as sensor, traverse without blocking
+            filter = 0xFFFF; // Completely block each other
         }
 
         let groups = (membership << 16) | filter;
@@ -157,7 +157,7 @@ export class CharacterController {
         }
     }
 
-    update(dt, input) {
+    update(dt, input, remotePlayers) {
         if (!this.rigidBody) return
 
         // 0. No-Clip Override (God Mode)
@@ -383,11 +383,58 @@ export class CharacterController {
         }
         desiredTranslation.add(this.momentum.clone().multiplyScalar(dt))
 
+        // Manual Player-Player Repulsion Logic (Soft push)
+        if (remotePlayers && this.playerCollision !== 'none') {
+            const myPos = this.getPosition();
+            const radius = 0.5;
+
+            remotePlayers.forEach(rp => {
+                const rpCollision = (rp.state && rp.state.playerCollision) || 'push';
+                if (rpCollision === 'none') return;
+                
+                // If both are 'no-push', Rapier handles it via collision groups.
+                if (this.playerCollision === 'no-push' && rpCollision === 'no-push') return;
+
+                // Vertical check
+                const dy = Math.abs((myPos.y + 0.9) - (rp.currentPosition.y + 0.9));
+                if (dy > 1.8) return; 
+
+                const dx = myPos.x - rp.currentPosition.x;
+                const dz = myPos.z - rp.currentPosition.z;
+                const distSq = dx * dx + dz * dz;
+                const maxDist = radius * 2.0;
+                
+                if (distSq > 0.0001 && distSq < maxDist * maxDist) {
+                    const dist = Math.sqrt(distSq);
+                    const overlap = maxDist - dist;
+                    
+                    let pushStrength = 0;
+                    if (this.playerCollision === 'push' && rpCollision === 'push') {
+                        // Soft push each other, strong enough to prevent pass-through at max walking speed
+                        pushStrength = 30 * overlap;
+                    } else if (this.playerCollision === 'push' && rpCollision === 'no-push') {
+                        // Soft push strongly against the wall to not penetrate it
+                        pushStrength = 60 * overlap;
+                    } else if (this.playerCollision === 'no-push' && rpCollision === 'push') {
+                        // I am wall, he pushes himself away softly. I don't move.
+                        pushStrength = 0; 
+                    }
+
+                    if (pushStrength > 0) {
+                        desiredTranslation.x += (dx / dist) * pushStrength * dt;
+                        desiredTranslation.z += (dz / dist) * pushStrength * dt;
+                    }
+                }
+            });
+        }
+
         // 3. EXECUTE MOVEMENT
+        const groups = this.collider.collisionGroups();
         this.characterController.computeColliderMovement(
             this.collider,
             desiredTranslation,
-            RAPIER.QueryFilterFlags.EXCLUDE_SENSORS
+            RAPIER.QueryFilterFlags.EXCLUDE_SENSORS,
+            groups
         )
 
         let correctedMovement = this.characterController.computedMovement()

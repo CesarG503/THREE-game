@@ -60,6 +60,10 @@ export class CharacterController {
 
         this.initPhysics()
         this.particleSystem = new ParticleSystem(scene)
+        
+        this.playerCollision = 'push';
+        this.applyCollisionProfile();
+
         this.setModelType(this.currentType) // Initialize visibility
 
         // Event System
@@ -115,8 +119,28 @@ export class CharacterController {
         this.characterController.enableSnapToGround(0.5)
         this.characterController.setApplyImpulsesToDynamicBodies(true)
 
+        this.characterController.setApplyImpulsesToDynamicBodies(true)
+
         this.characterController.setMaxSlopeClimbAngle(45 * Math.PI / 180);
         this.characterController.setMinSlopeSlideAngle(45 * Math.PI / 180);
+    }
+
+    applyCollisionProfile() {
+        if (!this.collider) return;
+
+        let membership = 0x0002; // Player
+        let filter = 0xFFFF; // Default: Collide with all
+        let isSensor = false;
+
+        if (this.playerCollision === 'none') {
+            filter = 0xFFFD; // Ignore other players (0x0002)
+        } else if (this.playerCollision === 'no-push') {
+            isSensor = true; // Act as sensor, traverse without blocking
+        }
+
+        let groups = (membership << 16) | filter;
+        this.collider.setCollisionGroups(groups);
+        this.collider.setSensor(isSensor);
     }
 
     setNoClip(enabled) {
@@ -557,6 +581,10 @@ export class CharacterController {
         }
         if (stats.fallAnimationType !== undefined) {
             this.polygonModelSkin.setFallAnimationType(stats.fallAnimationType)
+        }
+        if (stats.playerCollision !== undefined) {
+            this.playerCollision = stats.playerCollision;
+            this.applyCollisionProfile();
         }
 
         console.log("Stats Updated:", stats)

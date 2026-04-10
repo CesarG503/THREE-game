@@ -272,10 +272,10 @@ export class PlayerConfigPanel {
         const players = [];
         if (this.game.networkManager) {
             if (this.game.networkManager.playerId) {
-                players.push({ 
-                    id: this.game.networkManager.playerId, 
+                players.push({
+                    id: this.game.networkManager.playerId,
                     name: "Tu (" + (this.game.networkManager.playerName || "Jugador") + ")",
-                    isLocal: true 
+                    isLocal: true
                 });
             }
             if (this.game.networkManager.remotePlayers) {
@@ -527,16 +527,11 @@ export class PlayerConfigPanel {
 
         // Appearance / Logic Column
         const extraCol = document.createElement('div');
-        extraCol.innerHTML = "<h4 style='color:#aaa; border-bottom:1px solid #444;'>Aplicar Configuración</h4>";
-
-        // Assignment Mode (Only show if this is the active config context, assumes single config for now)
-        const modeContainer = document.createElement('div');
-        modeContainer.innerHTML = "<p style='color:#888; font-size:12px;'>Aplica este rol al jugador local</p>";
 
         // --- ANIMATIONS SECTION ---
         const animHeader = document.createElement('h4');
         animHeader.textContent = "Animaciones";
-        animHeader.style.cssText = "color:#aaa; border-bottom:1px solid #444; margin-top: 20px;";
+        animHeader.style.cssText = "color:#aaa; border-bottom:1px solid #444;";
         extraCol.appendChild(animHeader);
 
         const animContainer = document.createElement('div');
@@ -614,6 +609,51 @@ export class PlayerConfigPanel {
 
         extraCol.appendChild(animContainer);
 
+        // --- COLISIÓN ENTRE JUGADORES ---
+        const collisionHeader = document.createElement('h4');
+        collisionHeader.textContent = "Colisión entre Jugadores";
+        collisionHeader.style.cssText = "color:#aaa; border-bottom:1px solid #444; margin-top: 20px;";
+        extraCol.appendChild(collisionHeader);
+
+        const collisionContainer = document.createElement('div');
+        collisionContainer.style.marginBottom = "15px";
+
+        const collisionLabel = document.createElement('label');
+        collisionLabel.textContent = "Tipo de Colisión";
+        collisionLabel.style.display = "block";
+        collisionLabel.style.color = "#ddd";
+        collisionLabel.style.marginBottom = "5px";
+        collisionContainer.appendChild(collisionLabel);
+
+        const collisionSelect = document.createElement('select');
+        collisionSelect.style.cssText = "background:#333; color:white; padding:5px; border:1px solid #555; width: 100%; box-sizing: border-box;";
+
+        const collisionOptions = [
+            { v: 'push', t: "Colisión empujar" },
+            { v: 'no-push', t: "Colisión sin empujar" },
+            { v: 'none', t: "Sin interacción (Atravesar)" }
+        ];
+
+        collisionOptions.forEach(opt => {
+            const o = document.createElement('option');
+            o.value = opt.v;
+            o.textContent = opt.t;
+            if (profile.playerCollision === opt.v) o.selected = true;
+            collisionSelect.appendChild(o);
+        });
+
+        if (!profile.playerCollision) {
+            collisionSelect.value = 'push'; // Default mapping
+        }
+
+        collisionSelect.onchange = (e) => {
+            this.manager.updateProfile(profile.id, { playerCollision: e.target.value });
+        };
+
+        collisionContainer.appendChild(collisionSelect);
+
+        extraCol.appendChild(collisionContainer);
+
         // --- HUD CONFIG BUTTON ---
         const hudBtn = document.createElement('button');
         hudBtn.textContent = "Editar HUD e Inventario";
@@ -624,16 +664,25 @@ export class PlayerConfigPanel {
         extraCol.appendChild(hudBtn);
 
 
+        // --- APLICAR CONFIGURACION ---
+        const applyHeader = document.createElement('h4');
+        applyHeader.textContent = "Aplicar Configuración";
+        applyHeader.style.cssText = "color:#aaa; border-bottom:1px solid #444; margin-top: 20px;";
+        extraCol.appendChild(applyHeader);
+
+        const modeContainer = document.createElement('div');
+        modeContainer.innerHTML = "<p style='color:#888; font-size:12px;'>Aplica este rol al jugador local para probarlo en tiempo real.</p>";
+        extraCol.appendChild(modeContainer);
+
         // Apply Button (Immediate Test)
         const applyBtn = document.createElement('button');
         applyBtn.textContent = "Aplicar este Rol al Jugador Local (Test)";
-        applyBtn.style.cssText = "background: #44f; color: white; border: none; padding: 10px; width: 100%; cursor: pointer; border-radius: 4px; margin-top: 10px;";
+        applyBtn.style.cssText = "background: #44f; color: white; border: none; padding: 10px; width: 100%; cursor: pointer; border-radius: 4px; margin-top: 5px;";
         applyBtn.onclick = () => {
             this.manager.assignments.defaultProfileId = profile.id;
             this.manager.applyConfiguration();
             alert(`Rol "${profile.name}" aplicado al jugador.`);
         };
-        extraCol.appendChild(modeContainer);
         extraCol.appendChild(applyBtn);
 
         grid.appendChild(extraCol);

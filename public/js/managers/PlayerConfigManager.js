@@ -14,6 +14,7 @@ export class PlayerConfigManager {
                 maxMultiJumps: 1,
                 jumpAnimationType: 'none',
                 fallAnimationType: 'none',
+                playerCollision: 'push', // 'push', 'no-push', 'none'
                 statModes: {}, // key -> 'standard' | 'free'
                 hudSettings: {
                     showHealth: true,
@@ -68,6 +69,7 @@ export class PlayerConfigManager {
                 maxMultiJumps: 0,
                 jumpAnimationType: 'none',
                 fallAnimationType: 'none',
+                playerCollision: 'push',
                 statModes: {},
                 hudSettings: {
                     showHealth: true,
@@ -147,6 +149,7 @@ export class PlayerConfigManager {
             maxMultiJumps: 1,
             jumpAnimationType: 'none',
             fallAnimationType: 'none',
+            playerCollision: 'push',
             statModes: {},
             hudSettings: {
                 showHealth: true,
@@ -291,7 +294,8 @@ export class PlayerConfigManager {
                 canFly: profile.canFly,
                 maxMultiJumps: profile.maxMultiJumps,
                 jumpAnimationType: profile.jumpAnimationType,
-                fallAnimationType: profile.fallAnimationType
+                fallAnimationType: profile.fallAnimationType,
+                playerCollision: profile.playerCollision
             });
         } else {
             // Fallback

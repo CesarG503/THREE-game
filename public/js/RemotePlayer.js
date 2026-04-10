@@ -62,6 +62,28 @@ export class RemotePlayer {
 
         let colliderDesc = RAPIER.ColliderDesc.capsule(0.5, 0.4).setTranslation(0, 0.9, 0)
         this.collider = this.world.createCollider(colliderDesc, this.rigidBody)
+        
+        this.applyCollisionProfile()
+    }
+
+    applyCollisionProfile() {
+        if (!this.collider) return;
+
+        let membership = 0x0002; // Player
+        let filter = 0xFFFF; // Default: Collide with all
+        let isSensor = false;
+
+        let playerCollision = this.state.playerCollision || 'push';
+
+        if (playerCollision === 'none') {
+            filter = 0xFFFD; // Ignore other players (0x0002)
+        } else if (playerCollision === 'no-push') {
+            isSensor = true; // Act as sensor
+        }
+
+        let groups = (membership << 16) | filter;
+        this.collider.setCollisionGroups(groups);
+        this.collider.setSensor(isSensor);
     }
 
     setModelType(type) {
@@ -136,11 +158,17 @@ export class RemotePlayer {
         if (state.isAttacking) {
             this.attackEndTime = Date.now() + 300;
         }
+        
+        let oldPlayerCollision = this.state.playerCollision;
 
         this.state = state;
 
         if (state.modelType && state.modelType !== this.currentType) {
             this.setModelType(state.modelType);
+        }
+
+        if (state.playerCollision !== oldPlayerCollision) {
+            this.applyCollisionProfile();
         }
 
         if (state.jumpAnimationType !== undefined) {

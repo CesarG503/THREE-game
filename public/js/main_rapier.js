@@ -719,6 +719,7 @@ class Game {
                     equippedWeapon: equippedWeapon,
                     equippedHand: equippedHand,
                     jumpAnimationType: this.character.polygonModelSkin ? this.character.polygonModelSkin.jumpAnimationType : 'none',
+                    playerCollision: this.character.playerCollision || 'push',
                     headPitch: this.character.headPitch || 0,
                     headYaw: this.character.headYaw || 0
                 };

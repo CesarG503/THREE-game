@@ -671,6 +671,65 @@ class Game {
                     if (!proj.isDead && !proj.rebote) {
                         if (proj.colliderHandle === handle1 || proj.colliderHandle === handle2) {
                             const hitPos = proj.rigidBody.translation();
+                            const otherHandle = proj.colliderHandle === handle1 ? handle2 : handle1;
+                            
+                            let hitPlayer = false;
+
+                            // 1. Check if hit local player
+                            if (this.character && this.character.collider && this.character.collider.handle === otherHandle) {
+                                hitPlayer = true;
+                                const playerPos = this.character.getPosition();
+                                const hitY = hitPos.y - playerPos.y;
+                                
+                                let damageMult = 1.0;
+                                let color = "#FF2222"; // Head (Red)
+                                if (hitY < 0.7) {
+                                    damageMult = 0.2; // Legs
+                                    color = "#FFCC00";
+                                } else if (hitY < 1.4) {
+                                    damageMult = 0.8; // Torso
+                                    color = "#FF8800";
+                                }
+
+                                const finalDamage = Math.round(proj.damage * damageMult);
+                                this.character.takeDamage(finalDamage);
+
+                                const hitPosVec = new THREE.Vector3(hitPos.x, hitPos.y, hitPos.z);
+
+                                if (this.floatingTextManager) {
+                                    this.floatingTextManager.spawnText(`-${finalDamage}`, hitPosVec, color, 1.5);
+                                }
+                            }
+
+                            // 2. Check if hit remote player
+                            if (!hitPlayer && this.networkManager && this.networkManager.remotePlayers) {
+                                this.networkManager.remotePlayers.forEach(rp => {
+                                    if (rp.collider && rp.collider.handle === otherHandle) {
+                                        hitPlayer = true;
+                                        const playerPos = rp.currentPosition;
+                                        const hitY = hitPos.y - playerPos.y;
+                                        
+                                        let damageMult = 1.0;
+                                        let color = "#FF2222";
+                                        if (hitY < 0.7) {
+                                            damageMult = 0.2;
+                                            color = "#FFCC00";
+                                        } else if (hitY < 1.4) {
+                                            damageMult = 0.8;
+                                            color = "#FF8800";
+                                        }
+
+                                        const finalDamage = Math.round(proj.damage * damageMult);
+
+                                        const hitPosVec = new THREE.Vector3(hitPos.x, hitPos.y, hitPos.z);
+
+                                        if (this.floatingTextManager) {
+                                            this.floatingTextManager.spawnText(`-${finalDamage}`, hitPosVec, color, 1.5);
+                                        }
+                                    }
+                                });
+                            }
+
                             // Destruir proyectil (ej. bala) si choca y no tiene rebote
                             proj.destroy(hitPos);
                         }

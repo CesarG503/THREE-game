@@ -48,9 +48,10 @@ export class Projectile {
         // Collider (Sensor vs Solid?)
         // Ball: solid ball. Bullet: solid ball but much smaller padding
         const radius = this.type === "bullet" ? 0.05 : 0.1;
+        const bounciness = this.rebote ? 0.5 : 0.0;
 
         let colliderDesc = RAPIER.ColliderDesc.ball(radius)
-            .setRestitution(0.5) // Bounciness
+            .setRestitution(bounciness) // Bounciness depends on rebote setting
             .setDensity(5.0)   // Heavy enough to push small things?
             .setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS);
 

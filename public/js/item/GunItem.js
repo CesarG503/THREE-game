@@ -265,7 +265,7 @@ export class GunItem extends Item {
                     
                     // Traverse up the hierarchy to see if this mesh belongs to the player or the gun
                     while (obj) {
-                        if (obj === this.model || obj === this.equipGroup || obj.userData.isPlayer || obj.isLine || obj.userData.ignoreRaycast) {
+                        if (obj === this.model || obj === this.equipGroup || (obj.userData.isPlayer && obj.userData.isLocalPlayer) || obj.isLine || obj.userData.ignoreRaycast) {
                             isIgnored = true;
                             break;
                         }

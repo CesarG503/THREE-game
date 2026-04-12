@@ -1,8 +1,9 @@
 import * as THREE from "three"
 
 export class PolygonModel {
-    constructor(scene) {
+    constructor(scene, isLocal = true) {
         this.scene = scene
+        this.isLocal = isLocal
         this.model = null
         this.isVisible = false
 
@@ -18,6 +19,7 @@ export class PolygonModel {
     createModel() {
         this.model = new THREE.Group()
         this.model.userData.isPlayer = true
+        this.model.userData.isLocalPlayer = this.isLocal
         this.model.visible = false // Start hidden
 
         // Materials

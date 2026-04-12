@@ -1,8 +1,9 @@
 import * as THREE from "three"
 
 export class PolygonModelSkin {
-    constructor(scene) {
+    constructor(scene, isLocal = true) {
         this.scene = scene
+        this.isLocal = isLocal
         this.model = null
         this.isVisible = false
 
@@ -40,6 +41,7 @@ export class PolygonModelSkin {
     createModel() {
         this.model = new THREE.Group()
         this.model.userData.isPlayer = true
+        this.model.userData.isLocalPlayer = this.isLocal
         this.model.visible = false
 
         // --- Hierarchy for Flip Animation ---

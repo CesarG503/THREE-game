@@ -14,9 +14,9 @@ export class RemotePlayer {
         this.playerName = playerName || playerId.slice(-4)
 
         // Models
-        this.glbModel = new GLBModel(scene)
-        this.polygonModel = new PolygonModel(scene)
-        this.polygonModelSkin = new PolygonModelSkin(scene)
+        this.glbModel = new GLBModel(scene, false)
+        this.polygonModel = new PolygonModel(scene, false)
+        this.polygonModelSkin = new PolygonModelSkin(scene, false)
         this.currentType = 'skin'
 
         // State Tracking

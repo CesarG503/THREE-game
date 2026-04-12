@@ -2,8 +2,9 @@ import * as THREE from "three"
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js"
 
 export class GLBModel {
-    constructor(scene) {
+    constructor(scene, isLocal = true) {
         this.scene = scene
+        this.isLocal = isLocal
         this.model = null
         this.mixer = null
         this.animations = {}
@@ -18,6 +19,7 @@ export class GLBModel {
         loader.load("https://threejs.org/examples/models/gltf/Soldier.glb", (gltf) => {
             this.model = gltf.scene
             this.model.userData.isPlayer = true
+            this.model.userData.isLocalPlayer = this.isLocal
             this.scene.add(this.model)
 
             // Shadows

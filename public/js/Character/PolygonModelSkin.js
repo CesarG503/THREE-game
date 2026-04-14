@@ -18,6 +18,7 @@ export class PolygonModelSkin {
         // Groups for pivoting
         this.pivotGroup = null // For whole body rotation (flip)
         this.contentGroup = null // Holds all body parts, offset from pivot
+        this.upperBodyGroup = null // Holds torso, head, arms to twist from center
 
         this.headGroup = null
         this.rightArmGroup = null
@@ -55,6 +56,9 @@ export class PolygonModelSkin {
         this.contentGroup.position.y = -0.9
         this.pivotGroup.add(this.contentGroup)
 
+        this.upperBodyGroup = new THREE.Group()
+        this.contentGroup.add(this.upperBodyGroup)
+
         // Load Skin
         const texture = this.textureLoader.load(this.skinUrl)
         texture.magFilter = THREE.NearestFilter // Pixelated look
@@ -84,7 +88,7 @@ export class PolygonModelSkin {
         // --- Head ---
         this.headGroup = new THREE.Group()
         this.headGroup.position.y = 1.30 // Lowered by 0.20
-        this.contentGroup.add(this.headGroup)
+        this.upperBodyGroup.add(this.headGroup)
 
         const headGeo = this.createBoxGeometryWithUVs(8, 8, 8, 0, 0)
         this.head = new THREE.Mesh(headGeo, material)
@@ -107,20 +111,20 @@ export class PolygonModelSkin {
         this.body.position.y = 1.30 - (6 * pixelScale) // Lowered by 0.20
         this.body.scale.set(pixelScale, pixelScale, pixelScale)
         this.body.castShadow = true
-        this.contentGroup.add(this.body)
+        this.upperBodyGroup.add(this.body)
 
         // Body Outer Layer (Jacket)
         const bodyOuterGeo = this.createBoxGeometryWithUVs(8, 12, 4, 16, 32)
         const bodyOuter = new THREE.Mesh(bodyOuterGeo, material)
         bodyOuter.position.copy(this.body.position)
         bodyOuter.scale.set(pixelScale * 1.05, pixelScale * 1.05, pixelScale * 1.05)
-        this.contentGroup.add(bodyOuter)
+        this.upperBodyGroup.add(bodyOuter)
 
         // --- Arms ---
         // Right Arm
         this.rightArmGroup = new THREE.Group()
         this.rightArmGroup.position.set(4 * pixelScale + 2 * pixelScale, 1.30 - 2 * pixelScale, 0) // Lowered by 0.20
-        this.contentGroup.add(this.rightArmGroup)
+        this.upperBodyGroup.add(this.rightArmGroup)
 
         const rArmGeo = this.createBoxGeometryWithUVs(4, 12, 4, 40, 16)
         this.rightArm = new THREE.Mesh(rArmGeo, material)
@@ -139,7 +143,7 @@ export class PolygonModelSkin {
         // Left Arm
         this.leftArmGroup = new THREE.Group()
         this.leftArmGroup.position.set(-4 * pixelScale - 2 * pixelScale, 1.30 - 2 * pixelScale, 0) // Lowered by 0.20
-        this.contentGroup.add(this.leftArmGroup)
+        this.upperBodyGroup.add(this.leftArmGroup)
 
         const lArmGeo = this.createBoxGeometryWithUVs(4, 12, 4, 32, 48)
         this.leftArm = new THREE.Mesh(lArmGeo, material)
@@ -365,6 +369,8 @@ export class PolygonModelSkin {
     }
 
     setFirstPerson(isFirstPerson) {
+        this.isFirstPerson = isFirstPerson;
+
         if (!this.headGroup) return;
 
         this.headGroup.traverse((child) => {
@@ -467,7 +473,43 @@ export class PolygonModelSkin {
         // Target positions (Base Scale reference)
         const targetHeadY = 1.30 - crouchOffset
         const targetBodyY = 1.30 - (6 * pixelScale) - crouchOffset
-        const targetArmY = 1.30 - (2 * pixelScale) - crouchOffset
+
+        let targetRArmX = 4 * pixelScale + 2 * pixelScale;
+        let targetLArmX = -4 * pixelScale - 2 * pixelScale;
+        let targetRArmY = 1.30 - (2 * pixelScale) - crouchOffset;
+        let targetLArmY = 1.30 - (2 * pixelScale) - crouchOffset;
+        let targetRArmZ = 0;
+        let targetLArmZ = 0;
+
+        if (this.isFirstPerson && this.isHoldingWeapon) {
+             let curPitch = this.targetHeadPitch || 0;
+             const isLeft = (this.currentWeaponHand === 'left');
+             
+             // Base offset to make it look like a nice FPS view without blocking screen
+             let xOffset = isLeft ? -0.15 : 0.15;
+             let yOffset = -0.15; 
+             let zOffset = -0.05; 
+
+             // Dynamic offset: adjusting depending on view to prevent view blocking
+             if (curPitch > 0) {
+                 // Looking up: push it further down and out 
+                 xOffset += isLeft ? -curPitch * 0.15 : curPitch * 0.15;
+                 yOffset -= curPitch * 0.2;
+             } else {
+                 // Looking down: pull it up slightly and rotate into view natively
+                 yOffset -= curPitch * 0.1; 
+             }
+
+             if (isLeft) {
+                 targetLArmX += xOffset;
+                 targetLArmY += yOffset;
+                 targetLArmZ += zOffset;
+             } else {
+                 targetRArmX += xOffset;
+                 targetRArmY += yOffset;
+                 targetRArmZ += zOffset;
+             }
+        }
 
         // Base Leg Y (From constructor: 1.30 - 12 * pixelScale)
         const baseLegY = 1.30 - 12 * pixelScale
@@ -478,8 +520,14 @@ export class PolygonModelSkin {
         this.headGroup.position.y = THREE.MathUtils.lerp(this.headGroup.position.y, targetHeadY, lerpSpeed)
         this.body.position.y = THREE.MathUtils.lerp(this.body.position.y, targetBodyY, lerpSpeed)
 
-        this.rightArmGroup.position.y = THREE.MathUtils.lerp(this.rightArmGroup.position.y, targetArmY, lerpSpeed)
-        this.leftArmGroup.position.y = THREE.MathUtils.lerp(this.leftArmGroup.position.y, targetArmY, lerpSpeed)
+        this.rightArmGroup.position.x = THREE.MathUtils.lerp(this.rightArmGroup.position.x, targetRArmX, lerpSpeed)
+        this.leftArmGroup.position.x = THREE.MathUtils.lerp(this.leftArmGroup.position.x, targetLArmX, lerpSpeed)
+        
+        this.rightArmGroup.position.y = THREE.MathUtils.lerp(this.rightArmGroup.position.y, targetRArmY, lerpSpeed)
+        this.leftArmGroup.position.y = THREE.MathUtils.lerp(this.leftArmGroup.position.y, targetLArmY, lerpSpeed)
+        
+        this.rightArmGroup.position.z = THREE.MathUtils.lerp(this.rightArmGroup.position.z, targetRArmZ, lerpSpeed)
+        this.leftArmGroup.position.z = THREE.MathUtils.lerp(this.leftArmGroup.position.z, targetLArmZ, lerpSpeed)
 
         // Sink Legs
         this.rightLegGroup.position.y = THREE.MathUtils.lerp(this.rightLegGroup.position.y, targetLegY, lerpSpeed)
@@ -556,20 +604,41 @@ export class PolygonModelSkin {
             this.leftArmGroup.rotation.x = finalLArmX
             this.rightArmGroup.rotation.x = finalRArmX
 
-            // Apply Twist to upper body
-            this.body.rotation.y = finalTwist
-            this.headGroup.rotation.y = finalTwist + (this.targetHeadYaw || 0)
-            this.leftArmGroup.rotation.y = finalTwist
-            this.rightArmGroup.rotation.y = finalTwist
+            // Ensure upperBodyGroup rests from general twist (handled below in idle loop) 
+            // but during attack, we can apply the finalTwist directly to upperBodyGroup or body.
+            // Let's use upperBodyGroup for the main twist so arms stay attached, 
+            // or body.rotation.y for local twist.
+            this.body.rotation.y = 0; // Local body twist reset
+            this.upperBodyGroup.rotation.y = finalTwist;
+            this.headGroup.rotation.y = (this.targetHeadYaw || 0); // Head tracks aim
+            this.leftArmGroup.rotation.y = 0;
+            this.rightArmGroup.rotation.y = 0;
 
         } else if (this.isHoldingWeapon) {
             // --- WEAPON HOLDING POSE ---
-            // Override active arm to point forward
-            const pointAimAngle = -Math.PI / 2;
+            // Override active arm to point forward, and follow aim pitch!
+            let currentPitch = this.targetHeadPitch || 0;
+            const pointAimAngle = -Math.PI / 2 - currentPitch;
             const aimBob = isMoving ? Math.sin(Date.now() / 100 * 0.5) * 0.05 : Math.sin(Date.now() / 500) * 0.02;
 
             let freeArmTargetRotX = this.currentWeaponHand === 'left' ? baseRArmX : baseLArmX;
             let freeArmTargetRotZ = this.currentWeaponHand === 'left' ? baseRArmZ : baseLArmZ;
+
+            // Optional First Person visual adjustments (twisting arm so it fits nicely on screen)
+            // Optional First Person visual adjustments (twisting arm so it fits nicely on screen)
+            let weaponArmRotZ = 0;
+            let weaponArmRotY = 0;
+
+            if (this.isFirstPerson) {
+                const pitchOffset = currentPitch * 0.3; 
+                if (this.currentWeaponHand === 'left') {
+                    weaponArmRotZ = -0.1 - pitchOffset * 0.5;
+                    weaponArmRotY = 0.15 + pitchOffset * 0.5;
+                } else {
+                    weaponArmRotZ = 0.1 + pitchOffset * 0.5;
+                    weaponArmRotY = -0.15 - pitchOffset * 0.5;
+                }
+            }
 
             if (this.heldItem && this.heldItem.isReloading) {
                 if (!this.heldItem._reloadStartTime) {
@@ -617,16 +686,36 @@ export class PolygonModelSkin {
                 this.heldItem._reloadStartTime = null; // reset
             }
 
+            // The targetHeadYaw holds the horizontal aim offset (before the character feet rotate)
+            let headYaw = this.targetHeadYaw || 0;
+            // The upperBodyGroup MUST follow this yaw exactly so the shoulders pivot around the spine
+            this.upperBodyGroup.rotation.y = THREE.MathUtils.lerp(this.upperBodyGroup.rotation.y, headYaw, animLerp * 2.0);
+
+            // Add localized weapon sway: simulates the weapon lagging due to inertia when turning
+            let weaponSwayZ = 0;
+            let weaponSwayY = 0;
+            if (this.isFirstPerson) {
+                // negative Z rolls the weapon into the turn, positive Y drags it slightly
+                weaponSwayZ = headYaw * -0.4;
+                weaponSwayY = headYaw * 0.3;
+            }
+
             if (this.currentWeaponHand === 'left') {
                 this.leftArmGroup.rotation.x = THREE.MathUtils.lerp(this.leftArmGroup.rotation.x, pointAimAngle + aimBob, 0.2);
+                this.leftArmGroup.rotation.z = THREE.MathUtils.lerp(this.leftArmGroup.rotation.z, weaponArmRotZ + weaponSwayZ, 0.2);
+                this.leftArmGroup.rotation.y = THREE.MathUtils.lerp(this.leftArmGroup.rotation.y, weaponArmRotY + weaponSwayY, 0.4); // Local FPS wrist tweak + Sway
+
                 this.rightArmGroup.rotation.x = THREE.MathUtils.lerp(this.rightArmGroup.rotation.x, freeArmTargetRotX, animLerp);
                 this.rightArmGroup.rotation.z = THREE.MathUtils.lerp(this.rightArmGroup.rotation.z, freeArmTargetRotZ, animLerp);
-                this.rightArmGroup.rotation.y = THREE.MathUtils.lerp(this.rightArmGroup.rotation.y, 0, animLerp); // reset twist
+                this.rightArmGroup.rotation.y = THREE.MathUtils.lerp(this.rightArmGroup.rotation.y, 0, animLerp); // free arm straight
             } else {
                 this.rightArmGroup.rotation.x = THREE.MathUtils.lerp(this.rightArmGroup.rotation.x, pointAimAngle + aimBob, 0.2);
+                this.rightArmGroup.rotation.z = THREE.MathUtils.lerp(this.rightArmGroup.rotation.z, weaponArmRotZ + weaponSwayZ, 0.2);
+                this.rightArmGroup.rotation.y = THREE.MathUtils.lerp(this.rightArmGroup.rotation.y, weaponArmRotY + weaponSwayY, 0.4);
+
                 this.leftArmGroup.rotation.x = THREE.MathUtils.lerp(this.leftArmGroup.rotation.x, freeArmTargetRotX, animLerp);
                 this.leftArmGroup.rotation.z = THREE.MathUtils.lerp(this.leftArmGroup.rotation.z, freeArmTargetRotZ, animLerp);
-                this.leftArmGroup.rotation.y = THREE.MathUtils.lerp(this.leftArmGroup.rotation.y, 0, animLerp); // reset twist
+                this.leftArmGroup.rotation.y = THREE.MathUtils.lerp(this.leftArmGroup.rotation.y, 0, animLerp); // free arm straight
             }
 
             // --- ANIMACION PROCEDURAL DEL ARMA ---
@@ -648,13 +737,14 @@ export class PolygonModelSkin {
                 }
             }
 
-            // Twist body slightly to right or left to aim
+            // Twist body slightly to right or left to aim, and include the headYaw so the entire upper body tracks horizontal aim!
             const aimTwist = this.currentWeaponHand === 'left' ? 0.2 : -0.2;
             this.body.rotation.y = THREE.MathUtils.lerp(this.body.rotation.y, aimTwist, animLerp);
-            this.headGroup.rotation.y = THREE.MathUtils.lerp(this.headGroup.rotation.y, aimTwist * 0.5 + (this.targetHeadYaw || 0), animLerp * 2.0);
+            this.headGroup.rotation.y = THREE.MathUtils.lerp(this.headGroup.rotation.y, aimTwist * 0.5, animLerp * 2.0);
 
         } else {
             // No Attack & No Weapon
+            this.upperBodyGroup.rotation.y = THREE.MathUtils.lerp(this.upperBodyGroup.rotation.y, 0, animLerp)
             this.leftArmGroup.rotation.x = THREE.MathUtils.lerp(this.leftArmGroup.rotation.x, baseLArmX, animLerp)
             this.rightArmGroup.rotation.x = THREE.MathUtils.lerp(this.rightArmGroup.rotation.x, baseRArmX, animLerp)
 

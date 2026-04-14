@@ -241,8 +241,7 @@ export class CharacterController {
                 let angleDiff = targetBodyRot - this.currentRotation;
                 while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
                 while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
-                
-                const deadzone = Math.PI / 3; // 60 degrees max head turn
+                const deadzone = Math.PI / 8; // Faster body follow, smaller deadzone
                 if (Math.abs(angleDiff) > deadzone) {
                     let correction = Math.sign(angleDiff) * (Math.abs(angleDiff) - deadzone);
                     this.currentRotation += correction;
@@ -272,7 +271,7 @@ export class CharacterController {
                 while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
                 while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
                 
-                const deadzone = Math.PI / 3;
+                const deadzone = Math.PI / 8;
                 if (Math.abs(angleDiff) > deadzone) {
                     let correction = targetBodyRot - (Math.sign(angleDiff) * deadzone);
                     let diff = correction - this.currentRotation;

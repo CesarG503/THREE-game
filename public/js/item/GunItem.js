@@ -611,8 +611,24 @@ export class GunItem extends Item {
     }
 
     clone() {
-        // Cloning logic for passing configured item from Menu to Inventory
-        const cloned = new GunItem(this.originalConfig);
+        // Captura todas las propiedades actuales (pueden haber sido editadas en el panel)
+        const updatedConfig = Object.assign({}, this.originalConfig, {
+            damage:           this.damage,
+            cooldown:         this.cooldown,
+            recoil:           this.recoil,
+            recoilMode:       this.recoilMode,
+            isAuto:           this.isAuto,
+            projectileType:   this.projectileType,
+            shotSpeed:        this.shotSpeed,
+            bulletDrop:       this.bulletDrop,
+            hasTracer:        this.hasTracer,
+            hasTrajectoryLine: this.hasTrajectoryLine,
+            rebote:           this.rebote,
+            hasImpactEffect:  this.hasImpactEffect,
+            modelScale:       this.modelScale,
+            equippedHand:     this.equippedHand,
+        });
+        const cloned = new GunItem(updatedConfig);
         return cloned;
     }
 }

@@ -1362,12 +1362,20 @@ export class ConstructionMenu {
             card.appendChild(img)
             card.appendChild(lbl)
 
-            // Drag Events (Default White)
+            // Drag Events — Si el item seleccionado en el panel es este mismo, usamos el draft (con cambios del usuario).
+            // Así se preservan las propiedades editadas en el panel derecho.
             card.addEventListener('dragstart', (e) => {
-                this.draggedItem = item
-                e.dataTransfer.effectAllowed = "copy"
-                e.dataTransfer.setData("text/plain", "item")
+                if (this.currentDraftItem && this.currentDraftItem._baseId === item.id) {
+                    // El usuario lo tiene seleccionado y editado → usar el draft
+                    this.draggedItem = this.currentDraftItem;
+                } else {
+                    // No está seleccionado → clonar fresco para no mutar la librería
+                    this.draggedItem = item.clone ? item.clone() : item;
+                }
+                e.dataTransfer.effectAllowed = "copy";
+                e.dataTransfer.setData("text/plain", "item");
             })
+
 
             container.appendChild(card)
         })
@@ -2182,11 +2190,15 @@ export class ConstructionMenu {
             this.currentDraftItem = new MapObjectItem(id, name, type, "", color, scale, texturePath)
         }
 
+        // Marcar el ID base para que el dragstart del card pueda comparar
+        this.currentDraftItem._baseId = id;
+
         // Init Image
         if (this.editorImg) {
             this.editorImg.src = this.currentDraftItem.iconPath
         }
     }
+
 
     updateDraftColor(hexColor) {
         if (!this.currentDraftItem) return

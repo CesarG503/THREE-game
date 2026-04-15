@@ -433,13 +433,19 @@ export class PolygonModelSkin {
                 // Rotate to align with arm pointing forward.
                 // The weapon models are imported with their muzzle initially facing backwards,
                 // so we flip the Y rotation 180° while keeping the arm-facing X/Z alignment.
-                mesh.rotation.set(-Math.PI / 2, 1.5, Math.PI);
 
-                this.currentWeaponHand = item.equippedHand || 'right';
+
+                // Invert physical arms because the character is rotated 180 degrees visually
+                const intendedHand = item.equippedHand || 'right';
+                this.currentWeaponHand = intendedHand === 'left' ? 'right' : 'left';
 
                 if (this.currentWeaponHand === 'left') {
+                    // Visual RIGHT Arm (intended left)
+                    mesh.rotation.set(-Math.PI / 2, 1.5, Math.PI);
                     this.leftArmGroup.add(mesh);
                 } else {
+                    // Visual LEFT Arm (intended right)
+                    mesh.rotation.set(-Math.PI / 2, -1.5, Math.PI);
                     this.rightArmGroup.add(mesh);
                 }
             }

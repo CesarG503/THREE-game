@@ -53,7 +53,7 @@ export class GunItem extends Item {
         // Stats Customizables
         this.damage = config.damage !== undefined ? config.damage : 10;
         this.cooldown = config.cooldown !== undefined ? config.cooldown : 0.5; // Seconds
-        this.equippedHand = "right"; // "right" or "left" default
+        this.equippedHand = config.equippedHand || "right"; // "right" or "left" default
         this.recoil = config.recoil !== undefined ? config.recoil : 5.0; // Retroceso de la cámara
         this.recoilMode = config.recoilMode || "hybrid"; // Modos: 'manual', 'recenter', 'hybrid'
         this.isAuto = config.isAuto || false; // Disparo automático
@@ -522,7 +522,15 @@ export class GunItem extends Item {
 
         // === 0. ACTUALIZAR TRANSFORMACIONES PROCEDURALES (Nuevas) ===
         // Apply procedural offsets to the transform group
-        this.transformGroup.position.copy(this.handOffset).add(this.proceduralStates.extraPos);
+        let handOffsetAdjusted = this.handOffset.clone();
+        if (this.equippedHand === "left") {
+            handOffsetAdjusted.x *= -1; // Mirror position for left hand
+            // Mirror scale X to ensure left/right symmetric geometries perfectly match grip points
+            this.transformGroup.scale.set(-1, 1, 1); 
+        } else {
+            this.transformGroup.scale.set(1, 1, 1);
+        }
+        this.transformGroup.position.copy(handOffsetAdjusted).add(this.proceduralStates.extraPos);
         
         // Combine hand rotation with extra rotation
         // For simplicity, we just add them here, but a more robust system would use quaternions
@@ -661,6 +669,7 @@ export class GunItem extends Item {
             equippedHand:     this.equippedHand,
         });
         const cloned = new GunItem(updatedConfig);
+        if (this._baseId) cloned._baseId = this._baseId;
         return cloned;
     }
 }

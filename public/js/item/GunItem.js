@@ -1,37 +1,49 @@
 import * as THREE from "three";
 import { Item } from "./Item.js";
-import { FBXLoader } from "three/addons/loaders/FBXLoader.js";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { Projectile } from "../weapons/Projectile.js";
 import { BlasterSystem } from "../fx/BlasterSystem.js";
 import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
 
 export class GunItem extends Item {
-    static cachedModel = null;
-    static cachedAnimations = null;
-    static isLoadingCache = false;
-    static cacheCallbacks = [];
+    static cachedModels = {}; // Dictionary by modelPath
+    static cachedAnimations = {};
+    static isLoadingCache = {};
+    static cacheCallbacks = {};
 
-    constructor() {
-        super("gun", "Pistola", "/assets/gun/gun_d.png"); // Using diff texture as icon for now, or maybe create a snapshot?
-        // Actually, let's use a generic gun icon if available, or just the side view texture locally if it looks ok.
-        // User provided assets/gun/*.png are textures.
-        // We'll use gun_d.png for icon for now, it might be the diffuse map.
+    constructor(config = {}) {
+        const id = config.id || "gun";
+        const name = config.name || "Pistola";
+        const iconPath = config.icon || "/assets/gun/gun_d.png";
+
+        super(id, name, iconPath);
+
+        // Guardamos config original para clonado
+        this.originalConfig = config;
 
         this.type = "weapon";
-        this.damage = 10;
-        this.cooldown = 0.5; // Seconds
+        this.modelPath = config.modelPath || null;
+
+        // Stats Customizables
+        this.damage = config.damage !== undefined ? config.damage : 10;
+        this.cooldown = config.cooldown !== undefined ? config.cooldown : 0.5; // Seconds
         this.equippedHand = "right"; // "right" or "left" default
-        this.recoil = 5.0; // Retroceso de la cámara
-        this.recoilMode = "hybrid"; // Modos: 'manual', 'recenter', 'hybrid'
-        this.isAuto = false; // Disparo automático
-        this.projectileType = "bullet"; // "bullet" or "ball"
-        this.shotSpeed = 50.0; // Velocidad del proyectil
-        this.bulletDrop = 1.0; // Caída de bala (gravedad)
+        this.recoil = config.recoil !== undefined ? config.recoil : 5.0; // Retroceso de la cámara
+        this.recoilMode = config.recoilMode || "hybrid"; // Modos: 'manual', 'recenter', 'hybrid'
+        this.isAuto = config.isAuto || false; // Disparo automático
+        this.projectileType = config.projectileType || "bullet"; // "bullet" or "ball"
+        this.shotSpeed = config.shotSpeed !== undefined ? config.shotSpeed : 50.0; // Velocidad del proyectil
+        this.bulletDrop = config.bulletDrop !== undefined ? config.bulletDrop : 1.0; // Caída de bala (gravedad)
+
         this.lastShotTime = 0;
-        this.hasTracer = false;
-        this.hasTrajectoryLine = false;
-        this.rebote = false; // Por defecto las balas no rebotan
-        this.hasImpactEffect = false; // Humo al chocar
+        this.hasTracer = config.hasTracer !== undefined ? config.hasTracer : false;
+        this.hasTrajectoryLine = config.hasTrajectoryLine !== undefined ? config.hasTrajectoryLine : false;
+        this.rebote = config.rebote !== undefined ? config.rebote : false; // Por defecto las balas no rebotan
+        this.hasImpactEffect = config.hasImpactEffect !== undefined ? config.hasImpactEffect : false; // Humo al chocar
+
+        this.modelScale = config.modelScale !== undefined ? config.modelScale : 1.0;
+        this.modelOffset = config.modelOffset || new THREE.Vector3(0, 0, 0);
+        this.modelRotation = config.modelRotation || new THREE.Vector3(0, Math.PI / 2, 0);
 
         this.isReloading = false;
 
@@ -64,118 +76,116 @@ export class GunItem extends Item {
     }
 
     loadModel() {
-        if (this.model || this.isLoading) return;
+        if (!this.modelPath || this.model || this.isLoading) return;
         this.isLoading = true;
 
-        if (GunItem.cachedModel) {
+        if (GunItem.cachedModels[this.modelPath]) {
             this.setupFromCache();
             return;
         }
 
-        if (GunItem.isLoadingCache) {
-            GunItem.cacheCallbacks.push(() => this.setupFromCache());
+        if (GunItem.isLoadingCache[this.modelPath]) {
+            if (!GunItem.cacheCallbacks[this.modelPath]) GunItem.cacheCallbacks[this.modelPath] = [];
+            GunItem.cacheCallbacks[this.modelPath].push(() => this.setupFromCache());
             return;
         }
 
-        GunItem.isLoadingCache = true;
+        GunItem.isLoadingCache[this.modelPath] = true;
+        GunItem.cacheCallbacks[this.modelPath] = [];
 
-        const loader = new FBXLoader();
-        const textureLoader = new THREE.TextureLoader();
+        const loader = new GLTFLoader();
 
-        // Load Textures
-        const path = "/assets/heavy_pistol_animated/";
-        const mapArmHandColor = textureLoader.load(path + "armhandcolor.jpg");
-        const mapTalonColor = textureLoader.load(path + "taloncolor.jpg");
-        const mapTalonNormal = textureLoader.load(path + "talonnormal.jpg");
-        const mapTalonMetallic = textureLoader.load(path + "talonmetallic.jpg");
+        loader.load(this.modelPath, (gltf) => {
+            const obj = gltf.scene;
 
-        // Fix encoding
-        mapArmHandColor.colorSpace = THREE.SRGBColorSpace;
-        mapTalonColor.colorSpace = THREE.SRGBColorSpace;
-
-        const armMaterial = new THREE.MeshStandardMaterial({
-            map: mapArmHandColor,
-            roughness: 0.8
-        });
-
-        const gunMaterial = new THREE.MeshStandardMaterial({
-            map: mapTalonColor,
-            normalMap: mapTalonNormal,
-            metalnessMap: mapTalonMetallic,
-            roughness: 0.5,
-            metalness: 0.8
-        });
-
-        loader.load(path + "arms_talon.fbx", (obj) => {
-            // Apply Material Based on Name to the cached original
+            // Apply Shadows and Colors
             obj.traverse(child => {
                 if (child.isMesh) {
                     child.castShadow = true;
-                    // Assign materials based on name
-                    const name = child.name.toLowerCase();
-                    if (name.includes("arm") || name.includes("hand")) {
-                        child.material = armMaterial;
-                        // Ocultar los brazos para que solo se vea el arma
-                        child.visible = false;
-                    } else {
-                        child.material = gunMaterial;
+                    // Asegurar soporte PBR o colores si las texturas blancas vienen vacías de Blender
+                    if (child.material) {
+                        const matName = child.material.name || "";
+                        let colorHex = null;
+
+                        if (matName.includes("Metal")) colorHex = 0x555555;
+                        if (matName.includes("DarkerMetal")) colorHex = 0x222222;
+                        if (matName.includes("Wood")) colorHex = 0x5c3a21; // Madera oscura
+                        if (matName.includes("Magazine")) colorHex = 0x111111;
+                        if (matName.includes("Muzzle")) colorHex = 0x333333;
+                        if (matName.includes("Grip")) colorHex = 0x1a1a1a;
+
+                        // Si reconocemos el material, le inyectamos color para arreglar el "blanco" de blender
+                        if (colorHex !== null) {
+                            child.material = new THREE.MeshStandardMaterial({
+                                color: colorHex,
+                                roughness: matName.includes("Wood") ? 0.8 : 0.4,
+                                metalness: matName.includes("Wood") ? 0.1 : 0.8
+                            });
+                        } else {
+                            // Fallback general 
+                            child.material.color.setHex(0xaaaaaa); // Gris base en vez de blanco puro
+                            child.material.roughness = 0.5;
+                            child.material.metalness = 0.8;
+                        }
                     }
                 }
             });
 
             // Cache it
-            GunItem.cachedModel = obj;
-            GunItem.cachedAnimations = obj.animations;
+            GunItem.cachedModels[this.modelPath] = obj;
+            GunItem.cachedAnimations[this.modelPath] = gltf.animations;
 
-            GunItem.isLoadingCache = false;
-            
+            GunItem.isLoadingCache[this.modelPath] = false;
+
             this.setupFromCache();
 
-            GunItem.cacheCallbacks.forEach(cb => cb());
-            GunItem.cacheCallbacks = [];
+            GunItem.cacheCallbacks[this.modelPath].forEach(cb => cb());
+            GunItem.cacheCallbacks[this.modelPath] = [];
         }, undefined, (err) => {
-            console.error("Error loading Gun FBX:", err);
+            console.error("Error loading Gun GLB:", err);
             this.isLoading = false;
-            GunItem.isLoadingCache = false;
+            GunItem.isLoadingCache[this.modelPath] = false;
         });
     }
 
     setupFromCache() {
-        // Clone the FBX properly preserving Skeleton
-        this.model = SkeletonUtils.clone(GunItem.cachedModel);
+        // Clone the GLB properly preserving Skeleton
+        this.model = SkeletonUtils.clone(GunItem.cachedModels[this.modelPath]);
 
-        // Scale & Position adjustments for the gun itself
-        // Escala 0.05 para ajustar al tamaño de la mano del jugador
-        this.model.scale.set(0.05, 0.05, 0.05);
+        // Scale & Position adjustments based on config
+        this.model.scale.set(this.modelScale, this.modelScale, this.modelScale);
 
         // Ajuste de posición y rotación inicial
-        // 90 grados en el eje Y
-        this.model.rotation.set(0, Math.PI / 2, 0);
+        this.model.rotation.set(this.modelRotation.x, this.modelRotation.y, this.modelRotation.z);
+        this.model.position.copy(this.modelOffset);
 
         // Adding to a wrapper group so PolygonModelSkin doesn't override these manual adjustments
         this.equipGroup.add(this.model);
 
         // Setup Mixer & Animations
         this.mixer = new THREE.AnimationMixer(this.model);
+        const anims = GunItem.cachedAnimations[this.modelPath];
 
-        if (GunItem.cachedAnimations && GunItem.cachedAnimations.length > 0) {
-            const anim = GunItem.cachedAnimations[0];
+        if (anims && anims.length > 0) {
+            // Find Shoot ("Fire" or "disparo")
+            const shootClip = anims.find(a => a.name.toLowerCase().includes("fire") || a.name.toLowerCase().includes("disparo"));
+            if (shootClip) {
+                this.actionShoot = this.mixer.clipAction(shootClip);
+                this.actionShoot.timeScale = this.isAuto ? 1.0 : 2.0; // Auto guns might need natural speed
+                this.actionShoot.setLoop(THREE.LoopOnce);
+            }
 
-            // Shoot Clip (0-12)
-            let actionShootClip = THREE.AnimationUtils.subclip(anim, "disparo", 0, 12);
-            this.actionShoot = this.mixer.clipAction(actionShootClip);
-            this.actionShoot.timeScale = 2.0;
-            this.actionShoot.setLoop(THREE.LoopOnce);
-
-            // Reload Clip (14-85)
-            let actionReloadClip = THREE.AnimationUtils.subclip(anim, "recarga", 14, 85);
-            this.actionReload = this.mixer.clipAction(actionReloadClip);
-            this.actionReload.timeScale = 0.9;
-            this.actionReload.setLoop(THREE.LoopOnce);
+            // Find Reload ("Reload" or "recarga")
+            const reloadClip = anims.find(a => a.name.toLowerCase().includes("reload") || a.name.toLowerCase().includes("recarga"));
+            if (reloadClip) {
+                this.actionReload = this.mixer.clipAction(reloadClip);
+                this.actionReload.timeScale = 1.0;
+                this.actionReload.setLoop(THREE.LoopOnce);
+            }
         }
 
         this.isLoading = false;
-        console.log("Gun FBX Model Loaded (from cache)");
+        console.log(`Gun GLB Model Loaded (from cache): ${this.modelPath}`);
         if (this.onLoadCallback) this.onLoadCallback();
     }
 
@@ -262,7 +272,7 @@ export class GunItem extends Item {
                 for (let hit of intersects) {
                     let isIgnored = false;
                     let obj = hit.object;
-                    
+
                     // Traverse up the hierarchy to see if this mesh belongs to the player or the gun
                     while (obj) {
                         if (obj === this.model || obj === this.equipGroup || (obj.userData.isPlayer && obj.userData.isLocalPlayer) || obj.isLine || obj.userData.ignoreRaycast) {
@@ -271,9 +281,9 @@ export class GunItem extends Item {
                         }
                         obj = obj.parent;
                     }
-                    
+
                     if (isIgnored) continue;
-                    
+
                     targetPoint.copy(hit.point);
                     hitTarget = true;
                     break;
@@ -292,7 +302,7 @@ export class GunItem extends Item {
 
             // 4. Efecto de Estela (Solamente si es 'bullet')
             const projType = this.projectileType || "bullet";
-            
+
             // Instanciar BlasterSystem si se requiere el efecto nativo o el nuevo recursivo
             if ((projType === "bullet" || this.hasTracer) && context.scene) {
                 if (!this.blasterSystem) {
@@ -516,20 +526,7 @@ export class GunItem extends Item {
 
     clone() {
         // Cloning logic for passing configured item from Menu to Inventory
-        const cloned = new GunItem();
-        cloned.damage = this.damage;
-        cloned.cooldown = this.cooldown;
-        cloned.equippedHand = this.equippedHand;
-        cloned.recoil = this.recoil;
-        cloned.recoilMode = this.recoilMode;
-        cloned.isAuto = this.isAuto;
-        cloned.projectileType = this.projectileType || "bullet";
-        cloned.shotSpeed = this.shotSpeed !== undefined ? this.shotSpeed : 50.0;
-        cloned.bulletDrop = this.bulletDrop !== undefined ? this.bulletDrop : 1.0;
-        cloned.hasTracer = this.hasTracer || false;
-        cloned.hasTrajectoryLine = this.hasTrajectoryLine || false;
-        cloned.rebote = this.rebote !== undefined ? this.rebote : false;
-        cloned.hasImpactEffect = this.hasImpactEffect || false;
+        const cloned = new GunItem(this.originalConfig);
         return cloned;
     }
 }

@@ -430,15 +430,10 @@ export class PolygonModelSkin {
 
 
 
-                // Rotate to align with arm pointing forward
-                // Arm rotates -90 deg on X to point forward.
-                // To align Gun Forward (-Z) with Arm Forward (Y), and Gun Up (Y) with Arm Up (Z):
-                // Rotate -90 on X? 
-                // Original was Y=PI (180).
-                // Let's try adjusting to get it upright. 
-                // X = -Math.PI / 2 aligns -Z to Y.
-                // If it ends up backwards, we might need Y rotation too.
-                mesh.rotation.set(-Math.PI / 2, Math.PI + 1.5, Math.PI);
+                // Rotate to align with arm pointing forward.
+                // The weapon models are imported with their muzzle initially facing backwards,
+                // so we flip the Y rotation 180° while keeping the arm-facing X/Z alignment.
+                mesh.rotation.set(-Math.PI / 2, 1.5, Math.PI);
 
                 this.currentWeaponHand = item.equippedHand || 'right';
 

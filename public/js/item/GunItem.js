@@ -4,6 +4,7 @@ import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { Projectile } from "../weapons/Projectile.js";
 import { BlasterSystem } from "../fx/BlasterSystem.js";
 import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
+import { WEAPON_SETTINGS } from "./WeaponSettings.js";
 
 export class GunItem extends Item {
     static cachedModels = {}; // Dictionary by modelPath
@@ -45,6 +46,18 @@ export class GunItem extends Item {
         this.modelOffset = config.modelOffset || new THREE.Vector3(0, 0, 0);
         this.modelRotation = config.modelRotation || new THREE.Vector3(0, Math.PI / 2, 0);
 
+        // --- NEW SYSTEM: Per-model settings and procedural animations ---
+        const weaponSettings = WEAPON_SETTINGS[this.id] || {};
+        this.handOffset = weaponSettings.handOffset || new THREE.Vector3(0, 0, 0);
+        this.handRotation = weaponSettings.handRotation || new THREE.Euler(0, 0, 0);
+        this.extraAnimsConfig = weaponSettings.extraAnims || {};
+
+        this.proceduralStates = {
+            extraPos: new THREE.Vector3(0, 0, 0),
+            extraRot: new THREE.Euler(0, 0, 0),
+            actionQueue: []
+        };
+
         this.isReloading = false;
 
         // Animaciones Procedurales (Retroceso)
@@ -65,6 +78,9 @@ export class GunItem extends Item {
 
         this.model = null;
         this.equipGroup = new THREE.Group();
+        this.transformGroup = new THREE.Group(); // Intermediate layer for procedural movements
+        this.equipGroup.add(this.transformGroup);
+        
         this.isLoading = false;
 
         this.mixer = null;
@@ -155,12 +171,16 @@ export class GunItem extends Item {
         // Scale & Position adjustments based on config
         this.model.scale.set(this.modelScale, this.modelScale, this.modelScale);
 
-        // Ajuste de posición y rotación inicial
+        // Ajuste de posición y rotación inicial (Base)
         this.model.rotation.set(this.modelRotation.x, this.modelRotation.y, this.modelRotation.z);
         this.model.position.copy(this.modelOffset);
 
-        // Adding to a wrapper group so PolygonModelSkin doesn't override these manual adjustments
-        this.equipGroup.add(this.model);
+        // Apply Hand Settings from WeaponSettings system
+        this.transformGroup.position.copy(this.handOffset);
+        this.transformGroup.rotation.copy(this.handRotation);
+
+        // Adding to the transform group instead of directly to equipGroup
+        this.transformGroup.add(this.model);
 
         // Setup Mixer & Animations
         this.mixer = new THREE.AnimationMixer(this.model);
@@ -370,6 +390,62 @@ export class GunItem extends Item {
         return true; // Consumed action, but item not consumed (ammo logic future?)
     }
 
+    /**
+     * Start an extra procedural action like 'throw', 'spin', or 'inspect'
+     */
+    startExtraAction(actionName) {
+        console.log(`Iniciando acción extra: ${actionName}`);
+        if (actionName === "throw") {
+            this._startThrowAnimation();
+        } else if (actionName === "spin") {
+            this._startSpinAnimation();
+        }
+    }
+
+    _startThrowAnimation() {
+        // Visual throw: move gun forward and rotate, then return
+        const duration = 1.0;
+        const startTime = Date.now();
+        const startPos = new THREE.Vector3().copy(this.proceduralStates.extraPos);
+        const startRot = new THREE.Euler().copy(this.proceduralStates.extraRot);
+
+        const animate = () => {
+            const t = (Date.now() - startTime) / 1000 / duration;
+            if (t >= 1.0) {
+                this.proceduralStates.extraPos.set(0, 0, 0);
+                this.proceduralStates.extraRot.set(0, 0, 0);
+                return;
+            }
+
+            // Parabola-like movement forward
+            const x = t;
+            const y = 4 * t * (1 - t); // Parabola 0->1->0
+
+            this.proceduralStates.extraPos.z = -x * 2.0; // Forward 2 units
+            this.proceduralStates.extraPos.y = y * 0.5;   // Up 0.5 units
+            
+            this.proceduralStates.extraRot.x = x * Math.PI * 4; // 2 Full circles
+            
+            requestAnimationFrame(animate);
+        };
+        requestAnimationFrame(animate);
+    }
+
+    _startSpinAnimation() {
+        const duration = 0.5;
+        const startTime = Date.now();
+        const animate = () => {
+            const t = (Date.now() - startTime) / 1000 / duration;
+            if (t >= 1.0) {
+                this.proceduralStates.extraRot.y = 0;
+                return;
+            }
+            this.proceduralStates.extraRot.y = t * Math.PI * 2;
+            requestAnimationFrame(animate);
+        };
+        requestAnimationFrame(animate);
+    }
+
     reload() {
         if (this.isReloading) return;
 
@@ -411,6 +487,16 @@ export class GunItem extends Item {
         if (this.blasterSystem) {
             this.blasterSystem.Update(dt);
         }
+
+        // === 0. ACTUALIZAR TRANSFORMACIONES PROCEDURALES (Nuevas) ===
+        // Apply procedural offsets to the transform group
+        this.transformGroup.position.copy(this.handOffset).add(this.proceduralStates.extraPos);
+        
+        // Combine hand rotation with extra rotation
+        // For simplicity, we just add them here, but a more robust system would use quaternions
+        this.transformGroup.rotation.x = this.handRotation.x + this.proceduralStates.extraRot.x;
+        this.transformGroup.rotation.y = this.handRotation.y + this.proceduralStates.extraRot.y;
+        this.transformGroup.rotation.z = this.handRotation.z + this.proceduralStates.extraRot.z;
 
         // === 1. ACTUALIZAR RETROCESO VISUAL DEL ARMA ===
         if (this.gunImpulse > 0) {

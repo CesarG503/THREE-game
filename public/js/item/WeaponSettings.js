@@ -8,7 +8,7 @@ import * as THREE from "three";
 export const WEAPON_SETTINGS = {
     // ID must match the 'id' property in ConstructionMenu weaponsConfig
     "gun_pistol": {
-        handOffset: new THREE.Vector3(0, 0, 0),
+        handOffset: new THREE.Vector3(-0.17, -0.05, 0),
         // 225° - 135° (3×45°) = 90° = PI/2  → apunta al lugar correcto
         handRotation: new THREE.Euler(0, Math.PI / 2, 0),
         extraAnims: {

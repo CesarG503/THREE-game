@@ -6,6 +6,31 @@ import { BlasterSystem } from "../fx/BlasterSystem.js";
 import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
 import { WEAPON_SETTINGS } from "./WeaponSettings.js";
 
+const GUN_COLOR_PALETTE = {
+    Metal: 0xC0C0C0,        // Plateado brillante
+    DarkerMetal: 0x4A4A4A,  // Gris oscuro visible
+    DarkMetal: 0x2F2F2F,    // Metal más profundo
+    Wood: 0xC68642,         // Madera clara brillante
+    LightWood: 0xE0A96D,    // Madera clara cálida
+    DarkWood: 0x8B5A2B,     // Madera oscura rica
+    Magazine: 0x2E2E2E,     // Gris oscuro equilibrado
+    Muzzle: 0x6E6E6E,       // Gris medio claro
+    Grip: 0x3B2F2F,         // Marrón oscuro (mejor que negro puro)
+    Black: 0x1C1C1C,        // Negro suave (no apagado total)
+    BulletYellow: 0xFFD700, // Dorado fuerte
+    BulletOrange: 0xFF8C00, // Naranja intenso
+    Barrels: 0x9A9A9A,      // Metal claro neutro
+    Trigger: 0xB0B0B0,      // Plateado suave
+    Green: 0x32CD32         // Verde vivo
+};
+
+const GUN_MODEL_MATERIAL_OVERRIDES = {
+    "/assets/gun animated/GLB/P90.glb": {
+        "Material.001": 0xEDEDED, // Gris claro
+        "Material.003": 0x5A5A5A, // Gris mate 
+        "Material.004": 0x2F2F2F  // Gris oscuro mate 
+    }
+};
 export class GunItem extends Item {
     static cachedModels = {}; // Dictionary by modelPath
     static cachedAnimations = {};
@@ -123,25 +148,32 @@ export class GunItem extends Item {
                         const matName = child.material.name || "";
                         let colorHex = null;
 
-                        if (matName.includes("Metal")) colorHex = 0x555555;
-                        if (matName.includes("DarkerMetal")) colorHex = 0x222222;
-                        if (matName.includes("Wood")) colorHex = 0x5c3a21; // Madera oscura
-                        if (matName.includes("Magazine")) colorHex = 0x111111;
-                        if (matName.includes("Muzzle")) colorHex = 0x333333;
-                        if (matName.includes("Grip")) colorHex = 0x1a1a1a;
+                        for (const key in GUN_COLOR_PALETTE) {
+                            if (matName.includes(key)) {
+                                colorHex = GUN_COLOR_PALETTE[key];
+                                break;
+                            }
+                        }
 
-                        // Si reconocemos el material, le inyectamos color para arreglar el "blanco" de blender
+                        const modelOverrides = GUN_MODEL_MATERIAL_OVERRIDES[this.modelPath];
+                        if (colorHex === null && modelOverrides && modelOverrides[matName] !== undefined) {
+                            colorHex = modelOverrides[matName];
+                        }
+
+                        // If the material name is generic but the model has a known override we still color it.
                         if (colorHex !== null) {
                             child.material = new THREE.MeshStandardMaterial({
                                 color: colorHex,
-                                roughness: matName.includes("Wood") ? 0.8 : 0.4,
-                                metalness: matName.includes("Wood") ? 0.1 : 0.8
+                                roughness: matName.includes("Wood") || matName.includes("LightWood") || matName.includes("DarkWood") ? 0.8 : 0.4,
+                                metalness: matName.includes("Wood") || matName.includes("LightWood") || matName.includes("DarkWood") ? 0.1 : 0.8
                             });
                         } else {
-                            // Fallback general 
-                            child.material.color.setHex(0xaaaaaa); // Gris base en vez de blanco puro
-                            child.material.roughness = 0.5;
-                            child.material.metalness = 0.8;
+                            // Fallback general
+                            child.material = new THREE.MeshStandardMaterial({
+                                color: 0xF5EDF4,
+                                roughness: 0.6,
+                                metalness: 0.4
+                            });
                         }
                     }
                 }

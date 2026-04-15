@@ -534,9 +534,10 @@ export class GunItem extends Item {
         
         // Combine hand rotation with extra rotation
         // For simplicity, we just add them here, but a more robust system would use quaternions
+        let rotSign = this.equippedHand === "left" ? -1 : 1;
         this.transformGroup.rotation.x = this.handRotation.x + this.proceduralStates.extraRot.x;
-        this.transformGroup.rotation.y = this.handRotation.y + this.proceduralStates.extraRot.y;
-        this.transformGroup.rotation.z = this.handRotation.z + this.proceduralStates.extraRot.z;
+        this.transformGroup.rotation.y = (this.handRotation.y + this.proceduralStates.extraRot.y) * rotSign;
+        this.transformGroup.rotation.z = (this.handRotation.z + this.proceduralStates.extraRot.z) * rotSign;
 
         // === 1. ACTUALIZAR RETROCESO VISUAL DEL ARMA ===
         if (this.gunImpulse > 0) {

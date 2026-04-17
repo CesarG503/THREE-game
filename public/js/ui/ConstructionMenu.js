@@ -3,6 +3,7 @@ import { LogicSystem } from "../managers/LogicSystem.js"
 import { GameConfigPanel } from "./GameConfigPanel.js"
 import { PlayerConfigPanel } from "./PlayerConfigPanel.js"
 import { GunItem } from "../item/GunItem.js"
+import { WEAPONS_CONFIG } from "../item/WeaponSettings.js"
 import * as THREE from "three"
 
 export class ConstructionMenu {
@@ -59,15 +60,7 @@ export class ConstructionMenu {
         })
 
         // Add Guns to Library
-        const weaponsConfig = [
-            { id: "gun_pistol", name: "Pistola", modelPath: "/assets/gun animated/GLB/Pistol.glb", damage: 15, cooldown: 0.2, isAuto: false, recoil: 4.0, modelScale: 0.0006, shotSpeed: 60.0 },
-            { id: "gun_p90", name: "P90", modelPath: "/assets/gun animated/GLB/P90.glb", damage: 8, cooldown: 0.1, isAuto: true, recoil: 2.0, modelScale: 0.001, shotSpeed: 80.0 },
-            { id: "gun_rifle", name: "Rifle de Asalto", modelPath: "/assets/gun animated/GLB/Rifle.glb", damage: 20, cooldown: 0.15, isAuto: true, recoil: 5.0, modelScale: 0.002, shotSpeed: 100.0 },
-            { id: "gun_shotgun", name: "Escopeta", modelPath: "/assets/gun animated/GLB/Shotgun.glb", damage: 70, cooldown: 1.0, isAuto: false, recoil: 10.0, modelScale: 0.002, shotSpeed: 40.0, bulletDrop: 2.0 },
-            { id: "gun_sniper", name: "Francotirador", modelPath: "/assets/gun animated/GLB/SniperRifle.glb", damage: 100, cooldown: 1.5, isAuto: false, recoil: 15.0, modelScale: 0.002, shotSpeed: 150.0, bulletDrop: 0.1, hasTracer: true }
-        ];
-
-        weaponsConfig.forEach(cfg => {
+        WEAPONS_CONFIG.forEach(cfg => {
             this.libraryItems.push(new GunItem(cfg));
         });
     }

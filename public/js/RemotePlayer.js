@@ -4,6 +4,7 @@ import { GLBModel } from "./Character/GLBModel.js"
 import { PolygonModel } from "./Character/PolygonModel.js"
 import { PolygonModelSkin } from "./Character/PolygonModelSkin.js"
 import { GunItem } from "./item/GunItem.js"
+import { WEAPONS_CONFIG } from "./item/WeaponSettings.js"
 import { PelotaItem } from "./item/PelotaItem.js"
 
 export class RemotePlayer {
@@ -173,26 +174,46 @@ export class RemotePlayer {
         }
 
         if (state.equippedWeapon !== this.equippedWeaponName || state.equippedHand !== this.equippedHandName) {
+            const weaponChanged = state.equippedWeapon !== this.equippedWeaponName;
             this.equippedWeaponName = state.equippedWeapon;
             this.equippedHandName = state.equippedHand;
             
-            if (state.equippedWeapon === "gun") {
-                this.currentWeaponInstance = new GunItem();
+            if (!this.weaponsCache) {
+                this.weaponsCache = {};
+            }
+            
+            if (weaponChanged) {
+                if (state.equippedWeapon && state.equippedWeapon.startsWith("gun_")) {
+                    if (!this.weaponsCache[state.equippedWeapon]) {
+                        const weaponConfig = WEAPONS_CONFIG.find(c => c.id === state.equippedWeapon) || {};
+                        this.weaponsCache[state.equippedWeapon] = new GunItem(weaponConfig);
+                    }
+                    this.currentWeaponInstance = this.weaponsCache[state.equippedWeapon];
+                    this.currentWeaponInstance.equippedHand = state.equippedHand || "right";
+                    this.glbModel.setHeldItem(this.currentWeaponInstance);
+                    this.polygonModel.setHeldItem(this.currentWeaponInstance);
+                    this.polygonModelSkin.setHeldItem(this.currentWeaponInstance);
+                } else if (state.equippedWeapon === "pelota") {
+                    if (!this.weaponsCache["pelota"]) {
+                        this.weaponsCache["pelota"] = new PelotaItem();
+                    }
+                    this.currentWeaponInstance = this.weaponsCache["pelota"];
+                    this.currentWeaponInstance.equippedHand = state.equippedHand || "right";
+                    this.glbModel.setHeldItem(this.currentWeaponInstance);
+                    this.polygonModel.setHeldItem(this.currentWeaponInstance);
+                    this.polygonModelSkin.setHeldItem(this.currentWeaponInstance);
+                } else {
+                    this.currentWeaponInstance = null;
+                    this.glbModel.setHeldItem(null);
+                    this.polygonModel.setHeldItem(null);
+                    this.polygonModelSkin.setHeldItem(null);
+                }
+            } else if (this.currentWeaponInstance) {
+                // Solo cambió la mano
                 this.currentWeaponInstance.equippedHand = state.equippedHand || "right";
                 this.glbModel.setHeldItem(this.currentWeaponInstance);
                 this.polygonModel.setHeldItem(this.currentWeaponInstance);
                 this.polygonModelSkin.setHeldItem(this.currentWeaponInstance);
-            } else if (state.equippedWeapon === "pelota") {
-                this.currentWeaponInstance = new PelotaItem();
-                this.currentWeaponInstance.equippedHand = state.equippedHand || "right";
-                this.glbModel.setHeldItem(this.currentWeaponInstance);
-                this.polygonModel.setHeldItem(this.currentWeaponInstance);
-                this.polygonModelSkin.setHeldItem(this.currentWeaponInstance);
-            } else {
-                this.currentWeaponInstance = null;
-                this.glbModel.setHeldItem(null);
-                this.polygonModel.setHeldItem(null);
-                this.polygonModelSkin.setHeldItem(null);
             }
         }
 

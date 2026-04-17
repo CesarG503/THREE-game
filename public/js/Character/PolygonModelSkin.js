@@ -369,21 +369,27 @@ export class PolygonModelSkin {
     }
 
     setFirstPerson(isFirstPerson) {
+        if (this.isFirstPerson === isFirstPerson) return;
         this.isFirstPerson = isFirstPerson;
 
-        if (!this.headGroup) return;
-
-        this.headGroup.traverse((child) => {
-            if (child.isMesh) {
-                if (!child.userData.originalMaterial) {
-                    child.userData.originalMaterial = child.material;
-                    child.userData.invisibleMaterial = child.material.clone();
-                    child.userData.invisibleMaterial.colorWrite = false;
-                    child.userData.invisibleMaterial.depthWrite = false;
+        if (this.headGroup) {
+            this.headGroup.traverse((child) => {
+                if (child.isMesh) {
+                    if (!child.userData.originalMaterial) {
+                        child.userData.originalMaterial = child.material;
+                        child.userData.invisibleMaterial = child.material.clone();
+                        child.userData.invisibleMaterial.colorWrite = false;
+                        child.userData.invisibleMaterial.depthWrite = false;
+                    }
+                    child.material = isFirstPerson ? child.userData.invisibleMaterial : child.userData.originalMaterial;
                 }
-                child.material = isFirstPerson ? child.userData.invisibleMaterial : child.userData.originalMaterial;
-            }
-        });
+            });
+        }
+
+        // La alineación base del arma es simétrica al cargar el mesh, 
+        // los ajustes de la perspectiva (como ladear ligeramente el arma hacia la cámara) 
+        // ya se manejan proceduralmente en updateAnim de GunItem y PolygonModelSkin, 
+        // así que no necesitamos sobreescribir la rotación base del mesh en esta función.
     }
 
     setJumpAnimationType(type) {
@@ -440,12 +446,12 @@ export class PolygonModelSkin {
                 this.currentWeaponHand = intendedHand === 'left' ? 'right' : 'left';
 
                 if (this.currentWeaponHand === 'left') {
-                    // Visual RIGHT Arm (intended left)
-                    mesh.rotation.set(-Math.PI / 2, 1.5, Math.PI);
+                    // Visual RIGHT Arm (user intended hand: left)
+                    mesh.rotation.set(Math.PI / 2, 1.5, Math.PI);
                     this.leftArmGroup.add(mesh);
                 } else {
-                    // Visual LEFT Arm (intended right)
-                    mesh.rotation.set(-Math.PI / 2, -1.5, Math.PI);
+                    // Visual LEFT Arm (user intended hand: right)
+                    mesh.rotation.set(Math.PI / 2, 1.5, Math.PI);
                     this.rightArmGroup.add(mesh);
                 }
             }
@@ -483,33 +489,33 @@ export class PolygonModelSkin {
         let targetLArmZ = 0;
 
         if (this.isFirstPerson && this.isHoldingWeapon) {
-             let curPitch = this.targetHeadPitch || 0;
-             const isLeft = (this.currentWeaponHand === 'left');
-             
-             // Base offset to make it look like a nice FPS view without blocking screen
-             let xOffset = isLeft ? -0.15 : 0.15;
-             let yOffset = -0.15; 
-             let zOffset = -0.05; 
+            let curPitch = this.targetHeadPitch || 0;
+            const isLeft = (this.currentWeaponHand === 'left');
 
-             // Dynamic offset: adjusting depending on view to prevent view blocking
-             if (curPitch > 0) {
-                 // Looking up: push it further down and out 
-                 xOffset += isLeft ? -curPitch * 0.15 : curPitch * 0.15;
-                 yOffset -= curPitch * 0.2;
-             } else {
-                 // Looking down: pull it up slightly and rotate into view natively
-                 yOffset -= curPitch * 0.1; 
-             }
+            // Base offset to make it look like a nice FPS view without blocking screen
+            let xOffset = isLeft ? -0.15 : 0.15;
+            let yOffset = -0.15;
+            let zOffset = -0.05;
 
-             if (isLeft) {
-                 targetLArmX += xOffset;
-                 targetLArmY += yOffset;
-                 targetLArmZ += zOffset;
-             } else {
-                 targetRArmX += xOffset;
-                 targetRArmY += yOffset;
-                 targetRArmZ += zOffset;
-             }
+            // Dynamic offset: adjusting depending on view to prevent view blocking
+            if (curPitch > 0) {
+                // Looking up: push it further down and out 
+                xOffset += isLeft ? -curPitch * 0.15 : curPitch * 0.15;
+                yOffset -= curPitch * 0.2;
+            } else {
+                // Looking down: pull it up slightly and rotate into view natively
+                yOffset -= curPitch * 0.1;
+            }
+
+            if (isLeft) {
+                targetLArmX += xOffset;
+                targetLArmY += yOffset;
+                targetLArmZ += zOffset;
+            } else {
+                targetRArmX += xOffset;
+                targetRArmY += yOffset;
+                targetRArmZ += zOffset;
+            }
         }
 
         // Base Leg Y (From constructor: 1.30 - 12 * pixelScale)
@@ -523,10 +529,10 @@ export class PolygonModelSkin {
 
         this.rightArmGroup.position.x = THREE.MathUtils.lerp(this.rightArmGroup.position.x, targetRArmX, lerpSpeed)
         this.leftArmGroup.position.x = THREE.MathUtils.lerp(this.leftArmGroup.position.x, targetLArmX, lerpSpeed)
-        
+
         this.rightArmGroup.position.y = THREE.MathUtils.lerp(this.rightArmGroup.position.y, targetRArmY, lerpSpeed)
         this.leftArmGroup.position.y = THREE.MathUtils.lerp(this.leftArmGroup.position.y, targetLArmY, lerpSpeed)
-        
+
         this.rightArmGroup.position.z = THREE.MathUtils.lerp(this.rightArmGroup.position.z, targetRArmZ, lerpSpeed)
         this.leftArmGroup.position.z = THREE.MathUtils.lerp(this.leftArmGroup.position.z, targetLArmZ, lerpSpeed)
 
@@ -537,7 +543,7 @@ export class PolygonModelSkin {
         // Body Angle (Lean forward when crouching)
         const targetBodyRotX = isCrouching ? 0.2 : 0
         this.body.rotation.x = THREE.MathUtils.lerp(this.body.rotation.x, targetBodyRotX, lerpSpeed)
-        
+
         // headGroup.rotation.x: Body lean minus pitch (because pitch up is positive, and x positive is down)
         const targetHeadRotX = targetBodyRotX - (this.targetHeadPitch || 0)
         this.headGroup.rotation.x = THREE.MathUtils.lerp(this.headGroup.rotation.x, targetHeadRotX, lerpSpeed * 2.0)
@@ -631,7 +637,7 @@ export class PolygonModelSkin {
             let weaponArmRotY = 0;
 
             if (this.isFirstPerson) {
-                const pitchOffset = currentPitch * 0.3; 
+                const pitchOffset = currentPitch * 0.3;
                 if (this.currentWeaponHand === 'left') {
                     weaponArmRotZ = -0.1 - pitchOffset * 0.5;
                     weaponArmRotY = 0.15 + pitchOffset * 0.5;

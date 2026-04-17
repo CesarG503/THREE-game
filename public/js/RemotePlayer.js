@@ -272,13 +272,16 @@ export class RemotePlayer {
         this.glbModel.update(dt, hasInput)
         this.polygonModel.update(dt, hasInput)
         this.polygonModelSkin.update(
-            dt,
-            hasInput,
-            this.state.isCrouching === true,
-            effectivelyAttacking,
-            this.state.isGrounded !== false,
-            Number(this.state.verticalVelocity) || 0
+            dt, 
+            hasInput, 
+            (this.state.isCrouching || false), 
+            (this.state.isAttacking || false), 
+            (this.state.isGrounded !== undefined ? this.state.isGrounded : true),
+            this.state.verticalVelocity || 0
         )
+        if (this.currentWeaponInstance && typeof this.currentWeaponInstance.updateAnim === 'function') {
+            this.currentWeaponInstance.updateAnim(dt, 0);
+        }
     }
 
     dispose() {

@@ -524,20 +524,15 @@ export class GunItem extends Item {
         // Apply procedural offsets to the transform group
         let handOffsetAdjusted = this.handOffset.clone();
         if (this.equippedHand === "left") {
-            handOffsetAdjusted.x *= -1; // Mirror position for left hand
-            // Mirror scale X to ensure left/right symmetric geometries perfectly match grip points
-            this.transformGroup.scale.set(-1, 1, 1); 
-        } else {
-            this.transformGroup.scale.set(1, 1, 1);
+            handOffsetAdjusted.x *= -1; // Solo desplazar al lado izquierdo, sin crear espejos
         }
+        this.transformGroup.scale.set(1, 1, 1);
         this.transformGroup.position.copy(handOffsetAdjusted).add(this.proceduralStates.extraPos);
         
-        // Combine hand rotation with extra rotation
-        // For simplicity, we just add them here, but a more robust system would use quaternions
-        let rotSign = this.equippedHand === "left" ? -1 : 1;
+        // Combine hand rotation with extra rotation (sin invertir giros para evitar problemas de modo espejo)
         this.transformGroup.rotation.x = this.handRotation.x + this.proceduralStates.extraRot.x;
-        this.transformGroup.rotation.y = (this.handRotation.y + this.proceduralStates.extraRot.y) * rotSign;
-        this.transformGroup.rotation.z = (this.handRotation.z + this.proceduralStates.extraRot.z) * rotSign;
+        this.transformGroup.rotation.y = this.handRotation.y + this.proceduralStates.extraRot.y;
+        this.transformGroup.rotation.z = this.handRotation.z + this.proceduralStates.extraRot.z;
 
         // === 1. ACTUALIZAR RETROCESO VISUAL DEL ARMA ===
         if (this.gunImpulse > 0) {

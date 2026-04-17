@@ -523,9 +523,8 @@ export class GunItem extends Item {
         // === 0. ACTUALIZAR TRANSFORMACIONES PROCEDURALES (Nuevas) ===
         // Apply procedural offsets to the transform group
         let handOffsetAdjusted = this.handOffset.clone();
-        if (this.equippedHand === "left") {
-            handOffsetAdjusted.x *= -1; // Solo desplazar al lado izquierdo, sin crear espejos
-        }
+        // Sin modo espejo en la escala del objeto, el offset requerido para centrar la malla en la mano 
+        // debe ser exactamente el mismo para la izquierda y la derecha.
         this.transformGroup.scale.set(1, 1, 1);
         this.transformGroup.position.copy(handOffsetAdjusted).add(this.proceduralStates.extraPos);
         

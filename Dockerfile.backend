@@ -1,0 +1,19 @@
+FROM node:20-alpine
+
+# Set working directory
+WORKDIR /app
+
+# Copy package configurations
+COPY package*.json ./
+
+# Install production dependencies only
+RUN npm ci --omit=dev
+
+# Copy WebSocket server source code
+COPY server/ ./server/
+
+# Expose the WebSocket server port
+EXPOSE 8080
+
+# Start it
+CMD ["node", "server/websocket-server.js"]

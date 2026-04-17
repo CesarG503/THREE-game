@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    ports:
+      - "80:80"        # Host port 80 maps to Nginx port 80
+    container_name: threejs-game-frontend
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    ports:
+      - "8080:8080"    # WebSocket server port
+    container_name: threejs-game-backend
+    restart: unless-stopped

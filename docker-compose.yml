@@ -1,22 +1,12 @@
 version: '3.8'
 
 services:
-  frontend:
+  game-app:
     build:
       context: .
-      dockerfile: Dockerfile.frontend
+      dockerfile: Dockerfile
     ports:
-      - "80:80"        # Host port 80 maps to Nginx port 80
-    container_name: threejs-game-frontend
-    depends_on:
-      - backend
-    restart: unless-stopped
-
-  backend:
-    build:
-      context: .
-      dockerfile: Dockerfile.backend
-    ports:
-      - "8080:8080"    # WebSocket server port
-    container_name: threejs-game-backend
+      - "80:3000"        # Host port 80 maps to the internal react/vite (serve) at 3000
+      - "8080:8080"      # Backend WebSocket maps directly 8080 to 8080
+    container_name: threejs-game-app
     restart: unless-stopped

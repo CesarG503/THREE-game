@@ -160,6 +160,14 @@ wss.on("connection", (ws) => {
                     }
                     break
 
+                case "broadcastMapSync":
+                    broadcastToRoom(roomId, {
+                        type: "broadcastMapSync",
+                        mapData: message.mapData
+                    }, playerId)
+                    console.log(`[Room ${roomId}] Map sync broadcasted by ${playerId}`)
+                    break
+
                 // ── Shooting Sync ────────────────────────────────────────
                 case "playerShoot":
                     broadcastToRoom(roomId, {

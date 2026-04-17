@@ -947,6 +947,12 @@ export class ConstructionMenu {
                  const newJson = JSON.parse(jsonTextArea.value);
                  if (this.game.loadMap) {
                      this.game.loadMap(newJson);
+                     
+                     // Sincronizar en modo colaborativo
+                     if (this.game.networkManager && this.game.networkManager.collaborativeMode) {
+                         this.game.networkManager.broadcastMapSync(newJson);
+                     }
+
                      editCb.checked = false;
                      editCb.dispatchEvent(new Event('change'));
                      alert("¡Cambios aplicados al mapa exitosamente!");
@@ -980,11 +986,63 @@ export class ConstructionMenu {
         createFilter('gameConfig', 'Game Config')
         createFilter('playerConfig', 'Player Config')
         createFilter('objects', 'Objetos 3D')
+        
+        // Función de Limpiar Sección
+        const deleteContainer = document.createElement('div')
+        deleteContainer.style.cssText = `display: flex; gap: 10px; align-items: center; margin-top: 15px; padding-top: 10px; border-top: 1px solid #444; width: 100%;`
+
+        const deleteSelect = document.createElement('select')
+        deleteSelect.style.cssText = `padding: 5px; background: #333; color: white; border: 1px solid #555; border-radius: 4px;`
+        deleteSelect.innerHTML = `
+            <option value="objects" selected>Objetos 3D</option>
+            <option value="gameConfig">Game Config</option>
+            <option value="playerConfig">Player Config</option>
+            <option value="all">Todo el Mapa (Limpiar)</option>
+        `
+
+        const deleteBtn = document.createElement('button')
+        deleteBtn.textContent = "Borrar"
+        deleteBtn.style.cssText = `background: #dc2626; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: bold;`
+
+        deleteBtn.onclick = () => {
+            const section = deleteSelect.value;
+            if (confirm(`¿Estás seguro de que deseas borrar: ${section}?`)) {
+                if (this.game.saveMap && this.game.loadMap) {
+                    const currentMap = this.game.saveMap();
+                    
+                    if (section === 'objects') {
+                        currentMap.objects = [];
+                    } else if (section === 'gameConfig') {
+                        currentMap.gameConfig = null;
+                    } else if (section === 'playerConfig') {
+                        currentMap.playerConfig = null;
+                    } else if (section === 'all') {
+                        currentMap.objects = [];
+                        currentMap.gameConfig = null;
+                        currentMap.playerConfig = null;
+                    }
+
+                    this.game.loadMap(currentMap);
+
+                    if (this.game.networkManager && this.game.networkManager.collaborativeMode) {
+                        this.game.networkManager.broadcastMapSync(currentMap);
+                    }
+
+                    alert(`Sección ${section} borrada correctamente!`);
+                    updateJson();
+                }
+            }
+        }
+
+        deleteContainer.appendChild(document.createTextNode("Limpiar Sección:"))
+        deleteContainer.appendChild(deleteSelect)
+        deleteContainer.appendChild(deleteBtn)
 
         rightColumn.appendChild(rightTitleRow)
         rightColumn.appendChild(editorContainer)
         rightColumn.appendChild(applyBtn)
         rightColumn.appendChild(filtersContainer)
+        rightColumn.appendChild(deleteContainer)
 
         const syntaxHighlight = (json) => {
             if (!json) return "";

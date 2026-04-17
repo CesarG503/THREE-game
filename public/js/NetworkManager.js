@@ -186,6 +186,13 @@ export class NetworkManager {
                 }
                 break
 
+            case "broadcastMapSync":
+                if (this.onMapSyncData && message.mapData) {
+                    console.log("[Network] Map sync data received via broadcast")
+                    this.onMapSyncData(message.mapData)
+                }
+                break
+
             // ── Shooting Sync ────────────────────────────────────────
             case "playerShoot":
                 if (this.onPlayerShoot && message.playerId !== this.playerId) {
@@ -360,6 +367,14 @@ export class NetworkManager {
         this.socket.send(JSON.stringify({
             type: "mapSyncData",
             targetId: targetId,
+            mapData: mapData
+        }))
+    }
+
+    broadcastMapSync(mapData) {
+        if (!this.isConnected || !this.socket || this.socket.readyState !== WebSocket.OPEN) return
+        this.socket.send(JSON.stringify({
+            type: "broadcastMapSync",
             mapData: mapData
         }))
     }

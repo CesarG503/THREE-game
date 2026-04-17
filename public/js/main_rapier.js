@@ -149,11 +149,11 @@ class Game {
             this.networkManager.sendMapSyncData(targetId, JSON.stringify(mapJson))
         }
 
-        this.networkManager.onMapSyncData = (mapDataString) => {
+        this.networkManager.onMapSyncData = (mapData) => {
             if (this.gameMode !== 'editor') return
-            console.log("[Collab] Recibiendo estado de mapa completo (Late Joiner Sync)...")
+            console.log("[Collab] Recibiendo estado de mapa completo (Late Joiner/Broadcast Sync)...")
             try {
-                const mapJson = JSON.parse(mapDataString)
+                const mapJson = typeof mapData === 'string' ? JSON.parse(mapData) : mapData;
                 this._isApplyingRemoteEdit = true
                 this.loadMap(mapJson)
                 this._isApplyingRemoteEdit = false
@@ -1702,8 +1702,8 @@ class Game {
         // Or simple hack: Only remove visual for now, let's assume we are empty.
 
         // Load Player Config FIRST
-        if (jsonData.playerConfig && this.playerConfigManager) {
-            this.playerConfigManager.loadData(jsonData.playerConfig)
+        if (jsonData.hasOwnProperty('playerConfig') && this.playerConfigManager) {
+            this.playerConfigManager.loadData(jsonData.playerConfig || { roles: [], assignments: {} })
             // If ConstructionMenu is open and on PlayerConfig tab, valid refresh might be needed
             if (this.constructionMenu && this.constructionMenu.playerConfigPanel) {
                 // If it exposes a refresh/render method call it?
@@ -1716,9 +1716,9 @@ class Game {
         }
 
         // Load Global Logic Config
-        if (jsonData.gameConfig && this.constructionMenu && this.constructionMenu.logicSystem) {
-            this.constructionMenu.logicSystem.gameConfig = jsonData.gameConfig
-            console.log("Global Game Config Loaded", jsonData.gameConfig)
+        if (jsonData.hasOwnProperty('gameConfig') && this.constructionMenu && this.constructionMenu.logicSystem) {
+            this.constructionMenu.logicSystem.gameConfig = jsonData.gameConfig || { sequences: [] }
+            console.log("Global Game Config Loaded", this.constructionMenu.logicSystem.gameConfig)
 
             // Refresh UI if open
             if (this.constructionMenu.gameConfigPanel) {
@@ -1730,15 +1730,10 @@ class Game {
         for (let i = this.sceneManager.scene.children.length - 1; i >= 0; i--) {
             const obj = this.sceneManager.scene.children[i]
             if (obj.userData.isEditableMapObject) {
-                // Remove Physics Body if exists?
-                // Currently fixed bodies.
-                // We need access to removeRigidBody from world? Rapier API.
-                // We haven't stored the rigidBody reference on the mesh for easy deletion.
-                // This is tricky for now without refactor.
-                // For now: Visual clear, but physics might persist if not careful!
-
-                // Simpler: Reload page? No.
-                // Ideally: Store body handle on mesh.userData logic needed.
+                // Liberar física si existe
+                if (obj.userData.rigidBody) {
+                    try { this.world.removeRigidBody(obj.userData.rigidBody) } catch (e) { /* ignore */ }
+                }
                 this.sceneManager.scene.remove(obj)
             }
         }

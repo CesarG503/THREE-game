@@ -2,7 +2,7 @@ import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
 
 export class Projectile {
-    constructor(scene, world, origin, direction, speed, damage, bulletDrop = 1.0, type = "ball", rebote = false, hasImpactEffect = false) {
+    constructor(scene, world, origin, direction, speed, damage, bulletDrop = 1.0, type = "ball", rebote = false, hasImpactEffect = false, customTracerVFX = "Ninguno", customImpactVFX = "Ninguno") {
         this.scene = scene;
         this.world = world;
         this.damage = damage;
@@ -11,6 +11,10 @@ export class Projectile {
         this.type = type;
         this.rebote = rebote;
         this.hasImpactEffect = hasImpactEffect;
+        this.customTracerVFX = customTracerVFX;
+        this.customImpactVFX = customImpactVFX;
+        this.customTracerAttached = false;
+        this.customTracerWrapper = null;
 
         this.hasTracer = false;
         this.hasTrajectoryLine = false;
@@ -77,8 +81,34 @@ export class Projectile {
             const pos = this.rigidBody.translation();
             const currentPos = new THREE.Vector3(pos.x, pos.y, pos.z);
 
+            // Lazy initialization of custom tracer because particleSystem is set after constructor
+            if (this.particleSystem && this.customTracerVFX !== "Ninguno" && !this.customTracerAttached) {
+                this.customTracerAttached = true;
+                if (!this.mesh) {
+                    // Create a dummy mesh just to hold the tracer if there is no visual ball
+                    this.mesh = new THREE.Group();
+                    this.scene.add(this.mesh);
+                }
+                // Rotar para apuntar en dirección de la velocidad
+                const vel = this.rigidBody.linvel();
+                const dirVec = new THREE.Vector3(vel.x, vel.y, vel.z).normalize();
+                const quat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), dirVec);
+                
+                // Tracers are attached to this.mesh, so we pass a zero vector for local offset
+                this.customTracerWrapper = this.particleSystem.spawnLoadedEffect(this.customTracerVFX, new THREE.Vector3(0, 0, 0), this.mesh, quat, false);
+            }
+
             if (this.mesh) {
                 this.mesh.position.copy(currentPos);
+                
+                // Si la bala cae (gravedad), actualizar la rotación del mesh/tracer para que siga la trayectoria
+                if (this.customTracerAttached) {
+                    const vel = this.rigidBody.linvel();
+                    if (vel.x !== 0 || vel.y !== 0 || vel.z !== 0) {
+                        const dirVec = new THREE.Vector3(vel.x, vel.y, vel.z).normalize();
+                        this.mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), dirVec);
+                    }
+                }
             }
             
             if (this.hasTrajectoryLine) {
@@ -132,33 +162,52 @@ export class Projectile {
         }
 
         // Impact Effect
-        if (hitPos && this.hasImpactEffect && this.blasterSystem) {
+        if (hitPos && this.hasImpactEffect) {
             const vPos = new THREE.Vector3(hitPos.x, hitPos.y, hitPos.z);
-            for (let i = 0; i < 5; i++) {
-                const spark = this.blasterSystem.CreateParticle();
-                spark.Start.copy(vPos);
-                spark.End.copy(vPos).add(new THREE.Vector3(
-                    (Math.random()-0.5)*0.2, 
-                    (Math.random()-0.5)*0.2, 
-                    (Math.random()-0.5)*0.2
-                ));
-                spark.Velocity = new THREE.Vector3(
-                    (Math.random()-0.5)*5, 
-                    Math.random()*5, 
-                    (Math.random()-0.5)*5
-                );
-                spark.Colours = [new THREE.Color(0xffaa00), new THREE.Color(0x555555)]; // orange to smoke
-                spark.Length = 0.1;
-                spark.Life = 0.2 + Math.random()*0.2;
-                spark.TotalLife = spark.Life;
+            if (this.particleSystem) {
+                if (this.customImpactVFX !== "Ninguno") {
+                    this.particleSystem.spawnLoadedEffect(this.customImpactVFX, vPos, null, null, true, 3000);
+                } else {
+                    // Generar impacto y un pequeño efecto de explosión para mayor espectacularidad
+                    this.particleSystem.spawnImpactEffect(vPos, new THREE.Vector3(0, 1, 0));
+                    // Opcional: si el tipo de bala es explosiva podríamos llamar a explosion
+                    if (this.type === "explosive") {
+                        this.particleSystem.spawnExplosionEffect(vPos);
+                    }
+                }
+            } else if (this.blasterSystem) {
+                for (let i = 0; i < 5; i++) {
+                    const spark = this.blasterSystem.CreateParticle();
+                    spark.Start.copy(vPos);
+                    spark.End.copy(vPos).add(new THREE.Vector3(
+                        (Math.random()-0.5)*0.2, 
+                        (Math.random()-0.5)*0.2, 
+                        (Math.random()-0.5)*0.2
+                    ));
+                    spark.Velocity = new THREE.Vector3(
+                        (Math.random()-0.5)*5, 
+                        Math.random()*5, 
+                        (Math.random()-0.5)*5
+                    );
+                    spark.Colours = [new THREE.Color(0xffaa00), new THREE.Color(0x555555)]; // orange to smoke
+                    spark.Length = 0.1;
+                    spark.Life = 0.2 + Math.random()*0.2;
+                    spark.TotalLife = spark.Life;
+                }
             }
+        }
+
+        // Cleanup Custom Tracer
+        if (this.customTracerWrapper && this.particleSystem) {
+            this.particleSystem.destroyLoadedEffect(this.customTracerWrapper);
+            this.customTracerWrapper = null;
         }
 
         // Cleanup ThreeJS
         if (this.mesh) {
             this.scene.remove(this.mesh);
-            this.mesh.geometry.dispose();
-            this.mesh.material.dispose();
+            if (this.mesh.geometry) this.mesh.geometry.dispose();
+            if (this.mesh.material) this.mesh.material.dispose();
         }
 
         // Cleanup Rapier

@@ -66,6 +66,8 @@ export class GunItem extends Item {
         this.hasTrajectoryLine = config.hasTrajectoryLine !== undefined ? config.hasTrajectoryLine : false;
         this.rebote = config.rebote !== undefined ? config.rebote : false; // Por defecto las balas no rebotan
         this.hasImpactEffect = config.hasImpactEffect !== undefined ? config.hasImpactEffect : false; // Humo al chocar
+        this.customTracerVFX = config.customTracerVFX || "Ninguno";
+        this.customImpactVFX = config.customImpactVFX || "Ninguno";
 
         this.modelScale = config.modelScale !== undefined ? config.modelScale : 1.0;
         this.modelOffset = config.modelOffset || new THREE.Vector3(0, 0, 0);
@@ -391,11 +393,14 @@ export class GunItem extends Item {
                 drop, // bulletDrop base
                 projType, // "bullet" o "ball"
                 this.rebote,
-                this.hasImpactEffect
+                this.hasImpactEffect,
+                this.customTracerVFX,
+                this.customImpactVFX
             );
             proj.hasTracer = this.hasTracer;
             proj.hasTrajectoryLine = this.hasTrajectoryLine;
             proj.blasterSystem = this.blasterSystem;
+            proj.particleSystem = context.particleSystem; // REQUIRED FOR CUSTOM VFX!
             proj.initialTracer = tempTracer;
             context.registerProjectile(proj);
 
@@ -411,7 +416,9 @@ export class GunItem extends Item {
                     this.rebote,
                     this.hasImpactEffect,
                     this.hasTracer,
-                    this.hasTrajectoryLine
+                    this.hasTrajectoryLine,
+                    this.customTracerVFX,
+                    this.customImpactVFX
                 );
             }
         }
@@ -660,6 +667,8 @@ export class GunItem extends Item {
             hasTrajectoryLine: this.hasTrajectoryLine,
             rebote:           this.rebote,
             hasImpactEffect:  this.hasImpactEffect,
+            customTracerVFX:  this.customTracerVFX,
+            customImpactVFX:  this.customImpactVFX,
             modelScale:       this.modelScale,
             equippedHand:     this.equippedHand,
         });

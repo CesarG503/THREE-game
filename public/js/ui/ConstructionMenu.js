@@ -2135,6 +2135,62 @@ export class ConstructionMenu {
         impactRow.appendChild(impactLabel);
         impactRow.appendChild(this.impactInput);
 
+        // --- Custom Tracer VFX Row ---
+        const customTracerRow = document.createElement('div');
+        customTracerRow.style.display = "flex";
+        customTracerRow.style.alignItems = "center";
+        customTracerRow.style.justifyContent = "space-between";
+
+        const customTracerLabel = document.createElement('span');
+        customTracerLabel.textContent = "Estela Especial VFX:";
+
+        this.customTracerSelect = document.createElement('select');
+        this.customTracerSelect.style.cssText = this.projectileTypeSelect.style.cssText;
+        
+        ['Ninguno', 'Bubble Explosion', 'Cartoon Bang', 'Cartoon Blue Flamethrower'].forEach(opt => {
+            const el = document.createElement('option');
+            el.value = opt;
+            el.textContent = opt;
+            this.customTracerSelect.appendChild(el);
+        });
+
+        this.customTracerSelect.addEventListener('change', (e) => {
+            if (this.currentDraftItem && this.currentDraftItem.type === 'weapon') {
+                this.currentDraftItem.customTracerVFX = e.target.value;
+            }
+        });
+
+        customTracerRow.appendChild(customTracerLabel);
+        customTracerRow.appendChild(this.customTracerSelect);
+
+        // --- Custom Impact VFX Row ---
+        const customImpactRow = document.createElement('div');
+        customImpactRow.style.display = "flex";
+        customImpactRow.style.alignItems = "center";
+        customImpactRow.style.justifyContent = "space-between";
+
+        const customImpactLabel = document.createElement('span');
+        customImpactLabel.textContent = "Impacto Especial VFX:";
+
+        this.customImpactSelect = document.createElement('select');
+        this.customImpactSelect.style.cssText = this.projectileTypeSelect.style.cssText;
+        
+        ['Ninguno', 'Bubble Explosion', 'Cartoon Bang', 'Cartoon Blue Flamethrower'].forEach(opt => {
+            const el = document.createElement('option');
+            el.value = opt;
+            el.textContent = opt;
+            this.customImpactSelect.appendChild(el);
+        });
+
+        this.customImpactSelect.addEventListener('change', (e) => {
+            if (this.currentDraftItem && this.currentDraftItem.type === 'weapon') {
+                this.currentDraftItem.customImpactVFX = e.target.value;
+            }
+        });
+
+        customImpactRow.appendChild(customImpactLabel);
+        customImpactRow.appendChild(this.customImpactSelect);
+
         weaponControlsContainer.appendChild(damageRow);
         weaponControlsContainer.appendChild(cooldownRow);
         weaponControlsContainer.appendChild(handRow);
@@ -2148,6 +2204,8 @@ export class ConstructionMenu {
         weaponControlsContainer.appendChild(trajectoryRow);
         weaponControlsContainer.appendChild(reboteRow);
         weaponControlsContainer.appendChild(impactRow);
+        weaponControlsContainer.appendChild(customTracerRow);
+        weaponControlsContainer.appendChild(customImpactRow);
 
         this.panelEditor.appendChild(weaponControlsContainer);
 
@@ -2204,6 +2262,9 @@ export class ConstructionMenu {
             let defaultRebote = baseItem.projectileType === "ball" ? true : false;
             this.reboteInput.checked = baseItem.rebote !== undefined ? baseItem.rebote : defaultRebote;
             this.impactInput.checked = baseItem.hasImpactEffect !== undefined ? baseItem.hasImpactEffect : false;
+            
+            this.customTracerSelect.value = baseItem.customTracerVFX || "Ninguno";
+            this.customImpactSelect.value = baseItem.customImpactVFX || "Ninguno";
         } else {
             this.editorConstructionControls.style.display = 'flex';
             this.editorTextureContainer.style.display = 'flex';

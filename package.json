@@ -31,6 +31,7 @@
     "tailwind-merge": "3.4.0",
     "tailwindcss-animate": "1.0.7",
     "three": "^0.160.0",
+    "three.quarks": "^0.17.0",
     "ws": "8.18.3"
   }
 }

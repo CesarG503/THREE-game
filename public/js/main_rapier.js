@@ -205,14 +205,27 @@ class Game {
         }
 
         // ── Sincronización de Proyectiles (Shoot) ──────────────────
-        this.networkManager.onPlayerShoot = (playerId, startPos, direction, type, speed, damage, drop, rebote, hasImpactEffect, hasTracer, hasTrajectoryLine) => {
+        this.networkManager.onPlayerShoot = (playerId, startPos, direction, type, speed, damage, drop, rebote, hasImpactEffect, hasTracer, hasTrajectoryLine, customTracerVFX = "Ninguno", customImpactVFX = "Ninguno") => {
             console.log(`[Collab] Player ${playerId} disparó un ${type}!`)
-            this.handleRemoteShoot(startPos, direction, type, speed, damage, drop, rebote, hasImpactEffect, hasTracer, hasTrajectoryLine)
+            this.handleRemoteShoot(startPos, direction, type, speed, damage, drop, rebote, hasImpactEffect, hasTracer, hasTrajectoryLine, customTracerVFX, customImpactVFX)
         }
 
         // ── Sincronización de Acciones (Doble Salto, etc) ──────────────────
         this.networkManager.onPlayerAction = (playerId, actionType, data) => {
-            if (actionType === "air-jump") {
+            if (actionType === "spawn-effect") {
+                if (this.character && this.character.particleSystem && data) {
+                    const pos = new THREE.Vector3(data.pos.x, data.pos.y, data.pos.z);
+                    if (data.effectType === "jump") {
+                        this.character.particleSystem.spawnJumpEffect(pos);
+                    } else if (data.effectType === "impact") {
+                        const normal = data.normal ? new THREE.Vector3(data.normal.x, data.normal.y, data.normal.z) : new THREE.Vector3(0, 1, 0);
+                        this.character.particleSystem.spawnImpactEffect(pos, normal);
+                    } else if (data.effectType === "explosion") {
+                        this.character.particleSystem.spawnExplosionEffect(pos);
+                    }
+                }
+            } else if (actionType === "air-jump") {
+                // Fallback for older clients
                 if (this.character && this.character.particleSystem && data) {
                     const pos = new THREE.Vector3(data.x, data.y, data.z);
                     this.character.particleSystem.spawnJumpEffect(pos);
@@ -250,10 +263,9 @@ class Game {
             // Broadcast Air Jump Event
             if (data.type === 'air-jump' && this.networkManager) {
                 const pos = this.character.getPosition();
-                this.networkManager.sendPlayerAction("air-jump", {
-                    x: pos.x,
-                    y: pos.y,
-                    z: pos.z
+                this.networkManager.sendPlayerAction("spawn-effect", {
+                    effectType: "jump",
+                    pos: { x: pos.x, y: pos.y, z: pos.z }
                 });
             }
         })
@@ -1926,6 +1938,7 @@ class Game {
             direction: direction,
             camera: this.sceneManager.camera, // ADDED CAMERA FOR RAYCASTING
             networkManager: this.networkManager, // ADDED NETWORK TO RELAY SHOOTING
+            particleSystem: this.character ? this.character.particleSystem : null,
             registerProjectile: (proj) => {
                 this.projectiles.push(proj)
             },
@@ -1993,7 +2006,7 @@ class Game {
     }
 
     // ── Gestión de Disparos Remotos ───────────────────────────────────────
-    handleRemoteShoot(startPos, direction, type, speed, damage, drop, rebote, hasImpactEffect, hasTracer = false, hasTrajectoryLine = false) {
+    handleRemoteShoot(startPos, direction, type, speed, damage, drop, rebote, hasImpactEffect, hasTracer = false, hasTrajectoryLine = false, customTracerVFX = "Ninguno", customImpactVFX = "Ninguno") {
         if (!this.sceneManager || !this.world) return
 
         let tempTracer = null
@@ -2025,11 +2038,14 @@ class Game {
             drop || 1.0,
             type || "bullet",
             rebote || false,
-            hasImpactEffect || false
+            hasImpactEffect || false,
+            customTracerVFX,
+            customImpactVFX
         )
         proj.hasTracer = hasTracer
         proj.hasTrajectoryLine = hasTrajectoryLine
         proj.blasterSystem = blaster
+        proj.particleSystem = this.character ? this.character.particleSystem : null
         proj.initialTracer = tempTracer
         proj.isRemoteBlaster = true
         // We do not set isRemote flag conceptually, because projectile does physics and stops locally

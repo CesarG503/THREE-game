@@ -1213,7 +1213,7 @@ class Game {
         // Autodetección del servidor basado en la URL visitada
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const hostname = window.location.hostname || 'localhost';
-        const defaultWsUrl = `${protocol}//${hostname}:8080`;
+        const defaultWsUrl = `${protocol}//${hostname}:8085`;
 
         const panel = document.createElement("div")
         panel.id = "multiplayer-panel"

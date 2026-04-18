@@ -52,10 +52,10 @@ RUN chown -R gameuser:nodejs /app
 
 USER gameuser
 
-EXPOSE 3000 8080
+EXPOSE 3000 8085
 
 # Start both Vite preview and WebSocket server
-CMD ["sh", "-c", "PORT=8080 node server/websocket-server.js & npm run preview -- --host 0.0.0.0 --port 3000"]
+CMD ["sh", "-c", "PORT=8085 node server/websocket-server.js & npm run preview -- --host 0.0.0.0 --port 3000"]
 
 # -----------------------------
 # 🛠️ Stage 4: Development
@@ -71,7 +71,7 @@ ENV HOST=0.0.0.0
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-EXPOSE 5173 8080
+EXPOSE 5173 8085
 
 # Hot reload with Vite + WebSocket server
-CMD ["sh", "-c", "PORT=8080 node server/websocket-server.js & npm run dev -- --host 0.0.0.0 --port 5173"]
+CMD ["sh", "-c", "PORT=8085 node server/websocket-server.js & npm run dev -- --host 0.0.0.0 --port 5173"]

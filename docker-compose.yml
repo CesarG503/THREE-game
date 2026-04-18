@@ -14,8 +14,8 @@ services:
       target: development
     container_name: threejs-game-dev
     ports:
-      - "5173:5173"   # Vite dev server
-      - "9090:9090"   # WebSocket server
+      - "5173:5173" # Vite dev server
+      - "9090:9090" # WebSocket server
     volumes:
       # Mount source for hot reload (exclude node_modules)
       - .:/app
@@ -23,22 +23,3 @@ services:
     environment:
       - NODE_ENV=development
     restart: unless-stopped
-
-  # 🚀 Production optimized
-  prod:
-    build:
-      context: .
-      target: production
-    container_name: threejs-game-prod
-    ports:
-      - "3005:3000"   # Vite preview server (port 3005 on host, 3000 in container)
-      - "9090:9090"   # WebSocket server
-    environment:
-      - NODE_ENV=production
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 10s

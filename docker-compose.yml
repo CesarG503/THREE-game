@@ -1,12 +1,44 @@
-version: '3.8'
+# ============================================
+# 🎮 Three.js Game - Docker Compose
+# ============================================
+# Uso:
+#   Desarrollo: docker compose up dev
+#   Producción: docker compose up prod
+# ============================================
 
 services:
-  game-app:
+  # 🛠️ Development environment with hot reload
+  dev:
     build:
       context: .
-      dockerfile: Dockerfile
+      target: development
+    container_name: threejs-game-dev
     ports:
-      - "3000:3000"      # Changed from 80 to 3000 to avoid conflicts with Dokploy router
-      - "8080:8080"      # Backend WebSocket maps directly 8080 to 8080
-    container_name: threejs-game-app
+      - "5173:5173"   # Vite dev server
+      - "8080:8080"   # WebSocket server
+    volumes:
+      # Mount source for hot reload (exclude node_modules)
+      - .:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
     restart: unless-stopped
+
+  # 🚀 Production optimized
+  prod:
+    build:
+      context: .
+      target: production
+    container_name: threejs-game-prod
+    ports:
+      - "3000:3000"   # Vite preview server
+      - "8080:8080"   # WebSocket server
+    environment:
+      - NODE_ENV=production
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s

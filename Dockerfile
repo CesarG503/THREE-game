@@ -1,27 +1,77 @@
-# Usa la imagen oficial de Node.js ligera
-FROM node:20-alpine
+# ============================================
+# 🎮 Three.js Game - Docker Configuration
+# ============================================
+# Multi-stage build for optimal image size
+# Supports both development and production modes
 
-# Define el directorio de trabajo
+# -----------------------------
+# 📦 Stage 1: Dependencies
+# -----------------------------
+FROM node:20-alpine AS deps
+
 WORKDIR /app
 
-# Copia los archivos de configuración
-COPY package*.json ./
+# Install dependencies only (cached layer)
+COPY package.json package-lock.json* ./
+RUN npm ci --silent
 
-# Instala todas las dependencias
-RUN npm ci
+# -----------------------------
+# 🔨 Stage 2: Builder
+# -----------------------------
+FROM node:20-alpine AS builder
 
-# Copia el código fuente completo
+WORKDIR /app
+
+COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Compila el frontend (Vite genera la carpeta /app/dist)
+# Build for production
 RUN npm run build
 
-# Instala una utilidad ligera para servir archivos estáticos en producción
-RUN npm install -g serve
+# -----------------------------
+# 🚀 Stage 3: Production
+# -----------------------------
+FROM node:20-alpine AS production
 
-# Expone el puerto del frontend (3000) y del backend WebSocket (8080)
-EXPOSE 3000
-EXPOSE 8080
+WORKDIR /app
 
-# Inicia ambos servicios simultáneamente usando concurrently
-CMD ["npx", "concurrently", "\"serve -s dist -l 3000\"", "\"node server/websocket-server.js\""]
+ENV NODE_ENV=production
+
+# Create non-root user for security
+RUN addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 gameuser
+
+# Copy only necessary files
+COPY --from=builder /app/dist ./dist
+COPY --from=deps /app/node_modules ./node_modules
+COPY package.json ./
+COPY server ./server
+
+# Set proper ownership
+RUN chown -R gameuser:nodejs /app
+
+USER gameuser
+
+EXPOSE 3000 8080
+
+# Start both Vite preview and WebSocket server
+CMD ["sh", "-c", "PORT=8080 node server/websocket-server.js & npm run preview -- --host 0.0.0.0 --port 3000"]
+
+# -----------------------------
+# 🛠️ Stage 4: Development
+# -----------------------------
+FROM node:20-alpine AS development
+
+WORKDIR /app
+
+ENV NODE_ENV=development
+ENV HOST=0.0.0.0
+
+# Copy dependencies and source
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+
+EXPOSE 5173 8080
+
+# Hot reload with Vite + WebSocket server
+CMD ["sh", "-c", "PORT=8080 node server/websocket-server.js & npm run dev -- --host 0.0.0.0 --port 5173"]

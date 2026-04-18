@@ -31,7 +31,7 @@ services:
       target: production
     container_name: threejs-game-prod
     ports:
-      - "3000:3000"   # Vite preview server
+      - "3005:3000"   # Vite preview server (port 3005 on host, 3000 in container)
       - "8080:8080"   # WebSocket server
     environment:
       - NODE_ENV=production

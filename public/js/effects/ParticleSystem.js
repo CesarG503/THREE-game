@@ -56,6 +56,8 @@ export class ParticleSystem {
         this.preloadVFX("/assets/VFX/Bubble Explosion VFX.json", "Bubble Explosion");
         this.preloadVFX("/assets/VFX/Cartoon Bang VFX.json", "Cartoon Bang");
         this.preloadVFX("/assets/VFX/Cartoon Blue Flamethrower VFX.json", "Cartoon Blue Flamethrower");
+        this.preloadVFX("/assets/VFX/Dollar Bill Shower VFX.json", "Dollar Bill Shower");
+        this.preloadVFX("/assets/VFX/Cartoon Lightning Ball VFX.json", "Cartoon Lightning Ball");
         
         // Lista de sistemas activos para limpieza si es necesario
         this.activeSystems = [];

@@ -2147,7 +2147,7 @@ export class ConstructionMenu {
         this.customTracerSelect = document.createElement('select');
         this.customTracerSelect.style.cssText = this.projectileTypeSelect.style.cssText;
         
-        ['Ninguno', 'Bubble Explosion', 'Cartoon Bang', 'Cartoon Blue Flamethrower'].forEach(opt => {
+        ['Ninguno', 'Bubble Explosion', 'Cartoon Bang', 'Cartoon Blue Flamethrower', 'Dollar Bill Shower', 'Cartoon Lightning Ball'].forEach(opt => {
             const el = document.createElement('option');
             el.value = opt;
             el.textContent = opt;
@@ -2175,7 +2175,7 @@ export class ConstructionMenu {
         this.customImpactSelect = document.createElement('select');
         this.customImpactSelect.style.cssText = this.projectileTypeSelect.style.cssText;
         
-        ['Ninguno', 'Bubble Explosion', 'Cartoon Bang', 'Cartoon Blue Flamethrower'].forEach(opt => {
+        ['Ninguno', 'Bubble Explosion', 'Cartoon Bang', 'Cartoon Blue Flamethrower', 'Dollar Bill Shower', 'Cartoon Lightning Ball'].forEach(opt => {
             const el = document.createElement('option');
             el.value = opt;
             el.textContent = opt;

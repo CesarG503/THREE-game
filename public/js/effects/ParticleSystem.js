@@ -91,6 +91,12 @@ export class ParticleSystem {
         // Deep copy the JSON to prevent loader mutation, which causes infinite loops/lag
         const json = JSON.parse(JSON.stringify(rawJson));
 
+        // Compatibilidad: Eliminar propiedades que no existen en versiones de Three.js < 163
+        if (json.object) {
+            delete json.object.backgroundRotation;
+            delete json.object.environmentRotation;
+        }
+
         // Create a wrapper object that we can return synchronously
         const wrapper = new THREE.Group();
         if (position && !parent) wrapper.position.copy(position);

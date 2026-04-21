@@ -130,6 +130,20 @@ export class ParticleSystem {
         return wrapper;
     }
 
+    stopLoadedEffectEmission(wrapper) {
+        if (!wrapper || !wrapper.userData.effectRoot) return;
+        wrapper.userData.effectRoot.traverse((child) => {
+            if (child.type === "ParticleSystem" || child.isParticleSystem) {
+                // Detener emisión de nuevas partículas
+                child.emissionOverTime = new ConstantValue(0);
+                // Limpiar ráfagas de emisión
+                if (child.emissionBursts) {
+                    child.emissionBursts = [];
+                }
+            }
+        });
+    }
+
     destroyLoadedEffect(wrapper) {
         if (!wrapper) return;
         

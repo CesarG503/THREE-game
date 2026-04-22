@@ -67,6 +67,7 @@ export class GunItem extends Item {
         this.rebote = config.rebote !== undefined ? config.rebote : false; // Por defecto las balas no rebotan
         this.hasImpactEffect = config.hasImpactEffect !== undefined ? config.hasImpactEffect : false; // Humo al chocar
         this.customTracerVFX = config.customTracerVFX || "Ninguno";
+        this.tracerDestroyOnCollision = config.tracerDestroyOnCollision !== undefined ? config.tracerDestroyOnCollision : false;
         this.customImpactVFX = config.customImpactVFX || "Ninguno";
 
         this.modelScale = config.modelScale !== undefined ? config.modelScale : 1.0;
@@ -399,6 +400,7 @@ export class GunItem extends Item {
             );
             proj.hasTracer = this.hasTracer;
             proj.hasTrajectoryLine = this.hasTrajectoryLine;
+            proj.tracerDestroyOnCollision = this.tracerDestroyOnCollision;
             proj.blasterSystem = this.blasterSystem;
             proj.particleSystem = context.particleSystem; // REQUIRED FOR CUSTOM VFX!
             proj.initialTracer = tempTracer;
@@ -418,7 +420,8 @@ export class GunItem extends Item {
                     this.hasTracer,
                     this.hasTrajectoryLine,
                     this.customTracerVFX,
-                    this.customImpactVFX
+                    this.customImpactVFX,
+                    this.tracerDestroyOnCollision
                 );
             }
         }
@@ -668,6 +671,7 @@ export class GunItem extends Item {
             rebote:           this.rebote,
             hasImpactEffect:  this.hasImpactEffect,
             customTracerVFX:  this.customTracerVFX,
+            tracerDestroyOnCollision: this.tracerDestroyOnCollision,
             customImpactVFX:  this.customImpactVFX,
             modelScale:       this.modelScale,
             equippedHand:     this.equippedHand,

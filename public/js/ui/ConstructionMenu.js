@@ -2163,6 +2163,26 @@ export class ConstructionMenu {
         customTracerRow.appendChild(customTracerLabel);
         customTracerRow.appendChild(this.customTracerSelect);
 
+        // --- Tracer Destroy On Collision Row ---
+        const tracerDestroyRow = document.createElement('div');
+        tracerDestroyRow.style.display = "flex";
+        tracerDestroyRow.style.alignItems = "center";
+        tracerDestroyRow.style.justifyContent = "space-between";
+
+        const tracerDestroyLabel = document.createElement('span');
+        tracerDestroyLabel.textContent = "Eliminar al colisionar:";
+
+        this.tracerDestroyInput = document.createElement('input');
+        this.tracerDestroyInput.type = "checkbox";
+        this.tracerDestroyInput.addEventListener('change', (e) => {
+            if (this.currentDraftItem && this.currentDraftItem.type === 'weapon') {
+                this.currentDraftItem.tracerDestroyOnCollision = e.target.checked;
+            }
+        });
+
+        tracerDestroyRow.appendChild(tracerDestroyLabel);
+        tracerDestroyRow.appendChild(this.tracerDestroyInput);
+
         // --- Custom Impact VFX Row ---
         const customImpactRow = document.createElement('div');
         customImpactRow.style.display = "flex";
@@ -2205,6 +2225,7 @@ export class ConstructionMenu {
         weaponControlsContainer.appendChild(reboteRow);
         weaponControlsContainer.appendChild(impactRow);
         weaponControlsContainer.appendChild(customTracerRow);
+        weaponControlsContainer.appendChild(tracerDestroyRow);
         weaponControlsContainer.appendChild(customImpactRow);
 
         this.panelEditor.appendChild(weaponControlsContainer);
@@ -2264,6 +2285,7 @@ export class ConstructionMenu {
             this.impactInput.checked = baseItem.hasImpactEffect !== undefined ? baseItem.hasImpactEffect : false;
             
             this.customTracerSelect.value = baseItem.customTracerVFX || "Ninguno";
+            this.tracerDestroyInput.checked = baseItem.tracerDestroyOnCollision || false;
             this.customImpactSelect.value = baseItem.customImpactVFX || "Ninguno";
         } else {
             this.editorConstructionControls.style.display = 'flex';

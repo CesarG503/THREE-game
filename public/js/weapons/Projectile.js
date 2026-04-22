@@ -199,30 +199,35 @@ export class Projectile {
 
         // Cleanup Custom Tracer
         if (this.customTracerWrapper && this.particleSystem) {
-            // Desvincular del proyectil para que la estela se quede en su posición y rotación final
-            if (this.customTracerWrapper.parent) {
-                const worldPos = new THREE.Vector3();
-                this.customTracerWrapper.getWorldPosition(worldPos);
-                const worldQuat = new THREE.Quaternion();
-                this.customTracerWrapper.getWorldQuaternion(worldQuat);
-                
-                this.customTracerWrapper.parent.remove(this.customTracerWrapper);
-                this.scene.add(this.customTracerWrapper);
-                
-                this.customTracerWrapper.position.copy(worldPos);
-                this.customTracerWrapper.quaternion.copy(worldQuat);
-            }
-            
-            // Detener la emisión de nuevas partículas
-            this.particleSystem.stopLoadedEffectEmission(this.customTracerWrapper);
-            
-            // Destruir por completo después de 2 segundos (tiempo para que se desvanezcan las partículas existentes)
-            const wrapperToDestroy = this.customTracerWrapper;
-            setTimeout(() => {
-                if (this.particleSystem) {
-                    this.particleSystem.destroyLoadedEffect(wrapperToDestroy);
+            if (this.tracerDestroyOnCollision) {
+                // Eliminar inmediatamente (comportamiento antiguo/alternativo)
+                this.particleSystem.destroyLoadedEffect(this.customTracerWrapper);
+            } else {
+                // Desvincular del proyectil para que la estela se quede en su posición y rotación final
+                if (this.customTracerWrapper.parent) {
+                    const worldPos = new THREE.Vector3();
+                    this.customTracerWrapper.getWorldPosition(worldPos);
+                    const worldQuat = new THREE.Quaternion();
+                    this.customTracerWrapper.getWorldQuaternion(worldQuat);
+                    
+                    this.customTracerWrapper.parent.remove(this.customTracerWrapper);
+                    this.scene.add(this.customTracerWrapper);
+                    
+                    this.customTracerWrapper.position.copy(worldPos);
+                    this.customTracerWrapper.quaternion.copy(worldQuat);
                 }
-            }, 2000);
+                
+                // Detener la emisión de nuevas partículas
+                this.particleSystem.stopLoadedEffectEmission(this.customTracerWrapper);
+                
+                // Destruir por completo después de 2 segundos (tiempo para que se desvanezcan las partículas existentes)
+                const wrapperToDestroy = this.customTracerWrapper;
+                setTimeout(() => {
+                    if (this.particleSystem) {
+                        this.particleSystem.destroyLoadedEffect(wrapperToDestroy);
+                    }
+                }, 2000);
+            }
 
             this.customTracerWrapper = null;
         }

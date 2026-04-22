@@ -205,9 +205,9 @@ class Game {
         }
 
         // ── Sincronización de Proyectiles (Shoot) ──────────────────
-        this.networkManager.onPlayerShoot = (playerId, startPos, direction, type, speed, damage, drop, rebote, hasImpactEffect, hasTracer, hasTrajectoryLine, customTracerVFX = "Ninguno", customImpactVFX = "Ninguno") => {
+        this.networkManager.onPlayerShoot = (playerId, startPos, direction, type, speed, damage, drop, rebote, hasImpactEffect, hasTracer, hasTrajectoryLine, customTracerVFX = "Ninguno", customImpactVFX = "Ninguno", tracerDestroyOnCollision = false) => {
             console.log(`[Collab] Player ${playerId} disparó un ${type}!`)
-            this.handleRemoteShoot(startPos, direction, type, speed, damage, drop, rebote, hasImpactEffect, hasTracer, hasTrajectoryLine, customTracerVFX, customImpactVFX)
+            this.handleRemoteShoot(startPos, direction, type, speed, damage, drop, rebote, hasImpactEffect, hasTracer, hasTrajectoryLine, customTracerVFX, customImpactVFX, tracerDestroyOnCollision)
         }
 
         // ── Sincronización de Acciones (Doble Salto, etc) ──────────────────
@@ -2006,7 +2006,7 @@ class Game {
     }
 
     // ── Gestión de Disparos Remotos ───────────────────────────────────────
-    handleRemoteShoot(startPos, direction, type, speed, damage, drop, rebote, hasImpactEffect, hasTracer = false, hasTrajectoryLine = false, customTracerVFX = "Ninguno", customImpactVFX = "Ninguno") {
+    handleRemoteShoot(startPos, direction, type, speed, damage, drop, rebote, hasImpactEffect, hasTracer = false, hasTrajectoryLine = false, customTracerVFX = "Ninguno", customImpactVFX = "Ninguno", tracerDestroyOnCollision = false) {
         if (!this.sceneManager || !this.world) return
 
         let tempTracer = null

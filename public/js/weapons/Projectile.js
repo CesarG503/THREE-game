@@ -16,6 +16,9 @@ export class Projectile {
         this.customTracerAttached = false;
         this.customTracerWrapper = null;
 
+        this.direction = direction ? direction.clone() : new THREE.Vector3(0, 0, 1);
+        this.speed = speed;
+
         this.hasTracer = false;
         this.hasTrajectoryLine = false;
         this.blasterSystem = null;
@@ -200,8 +203,58 @@ export class Projectile {
         // Cleanup Custom Tracer
         if (this.customTracerWrapper && this.particleSystem) {
             if (this.tracerDestroyOnCollision) {
-                // Eliminar inmediatamente (comportamiento antiguo/alternativo)
-                this.particleSystem.destroyLoadedEffect(this.customTracerWrapper);
+                // Dinamizar "Eliminar al colisionar":
+                // Desvincular de la bala para evitar la destrucción inmediata
+                if (this.customTracerWrapper.parent) {
+                    const worldPos = new THREE.Vector3();
+                    this.customTracerWrapper.getWorldPosition(worldPos);
+                    const worldQuat = new THREE.Quaternion();
+                    this.customTracerWrapper.getWorldQuaternion(worldQuat);
+                    
+                    this.customTracerWrapper.parent.remove(this.customTracerWrapper);
+                    this.scene.add(this.customTracerWrapper);
+                    
+                    this.customTracerWrapper.position.copy(worldPos);
+                    this.customTracerWrapper.quaternion.copy(worldQuat);
+                }
+
+                // Usar la dirección original de la bala para mantener la inercia visual correcta (evita el "rebote" de físicas)
+                let vel = this.direction.clone().normalize().multiplyScalar(this.speed);
+
+                // Detener emisión de nuevas partículas al instante
+                this.particleSystem.stopLoadedEffectEmission(this.customTracerWrapper);
+
+                const wrapperToDestroy = this.customTracerWrapper;
+                const startTime = Date.now();
+                const duration = 250; // 250ms: tiempo suficiente para encogerse rápidamente sin notarse brusco
+                const startScale = wrapperToDestroy.scale.clone();
+                const pSys = this.particleSystem;
+
+                // Destrucción garantizada independiente de los frames (por si el jugador minimiza la ventana)
+                setTimeout(() => {
+                    if (pSys) {
+                        pSys.destroyLoadedEffect(wrapperToDestroy);
+                    }
+                }, duration);
+
+                const fadeAnim = () => {
+                    if (!pSys) return;
+                    
+                    const elapsed = Date.now() - startTime;
+                    const t = Math.min(elapsed / duration, 1.0);
+                    
+                    if (t < 1.0) {
+                        // NO MOVER HACIA ADELANTE.
+                        // Al dejarlo estático, garantizamos que la estela solo se muestre "antes" de la colisión.
+                        
+                        // Encoger la escala progresivamente, pero NUNCA a 0 exacto para evitar errores de Matriz NaN en ThreeJS
+                        const s = Math.max(0.01, 1.0 - t);
+                        wrapperToDestroy.scale.set(startScale.x * s, startScale.y * s, startScale.z * s);
+                        
+                        requestAnimationFrame(fadeAnim);
+                    }
+                };
+                fadeAnim();
             } else {
                 // Desvincular del proyectil para que la estela se quede en su posición y rotación final
                 if (this.customTracerWrapper.parent) {

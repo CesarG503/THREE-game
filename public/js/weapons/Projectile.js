@@ -165,12 +165,27 @@ export class Projectile {
         }
 
         // Impact Effect
-        if (hitPos && this.hasImpactEffect) {
+        if (hitPos && (this.hasImpactEffect || this.customImpactVFX !== "Ninguno")) {
             const vPos = new THREE.Vector3(hitPos.x, hitPos.y, hitPos.z);
             if (this.particleSystem) {
                 if (this.customImpactVFX !== "Ninguno") {
-                    this.particleSystem.spawnLoadedEffect(this.customImpactVFX, vPos, null, null, true, 3000);
-                } else {
+                    // Spawn the custom impact effect at the collision position
+                    const impactWrapper = this.particleSystem.spawnLoadedEffect(this.customImpactVFX, vPos, null, null, false);
+                    
+                    // Accionar los efectos por un tiempo: detenemos la emisión después de 500ms
+                    setTimeout(() => {
+                        if (this.particleSystem) {
+                            this.particleSystem.stopLoadedEffectEmission(impactWrapper);
+                        }
+                    }, 500);
+
+                    // Destruimos el wrapper después de 3000ms para que las partículas se desvanezcan
+                    setTimeout(() => {
+                        if (this.particleSystem) {
+                            this.particleSystem.destroyLoadedEffect(impactWrapper);
+                        }
+                    }, 3000);
+                } else if (this.hasImpactEffect) {
                     // Generar impacto y un pequeño efecto de explosión para mayor espectacularidad
                     this.particleSystem.spawnImpactEffect(vPos, new THREE.Vector3(0, 1, 0));
                     // Opcional: si el tipo de bala es explosiva podríamos llamar a explosion

@@ -2195,7 +2195,7 @@ export class ConstructionMenu {
         this.customImpactSelect = document.createElement('select');
         this.customImpactSelect.style.cssText = this.projectileTypeSelect.style.cssText;
         
-        ['Ninguno', 'Bubble Explosion', 'Cartoon Bang', 'Cartoon Blue Flamethrower', 'Dollar Bill Shower', 'Cartoon Lightning Ball'].forEach(opt => {
+        ['Ninguno', 'Bubble Explosion', 'Cartoon Bang', 'Dollar Bill Shower'].forEach(opt => {
             const el = document.createElement('option');
             el.value = opt;
             el.textContent = opt;

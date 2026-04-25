@@ -182,7 +182,10 @@ wss.on("connection", (ws) => {
                         rebote: message.rebote,
                         hasImpactEffect: message.hasImpactEffect,
                         hasTracer: message.hasTracer,
-                        hasTrajectoryLine: message.hasTrajectoryLine
+                        hasTrajectoryLine: message.hasTrajectoryLine,
+                        customTracerVFX: message.customTracerVFX,
+                        customImpactVFX: message.customImpactVFX,
+                        tracerDestroyOnCollision: message.tracerDestroyOnCollision
                     }, playerId)
                     break
 

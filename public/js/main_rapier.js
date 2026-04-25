@@ -2048,6 +2048,7 @@ class Game {
         proj.particleSystem = this.character ? this.character.particleSystem : null
         proj.initialTracer = tempTracer
         proj.isRemoteBlaster = true
+        proj.tracerDestroyOnCollision = tracerDestroyOnCollision
         // We do not set isRemote flag conceptually, because projectile does physics and stops locally
         // Alternatively, you could tag it to apply no damage locally.
         

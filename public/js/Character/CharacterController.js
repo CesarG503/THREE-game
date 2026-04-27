@@ -204,6 +204,14 @@ export class CharacterController {
                 if (input.keys.right) moveDir.x += 1
 
                 this.handleFlightMovement(dt, input, moveDir)
+                
+                // Keep animations and particles updating while flying!
+                let hasInput = moveDir.lengthSq() > 0;
+                this.glbModel.update(dt, hasInput);
+                this.polygonModel.update(dt, hasInput);
+                this.polygonModelSkin.update(dt, hasInput, input.keys.crouch, input.keys.attack, false, this.verticalVelocity);
+                if (this.particleSystem) this.particleSystem.update(dt);
+
                 return
             }
         }

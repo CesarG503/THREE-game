@@ -15,7 +15,8 @@ import {
     Vector4,
     ConeEmitter,
     QuarksLoader,
-    QuarksUtil
+    QuarksUtil,
+    Bezier
 } from "three.quarks";
 
 export class ParticleSystem {
@@ -200,7 +201,7 @@ export class ParticleSystem {
         });
         
         // Comportamiento a lo largo de la vida
-        system.addBehavior(new SizeOverLife(new PiecewiseBezier([[new Vector3(1, 1, 1), 0], [new Vector3(0, 0, 0), 1]])));
+        system.addBehavior(new SizeOverLife(new PiecewiseBezier([[new Bezier(1, 0.66, 0.33, 0), 0]])));
         
         // Ajustar posición ligeramente hacia abajo para que salga de los pies
         system.emitter.position.copy(position).add(new THREE.Vector3(0, -0.4, 0));
@@ -242,7 +243,7 @@ export class ParticleSystem {
         const quaternion = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), normal);
         system.emitter.quaternion.copy(quaternion);
         
-        system.addBehavior(new SizeOverLife(new PiecewiseBezier([[new Vector3(1, 1, 1), 0], [new Vector3(0, 0, 0), 1]])));
+        system.addBehavior(new SizeOverLife(new PiecewiseBezier([[new Bezier(1, 0.66, 0.33, 0), 0]])));
         
         system.emitter.position.copy(position);
         
@@ -274,7 +275,7 @@ export class ParticleSystem {
             renderMode: RenderMode.BillBoard
         });
         
-        system.addBehavior(new SizeOverLife(new PiecewiseBezier([[new Vector3(1, 1, 1), 0], [new Vector3(0, 0, 0), 1]])));
+        system.addBehavior(new SizeOverLife(new PiecewiseBezier([[new Bezier(1, 0.66, 0.33, 0), 0]])));
         
         system.emitter.position.copy(position);
         

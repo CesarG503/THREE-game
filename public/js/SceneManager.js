@@ -38,13 +38,8 @@ export class SceneManager {
     }
 
     initFloor() {
-        const mesh = new THREE.Mesh(
-            new THREE.PlaneGeometry(100, 100),
-            new THREE.MeshPhongMaterial({ color: 0x999999, depthWrite: false })
-        );
-        mesh.rotation.x = -Math.PI / 2;
-        mesh.receiveShadow = true;
-        this.scene.add(mesh);
+        // Floor plane is now managed by Game (main_rapier.js) dynamically
+
 
         const grid = new THREE.GridHelper(100, 20, 0x000000, 0x000000);
         grid.material.opacity = 0.2;

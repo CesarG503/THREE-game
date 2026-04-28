@@ -280,19 +280,32 @@ class Game {
             // Farming Zone removida temporalmente
         }
 
+        // Environment Config Defaults
+        this.environmentConfig = {
+            mapSizeX: 100,
+            mapSizeZ: 100,
+            invisibleWalls: false,
+            fallDeath: true,
+            fallDeathY: -50
+        };
+        this.invisibleWallMeshes = [];
+        this.invisibleWallBodies = [];
+
         // Create Basic Ground (For both Editor and Play modes)
-        const groundGeo = new THREE.BoxGeometry(100, 1, 100);
+        const groundGeo = new THREE.BoxGeometry(this.environmentConfig.mapSizeX, 1, this.environmentConfig.mapSizeZ);
         const groundMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.8 });
-        const groundMesh = new THREE.Mesh(groundGeo, groundMat);
-        groundMesh.position.y = -0.5; // Surface at 0
-        groundMesh.receiveShadow = true;
-        this.sceneManager.scene.add(groundMesh);
+        this.groundMesh = new THREE.Mesh(groundGeo, groundMat);
+        this.groundMesh.position.y = -0.5; // Surface at 0
+        this.groundMesh.receiveShadow = true;
+        this.sceneManager.scene.add(this.groundMesh);
 
         // Static Physics for Ground
         const groundBodyDesc = RAPIER.RigidBodyDesc.fixed().setTranslation(0, -0.5, 0);
-        const groundBody = this.world.createRigidBody(groundBodyDesc);
-        const groundCollider = RAPIER.ColliderDesc.cuboid(50, 0.5, 50);
-        this.world.createCollider(groundCollider, groundBody);
+        this.groundBody = this.world.createRigidBody(groundBodyDesc);
+        this.groundColliderDesc = RAPIER.ColliderDesc.cuboid(this.environmentConfig.mapSizeX / 2, 0.5, this.environmentConfig.mapSizeZ / 2);
+        this.groundCollider = this.world.createCollider(this.groundColliderDesc, this.groundBody);
+
+        this.updateEnvironmentConfig(this.environmentConfig);
 
         if (this.gameMode === 'editor') {
             // Editor Items (White default)
@@ -756,6 +769,19 @@ class Game {
 
         // Camera Update
         this.cameraController.update(this.character.getPosition(), this.character.getRotation(), dt)
+
+        // Fall Death Logic
+        if (this.environmentConfig && this.environmentConfig.fallDeath && this.character.getPosition().y < this.environmentConfig.fallDeathY) {
+            // Instant Death and Respawn
+            if (!this.character.isDead) {
+                console.log("Player fell off the map! Instant respawn.");
+                this.character.currentHealth = 0;
+                this.character.emit('healthChanged', { current: 0, max: this.character.maxHealth });
+                
+                // Immediately respawn
+                this.character.respawn();
+            }
+        }
 
         // Network Update
         if (this.networkManager) {
@@ -1693,8 +1719,75 @@ class Game {
             gameConfig: (this.constructionMenu && this.constructionMenu.logicSystem)
                 ? this.constructionMenu.logicSystem.gameConfig
                 : null,
+            environmentConfig: this.environmentConfig,
             // Save Player Config (Roles & Assignments)
             playerConfig: this.playerConfigManager ? this.playerConfigManager.saveData() : null
+        }
+    }
+
+    updateEnvironmentConfig(config) {
+        this.environmentConfig = Object.assign(this.environmentConfig, config);
+
+        // Update Ground Mesh and Physics
+        if (this.groundMesh) {
+            this.sceneManager.scene.remove(this.groundMesh);
+            this.groundMesh.geometry.dispose();
+            this.groundMesh.geometry = new THREE.BoxGeometry(this.environmentConfig.mapSizeX, 1, this.environmentConfig.mapSizeZ);
+            this.sceneManager.scene.add(this.groundMesh);
+        }
+
+        if (this.groundBody && this.groundCollider) {
+            this.world.removeCollider(this.groundCollider, true);
+            this.groundColliderDesc = RAPIER.ColliderDesc.cuboid(this.environmentConfig.mapSizeX / 2, 0.5, this.environmentConfig.mapSizeZ / 2);
+            this.groundCollider = this.world.createCollider(this.groundColliderDesc, this.groundBody);
+        }
+
+        // Update Floor Grid in SceneManager if exists
+        this.sceneManager.scene.children.forEach(child => {
+            if (child instanceof THREE.GridHelper) {
+                this.sceneManager.scene.remove(child);
+            }
+        });
+        const grid = new THREE.GridHelper(Math.max(this.environmentConfig.mapSizeX, this.environmentConfig.mapSizeZ), Math.max(this.environmentConfig.mapSizeX, this.environmentConfig.mapSizeZ) / 5, 0x000000, 0x000000);
+        grid.material.opacity = 0.2;
+        grid.material.transparent = true;
+        this.sceneManager.scene.add(grid);
+
+        // Clean up old invisible walls
+        this.invisibleWallMeshes.forEach(mesh => this.sceneManager.scene.remove(mesh));
+        this.invisibleWallMeshes = [];
+        this.invisibleWallBodies.forEach(body => {
+            try { this.world.removeRigidBody(body); } catch (e) { }
+        });
+        this.invisibleWallBodies = [];
+
+        // Add Invisible Walls
+        if (this.environmentConfig.invisibleWalls) {
+            const wallThickness = 2;
+            const wallHeight = 100;
+            const hX = this.environmentConfig.mapSizeX / 2;
+            const hZ = this.environmentConfig.mapSizeZ / 2;
+            const wallDefs = [
+                { width: this.environmentConfig.mapSizeX, depth: wallThickness, pos: { x: 0, y: wallHeight / 2 - 0.5, z: -hZ - wallThickness / 2 } }, // North
+                { width: this.environmentConfig.mapSizeX, depth: wallThickness, pos: { x: 0, y: wallHeight / 2 - 0.5, z: hZ + wallThickness / 2 } },  // South
+                { width: wallThickness, depth: this.environmentConfig.mapSizeZ, pos: { x: -hX - wallThickness / 2, y: wallHeight / 2 - 0.5, z: 0 } }, // West
+                { width: wallThickness, depth: this.environmentConfig.mapSizeZ, pos: { x: hX + wallThickness / 2, y: wallHeight / 2 - 0.5, z: 0 } }   // East
+            ];
+
+            wallDefs.forEach(def => {
+                const geo = new THREE.BoxGeometry(def.width, wallHeight, def.depth);
+                const mat = new THREE.MeshBasicMaterial({ color: 0xff0000, wireframe: true, transparent: true, opacity: 0 }); // fully invisible
+                const mesh = new THREE.Mesh(geo, mat);
+                mesh.position.set(def.pos.x, def.pos.y, def.pos.z);
+                this.sceneManager.scene.add(mesh);
+                this.invisibleWallMeshes.push(mesh);
+
+                const bodyDesc = RAPIER.RigidBodyDesc.fixed().setTranslation(def.pos.x, def.pos.y, def.pos.z);
+                const body = this.world.createRigidBody(bodyDesc);
+                const colliderDesc = RAPIER.ColliderDesc.cuboid(def.width / 2, wallHeight / 2, def.depth / 2);
+                this.world.createCollider(colliderDesc, body);
+                this.invisibleWallBodies.push(body);
+            });
         }
     }
 
@@ -1736,6 +1829,11 @@ class Game {
             if (this.constructionMenu.gameConfigPanel) {
                 this.constructionMenu.gameConfigPanel.render()
             }
+        }
+
+        // Load Environment Config
+        if (jsonData.hasOwnProperty('environmentConfig')) {
+            this.updateEnvironmentConfig(jsonData.environmentConfig);
         }
 
         // Iterate backwards

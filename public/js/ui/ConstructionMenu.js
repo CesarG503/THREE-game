@@ -725,6 +725,111 @@ export class ConstructionMenu {
         rowSky.appendChild(labelSky)
         rowSky.appendChild(selectSky)
         container.appendChild(rowSky)
+
+        // Map Boundaries and Rules Config
+        const rowMap = document.createElement('div')
+        rowMap.style.cssText = `display: flex; flex-direction: column; gap: 15px; margin-top: 15px; border-top: 1px solid #444; padding-top: 15px;`
+        
+        const labelMap = document.createElement('h3')
+        labelMap.textContent = "Límites y Reglas del Mapa"
+        labelMap.style.color = "#fff"
+        labelMap.style.margin = "0 0 5px 0"
+        rowMap.appendChild(labelMap)
+
+        const configChangeHandler = () => {
+            if (this.game && this.game.environmentConfig) {
+                const newConfig = {
+                    mapSizeX: parseFloat(inputSizeX.value) || 100,
+                    mapSizeZ: parseFloat(inputSizeZ.value) || 100,
+                    invisibleWalls: checkInvisibleWalls.checked,
+                    fallDeath: checkFallDeath.checked,
+                    fallDeathY: parseFloat(inputFallY.value) || -50
+                };
+                this.game.updateEnvironmentConfig(newConfig);
+                // Sync via network if in editor mode
+                if (this.game.networkManager && this.game.networkManager.collaborativeMode) {
+                    const mapJson = this.game.saveMap();
+                    this.game.networkManager.broadcastMapSync(mapJson);
+                }
+            }
+        };
+
+        // Size X
+        const rowSizeX = document.createElement('div')
+        rowSizeX.style.cssText = `display: flex; align-items: center; justify-content: space-between;`
+        const labelSizeX = document.createElement('label')
+        labelSizeX.textContent = "Ancho del Mapa (X):"
+        const inputSizeX = document.createElement('input')
+        inputSizeX.type = 'number'
+        inputSizeX.min = "10"
+        inputSizeX.step = "10"
+        inputSizeX.style.cssText = `padding: 5px; background: #333; color: white; border: 1px solid #555; border-radius: 4px; width: 80px; text-align: center;`
+        inputSizeX.value = this.game.environmentConfig ? this.game.environmentConfig.mapSizeX : 100;
+        inputSizeX.addEventListener('change', configChangeHandler);
+        rowSizeX.appendChild(labelSizeX)
+        rowSizeX.appendChild(inputSizeX)
+        rowMap.appendChild(rowSizeX)
+
+        // Size Z
+        const rowSizeZ = document.createElement('div')
+        rowSizeZ.style.cssText = `display: flex; align-items: center; justify-content: space-between;`
+        const labelSizeZ = document.createElement('label')
+        labelSizeZ.textContent = "Largo del Mapa (Z):"
+        const inputSizeZ = document.createElement('input')
+        inputSizeZ.type = 'number'
+        inputSizeZ.min = "10"
+        inputSizeZ.step = "10"
+        inputSizeZ.style.cssText = `padding: 5px; background: #333; color: white; border: 1px solid #555; border-radius: 4px; width: 80px; text-align: center;`
+        inputSizeZ.value = this.game.environmentConfig ? this.game.environmentConfig.mapSizeZ : 100;
+        inputSizeZ.addEventListener('change', configChangeHandler);
+        rowSizeZ.appendChild(labelSizeZ)
+        rowSizeZ.appendChild(inputSizeZ)
+        rowMap.appendChild(rowSizeZ)
+
+        // Invisible Walls
+        const rowWalls = document.createElement('div')
+        rowWalls.style.cssText = `display: flex; align-items: center; justify-content: space-between;`
+        const labelWalls = document.createElement('label')
+        labelWalls.textContent = "Paredes Invisibles en Límites:"
+        const checkInvisibleWalls = document.createElement('input')
+        checkInvisibleWalls.type = 'checkbox'
+        checkInvisibleWalls.style.transform = 'scale(1.5)'
+        checkInvisibleWalls.checked = this.game.environmentConfig ? this.game.environmentConfig.invisibleWalls : false;
+        checkInvisibleWalls.addEventListener('change', configChangeHandler);
+        rowWalls.appendChild(labelWalls)
+        rowWalls.appendChild(checkInvisibleWalls)
+        rowMap.appendChild(rowWalls)
+
+        // Fall Death Toggle
+        const rowFall = document.createElement('div')
+        rowFall.style.cssText = `display: flex; align-items: center; justify-content: space-between;`
+        const labelFall = document.createElement('label')
+        labelFall.textContent = "Muerte Instantánea por Caída:"
+        const checkFallDeath = document.createElement('input')
+        checkFallDeath.type = 'checkbox'
+        checkFallDeath.style.transform = 'scale(1.5)'
+        checkFallDeath.checked = this.game.environmentConfig ? this.game.environmentConfig.fallDeath : true;
+        checkFallDeath.addEventListener('change', configChangeHandler);
+        rowFall.appendChild(labelFall)
+        rowFall.appendChild(checkFallDeath)
+        rowMap.appendChild(rowFall)
+
+        // Fall Death Y Limit
+        const rowFallY = document.createElement('div')
+        rowFallY.style.cssText = `display: flex; align-items: center; justify-content: space-between;`
+        const labelFallY = document.createElement('label')
+        labelFallY.textContent = "Límite Y de Caída (Muerte):"
+        const inputFallY = document.createElement('input')
+        inputFallY.type = 'number'
+        inputFallY.step = "5"
+        inputFallY.style.cssText = `padding: 5px; background: #333; color: white; border: 1px solid #555; border-radius: 4px; width: 80px; text-align: center;`
+        inputFallY.value = this.game.environmentConfig ? this.game.environmentConfig.fallDeathY : -50;
+        inputFallY.addEventListener('change', configChangeHandler);
+        rowFallY.appendChild(labelFallY)
+        rowFallY.appendChild(inputFallY)
+        rowMap.appendChild(rowFallY)
+
+        container.appendChild(rowMap)
     }
 
     renderSaveLoad(container) {

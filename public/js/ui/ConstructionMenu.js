@@ -5,12 +5,14 @@ import { PlayerConfigPanel } from "./PlayerConfigPanel.js"
 import { GunItem } from "../item/GunItem.js"
 import { WEAPONS_CONFIG } from "../item/WeaponSettings.js"
 import * as THREE from "three"
+import { MapShapeEditor } from "./MapShapeEditor.js"
 
 export class ConstructionMenu {
     constructor(inventoryManager, gameInstance) {
         this.inventoryManager = inventoryManager
         this.game = gameInstance // Access to toggle pause, input etc.
         this.isVisible = false
+        this.mapShapeEditor = new MapShapeEditor(this.game, this);
 
         // Systems
         this.logicSystem = new LogicSystem(this.game)
@@ -736,6 +738,21 @@ export class ConstructionMenu {
         labelMap.style.margin = "0 0 5px 0"
         rowMap.appendChild(labelMap)
 
+        // Open Advanced Editor Button
+        const btnOpenEditor = document.createElement('button')
+        btnOpenEditor.textContent = "📐 Abrir Editor Avanzado de Forma"
+        btnOpenEditor.style.cssText = `
+            padding: 10px; background: #FF9800; color: white; border: none; border-radius: 4px;
+            font-size: 16px; font-weight: bold; cursor: pointer; transition: background 0.2s;
+            margin-bottom: 10px;
+        `
+        btnOpenEditor.onmouseover = () => btnOpenEditor.style.background = "#F57C00"
+        btnOpenEditor.onmouseout = () => btnOpenEditor.style.background = "#FF9800"
+        btnOpenEditor.onclick = () => {
+            this.mapShapeEditor.open()
+        }
+        rowMap.appendChild(btnOpenEditor)
+
         const configChangeHandler = () => {
             if (this.game && this.game.environmentConfig) {
                 const newConfig = {
@@ -765,6 +782,10 @@ export class ConstructionMenu {
         inputSizeX.step = "10"
         inputSizeX.style.cssText = `padding: 5px; background: #333; color: white; border: 1px solid #555; border-radius: 4px; width: 80px; text-align: center;`
         inputSizeX.value = this.game.environmentConfig ? this.game.environmentConfig.mapSizeX : 100;
+        // Also update the UI value when opening the settings if the shape type disables it
+        if (this.game.environmentConfig && this.game.environmentConfig.shapeType === 'custom') {
+            inputSizeX.disabled = true;
+        }
         inputSizeX.addEventListener('change', configChangeHandler);
         rowSizeX.appendChild(labelSizeX)
         rowSizeX.appendChild(inputSizeX)
@@ -781,6 +802,9 @@ export class ConstructionMenu {
         inputSizeZ.step = "10"
         inputSizeZ.style.cssText = `padding: 5px; background: #333; color: white; border: 1px solid #555; border-radius: 4px; width: 80px; text-align: center;`
         inputSizeZ.value = this.game.environmentConfig ? this.game.environmentConfig.mapSizeZ : 100;
+        if (this.game.environmentConfig && (this.game.environmentConfig.shapeType === 'custom' || this.game.environmentConfig.shapeType === 'circle')) {
+            inputSizeZ.disabled = true;
+        }
         inputSizeZ.addEventListener('change', configChangeHandler);
         rowSizeZ.appendChild(labelSizeZ)
         rowSizeZ.appendChild(inputSizeZ)

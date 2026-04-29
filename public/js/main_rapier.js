@@ -291,19 +291,15 @@ class Game {
         this.invisibleWallMeshes = [];
         this.invisibleWallBodies = [];
 
-        // Create Basic Ground (For both Editor and Play modes)
-        const groundGeo = new THREE.BoxGeometry(this.environmentConfig.mapSizeX, 1, this.environmentConfig.mapSizeZ);
-        const groundMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.8 });
-        this.groundMesh = new THREE.Mesh(groundGeo, groundMat);
-        this.groundMesh.position.y = -0.5; // Surface at 0
-        this.groundMesh.receiveShadow = true;
-        this.sceneManager.scene.add(this.groundMesh);
+        // Create Basic Ground Container
+        this.groundGroup = new THREE.Group();
+        this.groundGroup.position.y = -0.5; // Surface at 0
+        this.sceneManager.scene.add(this.groundGroup);
 
-        // Static Physics for Ground
+        // Static Physics Body for Ground
         const groundBodyDesc = RAPIER.RigidBodyDesc.fixed().setTranslation(0, -0.5, 0);
         this.groundBody = this.world.createRigidBody(groundBodyDesc);
-        this.groundColliderDesc = RAPIER.ColliderDesc.cuboid(this.environmentConfig.mapSizeX / 2, 0.5, this.environmentConfig.mapSizeZ / 2);
-        this.groundCollider = this.world.createCollider(this.groundColliderDesc, this.groundBody);
+        this.groundColliders = [];
 
         this.updateEnvironmentConfig(this.environmentConfig);
 
@@ -1727,19 +1723,63 @@ class Game {
 
     updateEnvironmentConfig(config) {
         this.environmentConfig = Object.assign(this.environmentConfig, config);
+        const shapeType = this.environmentConfig.shapeType || "rect";
+        const sx = this.environmentConfig.mapSizeX || 100;
+        const sz = this.environmentConfig.mapSizeZ || 100;
 
-        // Update Ground Mesh and Physics
-        if (this.groundMesh) {
-            this.sceneManager.scene.remove(this.groundMesh);
-            this.groundMesh.geometry.dispose();
-            this.groundMesh.geometry = new THREE.BoxGeometry(this.environmentConfig.mapSizeX, 1, this.environmentConfig.mapSizeZ);
-            this.sceneManager.scene.add(this.groundMesh);
+        // Clean up visual floor
+        if (this.groundGroup) {
+            while(this.groundGroup.children.length > 0) { 
+                const child = this.groundGroup.children[0];
+                this.groundGroup.remove(child); 
+                if (child.geometry) child.geometry.dispose();
+            }
         }
 
-        if (this.groundBody && this.groundCollider) {
-            this.world.removeCollider(this.groundCollider, true);
-            this.groundColliderDesc = RAPIER.ColliderDesc.cuboid(this.environmentConfig.mapSizeX / 2, 0.5, this.environmentConfig.mapSizeZ / 2);
-            this.groundCollider = this.world.createCollider(this.groundColliderDesc, this.groundBody);
+        // Clean up colliders
+        if (this.groundColliders && this.groundBody) {
+            this.groundColliders.forEach(c => this.world.removeCollider(c, true));
+            this.groundColliders = [];
+        }
+
+        const groundMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.8 });
+
+        if (shapeType === "rect") {
+            const geo = new THREE.BoxGeometry(sx, 1, sz);
+            const mesh = new THREE.Mesh(geo, groundMat);
+            mesh.receiveShadow = true;
+            this.groundGroup.add(mesh);
+
+            const colDesc = RAPIER.ColliderDesc.cuboid(sx / 2, 0.5, sz / 2);
+            this.groundColliders.push(this.world.createCollider(colDesc, this.groundBody));
+        } else if (shapeType === "circle") {
+            const radius = sx / 2;
+            const geo = new THREE.CylinderGeometry(radius, radius, 1, 64);
+            const mesh = new THREE.Mesh(geo, groundMat);
+            mesh.receiveShadow = true;
+            this.groundGroup.add(mesh);
+
+            const colDesc = RAPIER.ColliderDesc.cylinder(0.5, radius);
+            this.groundColliders.push(this.world.createCollider(colDesc, this.groundBody));
+        } else if (shapeType === "custom") {
+            const cellSize = 10;
+            const grid = this.environmentConfig.customGrid || [];
+            
+            grid.forEach(key => {
+                const [gx, gz] = key.split(',').map(Number);
+                const x = gx * cellSize;
+                const z = gz * cellSize;
+
+                const geo = new THREE.BoxGeometry(cellSize, 1, cellSize);
+                const mesh = new THREE.Mesh(geo, groundMat);
+                mesh.position.set(x, 0, z);
+                mesh.receiveShadow = true;
+                this.groundGroup.add(mesh);
+
+                const colDesc = RAPIER.ColliderDesc.cuboid(cellSize / 2, 0.5, cellSize / 2)
+                    .setTranslation(x, 0, z);
+                this.groundColliders.push(this.world.createCollider(colDesc, this.groundBody));
+            });
         }
 
         // Update Floor Grid in SceneManager if exists
@@ -1765,24 +1805,75 @@ class Game {
         if (this.environmentConfig.invisibleWalls) {
             const wallThickness = 2;
             const wallHeight = 100;
-            const hX = this.environmentConfig.mapSizeX / 2;
-            const hZ = this.environmentConfig.mapSizeZ / 2;
-            const wallDefs = [
-                { width: this.environmentConfig.mapSizeX, depth: wallThickness, pos: { x: 0, y: wallHeight / 2 - 0.5, z: -hZ - wallThickness / 2 } }, // North
-                { width: this.environmentConfig.mapSizeX, depth: wallThickness, pos: { x: 0, y: wallHeight / 2 - 0.5, z: hZ + wallThickness / 2 } },  // South
-                { width: wallThickness, depth: this.environmentConfig.mapSizeZ, pos: { x: -hX - wallThickness / 2, y: wallHeight / 2 - 0.5, z: 0 } }, // West
-                { width: wallThickness, depth: this.environmentConfig.mapSizeZ, pos: { x: hX + wallThickness / 2, y: wallHeight / 2 - 0.5, z: 0 } }   // East
-            ];
+            const hX = sx / 2;
+            const hZ = sz / 2;
+            let wallDefs = [];
+
+            if (shapeType === "rect") {
+                wallDefs = [
+                    { width: sx, depth: wallThickness, pos: { x: 0, y: wallHeight / 2 - 0.5, z: -hZ - wallThickness / 2 } }, // North
+                    { width: sx, depth: wallThickness, pos: { x: 0, y: wallHeight / 2 - 0.5, z: hZ + wallThickness / 2 } },  // South
+                    { width: wallThickness, depth: sz, pos: { x: -hX - wallThickness / 2, y: wallHeight / 2 - 0.5, z: 0 } }, // West
+                    { width: wallThickness, depth: sz, pos: { x: hX + wallThickness / 2, y: wallHeight / 2 - 0.5, z: 0 } }   // East
+                ];
+            } else if (shapeType === "circle") {
+                // Approximate circle with 16 segments
+                const segments = 16;
+                const radius = sx / 2;
+                for (let i = 0; i < segments; i++) {
+                    const angle = (i / segments) * Math.PI * 2;
+                    const nextAngle = ((i + 1) / segments) * Math.PI * 2;
+                    const midAngle = (angle + nextAngle) / 2;
+                    
+                    const x = Math.cos(midAngle) * (radius + wallThickness/2);
+                    const z = Math.sin(midAngle) * (radius + wallThickness/2);
+                    
+                    const width = (Math.PI * 2 * radius) / segments;
+                    
+                    wallDefs.push({ 
+                        width: width, 
+                        depth: wallThickness, 
+                        pos: { x: x, y: wallHeight / 2 - 0.5, z: z },
+                        rotY: -midAngle
+                    });
+                }
+            } else if (shapeType === "custom") {
+                const cellSize = 10;
+                const gridSet = new Set(this.environmentConfig.customGrid || []);
+                
+                gridSet.forEach(key => {
+                    const [gx, gz] = key.split(',').map(Number);
+                    const x = gx * cellSize;
+                    const z = gz * cellSize;
+                    
+                    // Check neighbors
+                    const neighbors = [
+                        { dx: 0, dz: -1, pos: { x: x, y: wallHeight/2 - 0.5, z: z - cellSize/2 - wallThickness/2 }, w: cellSize, d: wallThickness }, // N
+                        { dx: 0, dz: 1, pos: { x: x, y: wallHeight/2 - 0.5, z: z + cellSize/2 + wallThickness/2 }, w: cellSize, d: wallThickness },  // S
+                        { dx: -1, dz: 0, pos: { x: x - cellSize/2 - wallThickness/2, y: wallHeight/2 - 0.5, z: z }, w: wallThickness, d: cellSize }, // W
+                        { dx: 1, dz: 0, pos: { x: x + cellSize/2 + wallThickness/2, y: wallHeight/2 - 0.5, z: z }, w: wallThickness, d: cellSize }   // E
+                    ];
+                    
+                    neighbors.forEach(n => {
+                        const nKey = `${gx + n.dx},${gz + n.dz}`;
+                        if (!gridSet.has(nKey)) {
+                            wallDefs.push({ width: n.w, depth: n.d, pos: n.pos });
+                        }
+                    });
+                });
+            }
 
             wallDefs.forEach(def => {
                 const geo = new THREE.BoxGeometry(def.width, wallHeight, def.depth);
                 const mat = new THREE.MeshBasicMaterial({ color: 0xff0000, wireframe: true, transparent: true, opacity: 0 }); // fully invisible
                 const mesh = new THREE.Mesh(geo, mat);
                 mesh.position.set(def.pos.x, def.pos.y, def.pos.z);
+                if (def.rotY) mesh.rotation.y = def.rotY;
                 this.sceneManager.scene.add(mesh);
                 this.invisibleWallMeshes.push(mesh);
 
                 const bodyDesc = RAPIER.RigidBodyDesc.fixed().setTranslation(def.pos.x, def.pos.y, def.pos.z);
+                if (def.rotY) bodyDesc.setRotation({ x: 0, y: Math.sin(def.rotY/2), z: 0, w: Math.cos(def.rotY/2) });
                 const body = this.world.createRigidBody(bodyDesc);
                 const colliderDesc = RAPIER.ColliderDesc.cuboid(def.width / 2, wallHeight / 2, def.depth / 2);
                 this.world.createCollider(colliderDesc, body);

@@ -731,7 +731,7 @@ export class ConstructionMenu {
         // Map Boundaries and Rules Config
         const rowMap = document.createElement('div')
         rowMap.style.cssText = `display: flex; flex-direction: column; gap: 15px; margin-top: 15px; border-top: 1px solid #444; padding-top: 15px;`
-        
+
         const labelMap = document.createElement('h3')
         labelMap.textContent = "Límites y Reglas del Mapa"
         labelMap.style.color = "#fff"
@@ -740,14 +740,14 @@ export class ConstructionMenu {
 
         // Open Advanced Editor Button
         const btnOpenEditor = document.createElement('button')
-        btnOpenEditor.textContent = "📐 Abrir Editor Avanzado de Forma"
+        btnOpenEditor.textContent = "Abrir Editor Avanzado de Forma"
         btnOpenEditor.style.cssText = `
-            padding: 10px; background: #FF9800; color: white; border: none; border-radius: 4px;
+            padding: 10px; background: #4d4d4dff; color: white; border: none; border-radius: 4px;
             font-size: 16px; font-weight: bold; cursor: pointer; transition: background 0.2s;
             margin-bottom: 10px;
         `
-        btnOpenEditor.onmouseover = () => btnOpenEditor.style.background = "#F57C00"
-        btnOpenEditor.onmouseout = () => btnOpenEditor.style.background = "#FF9800"
+        btnOpenEditor.onmouseover = () => btnOpenEditor.style.background = "#7e7e7ea5"
+        btnOpenEditor.onmouseout = () => btnOpenEditor.style.background = "#4d4d4dff"
         btnOpenEditor.onclick = () => {
             this.mapShapeEditor.open()
         }
@@ -886,11 +886,11 @@ export class ConstructionMenu {
 
         const rightTitleRow = document.createElement('div')
         rightTitleRow.style.cssText = `display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #555; padding-bottom: 10px; flex-wrap: wrap; gap: 10px;`
-        
+
         const rightTitle = document.createElement('h3')
         rightTitle.textContent = "Visualizador de Mapa (JSON)"
         rightTitle.style.margin = "0"
-        
+
         // State for JSON logic
         let filters = {
             gameVersion: true,
@@ -907,33 +907,33 @@ export class ConstructionMenu {
         const editCb = document.createElement('input')
         editCb.type = 'checkbox'
         editCb.onchange = (e) => {
-             isEditing = e.target.checked;
-             if (isEditing) {
-                 jsonTextArea.style.pointerEvents = 'auto';
-                 jsonTextArea.style.caretColor = 'white';
-                 jsonTextArea.style.overflow = 'auto';
-                 jsonPre.style.pointerEvents = 'none';
-                 jsonPre.style.overflow = 'hidden';
-                 editorContainer.style.border = '1px solid #6366f1';
-                 applyBtn.style.visibility = 'visible';
-                 filtersContainer.style.opacity = '0.5';
-                 filtersContainer.style.pointerEvents = 'none';
-             } else {
-                 jsonTextArea.style.pointerEvents = 'none';
-                 jsonTextArea.style.caretColor = 'transparent';
-                 jsonTextArea.style.overflow = 'hidden';
-                 jsonPre.style.pointerEvents = 'auto';
-                 jsonPre.style.overflow = 'auto';
-                 editorContainer.style.border = '1px solid transparent';
-                 applyBtn.style.visibility = 'hidden';
-                 filtersContainer.style.opacity = '1';
-                 filtersContainer.style.pointerEvents = 'auto';
-                 updateJson();
-             }
+            isEditing = e.target.checked;
+            if (isEditing) {
+                jsonTextArea.style.pointerEvents = 'auto';
+                jsonTextArea.style.caretColor = 'white';
+                jsonTextArea.style.overflow = 'auto';
+                jsonPre.style.pointerEvents = 'none';
+                jsonPre.style.overflow = 'hidden';
+                editorContainer.style.border = '1px solid #6366f1';
+                applyBtn.style.visibility = 'visible';
+                filtersContainer.style.opacity = '0.5';
+                filtersContainer.style.pointerEvents = 'none';
+            } else {
+                jsonTextArea.style.pointerEvents = 'none';
+                jsonTextArea.style.caretColor = 'transparent';
+                jsonTextArea.style.overflow = 'hidden';
+                jsonPre.style.pointerEvents = 'auto';
+                jsonPre.style.overflow = 'auto';
+                editorContainer.style.border = '1px solid transparent';
+                applyBtn.style.visibility = 'hidden';
+                filtersContainer.style.opacity = '1';
+                filtersContainer.style.pointerEvents = 'auto';
+                updateJson();
+            }
         }
         editLabel.appendChild(editCb)
         editLabel.appendChild(document.createTextNode("Habilitar Edición Manual"))
-        
+
         rightTitleRow.appendChild(rightTitle)
         rightTitleRow.appendChild(editLabel)
 
@@ -986,7 +986,7 @@ export class ConstructionMenu {
             white-space: pre;
             pointer-events: auto;
         `
-        
+
         const jsonTextArea = document.createElement('textarea')
         jsonTextArea.style.cssText = `
             position: absolute;
@@ -1072,50 +1072,50 @@ export class ConstructionMenu {
             visibility: hidden;
         `
         applyBtn.onclick = () => {
-             try {
-                 const newJson = JSON.parse(jsonTextArea.value);
-                 if (this.game.loadMap) {
-                     this.game.loadMap(newJson);
-                     
-                     // Sincronizar en modo colaborativo
-                     if (this.game.networkManager && this.game.networkManager.collaborativeMode) {
-                         this.game.networkManager.broadcastMapSync(newJson);
-                     }
+            try {
+                const newJson = JSON.parse(jsonTextArea.value);
+                if (this.game.loadMap) {
+                    this.game.loadMap(newJson);
 
-                     editCb.checked = false;
-                     editCb.dispatchEvent(new Event('change'));
-                     alert("¡Cambios aplicados al mapa exitosamente!");
-                 }
-             } catch(err) {
-                 alert("Error de sintaxis JSON: " + err.message);
-             }
+                    // Sincronizar en modo colaborativo
+                    if (this.game.networkManager && this.game.networkManager.collaborativeMode) {
+                        this.game.networkManager.broadcastMapSync(newJson);
+                    }
+
+                    editCb.checked = false;
+                    editCb.dispatchEvent(new Event('change'));
+                    alert("¡Cambios aplicados al mapa exitosamente!");
+                }
+            } catch (err) {
+                alert("Error de sintaxis JSON: " + err.message);
+            }
         }
 
         // Filters UI
         const filtersContainer = document.createElement('div')
         filtersContainer.style.cssText = `display: flex; gap: 15px; flex-wrap: wrap; margin-top: 5px;`
-        
+
         const createFilter = (key, label) => {
-             const lbl = document.createElement('label')
-             lbl.style.cssText = `font-size: 12px; color: #cbd5e1; display: flex; align-items: center; gap: 4px; cursor: pointer;`
-             const cb = document.createElement('input')
-             cb.type = 'checkbox'
-             cb.checked = true
-             cb.onchange = () => {
-                 filters[key] = cb.checked;
-                 if(!isEditing) updateJson();
-             }
-             lbl.appendChild(cb)
-             lbl.appendChild(document.createTextNode(label))
-             filtersContainer.appendChild(lbl)
+            const lbl = document.createElement('label')
+            lbl.style.cssText = `font-size: 12px; color: #cbd5e1; display: flex; align-items: center; gap: 4px; cursor: pointer;`
+            const cb = document.createElement('input')
+            cb.type = 'checkbox'
+            cb.checked = true
+            cb.onchange = () => {
+                filters[key] = cb.checked;
+                if (!isEditing) updateJson();
+            }
+            lbl.appendChild(cb)
+            lbl.appendChild(document.createTextNode(label))
+            filtersContainer.appendChild(lbl)
         }
-        
+
         createFilter('gameVersion', 'Versión')
         createFilter('timestamp', 'Fecha/Hora')
         createFilter('gameConfig', 'Game Config')
         createFilter('playerConfig', 'Player Config')
         createFilter('objects', 'Objetos 3D')
-        
+
         // Función de Limpiar Sección
         const deleteContainer = document.createElement('div')
         deleteContainer.style.cssText = `display: flex; gap: 10px; align-items: center; margin-top: 15px; padding-top: 10px; border-top: 1px solid #444; width: 100%;`
@@ -1138,7 +1138,7 @@ export class ConstructionMenu {
             if (confirm(`¿Estás seguro de que deseas borrar: ${section}?`)) {
                 if (this.game.saveMap && this.game.loadMap) {
                     const currentMap = this.game.saveMap();
-                    
+
                     if (section === 'objects') {
                         currentMap.objects = [];
                     } else if (section === 'gameConfig') {
@@ -1198,15 +1198,15 @@ export class ConstructionMenu {
             try {
                 const mapData = this.game.saveMap();
                 const filteredData = {};
-                
+
                 if (filters.gameVersion && mapData.gameVersion !== undefined) filteredData.gameVersion = mapData.gameVersion;
                 if (filters.timestamp && mapData.timestamp !== undefined) filteredData.timestamp = mapData.timestamp;
                 if (filters.objects && mapData.objects !== undefined) filteredData.objects = mapData.objects;
                 if (filters.gameConfig && mapData.gameConfig !== undefined) filteredData.gameConfig = mapData.gameConfig;
                 if (filters.playerConfig && mapData.playerConfig !== undefined) filteredData.playerConfig = mapData.playerConfig;
-                
-                for(let key in mapData) {
-                    if(!['gameVersion', 'timestamp', 'objects', 'gameConfig', 'playerConfig'].includes(key)) {
+
+                for (let key in mapData) {
+                    if (!['gameVersion', 'timestamp', 'objects', 'gameConfig', 'playerConfig'].includes(key)) {
                         filteredData[key] = mapData[key];
                     }
                 }
@@ -1215,7 +1215,7 @@ export class ConstructionMenu {
                 jsonPre.innerHTML = syntaxHighlight(rawJson);
                 jsonTextArea.value = rawJson;
                 updateLineNumbers(rawJson);
-            } catch(e) {}
+            } catch (e) { }
         }
 
         // Auto update interval
@@ -1487,7 +1487,7 @@ export class ConstructionMenu {
 
         container.appendChild(leftColumn)
         container.appendChild(rightColumn)
-        
+
         // Initial setup
         setTimeout(updateJson, 50);
     }
@@ -2275,7 +2275,7 @@ export class ConstructionMenu {
 
         this.customTracerSelect = document.createElement('select');
         this.customTracerSelect.style.cssText = this.projectileTypeSelect.style.cssText;
-        
+
         ['Ninguno', 'Bubble Explosion', 'Cartoon Bang', 'Cartoon Blue Flamethrower', 'Dollar Bill Shower', 'Cartoon Lightning Ball', 'Cartoon Blood Splash', 'Cartoon Fireball Explosion', 'Cartoon Purple Lightning', 'Explosión de Gas Azul'].forEach(opt => {
             const el = document.createElement('option');
             el.value = opt;
@@ -2323,7 +2323,7 @@ export class ConstructionMenu {
 
         this.customImpactSelect = document.createElement('select');
         this.customImpactSelect.style.cssText = this.projectileTypeSelect.style.cssText;
-        
+
         ['Ninguno', 'Bubble Explosion', 'Cartoon Bang', 'Dollar Bill Shower', 'Cartoon Blood Splash', 'Cartoon Fireball Explosion', 'Cartoon Purple Lightning', 'Explosión de Gas Azul'].forEach(opt => {
             const el = document.createElement('option');
             el.value = opt;
@@ -2412,7 +2412,7 @@ export class ConstructionMenu {
             let defaultRebote = baseItem.projectileType === "ball" ? true : false;
             this.reboteInput.checked = baseItem.rebote !== undefined ? baseItem.rebote : defaultRebote;
             this.impactInput.checked = baseItem.hasImpactEffect !== undefined ? baseItem.hasImpactEffect : false;
-            
+
             this.customTracerSelect.value = baseItem.customTracerVFX || "Ninguno";
             this.tracerDestroyInput.checked = baseItem.tracerDestroyOnCollision || false;
             this.customImpactSelect.value = baseItem.customImpactVFX || "Ninguno";

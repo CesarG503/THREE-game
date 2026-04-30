@@ -1762,7 +1762,7 @@ class Game {
             const colDesc = RAPIER.ColliderDesc.cylinder(0.5, radius);
             this.groundColliders.push(this.world.createCollider(colDesc, this.groundBody));
         } else if (shapeType === "custom") {
-            const cellSize = 10;
+            const cellSize = this.environmentConfig.customCellSize || 10;
             const grid = this.environmentConfig.customGrid || [];
             
             grid.forEach(key => {
@@ -1838,7 +1838,7 @@ class Game {
                     });
                 }
             } else if (shapeType === "custom") {
-                const cellSize = 10;
+                const cellSize = this.environmentConfig.customCellSize || 10;
                 const gridSet = new Set(this.environmentConfig.customGrid || []);
                 
                 gridSet.forEach(key => {

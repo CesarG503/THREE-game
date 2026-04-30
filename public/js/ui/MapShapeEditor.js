@@ -14,13 +14,16 @@ export class MapShapeEditor {
         
         this.cellSize = 10; // Meters per cell
 
-        // Default Configs (cloned from game)
         this.config = {
             shapeType: "rect",
             mapSizeX: 100,
             mapSizeZ: 100,
-            customGrid: []
+            customGrid: [],
+            customCellSize: 10
         };
+
+        this.selectionBox = null; // { startX, startZ, endX, endZ, mode }
+        this.useAreaSelection = false;
 
         this.initUI();
     }
@@ -135,15 +138,42 @@ export class MapShapeEditor {
         // Instructions for Custom Mode
         const customInfo = document.createElement('div');
         this.customInfo = customInfo;
-        customInfo.style.cssText = `background: #2a2a2a; padding: 15px; border-radius: 8px; font-size: 13px; color: #ccc; display: none;`;
-        customInfo.innerHTML = `
-            <b>Modo Personalizado:</b><br><br>
-            • Click Izquierdo: Pintar bloque<br>
-            • Click Derecho: Borrar bloque<br>
+        customInfo.style.cssText = `background: #2a2a2a; padding: 15px; border-radius: 8px; font-size: 13px; color: #ccc; display: none; flex-direction: column; gap: 10px;`;
+        
+        // Add Cell Size Input
+        const rowCell = document.createElement('div');
+        rowCell.style.cssText = `display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #444; padding-bottom: 10px;`;
+        rowCell.innerHTML = `<span>Tamaño de Bloque:</span> <input id="mse-cell-size" type="number" step="1" min="1" max="100" style="width: 60px; padding: 5px; background: #333; color: white; border: 1px solid #555; border-radius: 4px; text-align: center;">`;
+        customInfo.appendChild(rowCell);
+
+        // Add Area Selection Checkbox
+        const rowSel = document.createElement('div');
+        rowSel.style.cssText = `display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #444; padding-bottom: 10px; cursor: pointer;`;
+        const checkSel = document.createElement('input');
+        checkSel.type = 'checkbox';
+        checkSel.id = 'mse-area-select';
+        checkSel.style.transform = 'scale(1.3)';
+        checkSel.onchange = (e) => { this.useAreaSelection = e.target.checked; };
+        
+        const labelSel = document.createElement('label');
+        labelSel.textContent = "Selección por Área (Arrastrar)";
+        labelSel.htmlFor = 'mse-area-select';
+        labelSel.style.cursor = 'pointer';
+        
+        rowSel.appendChild(labelSel);
+        rowSel.appendChild(checkSel);
+        customInfo.appendChild(rowSel);
+
+        const instructions = document.createElement('div');
+        instructions.innerHTML = `
+            <b>Controles:</b><br><br>
+            • Click Izquierdo: Pintar<br>
+            • Click Derecho: Borrar<br>
             • Rueda del Ratón: Zoom<br>
-            • Click Medio + Arrastrar: Mover cámara<br><br>
-            <i>Cada bloque representa un área de 10x10 metros.</i>
+            • Click Medio + Arrastrar: Mover cámara
         `;
+        customInfo.appendChild(instructions);
+
         sidebar.appendChild(customInfo);
 
         // Apply Button
@@ -187,9 +217,19 @@ export class MapShapeEditor {
                 this.isDragging = true;
                 this.lastMouse = { x: e.clientX, y: e.clientY };
             } else if (this.config.shapeType === 'custom') {
-                this.isDrawing = true;
                 this.drawMode = e.button === 0; // left click = paint, right click = erase
-                this.handleGridInteraction(e);
+                if (this.useAreaSelection) {
+                    const worldCoords = this.getWorldCoords(e);
+                    const gridCoords = this.getGridCoords(worldCoords);
+                    this.selectionBox = {
+                        startX: gridCoords.x, startZ: gridCoords.z,
+                        endX: gridCoords.x, endZ: gridCoords.z,
+                        mode: this.drawMode
+                    };
+                } else {
+                    this.isDrawing = true;
+                    this.handleGridInteraction(e);
+                }
             }
         });
 
@@ -199,31 +239,74 @@ export class MapShapeEditor {
                 this.offsetZ += (e.clientY - this.lastMouse.y);
                 this.lastMouse = { x: e.clientX, y: e.clientY };
                 this.draw();
-            } else if (this.isDrawing && this.config.shapeType === 'custom') {
-                this.handleGridInteraction(e);
+            } else if (this.config.shapeType === 'custom') {
+                if (this.useAreaSelection && this.selectionBox) {
+                    const worldCoords = this.getWorldCoords(e);
+                    const gridCoords = this.getGridCoords(worldCoords);
+                    this.selectionBox.endX = gridCoords.x;
+                    this.selectionBox.endZ = gridCoords.z;
+                    this.draw();
+                } else if (this.isDrawing) {
+                    this.handleGridInteraction(e);
+                }
             }
         });
 
         window.addEventListener('mouseup', () => {
             this.isDragging = false;
             this.isDrawing = false;
+            
+            if (this.selectionBox) {
+                this.applySelectionBox();
+                this.selectionBox = null;
+                this.draw();
+            }
         });
     }
 
-    handleGridInteraction(e) {
+    getWorldCoords(e) {
         const rect = this.canvas.getBoundingClientRect();
         const mouseX = e.clientX - rect.left;
         const mouseY = e.clientY - rect.top;
-
-        // Convert mouse position to world coordinates
         const worldX = (mouseX - this.canvas.width/2 - this.offsetX) / this.zoom;
         const worldZ = (mouseY - this.canvas.height/2 - this.offsetZ) / this.zoom;
+        return { x: worldX, z: worldZ };
+    }
 
-        // Convert world coords to grid indices
-        const gridX = Math.floor(worldX / this.cellSize);
-        const gridZ = Math.floor(worldZ / this.cellSize);
+    getGridCoords(worldCoords) {
+        return {
+            x: Math.floor(worldCoords.x / this.config.customCellSize),
+            z: Math.floor(worldCoords.z / this.config.customCellSize)
+        };
+    }
 
-        const key = `${gridX},${gridZ}`;
+    applySelectionBox() {
+        const minX = Math.min(this.selectionBox.startX, this.selectionBox.endX);
+        const maxX = Math.max(this.selectionBox.startX, this.selectionBox.endX);
+        const minZ = Math.min(this.selectionBox.startZ, this.selectionBox.endZ);
+        const maxZ = Math.max(this.selectionBox.startZ, this.selectionBox.endZ);
+
+        for (let x = minX; x <= maxX; x++) {
+            for (let z = minZ; z <= maxZ; z++) {
+                const key = `${x},${z}`;
+                if (this.selectionBox.mode) {
+                    if (!this.config.customGrid.includes(key)) {
+                        this.config.customGrid.push(key);
+                    }
+                } else {
+                    const idx = this.config.customGrid.indexOf(key);
+                    if (idx > -1) {
+                        this.config.customGrid.splice(idx, 1);
+                    }
+                }
+            }
+        }
+    }
+
+    handleGridInteraction(e) {
+        const worldCoords = this.getWorldCoords(e);
+        const gridCoords = this.getGridCoords(worldCoords);
+        const key = `${gridCoords.x},${gridCoords.z}`;
         
         if (this.drawMode) {
             if (!this.config.customGrid.includes(key)) {
@@ -249,10 +332,15 @@ export class MapShapeEditor {
         this.config.mapSizeX = env.mapSizeX || 100;
         this.config.mapSizeZ = env.mapSizeZ || 100;
         this.config.customGrid = [...(env.customGrid || [])];
+        this.config.customCellSize = env.customCellSize || 10;
+        this.useAreaSelection = false;
+        this.selectionBox = null;
 
         this.shapeSelect.value = this.config.shapeType;
         document.getElementById("mse-size-x").value = this.config.mapSizeX;
         document.getElementById("mse-size-z").value = this.config.mapSizeZ;
+        document.getElementById("mse-cell-size").value = this.config.customCellSize;
+        document.getElementById("mse-area-select").checked = this.useAreaSelection;
 
         // Reset view
         this.zoom = 4;
@@ -272,6 +360,7 @@ export class MapShapeEditor {
         // Read dims
         this.config.mapSizeX = parseFloat(document.getElementById("mse-size-x").value) || 100;
         this.config.mapSizeZ = parseFloat(document.getElementById("mse-size-z").value) || 100;
+        this.config.customCellSize = parseFloat(document.getElementById("mse-cell-size").value) || 10;
 
         // Ensure at least one grid block if custom
         if (this.config.shapeType === 'custom' && this.config.customGrid.length === 0) {
@@ -282,7 +371,8 @@ export class MapShapeEditor {
             shapeType: this.config.shapeType,
             mapSizeX: this.config.mapSizeX,
             mapSizeZ: this.config.mapSizeZ,
-            customGrid: this.config.customGrid
+            customGrid: this.config.customGrid,
+            customCellSize: this.config.customCellSize
         };
 
         this.game.updateEnvironmentConfig(newConfig);
@@ -304,7 +394,7 @@ export class MapShapeEditor {
     updateVisibility() {
         const isCustom = this.config.shapeType === 'custom';
         this.dimGroup.style.display = isCustom ? 'none' : 'flex';
-        this.customInfo.style.display = isCustom ? 'block' : 'none';
+        this.customInfo.style.display = isCustom ? 'flex' : 'none';
 
         if (!isCustom) {
             document.getElementById("mse-size-x").disabled = this.config.shapeType === 'circle';
@@ -362,10 +452,10 @@ export class MapShapeEditor {
             this.ctx.strokeStyle = "rgba(255,255,255,0.1)";
             this.ctx.lineWidth = 1 / this.zoom;
             this.ctx.beginPath();
-            for (let x = -sx/2; x <= sx/2; x+=this.cellSize) {
+            for (let x = -sx/2; x <= sx/2; x+=this.config.customCellSize) {
                 this.ctx.moveTo(x, -sz/2); this.ctx.lineTo(x, sz/2);
             }
-            for (let z = -sz/2; z <= sz/2; z+=this.cellSize) {
+            for (let z = -sz/2; z <= sz/2; z+=this.config.customCellSize) {
                 this.ctx.moveTo(-sx/2, z); this.ctx.lineTo(sx/2, z);
             }
             this.ctx.stroke();
@@ -388,20 +478,24 @@ export class MapShapeEditor {
             this.ctx.stroke();
 
         } else if (this.config.shapeType === "custom") {
+            // Read cell size from input dynamically for live preview
+            const cs = parseFloat(document.getElementById("mse-cell-size")?.value) || this.config.customCellSize || 10;
+            this.config.customCellSize = cs; // sync
+
             // Draw background grid lightly
             const vW = w / this.zoom;
             const vH = h / this.zoom;
-            const startX = Math.floor((-vW/2 - this.offsetX/this.zoom) / this.cellSize) * this.cellSize;
-            const startZ = Math.floor((-vH/2 - this.offsetZ/this.zoom) / this.cellSize) * this.cellSize;
+            const startX = Math.floor((-vW/2 - this.offsetX/this.zoom) / cs) * cs;
+            const startZ = Math.floor((-vH/2 - this.offsetZ/this.zoom) / cs) * cs;
             
             this.ctx.strokeStyle = "rgba(255,255,255,0.05)";
             this.ctx.lineWidth = 1 / this.zoom;
             this.ctx.beginPath();
-            for (let x = startX; x < startX + vW + this.cellSize; x += this.cellSize) {
-                this.ctx.moveTo(x, startZ); this.ctx.lineTo(x, startZ + vH + this.cellSize);
+            for (let x = startX; x < startX + vW + cs; x += cs) {
+                this.ctx.moveTo(x, startZ); this.ctx.lineTo(x, startZ + vH + cs);
             }
-            for (let z = startZ; z < startZ + vH + this.cellSize; z += this.cellSize) {
-                this.ctx.moveTo(startX, z); this.ctx.lineTo(startX + vW + this.cellSize, z);
+            for (let z = startZ; z < startZ + vH + cs; z += cs) {
+                this.ctx.moveTo(startX, z); this.ctx.lineTo(startX + vW + cs, z);
             }
             this.ctx.stroke();
 
@@ -412,12 +506,36 @@ export class MapShapeEditor {
 
             this.config.customGrid.forEach(key => {
                 const [gx, gz] = key.split(',').map(Number);
-                const x = gx * this.cellSize;
-                const z = gz * this.cellSize;
+                const x = gx * cs;
+                const z = gz * cs;
                 
-                this.ctx.fillRect(x, z, this.cellSize, this.cellSize);
-                this.ctx.strokeRect(x, z, this.cellSize, this.cellSize);
+                this.ctx.fillRect(x, z, cs, cs);
+                this.ctx.strokeRect(x, z, cs, cs);
             });
+
+            // Draw Selection Box preview
+            if (this.selectionBox) {
+                const minX = Math.min(this.selectionBox.startX, this.selectionBox.endX);
+                const maxX = Math.max(this.selectionBox.startX, this.selectionBox.endX);
+                const minZ = Math.min(this.selectionBox.startZ, this.selectionBox.endZ);
+                const maxZ = Math.max(this.selectionBox.startZ, this.selectionBox.endZ);
+
+                const sX = minX * cs;
+                const sZ = minZ * cs;
+                const sW = (maxX - minX + 1) * cs;
+                const sH = (maxZ - minZ + 1) * cs;
+
+                if (this.selectionBox.mode) {
+                    this.ctx.fillStyle = "rgba(76, 175, 80, 0.5)"; // Green for build
+                    this.ctx.strokeStyle = "#4CAF50";
+                } else {
+                    this.ctx.fillStyle = "rgba(244, 67, 54, 0.5)"; // Red for erase
+                    this.ctx.strokeStyle = "#F44336";
+                }
+                
+                this.ctx.fillRect(sX, sZ, sW, sH);
+                this.ctx.strokeRect(sX, sZ, sW, sH);
+            }
         }
 
         this.ctx.restore();

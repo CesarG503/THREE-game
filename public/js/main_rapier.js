@@ -1783,20 +1783,34 @@ class Game {
         }
 
         // Update Floor Grid in SceneManager if exists
-        this.sceneManager.scene.children.forEach(child => {
-            if (child instanceof THREE.GridHelper) {
-                this.sceneManager.scene.remove(child);
-            }
+        const oldGrids = this.sceneManager.scene.children.filter(c => c.name === "mapGrid" || c instanceof THREE.GridHelper);
+        oldGrids.forEach(child => {
+            this.sceneManager.scene.remove(child);
+            if (child.geometry) child.geometry.dispose();
+            if (child.material) child.material.dispose();
         });
-        const grid = new THREE.GridHelper(
-            Math.max(this.environmentConfig.mapSizeX, this.environmentConfig.mapSizeZ), 
-            Math.max(this.environmentConfig.mapSizeX, this.environmentConfig.mapSizeZ) / 5, 
-            0xaaaaaa, // Lighter color for center lines
-            0x666666  // Lighter color for grid lines
-        );
+
+        const cellSize = this.environmentConfig.customCellSize || 10;
+        const gridStep = cellSize / 5;
+        const hX = sx / 2;
+        const hZ = sz / 2;
+        const gridVertices = [];
+
+        // Lines along Z (Verticals)
+        for (let x = -hX; x <= hX; x += gridStep) {
+            gridVertices.push(x, 0, -hZ, x, 0, hZ);
+        }
+        // Lines along X (Horizontals)
+        for (let z = -hZ; z <= hZ; z += gridStep) {
+            gridVertices.push(-hX, 0, z, hX, 0, z);
+        }
+
+        const gridGeo = new THREE.BufferGeometry();
+        gridGeo.setAttribute('position', new THREE.Float32BufferAttribute(gridVertices, 3));
+        const gridMat = new THREE.LineBasicMaterial({ color: 0x666666, transparent: true, opacity: 0.4 });
+        const grid = new THREE.LineSegments(gridGeo, gridMat);
+        grid.name = "mapGrid";
         grid.position.y = 0.01;
-        grid.material.opacity = 0.4; // Higher opacity for visibility
-        grid.material.transparent = true;
         
         const chk = document.getElementById('chk-show-grid');
         if (chk) {

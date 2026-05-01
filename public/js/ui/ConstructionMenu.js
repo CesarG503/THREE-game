@@ -580,7 +580,7 @@ export class ConstructionMenu {
         checkbox.addEventListener('change', (e) => {
             if (this.game && this.game.sceneManager) {
                 this.game.sceneManager.scene.children.forEach(child => {
-                    if (child instanceof THREE.GridHelper) {
+                    if (child.name === "mapGrid" || child instanceof THREE.GridHelper) {
                         child.visible = e.target.checked;
                     }
                 });

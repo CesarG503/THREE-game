@@ -286,7 +286,7 @@ class Game {
             mapSizeZ: 100,
             invisibleWalls: false,
             fallDeath: true,
-            fallDeathY: -50
+            fallDeathY: -20
         };
         this.invisibleWallMeshes = [];
         this.invisibleWallBodies = [];
@@ -1788,9 +1788,21 @@ class Game {
                 this.sceneManager.scene.remove(child);
             }
         });
-        const grid = new THREE.GridHelper(Math.max(this.environmentConfig.mapSizeX, this.environmentConfig.mapSizeZ), Math.max(this.environmentConfig.mapSizeX, this.environmentConfig.mapSizeZ) / 5, 0x000000, 0x000000);
-        grid.material.opacity = 0.2;
+        const grid = new THREE.GridHelper(
+            Math.max(this.environmentConfig.mapSizeX, this.environmentConfig.mapSizeZ), 
+            Math.max(this.environmentConfig.mapSizeX, this.environmentConfig.mapSizeZ) / 5, 
+            0xaaaaaa, // Lighter color for center lines
+            0x666666  // Lighter color for grid lines
+        );
+        grid.position.y = 0.01;
+        grid.material.opacity = 0.4; // Higher opacity for visibility
         grid.material.transparent = true;
+        
+        const chk = document.getElementById('chk-show-grid');
+        if (chk) {
+            grid.visible = chk.checked;
+        }
+
         this.sceneManager.scene.add(grid);
 
         // Clean up old invisible walls

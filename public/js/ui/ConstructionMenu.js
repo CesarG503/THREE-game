@@ -159,13 +159,7 @@ export class ConstructionMenu {
     }
 
     setupUI() {
-        // Init Grid Helper
-        this.gridHelper = new THREE.GridHelper(100, 100, 0x888888, 0x444444)
-        this.gridHelper.position.y = 0.01 // Slightly above 0 to avoid z-fighting
-        this.gridHelper.visible = false
-        if (this.game.sceneManager && this.game.sceneManager.scene) {
-            this.game.sceneManager.scene.add(this.gridHelper)
-        }
+        // Remove old gridHelper creation, handled by main_rapier.js
 
         // Main Container
         this.container = document.createElement('div')
@@ -581,10 +575,15 @@ export class ConstructionMenu {
         const checkbox = document.createElement('input')
         checkbox.type = 'checkbox'
         checkbox.id = 'chk-show-grid'
+        checkbox.checked = true // Set default to true
         checkbox.style.transform = 'scale(1.5)'
         checkbox.addEventListener('change', (e) => {
-            if (this.gridHelper) {
-                this.gridHelper.visible = e.target.checked
+            if (this.game && this.game.sceneManager) {
+                this.game.sceneManager.scene.children.forEach(child => {
+                    if (child instanceof THREE.GridHelper) {
+                        child.visible = e.target.checked;
+                    }
+                });
             }
         })
 
@@ -760,7 +759,7 @@ export class ConstructionMenu {
                     mapSizeZ: parseFloat(inputSizeZ.value) || 100,
                     invisibleWalls: checkInvisibleWalls.checked,
                     fallDeath: checkFallDeath.checked,
-                    fallDeathY: parseFloat(inputFallY.value) || -50
+                    fallDeathY: parseFloat(inputFallY.value) || -20
                 };
                 this.game.updateEnvironmentConfig(newConfig);
                 // Sync via network if in editor mode
@@ -847,7 +846,7 @@ export class ConstructionMenu {
         inputFallY.type = 'number'
         inputFallY.step = "5"
         inputFallY.style.cssText = `padding: 5px; background: #333; color: white; border: 1px solid #555; border-radius: 4px; width: 80px; text-align: center;`
-        inputFallY.value = this.game.environmentConfig ? this.game.environmentConfig.fallDeathY : -50;
+        inputFallY.value = this.game.environmentConfig ? this.game.environmentConfig.fallDeathY : -20;
         inputFallY.addEventListener('change', configChangeHandler);
         rowFallY.appendChild(labelFallY)
         rowFallY.appendChild(inputFallY)

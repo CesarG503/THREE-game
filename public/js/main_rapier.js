@@ -2154,6 +2154,7 @@ class Game {
             camera: this.sceneManager.camera, // ADDED CAMERA FOR RAYCASTING
             networkManager: this.networkManager, // ADDED NETWORK TO RELAY SHOOTING
             particleSystem: this.character ? this.character.particleSystem : null,
+            character: this.character, // ADDED CHARACTER FOR IMPULSE
             registerProjectile: (proj) => {
                 this.projectiles.push(proj)
             },

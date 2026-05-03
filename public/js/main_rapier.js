@@ -13,6 +13,7 @@ import { ImpulsePlatform } from "./ImpulsePlatform.js"
 import { PlacementManager } from "./PlacementManager.js"
 import { InventoryManager } from "./item/InventoryManager.js"
 import { ItemDropManager } from "./item/ItemDropManager.js"
+import { Item } from "./item/Item.js"
 import { ImpulseItem } from "./item/ImpulseItem.js"
 import { FarmingZone } from "./FarmingZone.js"
 import { FuegoItem } from "./item/FuegoItem.js"
@@ -212,7 +213,51 @@ class Game {
 
         // ── Sincronización de Acciones (Doble Salto, etc) ──────────────────
         this.networkManager.onPlayerAction = (playerId, actionType, data) => {
-            if (actionType === "spawn-effect") {
+            if (actionType === "dropItem") {
+                let newItem;
+                if (data.itemData.itemClass === 'GunItem' || data.itemData.type === 'weapon' || data.itemData.id === 'gun' || data.itemData.modelPath) {
+                    newItem = new GunItem(data.itemData);
+                } else if (data.itemData.itemClass === 'FuegoItem' || data.itemData.id === 'fuego') {
+                    newItem = new FuegoItem();
+                } else if (data.itemData.itemClass === 'PelotaItem' || data.itemData.id === 'pelota') {
+                    newItem = new PelotaItem();
+                } else if (data.itemData.itemClass === 'MapObjectItem') {
+                    newItem = new MapObjectItem(data.itemData.id, data.itemData.name, data.itemData.type, data.itemData.iconPath, data.itemData.color, data.itemData.scale, data.itemData.texturePath);
+                } else if (data.itemData.itemClass === 'ImpulseItem' || data.itemData.type === 'impulse') {
+                    newItem = new ImpulseItem(data.itemData.id, data.itemData.name, data.itemData.iconPath, data.itemData.type, data.itemData.strength);
+                } else if (data.itemData.itemClass === 'TurretItem' || data.itemData.id === 'turret') {
+                    newItem = new TurretItem();
+                } else {
+                    newItem = new Item(data.itemData.id, data.itemData.name, data.itemData.iconPath);
+                }
+                
+                const restoreProperties = (target, source) => {
+                    for (let key in source) {
+                        if (target[key] && typeof target[key] === 'object' && !Array.isArray(target[key])) {
+                            if (target[key].isVector3) {
+                                target[key].set(source[key].x || 0, source[key].y || 0, source[key].z || 0);
+                            } else if (target[key].isEuler) {
+                                const rx = source[key].x !== undefined ? source[key].x : (source[key]._x || 0);
+                                const ry = source[key].y !== undefined ? source[key].y : (source[key]._y || 0);
+                                const rz = source[key].z !== undefined ? source[key].z : (source[key]._z || 0);
+                                target[key].set(rx, ry, rz);
+                            } else {
+                                restoreProperties(target[key], source[key]);
+                            }
+                        } else {
+                            target[key] = source[key];
+                        }
+                    }
+                };
+                
+                restoreProperties(newItem, data.itemData);
+                
+                const pos = new THREE.Vector3(data.position.x, data.position.y, data.position.z);
+                const dir = new THREE.Vector3(data.direction.x, data.direction.y, data.direction.z);
+                this.itemDropManager.dropItem(newItem, pos, dir, data.dropId, { torque: data.torque });
+            } else if (actionType === "pickupItem") {
+                this.itemDropManager.removeItemByDropId(data.dropId);
+            } else if (actionType === "spawn-effect") {
                 if (this.character && this.character.particleSystem && data) {
                     const pos = new THREE.Vector3(data.pos.x, data.pos.y, data.pos.z);
                     if (data.effectType === "jump") {
@@ -1552,7 +1597,21 @@ class Game {
                     this.sceneManager.camera.getWorldDirection(camDir)
 
                     // Drop slightly in front of camera/character
-                    this.itemDropManager.dropItem(item, charPos, camDir)
+                    const dropped = this.itemDropManager.dropItem(item, charPos, camDir)
+                    
+                    if (this.networkManager && this.networkManager.isConnected) {
+                        let itemData = Object.assign({}, item);
+                        itemData.itemClass = item.constructor.name;
+                        delete itemData.model; delete itemData.equipGroup; delete itemData.transformGroup; delete itemData.mixer; delete itemData.actionShoot; delete itemData.actionReload; delete itemData.blasterSystem; delete itemData.originalConfig;
+                        
+                        this.networkManager.sendPlayerAction("dropItem", {
+                            dropId: dropped.dropId,
+                            itemData: itemData,
+                            position: { x: charPos.x, y: charPos.y, z: charPos.z },
+                            direction: { x: camDir.x, y: camDir.y, z: camDir.z },
+                            torque: dropped.torque
+                        });
+                    }
                 }
             }
 
@@ -1582,8 +1641,14 @@ class Game {
                 if (triggeredButton) return // Don't pickup if we pressed button
 
                 // 2. Pickup Logic
-                const picked = this.itemDropManager.tryPickupNearest(charPos)
-                if (picked) {
+                const pickupResult = this.itemDropManager.tryPickupNearest(charPos)
+                if (pickupResult) {
+                    const picked = pickupResult.item;
+                    
+                    if (this.networkManager && this.networkManager.isConnected) {
+                        this.networkManager.sendPlayerAction("pickupItem", { dropId: pickupResult.dropId });
+                    }
+
                     if (picked.id === "fuego") {
                         this.fuegoCount += (picked.value || 1)
                         const counterEl = document.getElementById("fuego-count")
@@ -1596,7 +1661,21 @@ class Game {
                             console.log("Inventario lleno, soltando de nuevo...")
                             const camDir = new THREE.Vector3()
                             this.sceneManager.camera.getWorldDirection(camDir)
-                            this.itemDropManager.dropItem(picked, charPos, camDir)
+                            const droppedBack = this.itemDropManager.dropItem(picked, charPos, camDir)
+                            
+                            if (this.networkManager && this.networkManager.isConnected) {
+                                let itemData = Object.assign({}, picked);
+                                itemData.itemClass = picked.constructor.name;
+                                delete itemData.model; delete itemData.equipGroup; delete itemData.transformGroup; delete itemData.mixer; delete itemData.actionShoot; delete itemData.actionReload; delete itemData.blasterSystem; delete itemData.originalConfig;
+
+                                this.networkManager.sendPlayerAction("dropItem", {
+                                    dropId: droppedBack.dropId,
+                                    itemData: itemData,
+                                    position: { x: charPos.x, y: charPos.y, z: charPos.z },
+                                    direction: { x: camDir.x, y: camDir.y, z: camDir.z },
+                                    torque: droppedBack.torque
+                                });
+                            }
                         }
                     }
                 }

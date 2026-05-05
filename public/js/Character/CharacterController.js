@@ -48,6 +48,9 @@ export class CharacterController {
         this.momentum = new THREE.Vector3(0, 0, 0)
         this.momentumDamping = 2.0
 
+        // Weapon Modifiers
+        this.airWeaponMultiplier = 1.0;
+
         // No-Clip / Build Mode Ghost
         this.noClip = false
 
@@ -331,6 +334,7 @@ export class CharacterController {
         // Jump Logic
         // Reset Jump Count if grounded
         if (isGrounded) {
+            this.airWeaponMultiplier = 1.0;
             if (this.jumpCount > 0) {
                 this.jumpCount = 0;
                 this.emit('jumpChanged', { current: this.maxMultiJumps, max: this.maxMultiJumps, type: 'reset' });

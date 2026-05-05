@@ -2380,6 +2380,31 @@ export class ConstructionMenu {
         playerImpulseUpForceRow.appendChild(playerImpulseUpForceLabel);
         playerImpulseUpForceRow.appendChild(this.playerImpulseUpForceInput);
 
+        // --- Player Impulse Up Air Reduction Row ---
+        const playerImpulseUpAirRedRow = document.createElement('div');
+        playerImpulseUpAirRedRow.style.display = "flex";
+        playerImpulseUpAirRedRow.style.alignItems = "center";
+        playerImpulseUpAirRedRow.style.justifyContent = "space-between";
+
+        const playerImpulseUpAirRedLabel = document.createElement('span');
+        playerImpulseUpAirRedLabel.textContent = "Reducción en el Aire (%):";
+
+        this.playerImpulseUpAirRedInput = document.createElement('input');
+        this.playerImpulseUpAirRedInput.type = "number";
+        this.playerImpulseUpAirRedInput.step = "1.0";
+        this.playerImpulseUpAirRedInput.min = "0.0";
+        this.playerImpulseUpAirRedInput.max = "100.0";
+        this.playerImpulseUpAirRedInput.style.cssText = this.recoilInput.style.cssText;
+        this.playerImpulseUpAirRedInput.addEventListener('input', (e) => {
+            let val = parseFloat(e.target.value);
+            if (!isNaN(val) && this.currentDraftItem && this.currentDraftItem.type === 'weapon') {
+                this.currentDraftItem.playerImpulseUpAirReduction = val;
+            }
+        });
+
+        playerImpulseUpAirRedRow.appendChild(playerImpulseUpAirRedLabel);
+        playerImpulseUpAirRedRow.appendChild(this.playerImpulseUpAirRedInput);
+
         // --- Player Impulse Back Checkbox Row ---
         const playerImpulseBackRow = document.createElement('div');
         playerImpulseBackRow.style.display = "flex";
@@ -2442,6 +2467,7 @@ export class ConstructionMenu {
         weaponControlsContainer.appendChild(customImpactRow);
         weaponControlsContainer.appendChild(playerImpulseUpRow);
         weaponControlsContainer.appendChild(playerImpulseUpForceRow);
+        weaponControlsContainer.appendChild(playerImpulseUpAirRedRow);
         weaponControlsContainer.appendChild(playerImpulseBackRow);
         weaponControlsContainer.appendChild(playerImpulseBackForceRow);
 
@@ -2507,6 +2533,7 @@ export class ConstructionMenu {
             
             this.playerImpulseUpInput.checked = baseItem.hasPlayerImpulseUp !== undefined ? baseItem.hasPlayerImpulseUp : false;
             this.playerImpulseUpForceInput.value = baseItem.playerImpulseUpForce !== undefined ? baseItem.playerImpulseUpForce : 15.0;
+            this.playerImpulseUpAirRedInput.value = baseItem.playerImpulseUpAirReduction !== undefined ? baseItem.playerImpulseUpAirReduction : 50.0;
             
             this.playerImpulseBackInput.checked = baseItem.hasPlayerImpulseBack !== undefined ? baseItem.hasPlayerImpulseBack : false;
             this.playerImpulseBackForceInput.value = baseItem.playerImpulseBackForce !== undefined ? baseItem.playerImpulseBackForce : 5.0;

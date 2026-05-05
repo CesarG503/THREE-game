@@ -72,6 +72,7 @@ export class GunItem extends Item {
 
         this.hasPlayerImpulseUp = config.hasPlayerImpulseUp !== undefined ? config.hasPlayerImpulseUp : false;
         this.playerImpulseUpForce = config.playerImpulseUpForce !== undefined ? config.playerImpulseUpForce : 15.0;
+        this.playerImpulseUpAirReduction = config.playerImpulseUpAirReduction !== undefined ? config.playerImpulseUpAirReduction : 50.0;
         
         this.hasPlayerImpulseBack = config.hasPlayerImpulseBack !== undefined ? config.hasPlayerImpulseBack : false;
         this.playerImpulseBackForce = config.playerImpulseBackForce !== undefined ? config.playerImpulseBackForce : 5.0;
@@ -441,10 +442,23 @@ export class GunItem extends Item {
                     aimDir.copy(context.direction).normalize();
                 }
 
-                // Si la mirada tiene un componente Y fuertemente negativo (apuntando hacia abajo)
                 if (this.hasPlayerImpulseUp && aimDir.y < -0.4) {
                     // Rocket Jump: Salir impulsado hacia el aire en dirección inversa
-                    const forceVec = aimDir.clone().multiplyScalar(-this.playerImpulseUpForce);
+                    let forceMagnitud = this.playerImpulseUpForce;
+                    
+                    if (context.character.characterController && context.character.characterController.computedGrounded()) {
+                        context.character.airWeaponMultiplier = 1.0;
+                    } else {
+                        if (context.character.airWeaponMultiplier === undefined) {
+                            context.character.airWeaponMultiplier = 1.0;
+                        }
+                        const reduction = this.playerImpulseUpAirReduction / 100.0;
+                        context.character.airWeaponMultiplier *= (1.0 - reduction);
+                    }
+                    
+                    forceMagnitud *= context.character.airWeaponMultiplier;
+                    
+                    const forceVec = aimDir.clone().multiplyScalar(-forceMagnitud);
                     context.character.applyImpulse(forceVec);
                 } 
                 // Si apunta al frente o moderadamente arriba/abajo (Rango definido para empuje atrás)
@@ -707,6 +721,7 @@ export class GunItem extends Item {
             customImpactVFX:  this.customImpactVFX,
             hasPlayerImpulseUp: this.hasPlayerImpulseUp,
             playerImpulseUpForce: this.playerImpulseUpForce,
+            playerImpulseUpAirReduction: this.playerImpulseUpAirReduction,
             hasPlayerImpulseBack: this.hasPlayerImpulseBack,
             playerImpulseBackForce: this.playerImpulseBackForce,
             modelScale:       this.modelScale,

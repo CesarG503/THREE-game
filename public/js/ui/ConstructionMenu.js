@@ -2336,8 +2336,118 @@ export class ConstructionMenu {
             }
         });
 
-        customImpactRow.appendChild(customImpactLabel);
-        customImpactRow.appendChild(this.customImpactSelect);
+        // --- Player Impulse Up Checkbox Row ---
+        const playerImpulseUpRow = document.createElement('div');
+        playerImpulseUpRow.style.display = "flex";
+        playerImpulseUpRow.style.alignItems = "center";
+        playerImpulseUpRow.style.justifyContent = "space-between";
+
+        const playerImpulseUpLabel = document.createElement('span');
+        playerImpulseUpLabel.textContent = "Habilitar Salto Cohete (Abajo):";
+
+        this.playerImpulseUpInput = document.createElement('input');
+        this.playerImpulseUpInput.type = "checkbox";
+        this.playerImpulseUpInput.style.cssText = this.autoInput.style.cssText;
+        this.playerImpulseUpInput.addEventListener('change', (e) => {
+            if (this.currentDraftItem && this.currentDraftItem.type === 'weapon') {
+                this.currentDraftItem.hasPlayerImpulseUp = e.target.checked;
+            }
+        });
+
+        playerImpulseUpRow.appendChild(playerImpulseUpLabel);
+        playerImpulseUpRow.appendChild(this.playerImpulseUpInput);
+
+        // --- Player Impulse Up Force Row ---
+        const playerImpulseUpForceRow = document.createElement('div');
+        playerImpulseUpForceRow.style.display = "flex";
+        playerImpulseUpForceRow.style.alignItems = "center";
+        playerImpulseUpForceRow.style.justifyContent = "space-between";
+
+        const playerImpulseUpForceLabel = document.createElement('span');
+        playerImpulseUpForceLabel.textContent = "Fuerza Salto Cohete:";
+
+        this.playerImpulseUpForceInput = document.createElement('input');
+        this.playerImpulseUpForceInput.type = "number";
+        this.playerImpulseUpForceInput.step = "1.0";
+        this.playerImpulseUpForceInput.style.cssText = this.recoilInput.style.cssText;
+        this.playerImpulseUpForceInput.addEventListener('input', (e) => {
+            let val = parseFloat(e.target.value);
+            if (!isNaN(val) && this.currentDraftItem && this.currentDraftItem.type === 'weapon') {
+                this.currentDraftItem.playerImpulseUpForce = val;
+            }
+        });
+
+        playerImpulseUpForceRow.appendChild(playerImpulseUpForceLabel);
+        playerImpulseUpForceRow.appendChild(this.playerImpulseUpForceInput);
+
+        // --- Player Impulse Up Air Reduction Row ---
+        const playerImpulseUpAirRedRow = document.createElement('div');
+        playerImpulseUpAirRedRow.style.display = "flex";
+        playerImpulseUpAirRedRow.style.alignItems = "center";
+        playerImpulseUpAirRedRow.style.justifyContent = "space-between";
+
+        const playerImpulseUpAirRedLabel = document.createElement('span');
+        playerImpulseUpAirRedLabel.textContent = "Reducción en el Aire (%):";
+
+        this.playerImpulseUpAirRedInput = document.createElement('input');
+        this.playerImpulseUpAirRedInput.type = "number";
+        this.playerImpulseUpAirRedInput.step = "1.0";
+        this.playerImpulseUpAirRedInput.min = "0.0";
+        this.playerImpulseUpAirRedInput.max = "100.0";
+        this.playerImpulseUpAirRedInput.style.cssText = this.recoilInput.style.cssText;
+        this.playerImpulseUpAirRedInput.addEventListener('input', (e) => {
+            let val = parseFloat(e.target.value);
+            if (!isNaN(val) && this.currentDraftItem && this.currentDraftItem.type === 'weapon') {
+                this.currentDraftItem.playerImpulseUpAirReduction = val;
+            }
+        });
+
+        playerImpulseUpAirRedRow.appendChild(playerImpulseUpAirRedLabel);
+        playerImpulseUpAirRedRow.appendChild(this.playerImpulseUpAirRedInput);
+
+        // --- Player Impulse Back Checkbox Row ---
+        const playerImpulseBackRow = document.createElement('div');
+        playerImpulseBackRow.style.display = "flex";
+        playerImpulseBackRow.style.alignItems = "center";
+        playerImpulseBackRow.style.justifyContent = "space-between";
+
+        const playerImpulseBackLabel = document.createElement('span');
+        playerImpulseBackLabel.textContent = "Habilitar Empuje Atrás (Frente):";
+
+        this.playerImpulseBackInput = document.createElement('input');
+        this.playerImpulseBackInput.type = "checkbox";
+        this.playerImpulseBackInput.style.cssText = this.autoInput.style.cssText;
+        this.playerImpulseBackInput.addEventListener('change', (e) => {
+            if (this.currentDraftItem && this.currentDraftItem.type === 'weapon') {
+                this.currentDraftItem.hasPlayerImpulseBack = e.target.checked;
+            }
+        });
+
+        playerImpulseBackRow.appendChild(playerImpulseBackLabel);
+        playerImpulseBackRow.appendChild(this.playerImpulseBackInput);
+
+        // --- Player Impulse Back Force Row ---
+        const playerImpulseBackForceRow = document.createElement('div');
+        playerImpulseBackForceRow.style.display = "flex";
+        playerImpulseBackForceRow.style.alignItems = "center";
+        playerImpulseBackForceRow.style.justifyContent = "space-between";
+
+        const playerImpulseBackForceLabel = document.createElement('span');
+        playerImpulseBackForceLabel.textContent = "Fuerza Empuje Atrás:";
+
+        this.playerImpulseBackForceInput = document.createElement('input');
+        this.playerImpulseBackForceInput.type = "number";
+        this.playerImpulseBackForceInput.step = "1.0";
+        this.playerImpulseBackForceInput.style.cssText = this.recoilInput.style.cssText;
+        this.playerImpulseBackForceInput.addEventListener('input', (e) => {
+            let val = parseFloat(e.target.value);
+            if (!isNaN(val) && this.currentDraftItem && this.currentDraftItem.type === 'weapon') {
+                this.currentDraftItem.playerImpulseBackForce = val;
+            }
+        });
+
+        playerImpulseBackForceRow.appendChild(playerImpulseBackForceLabel);
+        playerImpulseBackForceRow.appendChild(this.playerImpulseBackForceInput);
 
         weaponControlsContainer.appendChild(damageRow);
         weaponControlsContainer.appendChild(cooldownRow);
@@ -2355,6 +2465,11 @@ export class ConstructionMenu {
         weaponControlsContainer.appendChild(customTracerRow);
         weaponControlsContainer.appendChild(tracerDestroyRow);
         weaponControlsContainer.appendChild(customImpactRow);
+        weaponControlsContainer.appendChild(playerImpulseUpRow);
+        weaponControlsContainer.appendChild(playerImpulseUpForceRow);
+        weaponControlsContainer.appendChild(playerImpulseUpAirRedRow);
+        weaponControlsContainer.appendChild(playerImpulseBackRow);
+        weaponControlsContainer.appendChild(playerImpulseBackForceRow);
 
         this.panelEditor.appendChild(weaponControlsContainer);
 
@@ -2415,6 +2530,13 @@ export class ConstructionMenu {
             this.customTracerSelect.value = baseItem.customTracerVFX || "Ninguno";
             this.tracerDestroyInput.checked = baseItem.tracerDestroyOnCollision || false;
             this.customImpactSelect.value = baseItem.customImpactVFX || "Ninguno";
+            
+            this.playerImpulseUpInput.checked = baseItem.hasPlayerImpulseUp !== undefined ? baseItem.hasPlayerImpulseUp : false;
+            this.playerImpulseUpForceInput.value = baseItem.playerImpulseUpForce !== undefined ? baseItem.playerImpulseUpForce : 15.0;
+            this.playerImpulseUpAirRedInput.value = baseItem.playerImpulseUpAirReduction !== undefined ? baseItem.playerImpulseUpAirReduction : 50.0;
+            
+            this.playerImpulseBackInput.checked = baseItem.hasPlayerImpulseBack !== undefined ? baseItem.hasPlayerImpulseBack : false;
+            this.playerImpulseBackForceInput.value = baseItem.playerImpulseBackForce !== undefined ? baseItem.playerImpulseBackForce : 5.0;
         } else {
             this.editorConstructionControls.style.display = 'flex';
             this.editorTextureContainer.style.display = 'flex';

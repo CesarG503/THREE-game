@@ -8,7 +8,7 @@ export class ItemDropManager {
         this.droppedItems = [];
     }
 
-    dropItem(item, position, launchDirection) {
+    dropItem(item, position, launchDirection, forceDropId = null, remoteData = null) {
         if (!item) return;
 
         // launchDirection debe ser un vector normalizado de hacia donde mira el jugador
@@ -20,6 +20,7 @@ export class ItemDropManager {
         );
 
         const dropped = new DroppedItem(this.scene, this.world, item, spawnPos);
+        dropped.dropId = forceDropId || ("drop_" + Math.random().toString(36).substring(2, 10));
 
         // Impulso estilo "Minecraft Q"
         // Un arco hacia adelante
@@ -30,16 +31,21 @@ export class ItemDropManager {
             z: launchDirection.z * force
         };
 
-        dropped.rigidBody.applyImpulse(impulse, true);
-        // Rotacion aleatoria al lanzar
-        dropped.rigidBody.applyTorqueImpulse({
+        const torque = remoteData && remoteData.torque ? remoteData.torque : {
             x: (Math.random() - 0.5) * 0.5,
             y: (Math.random() - 0.5) * 0.5,
             z: (Math.random() - 0.5) * 0.5
-        }, true);
+        };
+
+        dropped.torque = torque; // Guardar el torque para sincronización
+
+        dropped.rigidBody.applyImpulse(impulse, true);
+        dropped.rigidBody.applyTorqueImpulse(torque, true);
 
         this.droppedItems.push(dropped);
-        console.log("Item arrojado:", item.name);
+        console.log("Item arrojado:", item.name, dropped.dropId);
+        
+        return dropped;
     }
 
     /**
@@ -76,10 +82,21 @@ export class ItemDropManager {
             }
 
             console.log("Item recogido:", item.name);
-            return item;
+            return { item: item, dropId: nearest.dropId };
         }
 
         return null; // pickup failed
+    }
+
+    removeItemByDropId(dropId) {
+        const index = this.droppedItems.findIndex(d => d.dropId === dropId);
+        if (index !== -1) {
+            const dropped = this.droppedItems[index];
+            dropped.dispose();
+            this.droppedItems.splice(index, 1);
+            return true;
+        }
+        return false;
     }
 
     getNearestItem(position, range = 3.0) {

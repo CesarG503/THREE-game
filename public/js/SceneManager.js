@@ -103,12 +103,32 @@ export class SceneManager {
             this.scene.fog = new THREE.Fog(0x87CEEB, 10, 50);
             if (this.stars) this.stars.visible = false;
         }
+
+        if (this.currentRenderDistance !== undefined) {
+            this.setRenderDistance(this.currentRenderDistance);
+        }
     }
 
     onWindowResize() {
         this.camera.aspect = window.innerWidth / window.innerHeight;
         this.camera.updateProjectionMatrix();
         this.renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    setRenderDistance(distance) {
+        this.currentRenderDistance = distance;
+        if (this.camera) {
+            this.camera.far = distance;
+            this.camera.updateProjectionMatrix();
+        }
+        if (this.scene.fog) {
+            if (this.scene.fog.isFog) {
+                this.scene.fog.far = distance;
+            } else if (this.scene.fog.isFogExp2) {
+                // Aproximate density based on distance
+                this.scene.fog.density = 1.5 / distance;
+            }
+        }
     }
 
     update() {

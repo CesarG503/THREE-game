@@ -70,6 +70,13 @@ export class GunItem extends Item {
         this.tracerDestroyOnCollision = config.tracerDestroyOnCollision !== undefined ? config.tracerDestroyOnCollision : false;
         this.customImpactVFX = config.customImpactVFX || "Ninguno";
 
+        this.hasPlayerImpulseUp = config.hasPlayerImpulseUp !== undefined ? config.hasPlayerImpulseUp : false;
+        this.playerImpulseUpForce = config.playerImpulseUpForce !== undefined ? config.playerImpulseUpForce : 15.0;
+        this.playerImpulseUpAirReduction = config.playerImpulseUpAirReduction !== undefined ? config.playerImpulseUpAirReduction : 50.0;
+        
+        this.hasPlayerImpulseBack = config.hasPlayerImpulseBack !== undefined ? config.hasPlayerImpulseBack : false;
+        this.playerImpulseBackForce = config.playerImpulseBackForce !== undefined ? config.playerImpulseBackForce : 5.0;
+
         this.modelScale = config.modelScale !== undefined ? config.modelScale : 1.0;
         this.modelOffset = config.modelOffset || new THREE.Vector3(0, 0, 0);
         this.modelRotation = config.modelRotation || new THREE.Vector3(0, Math.PI / 2, 0);
@@ -424,6 +431,45 @@ export class GunItem extends Item {
                     this.tracerDestroyOnCollision
                 );
             }
+
+            // --- GOLPE DE IMPULSO AL JUGADOR (ROCKET JUMP / RETROCESO FISICO) ---
+            if (context.character) {
+                // Obtener la dirección de la cámara (la intención real del jugador) en lugar del cañón para evitar bugs de clipping con el suelo
+                let aimDir = new THREE.Vector3();
+                if (context.camera) {
+                    context.camera.getWorldDirection(aimDir);
+                } else {
+                    aimDir.copy(context.direction).normalize();
+                }
+
+                if (this.hasPlayerImpulseUp && aimDir.y < -0.4) {
+                    // Rocket Jump: Salir impulsado hacia el aire en dirección inversa
+                    let forceMagnitud = this.playerImpulseUpForce;
+                    
+                    if (context.character.characterController && context.character.characterController.computedGrounded()) {
+                        context.character.airWeaponMultiplier = 1.0;
+                    } else {
+                        if (context.character.airWeaponMultiplier === undefined) {
+                            context.character.airWeaponMultiplier = 1.0;
+                        }
+                        const reduction = this.playerImpulseUpAirReduction / 100.0;
+                        context.character.airWeaponMultiplier *= (1.0 - reduction);
+                    }
+                    
+                    forceMagnitud *= context.character.airWeaponMultiplier;
+                    
+                    const forceVec = aimDir.clone().multiplyScalar(-forceMagnitud);
+                    context.character.applyImpulse(forceVec);
+                } 
+                // Si apunta al frente o moderadamente arriba/abajo (Rango definido para empuje atrás)
+                else if (this.hasPlayerImpulseBack && aimDir.y >= -0.4 && aimDir.y <= 0.6) {
+                    // Retroceso: Salir impulsado hacia atrás
+                    const forceVec = aimDir.clone().multiplyScalar(-this.playerImpulseBackForce);
+                    // Anular la fuerza vertical para que solo te empuje hacia atrás horizontalmente
+                    forceVec.y = 0; 
+                    context.character.applyImpulse(forceVec);
+                }
+            }
         }
 
         // Play Sound?
@@ -673,6 +719,11 @@ export class GunItem extends Item {
             customTracerVFX:  this.customTracerVFX,
             tracerDestroyOnCollision: this.tracerDestroyOnCollision,
             customImpactVFX:  this.customImpactVFX,
+            hasPlayerImpulseUp: this.hasPlayerImpulseUp,
+            playerImpulseUpForce: this.playerImpulseUpForce,
+            playerImpulseUpAirReduction: this.playerImpulseUpAirReduction,
+            hasPlayerImpulseBack: this.hasPlayerImpulseBack,
+            playerImpulseBackForce: this.playerImpulseBackForce,
             modelScale:       this.modelScale,
             equippedHand:     this.equippedHand,
         });

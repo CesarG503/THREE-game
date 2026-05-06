@@ -92,6 +92,12 @@ export class InventoryManager {
             if (this.slots[i] === null) {
                 this.slots[i] = item;
                 this.updateUI();
+                
+                // If added to the currently selected slot, trigger update
+                if (i === this.currentSlotIndex && this.onItemChange) {
+                    this.onItemChange(item);
+                }
+                
                 return true;
             }
         }

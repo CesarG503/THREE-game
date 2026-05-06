@@ -17,7 +17,6 @@ import { Item } from "./item/Item.js"
 import { ImpulseItem } from "./item/ImpulseItem.js"
 import { FarmingZone } from "./FarmingZone.js"
 import { FuegoItem } from "./item/FuegoItem.js"
-import { FarmingSettings } from "./FarmingSettings.js"
 import { TurretItem } from "./item/TurretItem.js"
 import { TurretPad } from "./TurretPad.js"
 import { PelotaItem } from "./item/PelotaItem.js"
@@ -1438,6 +1437,25 @@ class Game {
         if (tpTrackingCheckbox) {
             tpTrackingCheckbox.addEventListener("change", (e) => {
                 this.cameraController.setAlwaysRotateThirdPerson(e.target.checked)
+            })
+        }
+
+        const renderDistance = document.getElementById("graphics-render-distance")
+        const renderDistanceVal = document.getElementById("graphics-render-distance-val")
+        if (renderDistance && renderDistanceVal) {
+            // Set initial value based on current fog
+            if (this.sceneManager.scene.fog && this.sceneManager.scene.fog.isFog) {
+                renderDistance.value = this.sceneManager.scene.fog.far;
+                renderDistanceVal.textContent = this.sceneManager.scene.fog.far;
+            } else {
+                renderDistance.value = this.sceneManager.camera.far;
+                renderDistanceVal.textContent = this.sceneManager.camera.far;
+            }
+
+            renderDistance.addEventListener("input", (e) => {
+                const val = parseInt(e.target.value)
+                this.sceneManager.setRenderDistance(val)
+                renderDistanceVal.textContent = val
             })
         }
 

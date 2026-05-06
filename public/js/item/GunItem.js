@@ -68,6 +68,7 @@ export class GunItem extends Item {
         this.hasImpactEffect = config.hasImpactEffect !== undefined ? config.hasImpactEffect : false; // Humo al chocar
         this.customTracerVFX = config.customTracerVFX || "Ninguno";
         this.tracerDestroyOnCollision = config.tracerDestroyOnCollision !== undefined ? config.tracerDestroyOnCollision : false;
+        this.tracerCollisionVFX = config.tracerCollisionVFX || "Ninguno";
         this.customImpactVFX = config.customImpactVFX || "Ninguno";
 
         this.hasPlayerImpulseUp = config.hasPlayerImpulseUp !== undefined ? config.hasPlayerImpulseUp : false;
@@ -408,6 +409,7 @@ export class GunItem extends Item {
             proj.hasTracer = this.hasTracer;
             proj.hasTrajectoryLine = this.hasTrajectoryLine;
             proj.tracerDestroyOnCollision = this.tracerDestroyOnCollision;
+            proj.tracerCollisionVFX = this.tracerCollisionVFX;
             proj.blasterSystem = this.blasterSystem;
             proj.particleSystem = context.particleSystem; // REQUIRED FOR CUSTOM VFX!
             proj.initialTracer = tempTracer;
@@ -428,7 +430,8 @@ export class GunItem extends Item {
                     this.hasTrajectoryLine,
                     this.customTracerVFX,
                     this.customImpactVFX,
-                    this.tracerDestroyOnCollision
+                    this.tracerDestroyOnCollision,
+                    this.tracerCollisionVFX
                 );
             }
 
@@ -718,6 +721,7 @@ export class GunItem extends Item {
             hasImpactEffect:  this.hasImpactEffect,
             customTracerVFX:  this.customTracerVFX,
             tracerDestroyOnCollision: this.tracerDestroyOnCollision,
+            tracerCollisionVFX: this.tracerCollisionVFX,
             customImpactVFX:  this.customImpactVFX,
             hasPlayerImpulseUp: this.hasPlayerImpulseUp,
             playerImpulseUpForce: this.playerImpulseUpForce,

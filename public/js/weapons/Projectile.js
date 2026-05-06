@@ -2,7 +2,7 @@ import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
 
 export class Projectile {
-    constructor(scene, world, origin, direction, speed, damage, bulletDrop = 1.0, type = "ball", rebote = false, hasImpactEffect = false, customTracerVFX = "Ninguno", customImpactVFX = "Ninguno") {
+    constructor(scene, world, origin, direction, speed, damage, bulletDrop = 1.0, type = "ball", rebote = false, hasImpactEffect = false, customTracerVFX = "Ninguno", customImpactVFX = "Ninguno", tracerCollisionVFX = "Ninguno") {
         this.scene = scene;
         this.world = world;
         this.damage = damage;
@@ -13,6 +13,7 @@ export class Projectile {
         this.hasImpactEffect = hasImpactEffect;
         this.customTracerVFX = customTracerVFX;
         this.customImpactVFX = customImpactVFX;
+        this.tracerCollisionVFX = tracerCollisionVFX;
         this.customTracerAttached = false;
         this.customTracerWrapper = null;
 
@@ -215,8 +216,27 @@ export class Projectile {
             }
         }
 
+        // Tracer Collision VFX (Independent of Tracer Wrapper existence)
+        if (hitPos && this.particleSystem && this.tracerCollisionVFX && this.tracerCollisionVFX !== "Ninguno") {
+            const tracerHitPos = new THREE.Vector3(hitPos.x, hitPos.y, hitPos.z);
+            const tracerImpactWrapper = this.particleSystem.spawnLoadedEffect(this.tracerCollisionVFX, tracerHitPos, null, null, false);
+            
+            setTimeout(() => {
+                if (this.particleSystem) {
+                    this.particleSystem.stopLoadedEffectEmission(tracerImpactWrapper);
+                }
+            }, 500);
+
+            setTimeout(() => {
+                if (this.particleSystem) {
+                    this.particleSystem.destroyLoadedEffect(tracerImpactWrapper);
+                }
+            }, 3000);
+        }
+
         // Cleanup Custom Tracer
         if (this.customTracerWrapper && this.particleSystem) {
+            
             if (this.tracerDestroyOnCollision) {
                 // Dinamizar "Eliminar al colisionar":
                 // Desvincular de la bala para evitar la destrucción inmediata

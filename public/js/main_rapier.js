@@ -205,9 +205,9 @@ class Game {
         }
 
         // ── Sincronización de Proyectiles (Shoot) ──────────────────
-        this.networkManager.onPlayerShoot = (playerId, startPos, direction, type, speed, damage, drop, rebote, hasImpactEffect, hasTracer, hasTrajectoryLine, customTracerVFX = "Ninguno", customImpactVFX = "Ninguno", tracerDestroyOnCollision = false) => {
+        this.networkManager.onPlayerShoot = (playerId, startPos, direction, type, speed, damage, drop, rebote, hasImpactEffect, hasTracer, hasTrajectoryLine, customTracerVFX = "Ninguno", customImpactVFX = "Ninguno", tracerDestroyOnCollision = false, tracerCollisionVFX = "Ninguno") => {
             console.log(`[Collab] Player ${playerId} disparó un ${type}!`)
-            this.handleRemoteShoot(startPos, direction, type, speed, damage, drop, rebote, hasImpactEffect, hasTracer, hasTrajectoryLine, customTracerVFX, customImpactVFX, tracerDestroyOnCollision)
+            this.handleRemoteShoot(startPos, direction, type, speed, damage, drop, rebote, hasImpactEffect, hasTracer, hasTrajectoryLine, customTracerVFX, customImpactVFX, tracerDestroyOnCollision, tracerCollisionVFX)
         }
 
         // ── Sincronización de Acciones (Doble Salto, etc) ──────────────────
@@ -2319,7 +2319,7 @@ class Game {
     }
 
     // ── Gestión de Disparos Remotos ───────────────────────────────────────
-    handleRemoteShoot(startPos, direction, type, speed, damage, drop, rebote, hasImpactEffect, hasTracer = false, hasTrajectoryLine = false, customTracerVFX = "Ninguno", customImpactVFX = "Ninguno", tracerDestroyOnCollision = false) {
+    handleRemoteShoot(startPos, direction, type, speed, damage, drop, rebote, hasImpactEffect, hasTracer = false, hasTrajectoryLine = false, customTracerVFX = "Ninguno", customImpactVFX = "Ninguno", tracerDestroyOnCollision = false, tracerCollisionVFX = "Ninguno") {
         if (!this.sceneManager || !this.world) return
 
         let tempTracer = null
@@ -2353,7 +2353,8 @@ class Game {
             rebote || false,
             hasImpactEffect || false,
             customTracerVFX,
-            customImpactVFX
+            customImpactVFX,
+            tracerCollisionVFX
         )
         proj.hasTracer = hasTracer
         proj.hasTrajectoryLine = hasTrajectoryLine
@@ -2362,6 +2363,7 @@ class Game {
         proj.initialTracer = tempTracer
         proj.isRemoteBlaster = true
         proj.tracerDestroyOnCollision = tracerDestroyOnCollision
+        proj.tracerCollisionVFX = tracerCollisionVFX
         // We do not set isRemote flag conceptually, because projectile does physics and stops locally
         // Alternatively, you could tag it to apply no damage locally.
         

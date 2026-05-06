@@ -2311,6 +2311,34 @@ export class ConstructionMenu {
         tracerDestroyRow.appendChild(tracerDestroyLabel);
         tracerDestroyRow.appendChild(this.tracerDestroyInput);
 
+        // --- Tracer Collision VFX Row ---
+        const tracerCollisionRow = document.createElement('div');
+        tracerCollisionRow.style.display = "flex";
+        tracerCollisionRow.style.alignItems = "center";
+        tracerCollisionRow.style.justifyContent = "space-between";
+
+        const tracerCollisionLabel = document.createElement('span');
+        tracerCollisionLabel.textContent = "efecto de impacto VFX:";
+
+        this.tracerCollisionSelect = document.createElement('select');
+        this.tracerCollisionSelect.style.cssText = this.projectileTypeSelect.style.cssText;
+
+        ['Ninguno', 'Bubble Explosion', 'Cartoon Bang', 'Dollar Bill Shower', 'Cartoon Blood Splash', 'Cartoon Fireball Explosion', 'Cartoon Purple Lightning', 'Explosión de Gas Azul'].forEach(opt => {
+            const el = document.createElement('option');
+            el.value = opt;
+            el.textContent = opt;
+            this.tracerCollisionSelect.appendChild(el);
+        });
+
+        this.tracerCollisionSelect.addEventListener('change', (e) => {
+            if (this.currentDraftItem && this.currentDraftItem.type === 'weapon') {
+                this.currentDraftItem.tracerCollisionVFX = e.target.value;
+            }
+        });
+
+        tracerCollisionRow.appendChild(tracerCollisionLabel);
+        tracerCollisionRow.appendChild(this.tracerCollisionSelect);
+
         // --- Custom Impact VFX Row ---
         const customImpactRow = document.createElement('div');
         customImpactRow.style.display = "flex";
@@ -2464,6 +2492,7 @@ export class ConstructionMenu {
         weaponControlsContainer.appendChild(impactRow);
         weaponControlsContainer.appendChild(customTracerRow);
         weaponControlsContainer.appendChild(tracerDestroyRow);
+        weaponControlsContainer.appendChild(tracerCollisionRow);
         weaponControlsContainer.appendChild(customImpactRow);
         weaponControlsContainer.appendChild(playerImpulseUpRow);
         weaponControlsContainer.appendChild(playerImpulseUpForceRow);
@@ -2529,6 +2558,7 @@ export class ConstructionMenu {
 
             this.customTracerSelect.value = baseItem.customTracerVFX || "Ninguno";
             this.tracerDestroyInput.checked = baseItem.tracerDestroyOnCollision || false;
+            this.tracerCollisionSelect.value = baseItem.tracerCollisionVFX || "Ninguno";
             this.customImpactSelect.value = baseItem.customImpactVFX || "Ninguno";
             
             this.playerImpulseUpInput.checked = baseItem.hasPlayerImpulseUp !== undefined ? baseItem.hasPlayerImpulseUp : false;

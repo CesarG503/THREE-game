@@ -3,6 +3,7 @@ import RAPIER from "@dimforge/rapier3d-compat"
 import { SceneManager } from "./SceneManager.js"
 import { InputManager } from "./InputManager.js"
 import { CameraController } from "./camera/CameraController.js"
+import { ScopeController } from "./camera/ScopeController.js"
 import { CharacterController } from "./Character/CharacterController.js"
 import { NetworkManager } from "./NetworkManager.js"
 import { ChatManager } from "./ChatManager.js"
@@ -78,6 +79,10 @@ class Game {
         this.cameraController = new CameraController(
             this.sceneManager.camera,
             this.sceneManager.renderer.domElement
+        )
+        this.scopeController = new ScopeController(
+            this.sceneManager.camera,
+            this
         )
         this.sceneManager.renderer.autoClear = false // Manual clear for overlays
         this.setupOrientationGizmo()
@@ -724,6 +729,11 @@ class Game {
         requestAnimationFrame(this.animate)
 
         const dt = this.clock.getDelta()
+
+        // Scope / Aiming update
+        if (this.scopeController && this.character) {
+            this.scopeController.update(dt, this.inputManager.keys.aim, this.inventoryManager ? this.inventoryManager.getCurrentItem() : null);
+        }
 
         // Step Physics 
         this.world.step(this.eventQueue)

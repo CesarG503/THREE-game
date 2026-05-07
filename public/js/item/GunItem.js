@@ -82,6 +82,9 @@ export class GunItem extends Item {
         this.modelOffset = config.modelOffset || new THREE.Vector3(0, 0, 0);
         this.modelRotation = config.modelRotation || new THREE.Vector3(0, Math.PI / 2, 0);
 
+        // Scope Settings
+        this.maxScope = config.maxScope !== undefined ? config.maxScope : 1;
+
         // --- NEW SYSTEM: Per-model settings and procedural animations ---
         const weaponSettings = WEAPON_SETTINGS[this.id] || {};
         this.handOffset = weaponSettings.handOffset || new THREE.Vector3(0, 0, 0);
@@ -258,6 +261,7 @@ export class GunItem extends Item {
     }
 
     use(context) {
+        if (context && context.isRightClick) return false; // Prevent shooting when right-clicking to aim
         if (this.isReloading) return false;
 
         const now = Date.now() / 1000;
@@ -273,6 +277,11 @@ export class GunItem extends Item {
             this.actionShoot.enabled = true;
             this.actionShoot.time = 0;
             this.actionShoot.play();
+        }
+
+        // Visual recoil en la mira si se está apuntando
+        if (context && context.game && context.game.scopeController) {
+            context.game.scopeController.onShoot();
         }
 
         // --- GOLPE DE RETROCESO (PROCEDURAL) ---
@@ -730,6 +739,7 @@ export class GunItem extends Item {
             playerImpulseBackForce: this.playerImpulseBackForce,
             modelScale:       this.modelScale,
             equippedHand:     this.equippedHand,
+            maxScope:         this.maxScope,
         });
         const cloned = new GunItem(updatedConfig);
         if (this._baseId) cloned._baseId = this._baseId;

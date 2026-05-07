@@ -2480,6 +2480,47 @@ export class ConstructionMenu {
         weaponControlsContainer.appendChild(damageRow);
         weaponControlsContainer.appendChild(cooldownRow);
         weaponControlsContainer.appendChild(handRow);
+        
+        // --- Max Scope Row ---
+        const maxScopeRow = document.createElement('div');
+        maxScopeRow.style.display = "flex";
+        maxScopeRow.style.alignItems = "center";
+        maxScopeRow.style.justifyContent = "space-between";
+
+        const maxScopeLabel = document.createElement('span');
+        maxScopeLabel.textContent = "Nivel de Mira (Scope):";
+
+        this.maxScopeSelect = document.createElement('select');
+        this.maxScopeSelect.style.cssText = this.handSelect.style.cssText;
+        
+        const scopeOptions = [
+            { value: 1, text: 'Ninguno (1x)' },
+            { value: 2, text: 'Mira Corta (x2)' },
+            { value: 4, text: 'Mira Media (x4)' },
+            { value: 5, text: 'Mira Media-Alta (x5)' },
+            { value: 8, text: 'Mira Larga (x8)' },
+            { value: 10, text: 'Mira Francotirador (x10)' },
+            { value: 16, text: 'Mira Avanzada (x16)' }
+        ];
+
+        scopeOptions.forEach(opt => {
+            const el = document.createElement('option');
+            el.value = opt.value;
+            el.textContent = opt.text;
+            this.maxScopeSelect.appendChild(el);
+        });
+
+        this.maxScopeSelect.addEventListener('change', (e) => {
+            let val = parseInt(e.target.value);
+            if (!isNaN(val) && this.currentDraftItem && this.currentDraftItem.type === 'weapon') {
+                this.currentDraftItem.maxScope = val;
+            }
+        });
+
+        maxScopeRow.appendChild(maxScopeLabel);
+        maxScopeRow.appendChild(this.maxScopeSelect);
+        weaponControlsContainer.appendChild(maxScopeRow);
+
         weaponControlsContainer.appendChild(recoilRow);
         weaponControlsContainer.appendChild(recoilModeRow);
         weaponControlsContainer.appendChild(autoRow);
@@ -2542,6 +2583,7 @@ export class ConstructionMenu {
             this.damageInput.value = baseItem.damage !== undefined ? baseItem.damage : 10;
             this.cooldownInput.value = baseItem.cooldown !== undefined ? baseItem.cooldown : 0.5;
             this.handSelect.value = baseItem.equippedHand !== undefined ? baseItem.equippedHand : "right";
+            this.maxScopeSelect.value = baseItem.maxScope !== undefined ? baseItem.maxScope : 1;
             this.recoilInput.value = baseItem.recoil !== undefined ? baseItem.recoil : 5.0;
             this.recoilModeSelect.value = baseItem.recoilMode !== undefined ? baseItem.recoilMode : "hybrid";
             this.autoInput.checked = baseItem.isAuto !== undefined ? baseItem.isAuto : false;

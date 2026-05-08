@@ -9,7 +9,7 @@ export class ScopeAnimation {
         this.overlayTween = null;
     }
 
-    animateEnter(targetFov) {
+    animateEnter(targetFov, zoomValue = 2) {
         // Kill previous tweens
         if (this.fovTween) this.fovTween.kill();
         if (this.overlayTween) this.overlayTween.kill();
@@ -29,8 +29,10 @@ export class ScopeAnimation {
                 scale: 1.1
             });
 
+            const targetOpacity = zoomValue === 1 ? 0 : 1;
+
             this.overlayTween = gsap.to(this.ui.overlay, {
-                opacity: 1,
+                opacity: targetOpacity,
                 scale: 1,
                 duration: ScopeSettings.animationDuration,
                 ease: "power2.out"

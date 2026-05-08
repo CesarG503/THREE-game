@@ -47,16 +47,32 @@ export class ScopeController {
 
     _applyZoomChange() {
         const selectedZoom = this.allowedScopes[this.currentScopeIndex];
-        const targetFov = ScopeSettings.defaultFov / selectedZoom;
+        const targetFov = selectedZoom === 1 
+            ? ScopeSettings.defaultFov / 1.2 // Iron Sights zoom
+            : ScopeSettings.defaultFov / selectedZoom;
         
         this.ui.setZoomText(selectedZoom);
         this.animation.animateZoomChange(targetFov);
+
+        // Hide UI overlay if zoom is 1 (no-scope mode)
+        if (this.ui.overlay) {
+            const isNoScope = selectedZoom === 1;
+            window.gsap.to(this.ui.overlay, {
+                opacity: isNoScope ? 0 : 1,
+                duration: 0.2,
+                ease: "power2.out"
+            });
+        }
     }
 
     // Llamado externo cuando se dispara el arma
     onShoot() {
         if (this.isAiming) {
-            this.animation.animateRecoil();
+            const selectedZoom = this.allowedScopes[this.currentScopeIndex];
+            // Solo aplicar recoil de la mira si el overlay es visible
+            if (selectedZoom > 1) {
+                this.animation.animateRecoil();
+            }
         }
     }
 
@@ -79,10 +95,12 @@ export class ScopeController {
                 }
                 
                 const zoomValue = this.allowedScopes[this.currentScopeIndex];
-                const targetFov = ScopeSettings.defaultFov / zoomValue;
+                const targetFov = zoomValue === 1 
+                    ? ScopeSettings.defaultFov / 1.2 
+                    : ScopeSettings.defaultFov / zoomValue;
                 
                 this.ui.setZoomText(zoomValue);
-                this.animation.animateEnter(targetFov);
+                this.animation.animateEnter(targetFov, zoomValue);
                 this.effects.startAmbientEffects();
             }
         } else {

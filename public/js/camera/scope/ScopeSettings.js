@@ -1,6 +1,6 @@
 export const ScopeSettings = {
     defaultFov: 75,
-    availableScopes: [2, 4, 5, 8, 10, 16],
+    availableScopes: [1, 2, 4, 5, 8, 10, 16],
     animationDuration: 0.3, // GSAP duration
     recoilIntensity: 8,
     swayIntensity: 2,

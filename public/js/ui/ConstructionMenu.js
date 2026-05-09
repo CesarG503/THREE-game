@@ -1583,13 +1583,49 @@ export class ConstructionMenu {
             width: 100%;
         `
 
-        // 1. Title
+        // 1. Title Container
+        this.editorTitleContainer = document.createElement('div');
+        this.editorTitleContainer.style.display = "flex";
+        this.editorTitleContainer.style.alignItems = "center";
+        this.editorTitleContainer.style.justifyContent = "space-between";
+        this.editorTitleContainer.style.width = "100%";
+        this.editorTitleContainer.style.borderBottom = "1px solid #444";
+        this.editorTitleContainer.style.paddingBottom = "10px";
+
+        // Title
         this.editorTitle = document.createElement('h3')
         this.editorTitle.style.margin = "0"
-        this.editorTitle.style.borderBottom = "1px solid #444"
-        this.editorTitle.style.width = "100%"
-        this.editorTitle.style.textAlign = "center"
-        this.editorTitle.style.paddingBottom = "10px"
+
+        // Advanced Panel Button
+        this.advancedConfigBtn = document.createElement('button');
+        this.advancedConfigBtn.innerHTML = 'Config. Avanzada';
+        this.advancedConfigBtn.style.cssText = `
+            background: #0078d7;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 11px;
+            font-weight: bold;
+            display: none;
+            transition: background 0.2s;
+        `;
+        this.advancedConfigBtn.onmouseover = () => this.advancedConfigBtn.style.background = "#005a9e";
+        this.advancedConfigBtn.onmouseout = () => this.advancedConfigBtn.style.background = "#0078d7";
+        this.advancedConfigBtn.onclick = () => {
+            if (!window.advancedWeaponConfigPanel) {
+                import('./AdvancedWeaponConfigPanel.js').then(module => {
+                    window.advancedWeaponConfigPanel = new module.AdvancedWeaponConfigPanel(this.game);
+                    window.advancedWeaponConfigPanel.show(this.currentDraftItem);
+                }).catch(err => console.error("Failed to load AdvancedWeaponConfigPanel", err));
+            } else {
+                window.advancedWeaponConfigPanel.show(this.currentDraftItem);
+            }
+        };
+
+        this.editorTitleContainer.appendChild(this.editorTitle);
+        this.editorTitleContainer.appendChild(this.advancedConfigBtn);
 
         // 2. Large Preview (Draggable)
         this.editorPreview = document.createElement('div')
@@ -1726,7 +1762,7 @@ export class ConstructionMenu {
         controlsContainer.appendChild(this.paletteContainer)
 
         // Add to panel
-        this.panelEditor.appendChild(this.editorTitle)
+        this.panelEditor.appendChild(this.editorTitleContainer)
         this.panelEditor.appendChild(this.editorPreview)
         this.panelEditor.appendChild(controlsContainer)
 
@@ -2480,7 +2516,7 @@ export class ConstructionMenu {
         weaponControlsContainer.appendChild(damageRow);
         weaponControlsContainer.appendChild(cooldownRow);
         weaponControlsContainer.appendChild(handRow);
-        
+
         // --- Max Scope Row ---
         const maxScopeRow = document.createElement('div');
         maxScopeRow.style.display = "flex";
@@ -2492,7 +2528,7 @@ export class ConstructionMenu {
 
         this.maxScopeSelect = document.createElement('select');
         this.maxScopeSelect.style.cssText = this.handSelect.style.cssText;
-        
+
         const scopeOptions = [
             { value: 1, text: 'Ninguno (1x)' },
             { value: 2, text: 'Mira Corta (x2)' },
@@ -2575,6 +2611,7 @@ export class ConstructionMenu {
         this.createDraft(baseItem.id, baseItem.name, baseItem.type, baseItem.color, scaleCopy, baseItem.texturePath, baseItem)
 
         if (baseItem.type === 'weapon') {
+            if (this.advancedConfigBtn) this.advancedConfigBtn.style.display = 'block';
             this.editorConstructionControls.style.display = 'none';
             this.editorTextureContainer.style.display = 'none';
             this.editorDimContainer.style.display = 'none';
@@ -2602,14 +2639,15 @@ export class ConstructionMenu {
             this.tracerDestroyInput.checked = baseItem.tracerDestroyOnCollision || false;
             this.tracerCollisionSelect.value = baseItem.tracerCollisionVFX || "Ninguno";
             this.customImpactSelect.value = baseItem.customImpactVFX || "Ninguno";
-            
+
             this.playerImpulseUpInput.checked = baseItem.hasPlayerImpulseUp !== undefined ? baseItem.hasPlayerImpulseUp : false;
             this.playerImpulseUpForceInput.value = baseItem.playerImpulseUpForce !== undefined ? baseItem.playerImpulseUpForce : 15.0;
             this.playerImpulseUpAirRedInput.value = baseItem.playerImpulseUpAirReduction !== undefined ? baseItem.playerImpulseUpAirReduction : 50.0;
-            
+
             this.playerImpulseBackInput.checked = baseItem.hasPlayerImpulseBack !== undefined ? baseItem.hasPlayerImpulseBack : false;
             this.playerImpulseBackForceInput.value = baseItem.playerImpulseBackForce !== undefined ? baseItem.playerImpulseBackForce : 5.0;
         } else {
+            if (this.advancedConfigBtn) this.advancedConfigBtn.style.display = 'none';
             this.editorConstructionControls.style.display = 'flex';
             this.editorTextureContainer.style.display = 'flex';
             this.editorDimContainer.style.display = 'flex';

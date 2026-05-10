@@ -529,9 +529,9 @@ export class AdvancedWeaponConfigPanel {
 
                 <div class="awc-footer">
                     <div>
-                        <button class="awc-btn" style="margin-right:10px;">RESTABLECER</button>
-                        <button class="awc-btn" style="margin-right:10px;">EQUIPAR</button>
-                        <button class="awc-btn" style="margin-right:10px;">DROPEAR</button>
+                        <button class="awc-btn" id="awc-reset-btn" style="margin-right:10px;">RESTABLECER</button>
+                        <button class="awc-btn" id="awc-equip-btn" style="margin-right:10px;">EQUIPAR</button>
+                        <button class="awc-btn" id="awc-drop-btn" style="margin-right:10px;">DROPEAR</button>
                     </div>
                     <button class="awc-btn awc-btn-primary" id="awc-save-btn">GUARDAR CAMBIOS</button>
                 </div>
@@ -545,6 +545,63 @@ export class AdvancedWeaponConfigPanel {
         this.container.querySelector('#awc-save-btn').onclick = () => {
             // Already synced on input change, just close
             this.hide();
+        };
+
+        this.container.querySelector('#awc-reset-btn').onclick = () => {
+            if (this.weapon && this.weapon.originalConfig) {
+                const draft = new this.weapon.constructor(this.weapon.originalConfig);
+                this.weapon = draft;
+                this.populateProperties();
+                this.drawTrajectory();
+                this.init3DPreview();
+                if (this.game && this.game.uiManager && this.game.uiManager.constructionMenu) {
+                    this.game.uiManager.constructionMenu.currentDraftItem = draft;
+                    this.game.uiManager.constructionMenu.selectItem(draft);
+                }
+            }
+        };
+
+        this.container.querySelector('#awc-equip-btn').onclick = () => {
+            if (this.game && this.game.inventoryManager) {
+                const draftConfig = Object.assign({}, this.weapon.originalConfig, this.weapon);
+                delete draftConfig.model; delete draftConfig.equipGroup; delete draftConfig.transformGroup; delete draftConfig.mixer; delete draftConfig.actionShoot; delete draftConfig.actionReload; delete draftConfig.blasterSystem;
+                const newWeapon = new this.weapon.constructor(draftConfig);
+                this.game.inventoryManager.addItem(newWeapon);
+            }
+        };
+
+        this.container.querySelector('#awc-drop-btn').onclick = () => {
+            if (this.game && this.game.itemDropManager && this.game.character) {
+                const draftConfig = Object.assign({}, this.weapon.originalConfig, this.weapon);
+                delete draftConfig.model; delete draftConfig.equipGroup; delete draftConfig.transformGroup; delete draftConfig.mixer; delete draftConfig.actionShoot; delete draftConfig.actionReload; delete draftConfig.blasterSystem;
+                const newWeapon = new this.weapon.constructor(draftConfig);
+                
+                const pos = this.game.character.getPosition().clone();
+                const dir = new THREE.Vector3();
+                if (this.game.sceneManager && this.game.sceneManager.camera) {
+                    this.game.sceneManager.camera.getWorldDirection(dir);
+                } else if (this.game.cameraController && this.game.cameraController.camera) {
+                    this.game.cameraController.camera.getWorldDirection(dir);
+                }
+                pos.add(dir.clone().multiplyScalar(1.5));
+                pos.y += 1.5;
+                
+                const dropped = this.game.itemDropManager.dropItem(newWeapon, pos, dir);
+                
+                if (this.game.networkManager && this.game.networkManager.isConnected) {
+                    let itemData = Object.assign({}, newWeapon);
+                    itemData.itemClass = newWeapon.constructor.name;
+                    delete itemData.model; delete itemData.equipGroup; delete itemData.transformGroup; delete itemData.mixer; delete itemData.actionShoot; delete itemData.actionReload; delete itemData.blasterSystem; delete itemData.originalConfig;
+                    
+                    this.game.networkManager.sendPlayerAction("dropItem", {
+                        dropId: dropped.dropId,
+                        itemData: itemData,
+                        position: { x: pos.x, y: pos.y, z: pos.z },
+                        direction: { x: dir.x, y: dir.y, z: dir.z },
+                        torque: dropped.torque
+                    });
+                }
+            }
         };
 
         const tabs = this.container.querySelectorAll('.awc-tab');
@@ -567,6 +624,11 @@ export class AdvancedWeaponConfigPanel {
     init3DPreview() {
         const container = this.container.querySelector('#awc-3d-container');
         if (!container) return;
+
+        if (this.renderer) {
+            if (this.weapon) this.loadModelPreview();
+            return;
+        }
 
         // Limpiar el placeholder
         container.innerHTML = '';
@@ -864,7 +926,10 @@ export class AdvancedWeaponConfigPanel {
         if (createSection('ESTADÍSTICAS BÁSICAS')) {
             createInput('Daño', 'number', this.weapon.damage !== undefined ? this.weapon.damage : 15, 'damage');
             createInput('Tiempo de Recarga (s)', 'number', this.weapon.cooldown !== undefined ? this.weapon.cooldown : 0.2, 'cooldown');
-            createInput('Mano Equipada', ['right', 'left'], this.weapon.equippedHand || 'right', 'equippedHand');
+            createInput('Mano Equipada', [
+                { value: 'right', text: 'Derecha' },
+                { value: 'left', text: 'Izquierda' }
+            ], this.weapon.equippedHand || 'right', 'equippedHand');
             createInput('Nivel de Mira (Scope)', [
                 { value: 1, text: 'Ninguno (1x)' },
                 { value: 2, text: 'Mira Corta (x2)' },
@@ -878,14 +943,21 @@ export class AdvancedWeaponConfigPanel {
 
         // DISPARO
         if (createSection('DISPARO')) {
-            createInput('Modo de Disparo', ['Automático', 'Semiautomático', 'hybrid'], this.weapon.recoilMode || 'hybrid', 'recoilMode');
+            createInput('Modo de Disparo', [
+                { value: 'hybrid', text: 'Híbrido' },
+                { value: 'recenter', text: 'Auto-Centrado' },
+                { value: 'manual', text: 'Manual' }
+            ], this.weapon.recoilMode || 'hybrid', 'recoilMode');
             createInput('Automático', 'checkbox', this.weapon.isAuto !== undefined ? this.weapon.isAuto : false, 'isAuto');
             createInput('Velocidad de Disparo', 'number', this.weapon.shotSpeed !== undefined ? this.weapon.shotSpeed : 50, 'shotSpeed');
         }
 
         // PROYECTIL
         if (createSection('PROYECTIL')) {
-            createInput('Tipo de Proyectil', ['bullet', 'laser', 'ball'], this.weapon.projectileType || 'bullet', 'projectileType');
+            createInput('Tipo de Proyectil', [
+                { value: 'bullet', text: 'Bala' },
+                { value: 'ball', text: 'Pelota' }
+            ], this.weapon.projectileType || 'bullet', 'projectileType');
             createInput('Gravedad (Caída)', 'number', this.weapon.bulletDrop !== undefined ? this.weapon.bulletDrop : 1, 'bulletDrop');
             createInput('Estela de Humo', 'checkbox', this.weapon.hasTracer !== undefined ? this.weapon.hasTracer : false, 'hasTracer');
             createInput('Línea de Trayectoria (Roja)', 'checkbox', this.weapon.hasTrajectoryLine !== undefined ? this.weapon.hasTrajectoryLine : false, 'hasTrajectoryLine');

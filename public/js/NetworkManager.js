@@ -211,6 +211,7 @@ export class NetworkManager {
                         message.customTracerVFX,
                         message.customImpactVFX,
                         message.tracerDestroyOnCollision,
+                        message.tracerStayForever,
                         message.tracerCollisionVFX
                     )
                 }
@@ -383,7 +384,7 @@ export class NetworkManager {
         }))
     }
 
-    sendPlayerShoot(startPos, direction, type, speed, damage, drop, rebote, hasImpactEffect, hasTracer = false, hasTrajectoryLine = false, customTracerVFX = "Ninguno", customImpactVFX = "Ninguno", tracerDestroyOnCollision = false, tracerCollisionVFX = "Ninguno") {
+    sendPlayerShoot(startPos, direction, type, speed, damage, drop, rebote, hasImpactEffect, hasTracer = false, hasTrajectoryLine = false, customTracerVFX = "Ninguno", customImpactVFX = "Ninguno", tracerDestroyOnCollision = false, tracerStayForever = false, tracerCollisionVFX = "Ninguno") {
         if (!this.isConnected || !this.socket || this.socket.readyState !== WebSocket.OPEN) return
         this.socket.send(JSON.stringify({
             type: "playerShoot",
@@ -400,6 +401,7 @@ export class NetworkManager {
             customTracerVFX: customTracerVFX,
             customImpactVFX: customImpactVFX,
             tracerDestroyOnCollision: tracerDestroyOnCollision,
+            tracerStayForever: tracerStayForever,
             tracerCollisionVFX: tracerCollisionVFX
         }))
     }

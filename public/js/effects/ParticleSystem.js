@@ -22,11 +22,11 @@ import {
 export class ParticleSystem {
     constructor(scene) {
         this.scene = scene;
-        
+
         // Quarks Batch Renderer
         this.batchRenderer = new BatchedParticleRenderer();
         this.scene.add(this.batchRenderer);
-        
+
         // Caches para materiales
         this.jumpMaterial = new THREE.MeshBasicMaterial({
             color: 0xffffff,
@@ -34,25 +34,25 @@ export class ParticleSystem {
             blending: THREE.AdditiveBlending,
             depthWrite: false
         });
-        
+
         this.impactMaterial = new THREE.MeshBasicMaterial({
             color: 0xffaa00,
             transparent: true,
             blending: THREE.AdditiveBlending,
             depthWrite: false
         });
-        
+
         this.explosionMaterial = new THREE.MeshBasicMaterial({
             color: 0xff4400,
             transparent: true,
             blending: THREE.AdditiveBlending,
             depthWrite: false
         });
-        
+
         // Custom VFX Cache and Loader
         this.loader = new QuarksLoader();
         this.vfxCache = {};
-        
+
         // Preload custom VFX
         this.preloadVFX("/assets/VFX/Bubble Explosion VFX.json", "Bubble Explosion");
         this.preloadVFX("/assets/VFX/Cartoon Bang VFX.json", "Cartoon Bang");
@@ -63,10 +63,10 @@ export class ParticleSystem {
         this.preloadVFX("/assets/VFX/Cartoon Fireball Explosion.json", "Cartoon Fireball Explosion");
         this.preloadVFX("/assets/VFX/Cartoon Purple Lightning Strike.json", "Cartoon Purple Lightning");
         this.preloadVFX("/assets/VFX/Explosión de Gas Azul Cartoon.json", "Explosión de Gas Azul");
-        
+
         // Lista de sistemas activos para limpieza si es necesario
         this.activeSystems = [];
-        
+
         // Static test spawn to verify rendering
         setTimeout(() => {
             console.log("[VFX] Spawning test static Cartoon Bang...");
@@ -92,7 +92,7 @@ export class ParticleSystem {
         }
 
         console.log(`[VFX] Spawning effect: ${effectName}`);
-        
+
         // Deep copy the JSON to prevent loader mutation, which causes infinite loops/lag
         const json = JSON.parse(JSON.stringify(rawJson));
 
@@ -106,7 +106,7 @@ export class ParticleSystem {
         const wrapper = new THREE.Group();
         if (position && !parent) wrapper.position.copy(position);
         if (rotation) wrapper.quaternion.copy(rotation);
-        
+
         if (parent) {
             parent.add(wrapper);
             if (position) wrapper.position.copy(position);
@@ -116,11 +116,16 @@ export class ParticleSystem {
 
         try {
             this.loader.parse(json, (effect) => {
+                if (wrapper.userData.isDestroyed) return;
                 console.log(`[VFX] Successfully parsed ${effectName}`);
                 QuarksUtil.addToBatchRenderer(effect, this.batchRenderer);
                 QuarksUtil.play(effect); // Force play to ensure it emits!
                 wrapper.add(effect);
                 wrapper.userData.effectRoot = effect;
+
+                if (wrapper.userData.stopEmission) {
+                    this.stopLoadedEffectEmission(wrapper);
+                }
 
                 if (autoCleanup && !parent) {
                     setTimeout(() => {
@@ -128,22 +133,28 @@ export class ParticleSystem {
                     }, cleanupTime);
                 }
             });
-        } catch(e) {
+        } catch (e) {
             console.error(`[VFX] Error parsing effect ${effectName}:`, e);
         }
-        
+
         return wrapper;
     }
 
     stopLoadedEffectEmission(wrapper) {
-        if (!wrapper || !wrapper.userData.effectRoot) return;
-        wrapper.userData.effectRoot.traverse((child) => {
-            if (child.type === "ParticleSystem" || child.isParticleSystem) {
-                // Detener emisión de nuevas partículas
-                child.emissionOverTime = new ConstantValue(0);
-                // Limpiar ráfagas de emisión
-                if (child.emissionBursts) {
-                    child.emissionBursts = [];
+        if (!wrapper) return;
+        wrapper.userData.stopEmission = true;
+        if (!wrapper.userData.effectRoot) return;
+
+        QuarksUtil.runOnAllParticleEmitters(wrapper.userData.effectRoot, (ps) => {
+            if (ps.system) {
+                // Utilizar el método nativo de three.quarks para detener la emisión suavemente
+                if (typeof ps.system.endEmit === 'function') {
+                    ps.system.endEmit();
+                } else {
+                    ps.system.emissionOverTime = new ConstantValue(0);
+                    if (ps.system.emissionBursts) {
+                        ps.system.emissionBursts = [];
+                    }
                 }
             }
         });
@@ -151,17 +162,25 @@ export class ParticleSystem {
 
     destroyLoadedEffect(wrapper) {
         if (!wrapper) return;
-        
+
+        wrapper.userData.isDestroyed = true;
+
         // Remove from scene or parent
         if (wrapper.parent) wrapper.parent.remove(wrapper);
-        
+        wrapper.removeFromParent();
+
         // Delete systems from batch renderer
         if (wrapper.userData.effectRoot) {
-            wrapper.userData.effectRoot.traverse((child) => {
-                if (child.type === "ParticleSystem" || child.isParticleSystem) {
-                    this.batchRenderer.deleteSystem(child);
+            QuarksUtil.runOnAllParticleEmitters(wrapper.userData.effectRoot, (ps) => {
+                if (ps.system) {
+                    try {
+                        this.batchRenderer.deleteSystem(ps.system);
+                    } catch (e) {
+                        console.warn("Could not delete particle system", e);
+                    }
                 }
             });
+            wrapper.userData.effectRoot.visible = false;
         }
     }
 
@@ -169,7 +188,7 @@ export class ParticleSystem {
         this.batchRenderer.addSystem(system);
         this.scene.add(system.emitter);
         this.activeSystems.push(system);
-        
+
         // Auto limpieza (rudimentaria, basada en duración)
         setTimeout(() => {
             this.scene.remove(system.emitter);
@@ -199,13 +218,13 @@ export class ParticleSystem {
             material: this.jumpMaterial,
             renderMode: RenderMode.BillBoard
         });
-        
+
         // Comportamiento a lo largo de la vida
         system.addBehavior(new SizeOverLife(new PiecewiseBezier([[new Bezier(1, 0.66, 0.33, 0), 0]])));
-        
+
         // Ajustar posición ligeramente hacia abajo para que salga de los pies
         system.emitter.position.copy(position).add(new THREE.Vector3(0, -0.4, 0));
-        
+
         this._addSystem(system);
     }
 
@@ -242,14 +261,14 @@ export class ParticleSystem {
         // ConeEmitter emite por defecto en el eje Z positivo, así que rotamos el objeto para apuntar en la dirección normal
         const quaternion = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), normal);
         system.emitter.quaternion.copy(quaternion);
-        
+
         system.addBehavior(new SizeOverLife(new PiecewiseBezier([[new Bezier(1, 0.66, 0.33, 0), 0]])));
-        
+
         system.emitter.position.copy(position);
-        
+
         this._addSystem(system);
     }
-    
+
     spawnExplosionEffect(position) {
         const system = new QParticleSystem({
             duration: 1.5,
@@ -274,11 +293,11 @@ export class ParticleSystem {
             material: this.explosionMaterial,
             renderMode: RenderMode.BillBoard
         });
-        
+
         system.addBehavior(new SizeOverLife(new PiecewiseBezier([[new Bezier(1, 0.66, 0.33, 0), 0]])));
-        
+
         system.emitter.position.copy(position);
-        
+
         this._addSystem(system);
     }
 

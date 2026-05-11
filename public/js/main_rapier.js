@@ -210,9 +210,9 @@ class Game {
         }
 
         // ── Sincronización de Proyectiles (Shoot) ──────────────────
-        this.networkManager.onPlayerShoot = (playerId, startPos, direction, type, speed, damage, drop, rebote, hasImpactEffect, hasTracer, hasTrajectoryLine, customTracerVFX = "Ninguno", customImpactVFX = "Ninguno", tracerDestroyOnCollision = false, tracerCollisionVFX = "Ninguno") => {
+        this.networkManager.onPlayerShoot = (playerId, startPos, direction, type, speed, damage, drop, rebote, hasImpactEffect, hasTracer, hasTrajectoryLine, customTracerVFX = "Ninguno", customImpactVFX = "Ninguno", tracerDestroyOnCollision = false, tracerStayForever = false, tracerCollisionVFX = "Ninguno") => {
             console.log(`[Collab] Player ${playerId} disparó un ${type}!`)
-            this.handleRemoteShoot(startPos, direction, type, speed, damage, drop, rebote, hasImpactEffect, hasTracer, hasTrajectoryLine, customTracerVFX, customImpactVFX, tracerDestroyOnCollision, tracerCollisionVFX)
+            this.handleRemoteShoot(startPos, direction, type, speed, damage, drop, rebote, hasImpactEffect, hasTracer, hasTrajectoryLine, customTracerVFX, customImpactVFX, tracerDestroyOnCollision, tracerStayForever, tracerCollisionVFX)
         }
 
         // ── Sincronización de Acciones (Doble Salto, etc) ──────────────────
@@ -988,9 +988,9 @@ class Game {
         if (this.inputManager && this.inputManager.keys.attack && this.inventoryManager) {
             const currentItem = this.inventoryManager.getCurrentItem()
             if (currentItem instanceof PelotaItem) {
-                this.useCurrentItem(currentItem) // Pass item directly optimization
+                this.useCurrentItem(false) // Pass false instead of item directly
             } else if (currentItem instanceof GunItem && currentItem.isAuto) {
-                this.useCurrentItem(currentItem) // GunItem handles its own cooldown
+                this.useCurrentItem(false) // GunItem handles its own cooldown
             }
         }
 
@@ -2329,7 +2329,7 @@ class Game {
     }
 
     // ── Gestión de Disparos Remotos ───────────────────────────────────────
-    handleRemoteShoot(startPos, direction, type, speed, damage, drop, rebote, hasImpactEffect, hasTracer = false, hasTrajectoryLine = false, customTracerVFX = "Ninguno", customImpactVFX = "Ninguno", tracerDestroyOnCollision = false, tracerCollisionVFX = "Ninguno") {
+    handleRemoteShoot(startPos, direction, type, speed, damage, drop, rebote, hasImpactEffect, hasTracer = false, hasTrajectoryLine = false, customTracerVFX = "Ninguno", customImpactVFX = "Ninguno", tracerDestroyOnCollision = false, tracerStayForever = false, tracerCollisionVFX = "Ninguno") {
         if (!this.sceneManager || !this.world) return
 
         let tempTracer = null
@@ -2372,8 +2372,9 @@ class Game {
         proj.particleSystem = this.character ? this.character.particleSystem : null
         proj.initialTracer = tempTracer
         proj.isRemoteBlaster = true
-        proj.tracerDestroyOnCollision = tracerDestroyOnCollision
-        proj.tracerCollisionVFX = tracerCollisionVFX
+        proj.tracerDestroyOnCollision = tracerDestroyOnCollision;
+        proj.tracerStayForever = tracerStayForever;
+        proj.tracerCollisionVFX = tracerCollisionVFX;
         // We do not set isRemote flag conceptually, because projectile does physics and stops locally
         // Alternatively, you could tag it to apply no damage locally.
         

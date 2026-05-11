@@ -575,7 +575,7 @@ export class AdvancedWeaponConfigPanel {
                 const draftConfig = Object.assign({}, this.weapon.originalConfig, this.weapon);
                 delete draftConfig.model; delete draftConfig.equipGroup; delete draftConfig.transformGroup; delete draftConfig.mixer; delete draftConfig.actionShoot; delete draftConfig.actionReload; delete draftConfig.blasterSystem;
                 const newWeapon = new this.weapon.constructor(draftConfig);
-                
+
                 const pos = this.game.character.getPosition().clone();
                 const dir = new THREE.Vector3();
                 if (this.game.sceneManager && this.game.sceneManager.camera) {
@@ -585,14 +585,14 @@ export class AdvancedWeaponConfigPanel {
                 }
                 pos.add(dir.clone().multiplyScalar(1.5));
                 pos.y += 1.5;
-                
+
                 const dropped = this.game.itemDropManager.dropItem(newWeapon, pos, dir);
-                
+
                 if (this.game.networkManager && this.game.networkManager.isConnected) {
                     let itemData = Object.assign({}, newWeapon);
                     itemData.itemClass = newWeapon.constructor.name;
                     delete itemData.model; delete itemData.equipGroup; delete itemData.transformGroup; delete itemData.mixer; delete itemData.actionShoot; delete itemData.actionReload; delete itemData.blasterSystem; delete itemData.originalConfig;
-                    
+
                     this.game.networkManager.sendPlayerAction("dropItem", {
                         dropId: dropped.dropId,
                         itemData: itemData,
@@ -966,11 +966,123 @@ export class AdvancedWeaponConfigPanel {
 
         // EFECTOS
         if (createSection('EFECTOS')) {
+            const createVFXSelects = (label, options, key) => {
+                if (!currentSectionEl) return;
+
+                const row = document.createElement('div');
+                row.className = 'awc-prop-row';
+                row.style.flexDirection = 'column';
+                row.style.alignItems = 'flex-start';
+                row.style.gap = '5px';
+
+                const header = document.createElement('div');
+                header.style.display = 'flex';
+                header.style.justifyContent = 'space-between';
+                header.style.width = '100%';
+
+                const lbl = document.createElement('span');
+                lbl.className = 'awc-prop-label';
+                lbl.textContent = label + ' (Máx 3)';
+                header.appendChild(lbl);
+
+                const addBtn = document.createElement('button');
+                addBtn.textContent = '+';
+                addBtn.className = 'awc-btn';
+                addBtn.style.padding = '2px 8px';
+                addBtn.style.fontSize = '12px';
+                header.appendChild(addBtn);
+
+                row.appendChild(header);
+
+                let currentVals = (this.weapon[key] || "Ninguno").split(',').map(s => s.trim());
+                if (currentVals.length === 0 || (currentVals.length === 1 && currentVals[0] === "")) {
+                    currentVals = ["Ninguno"];
+                }
+
+                const container = document.createElement('div');
+                container.style.display = 'flex';
+                container.style.flexDirection = 'column';
+                container.style.gap = '5px';
+                container.style.width = '100%';
+                row.appendChild(container);
+
+                const renderSelects = () => {
+                    container.innerHTML = '';
+                    addBtn.style.display = currentVals.length < 3 ? 'block' : 'none';
+
+                    currentVals.forEach((val, idx) => {
+                        const wrapper = document.createElement('div');
+                        wrapper.style.display = 'flex';
+                        wrapper.style.gap = '5px';
+                        wrapper.style.width = '100%';
+
+                        const input = document.createElement('select');
+                        input.className = 'awc-prop-value';
+                        input.style.flex = '1';
+
+                        options.forEach(opt => {
+                            const o = document.createElement('option');
+                            if (typeof opt === 'object' && opt !== null) {
+                                o.value = opt.value;
+                                o.textContent = opt.text;
+                            } else {
+                                o.value = opt;
+                                o.textContent = opt;
+                            }
+                            input.appendChild(o);
+                        });
+
+                        input.value = val || "Ninguno";
+
+                        input.addEventListener('change', () => {
+                            currentVals[idx] = input.value;
+                            const newVal = currentVals.join(',');
+                            this.weapon[key] = newVal;
+                            this.syncToOriginalMenu(key, newVal);
+                        });
+                        wrapper.appendChild(input);
+
+                        if (currentVals.length > 1) {
+                            const removeBtn = document.createElement('button');
+                            removeBtn.textContent = 'x';
+                            removeBtn.className = 'awc-btn';
+                            removeBtn.style.padding = '2px 8px';
+                            removeBtn.style.background = 'rgba(218, 54, 51, 0.6)';
+                            removeBtn.style.border = '1px solid #da3633';
+                            removeBtn.onclick = () => {
+                                currentVals.splice(idx, 1);
+                                const newVal = currentVals.join(',');
+                                this.weapon[key] = newVal;
+                                this.syncToOriginalMenu(key, newVal);
+                                renderSelects();
+                            };
+                            wrapper.appendChild(removeBtn);
+                        }
+
+                        container.appendChild(wrapper);
+                    });
+                };
+
+                addBtn.onclick = () => {
+                    if (currentVals.length < 3) {
+                        currentVals.push("Ninguno");
+                        const newVal = currentVals.join(',');
+                        this.weapon[key] = newVal;
+                        this.syncToOriginalMenu(key, newVal);
+                        renderSelects();
+                    }
+                };
+
+                renderSelects();
+                propContainer.appendChild(row);
+            };
+
             createInput('Impacto (Humo)', 'checkbox', this.weapon.hasImpactEffect !== undefined ? this.weapon.hasImpactEffect : false, 'hasImpactEffect');
-            createInput('Estela Especial VFX', ['Ninguno', 'Bubble Explosion', 'Cartoon Bang', 'Cartoon Blue Flamethrower', 'Dollar Bill Shower', 'Cartoon Lightning Ball', 'Cartoon Blood Splash', 'Cartoon Fireball Explosion', 'Cartoon Purple Lightning', 'Explosión de Gas Azul'], this.weapon.customTracerVFX || 'Ninguno', 'customTracerVFX');
-            createInput('Efecto de Impacto VFX', ['Ninguno', 'Bubble Explosion', 'Cartoon Bang', 'Dollar Bill Shower', 'Cartoon Blood Splash', 'Cartoon Fireball Explosion', 'Cartoon Purple Lightning', 'Explosión de Gas Azul'], this.weapon.customImpactVFX || 'Ninguno', 'customImpactVFX');
+            const vfxOptions = ['Ninguno', 'Bubble Explosion', 'Cartoon Bang', 'Cartoon Blue Flamethrower', 'Dollar Bill Shower', 'Cartoon Lightning Ball', 'Cartoon Blood Splash', 'Cartoon Fireball Explosion', 'Cartoon Purple Lightning', 'Explosión de Gas Azul'];
+            createVFXSelects('Estela Especial VFX', vfxOptions, 'customTracerVFX');
+            createVFXSelects('Efecto de Impacto VFX', vfxOptions, 'customImpactVFX');
+            createInput('Permanecer para siempre', 'checkbox', this.weapon.tracerStayForever !== undefined ? this.weapon.tracerStayForever : false, 'tracerStayForever');
             createInput('Eliminar al Colisionar', 'checkbox', this.weapon.tracerDestroyOnCollision !== undefined ? this.weapon.tracerDestroyOnCollision : false, 'tracerDestroyOnCollision');
-            createInput('Efecto VFX al Colisionar', ['Ninguno', 'Bubble Explosion', 'Cartoon Bang', 'Dollar Bill Shower', 'Cartoon Blood Splash', 'Cartoon Fireball Explosion', 'Cartoon Purple Lightning', 'Explosión de Gas Azul'], this.weapon.tracerCollisionVFX || 'Ninguno', 'tracerCollisionVFX');
         }
 
         // RETROCESO

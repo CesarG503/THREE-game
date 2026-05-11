@@ -2347,6 +2347,26 @@ export class ConstructionMenu {
         tracerDestroyRow.appendChild(tracerDestroyLabel);
         tracerDestroyRow.appendChild(this.tracerDestroyInput);
 
+        // --- Tracer Stay Forever Row ---
+        const tracerStayForeverRow = document.createElement('div');
+        tracerStayForeverRow.style.display = "flex";
+        tracerStayForeverRow.style.alignItems = "center";
+        tracerStayForeverRow.style.justifyContent = "space-between";
+
+        const tracerStayForeverLabel = document.createElement('span');
+        tracerStayForeverLabel.textContent = "Permanecer para siempre:";
+
+        this.tracerStayForeverInput = document.createElement('input');
+        this.tracerStayForeverInput.type = "checkbox";
+        this.tracerStayForeverInput.addEventListener('change', (e) => {
+            if (this.currentDraftItem && this.currentDraftItem.type === 'weapon') {
+                this.currentDraftItem.tracerStayForever = e.target.checked;
+            }
+        });
+
+        tracerStayForeverRow.appendChild(tracerStayForeverLabel);
+        tracerStayForeverRow.appendChild(this.tracerStayForeverInput);
+
         // --- Tracer Collision VFX Row ---
         const tracerCollisionRow = document.createElement('div');
         tracerCollisionRow.style.display = "flex";
@@ -2568,6 +2588,7 @@ export class ConstructionMenu {
         weaponControlsContainer.appendChild(reboteRow);
         weaponControlsContainer.appendChild(impactRow);
         weaponControlsContainer.appendChild(customTracerRow);
+        weaponControlsContainer.appendChild(tracerStayForeverRow);
         weaponControlsContainer.appendChild(tracerDestroyRow);
         weaponControlsContainer.appendChild(tracerCollisionRow);
         weaponControlsContainer.appendChild(customImpactRow);
@@ -2636,6 +2657,7 @@ export class ConstructionMenu {
             this.impactInput.checked = baseItem.hasImpactEffect !== undefined ? baseItem.hasImpactEffect : false;
 
             this.customTracerSelect.value = baseItem.customTracerVFX || "Ninguno";
+            this.tracerStayForeverInput.checked = baseItem.tracerStayForever || false;
             this.tracerDestroyInput.checked = baseItem.tracerDestroyOnCollision || false;
             this.tracerCollisionSelect.value = baseItem.tracerCollisionVFX || "Ninguno";
             this.customImpactSelect.value = baseItem.customImpactVFX || "Ninguno";

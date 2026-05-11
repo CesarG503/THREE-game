@@ -14,7 +14,8 @@ export class Projectile {
         this.customTracerVFX = customTracerVFX;
         this.customImpactVFX = customImpactVFX;
         this.tracerCollisionVFX = tracerCollisionVFX;
-        this.customTracerAttached = false;
+        this.tracerDestroyOnCollision = false;
+        this.tracerStayForever = false;
         this.customTracerWrapper = null;
 
         this.direction = direction ? direction.clone() : new THREE.Vector3(0, 0, 1);
@@ -236,8 +237,25 @@ export class Projectile {
 
         // Cleanup Custom Tracer
         if (this.customTracerWrapper && this.particleSystem) {
-            
-            if (this.tracerDestroyOnCollision) {
+            console.log(`[Projectile] Cleanup Estela - tracerStayForever: ${this.tracerStayForever}, tracerDestroyOnCollision: ${this.tracerDestroyOnCollision}`);
+
+            if (this.tracerStayForever) {
+                console.log("[Projectile] tracerStayForever activado. La estela se quedará indefinidamente.");
+                // Desvincular de la bala para que se quede en su posición final
+                if (this.customTracerWrapper.parent) {
+                    const worldPos = new THREE.Vector3();
+                    this.customTracerWrapper.getWorldPosition(worldPos);
+                    const worldQuat = new THREE.Quaternion();
+                    this.customTracerWrapper.getWorldQuaternion(worldQuat);
+                    
+                    this.customTracerWrapper.parent.remove(this.customTracerWrapper);
+                    this.scene.add(this.customTracerWrapper);
+                    
+                    this.customTracerWrapper.position.copy(worldPos);
+                    this.customTracerWrapper.quaternion.copy(worldQuat);
+                }
+                // NO detener la emisión ni destruir el wrapper. Se queda para siempre.
+            } else if (this.tracerDestroyOnCollision && hitPos) {
                 // Dinamizar "Eliminar al colisionar":
                 // Desvincular de la bala para evitar la destrucción inmediata
                 if (this.customTracerWrapper.parent) {
@@ -253,24 +271,13 @@ export class Projectile {
                     this.customTracerWrapper.quaternion.copy(worldQuat);
                 }
 
-                // Usar la dirección original de la bala para mantener la inercia visual correcta (evita el "rebote" de físicas)
-                let vel = this.direction.clone().normalize().multiplyScalar(this.speed);
-
                 // Detener emisión de nuevas partículas al instante
                 this.particleSystem.stopLoadedEffectEmission(this.customTracerWrapper);
 
                 const wrapperToDestroy = this.customTracerWrapper;
                 const startTime = Date.now();
-                const duration = 250; // 250ms: tiempo suficiente para encogerse rápidamente sin notarse brusco
-                const startScale = wrapperToDestroy.scale.clone();
+                const duration = 500; // 500ms
                 const pSys = this.particleSystem;
-
-                // Destrucción garantizada independiente de los frames (por si el jugador minimiza la ventana)
-                setTimeout(() => {
-                    if (pSys) {
-                        pSys.destroyLoadedEffect(wrapperToDestroy);
-                    }
-                }, duration);
 
                 const fadeAnim = () => {
                     if (!pSys) return;
@@ -279,14 +286,9 @@ export class Projectile {
                     const t = Math.min(elapsed / duration, 1.0);
                     
                     if (t < 1.0) {
-                        // NO MOVER HACIA ADELANTE.
-                        // Al dejarlo estático, garantizamos que la estela solo se muestre "antes" de la colisión.
-                        
-                        // Encoger la escala progresivamente, pero NUNCA a 0 exacto para evitar errores de Matriz NaN en ThreeJS
-                        const s = Math.max(0.01, 1.0 - t);
-                        wrapperToDestroy.scale.set(startScale.x * s, startScale.y * s, startScale.z * s);
-                        
                         requestAnimationFrame(fadeAnim);
+                    } else {
+                        pSys.destroyLoadedEffect(wrapperToDestroy);
                     }
                 };
                 fadeAnim();

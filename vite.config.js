@@ -1,12 +1,16 @@
 import { defineConfig } from 'vite'
+import { resolve } from 'path'
 
 export default defineConfig({
-  root: 'public',
-  // Stop pointing to public as a static asset dir since it is now the project root
-  publicDir: false,
   build: {
-    // Output directly above public when compiled
-    outDir: '../dist',
+    rollupOptions: {
+      input: {
+        main: resolve(__dirname, 'index.html'),
+        play: resolve(__dirname, 'play.html'),
+        editor: resolve(__dirname, 'editor.html'),
+      },
+    },
+    outDir: 'dist',
     emptyOutDir: true
   }
 })

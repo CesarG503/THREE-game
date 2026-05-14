@@ -1,12 +1,14 @@
+import type { ItemLike } from "../types";
+
 export class InventoryManager {
   uiSlots: NodeListOf<Element>;
-  inputManager: any;
+  inputManager: unknown;
   capacity: number;
-  slots: any[];
+  slots: Array<ItemLike | null>;
   currentSlotIndex: number;
-  onItemChange: any;
+  onItemChange: ((item: ItemLike | null) => void) | null;
 
-  constructor(containerId: any) {
+  constructor(containerId: string) {
     void containerId;
     this.uiSlots = document.querySelectorAll(".inventory-slot");
     this.inputManager = null;
@@ -22,14 +24,14 @@ export class InventoryManager {
   }
 
   setupEventListeners() {
-    document.addEventListener("keydown", (e: any) => {
+    document.addEventListener("keydown", (e: KeyboardEvent) => {
       const key = parseInt(e.key, 10);
       if (!isNaN(key) && key >= 1 && key <= this.capacity) {
         this.selectSlot(key - 1);
       }
     });
 
-    document.addEventListener("wheel", (e: any) => {
+    document.addEventListener("wheel", (e: WheelEvent) => {
       if (!e.shiftKey) {
         if (e.deltaY > 0) {
           this.selectSlot((this.currentSlotIndex + 1) % this.capacity);
@@ -40,24 +42,24 @@ export class InventoryManager {
     });
   }
 
-  enableDragAndDrop(onDropCallback: any) {
-    this.uiSlots.forEach((slot: any, index: any) => {
-      slot.addEventListener("dragover", (e: any) => {
+  enableDragAndDrop(onDropCallback: ((index: number) => void) | null) {
+    this.uiSlots.forEach((slot: Element, index: number) => {
+      slot.addEventListener("dragover", (e: DragEvent) => {
         e.preventDefault();
-        slot.style.borderColor = "yellow";
+        (slot as HTMLElement).style.borderColor = "yellow";
       });
       slot.addEventListener("dragleave", () => {
-        slot.style.borderColor = "";
+        (slot as HTMLElement).style.borderColor = "";
       });
-      slot.addEventListener("drop", (e: any) => {
+      slot.addEventListener("drop", (e: DragEvent) => {
         e.preventDefault();
-        slot.style.borderColor = "";
+        (slot as HTMLElement).style.borderColor = "";
         if (onDropCallback) onDropCallback(index);
       });
     });
   }
 
-  setItem(index: any, item: any) {
+  setItem(index: number, item: ItemLike | null) {
     if (index >= 0 && index < this.slots.length) {
       this.slots[index] = item;
       this.updateUI();
@@ -68,7 +70,7 @@ export class InventoryManager {
     }
   }
 
-  addItem(item: any) {
+  addItem(item: ItemLike) {
     for (let i = 0; i < this.slots.length; i++) {
       if (this.slots[i] && this.slots[i].id === item.id && this.slots[i].count < this.slots[i].maxStack) {
         console.log("Item apilado (logica placeholder)");
@@ -93,7 +95,7 @@ export class InventoryManager {
     return false;
   }
 
-  removeItem(index: any) {
+  removeItem(index: number) {
     if (index >= 0 && index < this.slots.length) {
       const item = this.slots[index];
       this.slots[index] = null;
@@ -111,7 +113,7 @@ export class InventoryManager {
     return this.removeItem(this.currentSlotIndex);
   }
 
-  selectSlot(index: any) {
+  selectSlot(index: number) {
     if (index < 0) index = this.capacity - 1;
     if (index >= this.capacity) index = 0;
 
@@ -128,7 +130,7 @@ export class InventoryManager {
   }
 
   updateUI() {
-    this.uiSlots.forEach((slotEl: any, index: any) => {
+    this.uiSlots.forEach((slotEl: Element, index: number) => {
       if (index === this.currentSlotIndex) {
         slotEl.classList.add("active");
       } else {

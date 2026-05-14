@@ -1,11 +1,12 @@
 import * as THREE from "three";
+import type { GunConfig, WeaponSettingsMap } from "../types";
 
 /**
  * Configuration for weapon offsets and procedural animations.
  * This allows fine-tuning each weapon's position/rotation in the player's hand
  * and defining additional movements without touching core character code.
  */
-export const WEAPON_SETTINGS = {
+export const WEAPON_SETTINGS: WeaponSettingsMap = {
   // ID must match the 'id' property in ConstructionMenu weaponsConfig
   gun_pistol: {
     handOffset: new THREE.Vector3(-0.17, -0.05, 0),
@@ -39,7 +40,7 @@ export const WEAPON_SETTINGS = {
   }
 };
 
-export const WEAPONS_CONFIG = [
+export const WEAPONS_CONFIG: GunConfig[] = [
   {
     id: "gun_pistol",
     name: "Pistola",

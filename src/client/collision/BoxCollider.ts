@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { Collider, ColliderType } from "./Collider";
+import type { BoxColliderOptions, CollisionResponse } from "../types";
 
 /**
  * Colisionador de caja - ideal para paredes, plataformas y objetos rectangulares
@@ -10,7 +11,7 @@ export class BoxCollider extends Collider {
   min: THREE.Vector3;
   max: THREE.Vector3;
 
-  constructor(options: any = {}) {
+  constructor(options: BoxColliderOptions = {}) {
     super({ ...options, type: ColliderType.BOX });
     this.size = options.size || new THREE.Vector3(1, 1, 1);
     this.rotation = options.rotation || new THREE.Euler(0, 0, 0);
@@ -58,7 +59,7 @@ export class BoxCollider extends Collider {
   /**
    * Verifica colision AABB vs AABB
    */
-  intersectsBox(other: any) {
+  intersectsBox(other: BoxCollider) {
     this.updateBounds();
     other.updateBounds();
 
@@ -75,7 +76,7 @@ export class BoxCollider extends Collider {
   /**
    * Verifica colision OBB vs Esfera
    */
-  intersectsSphere(sphereCollider: any) {
+  intersectsSphere(sphereCollider: { worldPosition: THREE.Vector3; radius: number }) {
     // Transformar esfera al espacio local de la caja
     const boxToWorld = new THREE.Matrix4();
     const quaternion = new THREE.Quaternion().setFromEuler(this.rotation);
@@ -100,7 +101,7 @@ export class BoxCollider extends Collider {
   /**
    * Calcula la respuesta de colision para una esfera (soportando rotacion)
    */
-  getCollisionResponseForSphere(sphereCollider: any) {
+  getCollisionResponseForSphere(sphereCollider: { worldPosition: THREE.Vector3; radius: number }): CollisionResponse {
     // Transformar esfera al espacio local
     const boxToWorld = new THREE.Matrix4();
     const quaternion = new THREE.Quaternion().setFromEuler(this.rotation);

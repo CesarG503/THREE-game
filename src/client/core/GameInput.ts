@@ -4,7 +4,7 @@ import { GunItem } from "../items/GunItem";
 export function setupGameInput(this: any) {
 	this.placementRotationIndex = 0;
 
-	document.addEventListener("keydown", (e) => {
+	document.addEventListener("keydown", (e: KeyboardEvent) => {
 		const activeElement = document.activeElement as HTMLElement | null;
 		if (activeElement && (activeElement.tagName === "INPUT" || activeElement.tagName === "SELECT" || activeElement.tagName === "TEXTAREA")) {
 			if (e.key === "Escape") {
@@ -146,7 +146,7 @@ export function setupGameInput(this: any) {
 		}
 	});
 
-	document.addEventListener("keyup", (e) => {
+	document.addEventListener("keyup", (e: KeyboardEvent) => {
 		if (e.key.toLowerCase() === "f") {
 			this.isFKeyDown = false;
 			this.fKeyHeldTime = 0;
@@ -155,7 +155,7 @@ export function setupGameInput(this: any) {
 		}
 	});
 
-	document.addEventListener("mousedown", (e) => {
+	document.addEventListener("mousedown", (e: MouseEvent) => {
 		if (this.inputManager && !this.inputManager.enabled) return;
 		if (e.target !== this.sceneManager.renderer.domElement) return;
 

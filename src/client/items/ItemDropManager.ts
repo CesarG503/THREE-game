@@ -1,18 +1,25 @@
 import * as THREE from "three";
 import { DroppedItem } from "./DroppedItem";
+import type { ItemLike } from "../types";
 
 export class ItemDropManager {
-  scene: any;
-  world: any;
-  droppedItems: any[];
+  scene: THREE.Scene;
+  world: unknown;
+  droppedItems: DroppedItem[];
 
-  constructor(scene: any, world: any) {
+  constructor(scene: THREE.Scene, world: unknown) {
     this.scene = scene;
     this.world = world;
     this.droppedItems = [];
   }
 
-  dropItem(item: any, position: any, launchDirection: any, forceDropId: any = null, remoteData: any = null) {
+  dropItem(
+    item: ItemLike,
+    position: { x: number; y: number; z: number },
+    launchDirection: { x: number; y: number; z: number },
+    forceDropId: string | null = null,
+    remoteData: { torque?: { x: number; y: number; z: number } } | null = null
+  ) {
     if (!item) return;
 
     const spawnPos = new THREE.Vector3(
@@ -48,9 +55,9 @@ export class ItemDropManager {
     return dropped;
   }
 
-  tryPickupNearest(position: any) {
+  tryPickupNearest(position: { x: number; y: number; z: number }) {
     const pickupRange = 3.0;
-    let nearest = null;
+    let nearest: DroppedItem | null = null;
     let minDistSq = pickupRange * pickupRange;
 
     for (const dropped of this.droppedItems) {
@@ -82,8 +89,8 @@ export class ItemDropManager {
     return null;
   }
 
-  removeItemByDropId(dropId: any) {
-    const index = this.droppedItems.findIndex((d: any) => d.dropId === dropId);
+  removeItemByDropId(dropId: string) {
+    const index = this.droppedItems.findIndex((d: DroppedItem) => d.dropId === dropId);
     if (index !== -1) {
       const dropped = this.droppedItems[index];
       dropped.dispose();
@@ -93,8 +100,8 @@ export class ItemDropManager {
     return false;
   }
 
-  getNearestItem(position: any, range = 3.0) {
-    let nearest = null;
+  getNearestItem(position: { x: number; y: number; z: number }, range = 3.0) {
+    let nearest: DroppedItem | null = null;
     let minDistSq = range * range;
 
     for (const dropped of this.droppedItems) {
@@ -112,8 +119,8 @@ export class ItemDropManager {
     return nearest;
   }
 
-  checkAutoPickup(position: any, range = 1.0, itemIdFilter: any = null) {
-    const collected = [];
+  checkAutoPickup(position: { x: number; y: number; z: number }, range = 1.0, itemIdFilter: string | null = null) {
+    const collected: ItemLike[] = [];
     const rangeSq = range * range;
 
     for (let i = this.droppedItems.length - 1; i >= 0; i--) {
@@ -137,7 +144,7 @@ export class ItemDropManager {
     return collected;
   }
 
-  update(dt: any, time: any) {
-    this.droppedItems.forEach((item: any) => item.update(dt, time));
+  update(dt: number, time: number) {
+    this.droppedItems.forEach((item: DroppedItem) => item.update(dt, time));
   }
 }

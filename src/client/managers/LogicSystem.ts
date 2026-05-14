@@ -18,6 +18,8 @@ export class LogicSystem {
 	gameConfig: any;
 	configRuntime: any;
 	configPanel: any;
+	interactiveCollisionLogic: any;
+	targetLogic: any;
 
 	constructor(game: any) {
 		this.game = game;
@@ -26,6 +28,8 @@ export class LogicSystem {
 		this.editingSequenceIndex = undefined;
 		this.toolbar = new LogicToolbar(game);
 		this.sequenceEditor = new LogicSequenceEditor(game, this);
+		this.interactiveCollisionLogic = new InteractiveCollisionLogic(game, this);
+		this.targetLogic = new TargetLogic(game, this);
 		// this.hud = new GameHUD() // Use shared HUD from Game
 		this.hud = this.game.hud;
 		// Use shared PlayerConfigManager from Game if available
@@ -326,12 +330,18 @@ export class LogicSystem {
 
 		// 4. Interactive Collision Logic
 		if (object.userData.mapObjectType === "interactive_collision") {
-			InteractiveCollisionLogic.setupUI(container, object, props, this);
+			this.interactiveCollisionLogic.render(container, props, (key: string, value: any) => {
+				props[key] = value;
+				if (refreshCallback) refreshCallback();
+			});
 		}
 
 		// 5. Target Logic
 		if (object.userData.mapObjectType === "target") {
-			TargetLogic.setupUI(container, object, props, this);
+			this.targetLogic.render(container, props, (key: string, value: any) => {
+				props[key] = value;
+				if (refreshCallback) refreshCallback();
+			});
 		}
 	}
 

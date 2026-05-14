@@ -1,17 +1,12 @@
+import type { InputManagerOptions, InputState } from "../types";
+
 export class InputManager {
-  keys: {
-    forward: boolean;
-    backward: boolean;
-    left: boolean;
-    right: boolean;
-    jump: boolean;
-    crouch: boolean;
-    attack: boolean;
-  };
+  keys: InputState;
   isPaused: boolean;
   enabled: boolean;
+  options: Required<InputManagerOptions>;
 
-  constructor() {
+  constructor(options: InputManagerOptions = {}) {
     this.keys = {
       forward: false,
       backward: false,
@@ -23,24 +18,30 @@ export class InputManager {
     };
 
     this.isPaused = false;
-    this.enabled = true;
+    this.options = {
+      enabled: options.enabled ?? true,
+      pauseEvents: options.pauseEvents ?? true
+    };
+    this.enabled = this.options.enabled;
 
-    document.addEventListener("keydown", (e: any) => this.onKeyDown(e));
-    document.addEventListener("keyup", (e: any) => this.onKeyUp(e));
+    document.addEventListener("keydown", (e) => this.onKeyDown(e));
+    document.addEventListener("keyup", (e) => this.onKeyUp(e));
 
-    document.addEventListener("gamePauseChanged", (e: any) => {
-      this.isPaused = e.detail.isPaused;
+    document.addEventListener("gamePauseChanged", (e) => {
+      if (!this.options.pauseEvents) return;
+      const event = e as CustomEvent<{ isPaused: boolean }>;
+      this.isPaused = event.detail.isPaused;
       if (this.isPaused) {
         this.reset();
       }
     });
 
-    document.addEventListener("mousedown", (e: any) => {
+    document.addEventListener("mousedown", (e) => {
       if (this.isPaused || !this.enabled) return;
       if (e.button === 0 || e.button === 2) this.keys.attack = true;
     });
 
-    document.addEventListener("mouseup", (e: any) => {
+    document.addEventListener("mouseup", (e) => {
       if (e.button === 0 || e.button === 2) this.keys.attack = false;
     });
   }
@@ -55,7 +56,7 @@ export class InputManager {
     this.keys.attack = false;
   }
 
-  onKeyDown(event: any) {
+  onKeyDown(event: KeyboardEvent) {
     if (this.isPaused || !this.enabled) return;
 
     switch (event.code) {
@@ -80,7 +81,7 @@ export class InputManager {
     }
   }
 
-  onKeyUp(event: any) {
+  onKeyUp(event: KeyboardEvent) {
     switch (event.code) {
       case "KeyW":
         this.keys.forward = false;

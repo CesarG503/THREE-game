@@ -2,17 +2,34 @@ import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
 import { Item } from "./Item";
 import { StairsUtils } from "../utils/StairsUtils";
+import type { ItemContext } from "../types";
+
+type MapObjectScale = {
+  x: number;
+  y: number;
+  z: number;
+  shapeType?: string;
+  radius?: number;
+};
 
 export class MapObjectItem extends Item {
-  type: any;
-  color: any;
-  scale: any;
-  texturePath: any;
+  type: string;
+  color: number;
+  scale: MapObjectScale;
+  texturePath: string | null;
   logicProperties: any;
-  opacity: any;
-  uuid: any;
+  opacity: number | undefined;
+  uuid: string;
 
-  constructor(id: any, name: any, type: any, iconPath: any, color: any, scale: any = { x: 1, y: 1, z: 1 }, texturePath: any = null) {
+  constructor(
+    id: string,
+    name: string,
+    type: string,
+    iconPath: string,
+    color: number,
+    scale: MapObjectScale = { x: 1, y: 1, z: 1 },
+    texturePath: string | null = null
+  ) {
     super(id, name, iconPath);
     this.type = type;
     this.color = color;
@@ -153,7 +170,7 @@ export class MapObjectItem extends Item {
     return canvas.toDataURL();
   }
 
-  use(context: any) {
+  use(context: ItemContext) {
     if (this.type === "interactive_collision") {
       if (context.isRightClick) {
         const raycaster = new THREE.Raycaster();

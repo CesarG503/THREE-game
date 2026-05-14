@@ -1,5 +1,7 @@
 import * as THREE from "three";
 import { Collider, ColliderType } from "./Collider";
+import type { BoxCollider } from "./BoxCollider";
+import type { CollisionResponse, CylinderColliderOptions } from "../types";
 
 /**
  * Colisionador de cilindro - ideal para personajes que necesitan base plana
@@ -12,7 +14,7 @@ export class CylinderCollider extends Collider {
   min: THREE.Vector3;
   max: THREE.Vector3;
 
-  constructor(options: any = {}) {
+  constructor(options: CylinderColliderOptions = {}) {
     super({ ...options, type: ColliderType.CYLINDER });
     this.radius = options.radius || 0.3;
     this.height = options.height || 1.8;
@@ -77,7 +79,7 @@ export class CylinderCollider extends Collider {
   /**
    * Verifica colision Cilindro vs Esfera
    */
-  intersectsSphere(sphereCollider: any) {
+  intersectsSphere(sphereCollider: { worldPosition: THREE.Vector3; radius: number }) {
     const closestY = Math.max(this.min.y, Math.min(sphereCollider.worldPosition.y, this.max.y));
 
     const dx = sphereCollider.worldPosition.x - this.worldPosition.x;
@@ -103,7 +105,7 @@ export class CylinderCollider extends Collider {
   /**
    * Verifica colision Cilindro vs Caja (AABB)
    */
-  intersectsBox(boxCollider: any) {
+  intersectsBox(boxCollider: BoxCollider) {
     this.updateWorldPosition();
     boxCollider.updateBounds();
 
@@ -130,7 +132,7 @@ export class CylinderCollider extends Collider {
   /**
    * Respuesta de colision para Caja
    */
-  getCollisionResponseForBox(boxCollider: any) {
+  getCollisionResponseForBox(boxCollider: BoxCollider): CollisionResponse {
     const closest = new THREE.Vector3();
     closest.x = Math.max(boxCollider.min.x, Math.min(this.worldPosition.x, boxCollider.max.x));
     closest.y = Math.max(boxCollider.min.y, Math.min(this.worldPosition.y, boxCollider.max.y));

@@ -1,53 +1,33 @@
 import * as THREE from "three";
+import type { ColliderId, ColliderOptions, CollisionCallback } from "../types";
+import { ColliderType, CollisionLayer } from "../types";
 
-/**
- * Tipos de colisionadores disponibles
- */
-export const ColliderType = {
-  SPHERE: "sphere",
-  BOX: "box",
-  CAPSULE: "capsule",
-  CYLINDER: "cylinder"
-};
-
-/**
- * Capas de colision para filtrar interacciones
- */
-export const CollisionLayer = {
-  NONE: 0,
-  PLAYER: 1 << 0,
-  REMOTE_PLAYER: 1 << 1,
-  NPC: 1 << 2,
-  ENVIRONMENT: 1 << 3,
-  GROUND: 1 << 4,
-  TRIGGER: 1 << 5,
-  ALL: 0xffffffff
-};
+export { ColliderType, CollisionLayer } from "../types";
 
 /**
  * Clase base para todos los colisionadores
  */
-export class Collider {
-  id: any;
-  type: string;
+export class Collider<TUser = any> {
+  id: ColliderId;
+  type: ColliderType;
   layer: number;
   collidesWithMask: number;
   isTrigger: boolean;
   isStatic: boolean;
   enabled: boolean;
   manualResolution: boolean;
-  parent: any;
+  parent: THREE.Object3D | null;
   offset: THREE.Vector3;
   worldPosition: THREE.Vector3;
-  userData: any;
-  onCollisionEnter: any;
-  onCollisionStay: any;
-  onCollisionExit: any;
-  activeCollisions: Set<any>;
-  debugMesh: any;
+  userData: TUser;
+  onCollisionEnter: CollisionCallback<TUser> | null;
+  onCollisionStay: CollisionCallback<TUser> | null;
+  onCollisionExit: CollisionCallback<TUser> | null;
+  activeCollisions: Set<ColliderId>;
+  debugMesh: THREE.Mesh | null;
   showDebug: boolean;
 
-  constructor(options: any = {}) {
+  constructor(options: ColliderOptions<TUser> = {}) {
     const generateUUID = () =>
       typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
         ? crypto.randomUUID()
@@ -75,7 +55,7 @@ export class Collider {
     this.worldPosition = new THREE.Vector3();
 
     // Datos del usuario para callbacks
-    this.userData = options.userData || {};
+    this.userData = (options.userData ?? {}) as TUser;
 
     // Callbacks de colision
     this.onCollisionEnter = options.onCollisionEnter || null;
@@ -83,7 +63,7 @@ export class Collider {
     this.onCollisionExit = options.onCollisionExit || null;
 
     // Set para trackear colisiones activas
-    this.activeCollisions = new Set();
+    this.activeCollisions = new Set<ColliderId>();
 
     // Helper visual para debug
     this.debugMesh = null;
@@ -102,7 +82,7 @@ export class Collider {
   /**
    * Verifica si puede colisionar con otro collider basado en las capas
    */
-  canCollideWith(other: any) {
+  canCollideWith(other: Collider) {
     if (!this.enabled || !other.enabled) return false;
     if (this === other) return false;
 
@@ -129,7 +109,13 @@ export class Collider {
   dispose() {
     if (this.debugMesh) {
       if (this.debugMesh.geometry) this.debugMesh.geometry.dispose();
-      if (this.debugMesh.material) this.debugMesh.material.dispose();
+      if (this.debugMesh.material) {
+        if (Array.isArray(this.debugMesh.material)) {
+          this.debugMesh.material.forEach((material) => material.dispose());
+        } else {
+          this.debugMesh.material.dispose();
+        }
+      }
     }
     this.activeCollisions.clear();
   }

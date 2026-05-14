@@ -2,42 +2,42 @@ import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
 
 export class Projectile {
-  scene: any;
+  scene: THREE.Scene;
   world: any;
-  damage: any;
+  damage: number;
   isDead: boolean;
   lifetime: number;
-  type: any;
+  type: string;
   rebote: boolean;
   hasImpactEffect: boolean;
-  customTracerVFX: any;
-  customImpactVFX: any;
+  customTracerVFX: string;
+  customImpactVFX: string;
   customTracerAttached: boolean;
   customTracerWrapper: any;
-  direction: any;
-  speed: any;
+  direction: THREE.Vector3;
+  speed: number;
   hasTracer: boolean;
   hasTrajectoryLine: boolean;
   blasterSystem: any;
-  lastPosition: any;
-  trajectoryPoints: any;
-  trajectoryLine: any;
-  mesh: any;
+  lastPosition: THREE.Vector3;
+  trajectoryPoints: THREE.Vector3[];
+  trajectoryLine: THREE.Line | null;
+  mesh: THREE.Object3D | null;
   rigidBody: any;
   collider: any;
-  colliderHandle: any;
+  colliderHandle: number;
   particleSystem: any;
   initialTracer: any;
   isRemoteBlaster: boolean;
   tracerDestroyOnCollision: boolean;
 
   constructor(
-    scene: any,
+    scene: THREE.Scene,
     world: any,
-    origin: any,
-    direction: any,
-    speed: any,
-    damage: any,
+    origin: THREE.Vector3,
+    direction: THREE.Vector3,
+    speed: number,
+    damage: number,
     bulletDrop = 1.0,
     type = "ball",
     rebote = false,
@@ -101,7 +101,7 @@ export class Projectile {
     this.colliderHandle = this.collider.handle;
   }
 
-  update(dt: any) {
+  update(dt: number) {
     if (this.isDead) return;
 
     this.lifetime -= dt;
@@ -184,7 +184,7 @@ export class Projectile {
     }
   }
 
-  destroy(hitPos: any = null) {
+  destroy(hitPos: { x: number; y: number; z: number } | null = null) {
     if (this.isDead) return;
     this.isDead = true;
 
@@ -306,8 +306,14 @@ export class Projectile {
 
     if (this.mesh) {
       this.scene.remove(this.mesh);
-      if (this.mesh.geometry) this.mesh.geometry.dispose();
-      if (this.mesh.material) this.mesh.material.dispose();
+      if (this.mesh instanceof THREE.Mesh) {
+        if (this.mesh.geometry) this.mesh.geometry.dispose();
+        if (Array.isArray(this.mesh.material)) {
+          this.mesh.material.forEach((material) => material.dispose());
+        } else if (this.mesh.material) {
+          this.mesh.material.dispose();
+        }
+      }
     }
 
     if (this.rigidBody) {
@@ -319,7 +325,11 @@ export class Projectile {
       setTimeout(() => {
         this.scene.remove(line);
         line.geometry.dispose();
-        line.material.dispose();
+        if (Array.isArray(line.material)) {
+          line.material.forEach((material) => material.dispose());
+        } else {
+          line.material.dispose();
+        }
       }, 500);
       this.trajectoryLine = null;
     }

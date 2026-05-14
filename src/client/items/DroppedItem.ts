@@ -1,20 +1,21 @@
 import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
+import type { ItemLike } from "../types";
 
 export class DroppedItem {
-  scene: any;
+  scene: THREE.Scene;
   world: any;
-  item: any;
+  item: ItemLike;
   isCollected: boolean;
   mesh: THREE.Group;
   visualContainer: THREE.Group;
   rigidBody: any;
   collider: any;
   timeOffset: number;
-  dropId: any;
-  torque: any;
+  dropId: string;
+  torque: { x: number; y: number; z: number } | null;
 
-  constructor(scene: any, world: any, item: any, position: any) {
+  constructor(scene: THREE.Scene, world: any, item: ItemLike, position: { x: number; y: number; z: number }) {
     this.scene = scene;
     this.world = world;
     this.item = item;
@@ -54,9 +55,11 @@ export class DroppedItem {
     this.collider = this.world.createCollider(colliderDesc, this.rigidBody);
 
     this.timeOffset = Math.random() * 100;
+    this.dropId = "";
+    this.torque = null;
   }
 
-  update(dt: any, time: any) {
+  update(dt: number, time: number) {
     if (this.isCollected) return;
 
     const pos = this.rigidBody.translation();

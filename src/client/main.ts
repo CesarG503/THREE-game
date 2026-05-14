@@ -1,6 +1,7 @@
 import { Router } from "./routing/Router";
 import { Game } from "./Game";
 import { renderLobby } from "./ui/LobbyScreen";
+import type { GameMode } from "./types";
 
 const router = new Router();
 let game: Game | null = null;
@@ -17,7 +18,7 @@ const startGame = () => {
 
 const generateRoomId = () => Math.random().toString(36).substring(2, 7).toUpperCase();
 
-const handleRoute = (mode: string) => {
+const handleRoute = (mode: GameMode) => {
 	if (mode === "lobby") {
 		if (!cleanupLobby) cleanupLobby = renderLobby(router);
 		return;

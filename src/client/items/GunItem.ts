@@ -5,6 +5,7 @@ import { Item } from "./Item";
 import { Projectile } from "../weapons/Projectile";
 import { BlasterSystem } from "../fx/BlasterSystem";
 import { WEAPON_SETTINGS } from "./WeaponSettings";
+import type { GunConfig, ItemContext } from "../types";
 
 const GUN_COLOR_PALETTE = {
   Metal: 0xc0c0c0,
@@ -33,17 +34,17 @@ const GUN_MODEL_MATERIAL_OVERRIDES = {
 };
 
 export class GunItem extends Item {
-  static cachedModels = {};
-  static cachedAnimations = {};
-  static isLoadingCache = {};
-  static cacheCallbacks = {};
+  static cachedModels: Record<string, THREE.Object3D> = {};
+  static cachedAnimations: Record<string, THREE.AnimationClip[]> = {};
+  static isLoadingCache: Record<string, boolean> = {};
+  static cacheCallbacks: Record<string, Array<() => void>> = {};
 
-  originalConfig: any;
-  type: any;
-  modelPath: any;
+  originalConfig: GunConfig;
+  type: string;
+  modelPath: string | null;
   damage: number;
   cooldown: number;
-  equippedHand: string;
+  equippedHand: "left" | "right";
   recoil: number;
   recoilMode: string;
   isAuto: boolean;
@@ -55,9 +56,9 @@ export class GunItem extends Item {
   hasTrajectoryLine: boolean;
   rebote: boolean;
   hasImpactEffect: boolean;
-  customTracerVFX: any;
+  customTracerVFX: string;
   tracerDestroyOnCollision: boolean;
-  customImpactVFX: any;
+  customImpactVFX: string;
   hasPlayerImpulseUp: boolean;
   playerImpulseUpForce: number;
   playerImpulseUpAirReduction: number;
@@ -68,8 +69,8 @@ export class GunItem extends Item {
   modelRotation: THREE.Vector3;
   handOffset: THREE.Vector3;
   handRotation: THREE.Euler;
-  extraAnimsConfig: any;
-  proceduralStates: any;
+  extraAnimsConfig: Record<string, number>;
+  proceduralStates: { extraPos: THREE.Vector3; extraRot: THREE.Euler; actionQueue: any[] };
   isReloading: boolean;
   gunImpulse: number;
   cameraRecoilPitch: number;
@@ -81,18 +82,18 @@ export class GunItem extends Item {
   springReloadImpulseZ: number;
   SPRING_STIFFNESS: number;
   SPRING_DAMPING: number;
-  model: any;
+  model: THREE.Object3D | null;
   equipGroup: THREE.Group;
   transformGroup: THREE.Group;
   isLoading: boolean;
-  mixer: any;
-  actionShoot: any;
-  actionReload: any;
-  onLoadCallback: any;
-  blasterSystem: any;
+  mixer: THREE.AnimationMixer | null;
+  actionShoot: THREE.AnimationAction | null;
+  actionReload: THREE.AnimationAction | null;
+  onLoadCallback: (() => void) | null;
+  blasterSystem: BlasterSystem | null;
   _baseId: any;
 
-  constructor(config: any = {}) {
+  constructor(config: GunConfig = {} as GunConfig) {
     const id = config.id || "gun";
     const name = config.name || "Pistola";
     const iconPath = config.icon || "/assets/gun/gun_d.png";
@@ -135,10 +136,10 @@ export class GunItem extends Item {
     this.modelOffset = config.modelOffset || new THREE.Vector3(0, 0, 0);
     this.modelRotation = config.modelRotation || new THREE.Vector3(0, Math.PI / 2, 0);
 
-    const weaponSettings = WEAPON_SETTINGS[this.id] || {};
-    this.handOffset = weaponSettings.handOffset || new THREE.Vector3(0, 0, 0);
-    this.handRotation = weaponSettings.handRotation || new THREE.Euler(0, 0, 0);
-    this.extraAnimsConfig = weaponSettings.extraAnims || {};
+    const weaponSettings = WEAPON_SETTINGS[this.id];
+    this.handOffset = weaponSettings?.handOffset || new THREE.Vector3(0, 0, 0);
+    this.handRotation = weaponSettings?.handRotation || new THREE.Euler(0, 0, 0);
+    this.extraAnimsConfig = weaponSettings?.extraAnims || {};
 
     this.proceduralStates = {
       extraPos: new THREE.Vector3(0, 0, 0),
@@ -171,6 +172,8 @@ export class GunItem extends Item {
     this.mixer = null;
     this.actionShoot = null;
     this.actionReload = null;
+    this.onLoadCallback = null;
+    this.blasterSystem = null;
 
     this.loadModel();
   }
@@ -276,14 +279,14 @@ export class GunItem extends Item {
       if (shootClip) {
         this.actionShoot = this.mixer.clipAction(shootClip);
         this.actionShoot.timeScale = this.isAuto ? 1.0 : 2.0;
-        this.actionShoot.setLoop(THREE.LoopOnce);
+        this.actionShoot.setLoop(THREE.LoopOnce, 1);
       }
 
       const reloadClip = anims.find((a: any) => a.name.toLowerCase().includes("reload") || a.name.toLowerCase().includes("recarga"));
       if (reloadClip) {
         this.actionReload = this.mixer.clipAction(reloadClip);
         this.actionReload.timeScale = 1.0;
-        this.actionReload.setLoop(THREE.LoopOnce);
+        this.actionReload.setLoop(THREE.LoopOnce, 1);
       }
     }
 
@@ -292,12 +295,12 @@ export class GunItem extends Item {
     if (this.onLoadCallback) this.onLoadCallback();
   }
 
-  setOnLoad(callback: any) {
+  setOnLoad(callback: () => void) {
     this.onLoadCallback = callback;
     if (this.model) callback();
   }
 
-  use(context: any) {
+  use(context: ItemContext) {
     if (this.isReloading) return false;
 
     const now = Date.now() / 1000;

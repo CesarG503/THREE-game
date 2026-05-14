@@ -6,6 +6,7 @@ import { PolygonModelSkin } from "../character/models/PolygonModelSkin";
 import { GunItem } from "../items/GunItem";
 import { WEAPONS_CONFIG } from "../items/WeaponSettings";
 import { PelotaItem } from "../items/PelotaItem";
+import type { GunConfig } from "../types";
 
 export class RemotePlayer {
     scene: any;
@@ -211,7 +212,9 @@ export class RemotePlayer {
             if (weaponChanged) {
                 if (state.equippedWeapon && state.equippedWeapon.startsWith("gun_")) {
                     if (!this.weaponsCache[state.equippedWeapon]) {
-                        const weaponConfig = WEAPONS_CONFIG.find(c => c.id === state.equippedWeapon) || {};
+                        const weaponConfig =
+                            WEAPONS_CONFIG.find(c => c.id === state.equippedWeapon) ||
+                            ({ id: state.equippedWeapon, name: state.equippedWeapon } as GunConfig);
                         this.weaponsCache[state.equippedWeapon] = new GunItem(weaponConfig);
                     }
                     this.currentWeaponInstance = this.weaponsCache[state.equippedWeapon];

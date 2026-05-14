@@ -1,16 +1,36 @@
 import * as THREE from "three";
 import { ColliderType, CollisionLayer } from "./Collider";
+import type { CollisionResponse, CollisionStats, ColliderId } from "../types";
+import type { Collider } from "./Collider";
+
+type CollisionPrimitive = Collider<any> & {
+  createDebugMesh?: (scene: THREE.Scene) => void;
+  updateDebugMesh?: () => void;
+  intersectsSphere?: (other: any) => boolean;
+  intersectsCapsule?: (other: any) => boolean;
+  intersectsBox?: (other: any) => boolean;
+  getCollisionResponse?: (other: any) => CollisionResponse;
+  getCollisionResponseForSphere?: (other: any) => CollisionResponse;
+  getCollisionResponseForBox?: (other: any) => CollisionResponse;
+  updateBounds?: () => void;
+  min?: THREE.Vector3;
+  max?: THREE.Vector3;
+  radius?: number;
+  height?: number;
+  size?: THREE.Vector3;
+  rotation?: THREE.Euler;
+};
 
 /**
  * Sistema central de deteccion y resolucion de colisiones
  */
 export class CollisionSystem {
-  scene: any;
-  colliders: Map<any, any>;
+  scene: THREE.Scene;
+  colliders: Map<ColliderId, CollisionPrimitive>;
   debugMode: boolean;
-  stats: { totalChecks: number; collisionsDetected: number; lastUpdateTime: number };
+  stats: CollisionStats;
 
-  constructor(scene: any) {
+  constructor(scene: THREE.Scene) {
     this.scene = scene;
     this.colliders = new Map();
     this.debugMode = false;
@@ -26,7 +46,7 @@ export class CollisionSystem {
   /**
    * Registra un colisionador en el sistema
    */
-  addCollider(collider: any) {
+  addCollider(collider: CollisionPrimitive) {
     if (this.colliders.has(collider.id)) {
       console.warn(`[CollisionSystem] Collider ${collider.id} already exists`);
       return;
@@ -45,7 +65,7 @@ export class CollisionSystem {
   /**
    * Elimina un colisionador del sistema
    */
-  removeCollider(colliderId: any) {
+  removeCollider(colliderId: ColliderId) {
     const collider = this.colliders.get(colliderId);
     if (collider) {
       if (collider.debugMesh) {
@@ -59,7 +79,7 @@ export class CollisionSystem {
   /**
    * Obtiene un colisionador por ID
    */
-  getCollider(colliderId: any) {
+  getCollider(colliderId: ColliderId) {
     return this.colliders.get(colliderId);
   }
 
@@ -69,7 +89,7 @@ export class CollisionSystem {
   setDebugMode(enabled: boolean) {
     this.debugMode = enabled;
 
-    this.colliders.forEach((collider: any) => {
+    this.colliders.forEach((collider) => {
       if (enabled && !collider.debugMesh) {
         collider.createDebugMesh(this.scene);
       }
@@ -80,7 +100,7 @@ export class CollisionSystem {
   /**
    * Verifica colision entre dos colisionadores
    */
-  checkCollision(a: any, b: any) {
+  checkCollision(a: CollisionPrimitive, b: CollisionPrimitive) {
     if (!a.canCollideWith(b)) return false;
 
     this.stats.totalChecks++;
@@ -166,7 +186,7 @@ export class CollisionSystem {
   /**
    * Obtiene la respuesta de colision entre dos colisionadores
    */
-  getCollisionResponse(a: any, b: any) {
+  getCollisionResponse(a: CollisionPrimitive, b: CollisionPrimitive): CollisionResponse {
     a.updateWorldPosition();
     b.updateWorldPosition();
 
@@ -179,10 +199,6 @@ export class CollisionSystem {
       }
     }
 
-    if (a.type === ColliderType.CAPSULE) {
-      return a.getCollisionResponse(b);
-    }
-
     if (a.type === ColliderType.CAPSULE && b.type === ColliderType.BOX) {
       const feetPos = a.worldPosition.clone().add(new THREE.Vector3(0, -a.height / 2 + a.radius, 0));
       const hitFeet = b.intersectsSphere({ worldPosition: feetPos, radius: a.radius });
@@ -191,6 +207,10 @@ export class CollisionSystem {
         return b.getCollisionResponseForSphere({ worldPosition: feetPos, radius: a.radius });
       }
       return b.getCollisionResponseForSphere({ worldPosition: a.worldPosition, radius: a.radius });
+    }
+
+    if (a.type === ColliderType.CAPSULE) {
+      return a.getCollisionResponse(b);
     }
 
     if (a.type === ColliderType.BOX && b.type === ColliderType.CAPSULE) {
@@ -239,7 +259,7 @@ export class CollisionSystem {
   /**
    * Resuelve la colision empujando los objetos
    */
-  resolveCollision(a: any, b: any, response: any) {
+  resolveCollision(a: CollisionPrimitive, b: CollisionPrimitive, response: CollisionResponse) {
     if (a.isTrigger || b.isTrigger) return;
     if (a.isStatic && b.isStatic) return;
     if (a.manualResolution || b.manualResolution) return;
@@ -340,7 +360,7 @@ export class CollisionSystem {
         if (!currentCollisions.has(pairKey)) {
           toRemove.push(otherId);
 
-          if (collider.onCollisionExit) collider.onCollisionExit(other);
+          if (collider.onCollisionExit) collider.onCollisionExit(other, null);
         }
       }
 

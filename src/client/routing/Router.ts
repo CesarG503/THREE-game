@@ -1,6 +1,10 @@
+import type { GameMode, Route } from "../types";
+
+type RouteListener = (route: Route) => void;
+
 export class Router {
-  currentRoute: any;
-  listeners: any[];
+  currentRoute: Route;
+  listeners: RouteListener[];
 
   constructor() {
     this.currentRoute = this.parseUrl();
@@ -12,7 +16,7 @@ export class Router {
     });
   }
 
-  parseUrl() {
+  parseUrl(): Route {
     const path = window.location.pathname;
     const segments = path.split("/").filter(Boolean);
     const mode = this.resolveMode(segments[0]);
@@ -20,32 +24,32 @@ export class Router {
     return { mode, roomId };
   }
 
-  resolveMode(segment: any) {
+  resolveMode(segment?: string): GameMode {
     if (segment === "editor") return "editor";
     if (segment === "play") return "play";
     return "lobby";
   }
 
-  navigate(mode: any, roomId: any = null) {
+  navigate(mode: GameMode, roomId: string | null = null) {
     const path = roomId ? `/${mode}/${roomId}` : `/${mode}`;
     window.history.pushState(null, "", path);
     this.currentRoute = { mode, roomId };
     this.notify();
   }
 
-  getMode() {
+  getMode(): GameMode {
     return this.currentRoute.mode;
   }
 
-  getRoomId() {
+  getRoomId(): string | null {
     return this.currentRoute.roomId;
   }
 
-  onChange(cb: any) {
+  onChange(cb: RouteListener) {
     this.listeners.push(cb);
   }
 
   notify() {
-    this.listeners.forEach((cb: any) => cb(this.currentRoute));
+    this.listeners.forEach((cb) => cb(this.currentRoute));
   }
 }

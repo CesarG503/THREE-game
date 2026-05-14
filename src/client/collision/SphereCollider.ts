@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { Collider, ColliderType } from "./Collider";
+import type { CollisionResponse, SphereColliderOptions } from "../types";
 
 /**
  * Colisionador esferico - ideal para personajes y objetos simples
@@ -7,7 +8,7 @@ import { Collider, ColliderType } from "./Collider";
 export class SphereCollider extends Collider {
   radius: number;
 
-  constructor(options: any = {}) {
+  constructor(options: SphereColliderOptions = {}) {
     super({ ...options, type: ColliderType.SPHERE });
     this.radius = options.radius || 0.5;
   }
@@ -40,7 +41,7 @@ export class SphereCollider extends Collider {
   /**
    * Verifica colision esfera-esfera
    */
-  intersectsSphere(other: any) {
+  intersectsSphere(other: { worldPosition: THREE.Vector3; radius: number }) {
     const distance = this.worldPosition.distanceTo(other.worldPosition);
     const combinedRadius = this.radius + other.radius;
     return distance < combinedRadius;
@@ -49,7 +50,7 @@ export class SphereCollider extends Collider {
   /**
    * Calcula la respuesta de colision (push-back)
    */
-  getCollisionResponse(other: any) {
+  getCollisionResponse(other: { worldPosition: THREE.Vector3; radius: number }): CollisionResponse {
     const direction = new THREE.Vector3()
       .subVectors(this.worldPosition, other.worldPosition)
       .normalize();

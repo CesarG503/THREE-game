@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { Collider, ColliderType } from "./Collider";
+import type { CapsuleColliderOptions, CollisionResponse } from "../types";
 
 /**
  * Colisionador de capsula - ideal para personajes humanoides
@@ -10,7 +11,7 @@ export class CapsuleCollider extends Collider {
   pointA: THREE.Vector3;
   pointB: THREE.Vector3;
 
-  constructor(options: any = {}) {
+  constructor(options: CapsuleColliderOptions = {}) {
     super({ ...options, type: ColliderType.CAPSULE });
     this.radius = options.radius || 0.3;
     this.height = options.height || 1.8;
@@ -57,7 +58,7 @@ export class CapsuleCollider extends Collider {
   /**
    * Punto mas cercano en un segmento de linea
    */
-  closestPointOnSegment(point: any, segStart: any, segEnd: any) {
+  closestPointOnSegment(point: THREE.Vector3, segStart: THREE.Vector3, segEnd: THREE.Vector3) {
     const seg = new THREE.Vector3().subVectors(segEnd, segStart);
     const t = Math.max(
       0,
@@ -69,7 +70,7 @@ export class CapsuleCollider extends Collider {
   /**
    * Verifica colision capsula-capsula
    */
-  intersectsCapsule(other: any) {
+  intersectsCapsule(other: CapsuleCollider) {
     this.updateCapsulePoints();
     other.updateCapsulePoints();
 
@@ -84,7 +85,7 @@ export class CapsuleCollider extends Collider {
   /**
    * Encuentra los puntos mas cercanos entre dos segmentos
    */
-  closestPointsOnSegments(a1: any, a2: any, b1: any, b2: any) {
+  closestPointsOnSegments(a1: THREE.Vector3, a2: THREE.Vector3, b1: THREE.Vector3, b2: THREE.Vector3) {
     const d1 = new THREE.Vector3().subVectors(a2, a1);
     const d2 = new THREE.Vector3().subVectors(b2, b1);
     const r = new THREE.Vector3().subVectors(a1, b1);
@@ -137,7 +138,7 @@ export class CapsuleCollider extends Collider {
   /**
    * Verifica colision capsula-esfera
    */
-  intersectsSphere(sphereCollider: any) {
+  intersectsSphere(sphereCollider: { worldPosition: THREE.Vector3; radius: number }) {
     this.updateCapsulePoints();
 
     const closest = this.closestPointOnSegment(sphereCollider.worldPosition, this.pointA, this.pointB);
@@ -151,7 +152,7 @@ export class CapsuleCollider extends Collider {
   /**
    * Calcula la respuesta de colision
    */
-  getCollisionResponse(other: any) {
+  getCollisionResponse(other: { type?: ColliderType; radius?: number; worldPosition: THREE.Vector3; updateCapsulePoints?: () => void; pointA?: THREE.Vector3; pointB?: THREE.Vector3 }): CollisionResponse {
     this.updateCapsulePoints();
 
     let closestOnThis;

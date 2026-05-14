@@ -1,11 +1,14 @@
-export class Item {
-  id: any;
-  name: any;
-  iconPath: any;
+import type { Object3D } from "three";
+import type { ItemContext, ItemLike } from "../types";
+
+export class Item implements ItemLike {
+  id: string;
+  name: string;
+  iconPath: string;
   count: number;
   maxStack: number;
 
-  constructor(id: any, name: any, iconPath: any) {
+  constructor(id: string, name: string, iconPath: string) {
     this.id = id;
     this.name = name;
     this.iconPath = iconPath;
@@ -18,7 +21,7 @@ export class Item {
    * @param {Object} context - Contexto del juego (scene, world, position, etc)
    * @returns {boolean} - True si se consumio el item
    */
-  use(context: any) {
+  use(context: ItemContext) {
     console.log("Usando item base:", this.name);
     return false;
   }
@@ -27,7 +30,7 @@ export class Item {
    * Retorna la malla o geometria para renderizar cuando se tira al suelo
    * @returns {any}
    */
-  getDisplayMesh() {
+  getDisplayMesh(): Object3D | null {
     return null;
   }
 }

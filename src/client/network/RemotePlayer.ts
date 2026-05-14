@@ -1,0 +1,335 @@
+import * as THREE from "three";
+import RAPIER from "@dimforge/rapier3d-compat";
+import { GLBModel } from "../character/models/GLBModel";
+import { PolygonModel } from "../character/models/PolygonModel";
+import { PolygonModelSkin } from "../character/models/PolygonModelSkin";
+import { GunItem } from "../items/GunItem";
+import { WEAPONS_CONFIG } from "../items/WeaponSettings";
+import { PelotaItem } from "../items/PelotaItem";
+
+export class RemotePlayer {
+    scene: any;
+    world: any;
+    playerId: any;
+    playerName: any;
+
+    glbModel: any;
+    polygonModel: any;
+    polygonModelSkin: any;
+    currentType: any;
+
+    state: any;
+    equippedWeaponName: any;
+    equippedHandName: any;
+    currentWeaponInstance: any;
+
+    currentPosition: any;
+    targetPosition: any;
+    interpolationSpeed: number;
+
+    currentRotation: number;
+    targetRotation: number;
+    rotationOffset: number;
+
+    label: any;
+    labelVisible: boolean;
+
+    collider: any;
+    rigidBody: any;
+    attackEndTime: number;
+    weaponsCache: any;
+
+    constructor(scene: any, world: any, playerId: any, playerName: any, position: any = new THREE.Vector3(0, 0, 0)) {
+        this.scene = scene;
+        this.world = world;
+        this.playerId = playerId;
+        this.playerName = playerName || playerId.slice(-4);
+
+        this.glbModel = new GLBModel(scene, false);
+        this.polygonModel = new PolygonModel(scene, false);
+        this.polygonModelSkin = new PolygonModelSkin(scene, false);
+        this.currentType = "skin";
+
+        this.state = {
+            modelType: "skin",
+            isMoving: false,
+            isCrouching: false,
+            isAttacking: false,
+            isGrounded: true,
+            verticalVelocity: 0,
+            action: "Idle",
+            equippedWeapon: null
+        };
+
+        this.equippedWeaponName = null;
+        this.equippedHandName = null;
+        this.currentWeaponInstance = null;
+
+        this.currentPosition = position.clone();
+        this.targetPosition = position.clone();
+        this.interpolationSpeed = 10;
+
+        this.currentRotation = 0;
+        this.targetRotation = 0;
+        this.rotationOffset = Math.PI;
+
+        this.label = null;
+        this.labelVisible = true;
+
+        this.collider = null;
+        this.rigidBody = null;
+        this.attackEndTime = 0;
+        this.weaponsCache = null;
+
+        this.initPhysics();
+        this.createLabel();
+        this.setModelType(this.currentType);
+    }
+
+    initPhysics() {
+        let bodyDesc = RAPIER.RigidBodyDesc.kinematicPositionBased()
+            .setTranslation(this.currentPosition.x, this.currentPosition.y, this.currentPosition.z);
+        this.rigidBody = this.world.createRigidBody(bodyDesc);
+
+        let colliderDesc = RAPIER.ColliderDesc.capsule(0.5, 0.4).setTranslation(0, 0.9, 0);
+        this.collider = this.world.createCollider(colliderDesc, this.rigidBody);
+
+        this.applyCollisionProfile();
+    }
+
+    applyCollisionProfile() {
+        if (!this.collider) return;
+
+        let membership = 0x0002;
+        let filter = 0xfffd;
+
+        let isSensor = false;
+
+        let groups = (membership << 16) | filter;
+        this.collider.setCollisionGroups(groups);
+        this.collider.setSensor(isSensor);
+    }
+
+    setModelType(type: any) {
+        if (!type) return;
+        this.currentType = type;
+
+        this.glbModel.setVisible(false);
+        this.polygonModel.setVisible(false);
+        this.polygonModelSkin.setVisible(false);
+
+        if (type === "glb") {
+            this.glbModel.setVisible(true);
+        } else if (type === "polygon") {
+            this.polygonModel.setVisible(true);
+        } else if (type === "skin") {
+            this.polygonModelSkin.setVisible(true);
+        }
+    }
+
+    getPlayerColor() {
+        const colors = [0x4488ff, 0xff4444, 0x44ff44, 0xffff44, 0xff44ff, 0x44ffff, 0xff8844, 0x8844ff];
+        const hash = this.playerId.split("").reduce((acc: any, char: any) => acc + char.charCodeAt(0), 0);
+        return colors[hash % colors.length];
+    }
+
+    createLabel() {
+        const canvas = document.createElement("canvas");
+        canvas.width = 128;
+        canvas.height = 32;
+        const ctx = canvas.getContext("2d");
+
+        if (!ctx) return;
+
+        ctx.fillStyle = "rgba(0, 0, 0, 0.6)";
+        ctx.roundRect(0, 0, 128, 32, 6);
+        ctx.fill();
+
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "bold 16px Arial";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(`${this.playerName}`, 64, 16);
+
+        const texture = new THREE.CanvasTexture(canvas);
+        const material = new THREE.SpriteMaterial({ map: texture });
+        this.label = new THREE.Sprite(material);
+        this.label.scale.set(1, 0.25, 1);
+        this.label.position.y = 2.2;
+        this.label.visible = this.labelVisible;
+
+        this.scene.add(this.label);
+    }
+
+    setLabelVisibility(visible: boolean) {
+        this.labelVisible = visible;
+        if (this.label) {
+            this.label.visible = visible;
+        }
+    }
+
+    setTargetPosition(x: number, y: number, z: number) {
+        this.targetPosition.set(x, y, z);
+    }
+
+    setRotation(rotation: number) {
+        this.targetRotation = rotation;
+    }
+
+    setState(state: any) {
+        if (!state) return;
+
+        if (state.isAttacking) {
+            this.attackEndTime = Date.now() + 300;
+        }
+
+        let oldPlayerCollision = this.state.playerCollision;
+
+        this.state = state;
+
+        if (state.modelType && state.modelType !== this.currentType) {
+            this.setModelType(state.modelType);
+        }
+
+        if (state.playerCollision !== oldPlayerCollision) {
+            this.applyCollisionProfile();
+        }
+
+        if (state.jumpAnimationType !== undefined) {
+            this.polygonModelSkin.setJumpAnimationType(state.jumpAnimationType);
+        }
+
+        if (state.equippedWeapon !== this.equippedWeaponName || state.equippedHand !== this.equippedHandName) {
+            const weaponChanged = state.equippedWeapon !== this.equippedWeaponName;
+            this.equippedWeaponName = state.equippedWeapon;
+            this.equippedHandName = state.equippedHand;
+
+            if (!this.weaponsCache) {
+                this.weaponsCache = {};
+            }
+
+            if (weaponChanged) {
+                if (state.equippedWeapon && state.equippedWeapon.startsWith("gun_")) {
+                    if (!this.weaponsCache[state.equippedWeapon]) {
+                        const weaponConfig = WEAPONS_CONFIG.find(c => c.id === state.equippedWeapon) || {};
+                        this.weaponsCache[state.equippedWeapon] = new GunItem(weaponConfig);
+                    }
+                    this.currentWeaponInstance = this.weaponsCache[state.equippedWeapon];
+                    this.currentWeaponInstance.equippedHand = state.equippedHand || "right";
+                    this.glbModel.setHeldItem(this.currentWeaponInstance);
+                    this.polygonModel.setHeldItem(this.currentWeaponInstance);
+                    this.polygonModelSkin.setHeldItem(this.currentWeaponInstance);
+                } else if (state.equippedWeapon === "pelota") {
+                    if (!this.weaponsCache["pelota"]) {
+                        this.weaponsCache["pelota"] = new PelotaItem();
+                    }
+                    this.currentWeaponInstance = this.weaponsCache["pelota"];
+                    this.currentWeaponInstance.equippedHand = state.equippedHand || "right";
+                    this.glbModel.setHeldItem(this.currentWeaponInstance);
+                    this.polygonModel.setHeldItem(this.currentWeaponInstance);
+                    this.polygonModelSkin.setHeldItem(this.currentWeaponInstance);
+                } else {
+                    this.currentWeaponInstance = null;
+                    this.glbModel.setHeldItem(null);
+                    this.polygonModel.setHeldItem(null);
+                    this.polygonModelSkin.setHeldItem(null);
+                }
+            } else if (this.currentWeaponInstance) {
+                this.currentWeaponInstance.equippedHand = state.equippedHand || "right";
+                this.glbModel.setHeldItem(this.currentWeaponInstance);
+                this.polygonModel.setHeldItem(this.currentWeaponInstance);
+                this.polygonModelSkin.setHeldItem(this.currentWeaponInstance);
+            }
+        }
+    }
+
+    update(dt: number) {
+        this.currentPosition.lerp(this.targetPosition, this.interpolationSpeed * dt);
+
+        if (this.label) {
+            this.label.position.x = this.currentPosition.x;
+            this.label.position.y = this.currentPosition.y + 2.2;
+            this.label.position.z = this.currentPosition.z;
+        }
+
+        if (this.rigidBody) {
+            this.rigidBody.setNextKinematicTranslation({
+                x: this.currentPosition.x,
+                y: this.currentPosition.y,
+                z: this.currentPosition.z
+            });
+        }
+
+        let diff = this.targetRotation - this.currentRotation;
+        while (diff > Math.PI) diff -= Math.PI * 2;
+        while (diff < -Math.PI) diff += Math.PI * 2;
+        this.currentRotation += diff * 0.15;
+
+        this.glbModel.setPosition(this.currentPosition);
+        this.glbModel.setRotation(this.currentRotation);
+
+        this.polygonModel.setPosition(this.currentPosition);
+        this.polygonModel.setRotation(this.currentRotation);
+
+        this.polygonModelSkin.setPosition(this.currentPosition);
+        this.polygonModelSkin.setRotation(this.currentRotation);
+
+        if (this.polygonModelSkin.setHeadRotation) {
+            this.polygonModelSkin.setHeadRotation(this.state.headPitch || 0, this.state.headYaw || 0);
+        }
+
+        const isLocallyMoving = (this.currentPosition.distanceTo(this.targetPosition) > 0.05);
+        const hasInput = this.state.isMoving || isLocallyMoving;
+
+        const effectivelyAttacking = this.state.isAttacking || (Date.now() < this.attackEndTime);
+
+        this.glbModel.update(dt, hasInput);
+        this.polygonModel.update(dt, hasInput);
+        this.polygonModelSkin.update(
+            dt,
+            hasInput,
+            (this.state.isCrouching || false),
+            (effectivelyAttacking || false),
+            (this.state.isGrounded !== undefined ? this.state.isGrounded : true),
+            this.state.verticalVelocity || 0
+        );
+        if (this.currentWeaponInstance && typeof this.currentWeaponInstance.updateAnim === "function") {
+            this.currentWeaponInstance.updateAnim(dt, 0);
+        }
+    }
+
+    dispose() {
+        const removeMesh = (modelObj: any) => {
+            if (modelObj && modelObj.model) {
+                this.scene.remove(modelObj.model);
+                modelObj.model.traverse((object: any) => {
+                    if (object.geometry) object.geometry.dispose();
+                    if (object.material) {
+                        if (Array.isArray(object.material)) {
+                            object.material.forEach((m: any) => m.dispose());
+                        } else {
+                            object.material.dispose();
+                        }
+                    }
+                });
+            }
+        };
+
+        removeMesh(this.glbModel);
+        removeMesh(this.polygonModel);
+        removeMesh(this.polygonModelSkin);
+
+        if (this.label) {
+            this.scene.remove(this.label);
+            if (this.label.material.map) this.label.material.map.dispose();
+            this.label.material.dispose();
+        }
+        if (this.rigidBody) {
+            this.world.removeRigidBody(this.rigidBody);
+        }
+    }
+
+    getCollider() {
+        return this.collider;
+    }
+}

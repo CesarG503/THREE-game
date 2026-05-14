@@ -5,14 +5,6 @@
     <meta charset="UTF-8">
     <title>Veta</title>
     <link rel="stylesheet" href="/resources/style/main.css">
-    <script type="importmap">
-        {
-            "imports": {
-                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
-            }
-        }
-    </script>
 </head>
 
 <body>
@@ -153,7 +145,7 @@
             <div class="tab-btn active" data-tab="fp-settings">Primera Persona</div>
             <div class="tab-btn" data-tab="tp-settings">Tercera Persona</div>
             <div class="tab-btn" data-tab="ch-settings">Puntero</div>
-            <div class="tab-btn" data-tab="graphics-settings">Gráficos</div>
+            <div class="tab-btn" data-tab="graphics-settings">Graficos</div>
             <div class="tab-btn" data-tab="char-settings">Personaje</div>
         </div>
 
@@ -235,7 +227,7 @@
                 </select>
             </div>
             <div class="setting-row">
-                <span class="setting-label">Tamaño</span>
+                <span class="setting-label">Tamano</span>
                 <div class="slider-container">
                     <input type="range" id="ch-size" min="10" max="100" value="40">
                     <span id="ch-size-val">40px</span>
@@ -244,7 +236,7 @@
         </div>
 
         <div class="settings-content" id="graphics-settings">
-            <h3>Configuración de Gráficos</h3>
+            <h3>Configuracion de Graficos</h3>
             <div class="setting-row">
                 <div class="setting-item">
                     <label>Distancia de Renderizado</label>
@@ -262,7 +254,7 @@
                 <span class="setting-label">Tipo de Modelo</span>
                 <select id="char-model-type" class="settings-select">
                     <option value="glb">Modelo (GLB)</option>
-                    <option value="polygon">Polígonos</option>
+                    <option value="polygon">Poligonos</option>
                     <option value="skin">Poligono Skin</option>
                 </select>
             </div>
@@ -285,7 +277,7 @@
         <button id="resume-btn">Configurar</button>
 
         <div class="controls-hint">
-            Presiona ESC para alternar el menu | TAB para cambiar la cámara | Click derecho para rotar
+            Presiona ESC para alternar el menu | TAB para cambiar la camara | Click derecho para rotar
         </div>
     </div>
 
@@ -324,7 +316,7 @@
         </div>
     </div>
 
-    <script type="module" src="/js/main_rapier.js"></script>
+    <script type="module" src="/src/client/main.ts"></script>
 </body>
 
 </html>

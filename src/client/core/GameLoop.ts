@@ -1,0 +1,468 @@
+import * as THREE from "three";
+
+export function setupDebugRender(this: any) {
+	this.debugMesh = new THREE.LineSegments(
+		new THREE.BufferGeometry(),
+		new THREE.LineBasicMaterial({ color: 0xffffff, vertexColors: true })
+	);
+	this.debugMesh.frustumCulled = false;
+	this.debugMesh.visible = false;
+	this.sceneManager.scene.add(this.debugMesh);
+}
+
+export function updateDebugRender(this: any) {
+	if (!this.debugEnabled) return;
+
+	const buffers = this.world.debugRender();
+	const vertices = buffers.vertices;
+	const colors = buffers.colors;
+
+	this.debugMesh.geometry.setAttribute("position", new THREE.BufferAttribute(vertices, 3));
+	this.debugMesh.geometry.setAttribute("color", new THREE.BufferAttribute(colors, 4));
+}
+
+export function setupOrientationGizmo(this: any) {
+	this.gizmoScene = new THREE.Scene();
+	this.gizmoAxes = new THREE.AxesHelper(1);
+	this.gizmoScene.add(this.gizmoAxes);
+
+	const size = 2;
+	this.gizmoCamera = new THREE.OrthographicCamera(-size, size, size, -size, 0.1, 100);
+	this.gizmoCamera.position.set(0, 0, 10);
+	this.gizmoCamera.lookAt(0, 0, 0);
+}
+
+export function renderOrientationGizmo(this: any) {
+	if (!this.gizmoScene || !this.gizmoCamera || !this.sceneManager) return;
+
+	const renderer = this.sceneManager.renderer;
+	const width = window.innerWidth;
+	const height = window.innerHeight;
+
+	const size = 150;
+	const padding = 10;
+
+	this.gizmoCamera.position.set(0, 0, 10);
+	this.gizmoCamera.position.applyQuaternion(this.sceneManager.camera.quaternion);
+	this.gizmoCamera.quaternion.copy(this.sceneManager.camera.quaternion);
+
+	renderer.setScissorTest(true);
+	renderer.setScissor(padding, padding, size, size);
+	renderer.setViewport(padding, padding, size, size);
+
+	renderer.clearDepth();
+	renderer.render(this.gizmoScene, this.gizmoCamera);
+
+	renderer.setScissorTest(false);
+	renderer.setViewport(0, 0, width, height);
+}
+
+export function animate(this: any) {
+	requestAnimationFrame(this.animate);
+
+	const dt = this.clock.getDelta();
+
+	// Step Physics
+	this.world.step(this.eventQueue);
+
+	// Handle Projectile Collisions
+	this.eventQueue.drainCollisionEvents((handle1: any, handle2: any, started: any) => {
+		if (started && this.projectiles) {
+			for (let i = 0; i < this.projectiles.length; i++) {
+				const proj = this.projectiles[i];
+				if (!proj.isDead && !proj.rebote) {
+					if (proj.colliderHandle === handle1 || proj.colliderHandle === handle2) {
+						const hitPos = proj.rigidBody.translation();
+						const otherHandle = proj.colliderHandle === handle1 ? handle2 : handle1;
+
+						let hitPlayer = false;
+
+						// 1. Check if hit local player
+						if (this.character && this.character.collider && this.character.collider.handle === otherHandle) {
+							hitPlayer = true;
+							const playerPos = this.character.getPosition();
+							const hitY = hitPos.y - playerPos.y;
+
+							let damageMult = 1.0;
+							let color = "#FF2222";
+							if (hitY < 0.7) {
+								damageMult = 0.2;
+								color = "#FFCC00";
+							} else if (hitY < 1.4) {
+								damageMult = 0.8;
+								color = "#FF8800";
+							}
+
+							const finalDamage = Math.round(proj.damage * damageMult);
+							this.character.takeDamage(finalDamage);
+
+							const hitPosVec = new THREE.Vector3(hitPos.x, hitPos.y, hitPos.z);
+
+							if (this.floatingTextManager) {
+								this.floatingTextManager.spawnText(`-${finalDamage}`, hitPosVec, color, 1.5);
+							}
+						}
+
+						// 2. Check if hit remote player
+						if (!hitPlayer && this.networkManager && this.networkManager.remotePlayers) {
+							this.networkManager.remotePlayers.forEach((rp: any) => {
+								if (rp.collider && rp.collider.handle === otherHandle) {
+									hitPlayer = true;
+									const playerPos = rp.currentPosition;
+									const hitY = hitPos.y - playerPos.y;
+
+									let damageMult = 1.0;
+									let color = "#FF2222";
+									if (hitY < 0.7) {
+										damageMult = 0.2;
+										color = "#FFCC00";
+									} else if (hitY < 1.4) {
+										damageMult = 0.8;
+										color = "#FF8800";
+									}
+
+									const finalDamage = Math.round(proj.damage * damageMult);
+
+									const hitPosVec = new THREE.Vector3(hitPos.x, hitPos.y, hitPos.z);
+
+									if (this.floatingTextManager) {
+										this.floatingTextManager.spawnText(`-${finalDamage}`, hitPosVec, color, 1.5);
+									}
+								}
+							});
+						}
+
+						proj.destroy(hitPos);
+					}
+				}
+			}
+		}
+	});
+
+	// Character Update
+	const remotePlayers = this.networkManager ? this.networkManager.remotePlayers : null;
+	this.character.update(dt, this.inputManager, remotePlayers);
+
+	// Camera Update
+	this.cameraController.update(this.character.getPosition(), this.character.getRotation(), dt);
+
+	// Fall Death Logic
+	if (this.environmentConfig && this.environmentConfig.fallDeath && this.character.getPosition().y < this.environmentConfig.fallDeathY) {
+		if (!this.character.isDead) {
+			console.log("Player fell off the map! Instant respawn.");
+			this.character.currentHealth = 0;
+			this.character.emit("healthChanged", { current: 0, max: this.character.maxHealth });
+			this.character.respawn();
+		}
+	}
+
+	// Network Update
+	if (this.networkManager) {
+		this.networkManager.update(dt);
+
+		if (this.character) {
+			if (!this._netAttackLatch && this.inputManager && this.inputManager.keys.attack) {
+				this._netAttackLatch = true;
+			}
+
+			const isMoving = this.inputManager ? (this.inputManager.keys.forward || this.inputManager.keys.backward || this.inputManager.keys.left || this.inputManager.keys.right) : false;
+			const isCrouching = this.inputManager ? this.inputManager.keys.crouch : false;
+			const isAttacking = this.inputManager ? this.inputManager.keys.attack : false;
+			const isGrounded = this.character.characterController ? this.character.characterController.computedGrounded() : true;
+
+			const sendAttacking = isAttacking || this._netAttackLatch;
+
+			const currentItem = this.inventoryManager ? this.inventoryManager.getCurrentItem() : null;
+			const equippedWeapon = (currentItem && currentItem.type === "weapon") ? currentItem.id : null;
+			const equippedHand = (currentItem && currentItem.equippedHand) ? currentItem.equippedHand : "right";
+
+			const playerState = {
+				modelType: this.character.currentType || "skin",
+				isMoving: isMoving,
+				isCrouching: isCrouching,
+				isAttacking: sendAttacking,
+				isGrounded: isGrounded,
+				verticalVelocity: this.character.verticalVelocity || 0,
+				action: this.character.currentAction ? this.character.currentAction.getClip().name : "Idle",
+				equippedWeapon: equippedWeapon,
+				equippedHand: equippedHand,
+				jumpAnimationType: this.character.polygonModelSkin ? this.character.polygonModelSkin.jumpAnimationType : "none",
+				playerCollision: this.character.playerCollision || "push",
+				headPitch: this.character.headPitch || 0,
+				headYaw: this.character.headYaw || 0
+			};
+
+			const updateSent = this.networkManager.sendPlayerUpdate(
+				this.character.getPosition(),
+				this.character.getRotation(),
+				playerState
+			);
+
+			if (updateSent === true) {
+				this._netAttackLatch = false;
+			}
+		}
+
+		const countEl = document.getElementById("player-count");
+		if (countEl) countEl.textContent = `Jugadores: ${this.networkManager.getPlayerCount()}`;
+	}
+
+	if (this.npc) this.npc.update(dt);
+
+	if (this.platforms) {
+		this.platforms.forEach((p: any) => p.update(this.character));
+	}
+
+	if (this.projectiles) {
+		for (let i = this.projectiles.length - 1; i >= 0; i--) {
+			const proj = this.projectiles[i];
+			proj.update(dt);
+
+			if (proj.isDead) {
+				this.projectiles.splice(i, 1);
+				continue;
+			}
+
+			let hitTarget = false;
+
+			this.sceneManager.scene.children.forEach((obj: any) => {
+				if (hitTarget) return;
+				if (obj.userData.mapObjectType === "target") {
+					const rbPos = proj.rigidBody.translation();
+					const worldPos = new THREE.Vector3(rbPos.x, rbPos.y, rbPos.z);
+					const localPos = obj.worldToLocal(worldPos.clone());
+
+					const props = obj.userData.logicProperties || {};
+					const radius = props.radius !== undefined ? props.radius : (obj.userData.radius || 1.0);
+					const thickness = obj.scale.y || 0.2;
+
+					if (Math.abs(localPos.y) < thickness && Math.sqrt(localPos.x * localPos.x + localPos.z * localPos.z) <= radius) {
+						if (!proj.hasHitTarget) {
+							proj.hasHitTarget = true;
+							hitTarget = true;
+
+							const dist = Math.sqrt(localPos.x * localPos.x + localPos.z * localPos.z);
+							const rings = props.rings || 3;
+							const ringWidth = radius / rings;
+
+							let ringIdxHit = Math.floor(dist / ringWidth);
+							if (ringIdxHit >= rings) ringIdxHit = rings - 1;
+
+							const mappedIdx = rings - 1 - ringIdxHit;
+
+							const mults = props.ringMultipliers || [0.25, 0.5, 1.0];
+							const mult = mults[mappedIdx] !== undefined ? mults[mappedIdx] : 1;
+
+							const useProj = props.useProjectileDamage !== undefined ? props.useProjectileDamage : false;
+							const baseDmg = useProj ? proj.damage : (props.baseDamage !== undefined ? props.baseDamage : 10);
+							const finalDamage = Math.round(baseDmg * mult);
+
+							let color = "#FFFFFF";
+							if (mappedIdx === rings - 1) color = "#FF2222";
+							else if (mult >= 0.5) color = "#FFCC00";
+
+							if (this.floatingTextManager) {
+								this.floatingTextManager.spawnText(`-${finalDamage}`, worldPos, color, 1.5);
+							}
+
+							proj.destroy(worldPos);
+						}
+					}
+				}
+			});
+
+			if (proj.isDead) {
+				this.projectiles.splice(i, 1);
+			}
+		}
+	}
+
+	if (this.floatingTextManager) {
+		this.floatingTextManager.update(dt);
+	}
+
+	if (this.fxBlasterSystem) {
+		this.fxBlasterSystem.Update(dt);
+	}
+
+	this.updateMovementLogic(dt);
+	this.updateCollisionLogic(dt);
+	this.updateButtonInteraction(dt);
+
+	if (this.inputManager && this.inputManager.keys.attack && this.inventoryManager) {
+		const currentItem = this.inventoryManager.getCurrentItem();
+		if (currentItem instanceof this.PelotaItemClass) {
+			this.useCurrentItem(currentItem);
+		} else if (currentItem instanceof this.GunItemClass && currentItem.isAuto) {
+			this.useCurrentItem(currentItem);
+		}
+	}
+
+	if (this.inventoryManager && this.character && this.cameraController) {
+		const currentItem = this.inventoryManager.getCurrentItem();
+		if (currentItem instanceof this.GunItemClass) {
+			const manualPitchDelta = this.cameraController.consumeManualPitchDelta();
+			const diffs = currentItem.updateAnim(dt, manualPitchDelta);
+
+			if (diffs && diffs.pitchDiff !== undefined) {
+				if (diffs.pitchDiff !== 0) {
+					if (this.cameraController.isFirstPerson) {
+						this.cameraController.fpPitch += diffs.pitchDiff;
+						this.cameraController.fpPitch = Math.max(-this.cameraController.maxPitch, Math.min(this.cameraController.maxPitch, this.cameraController.fpPitch));
+					} else {
+						this.cameraController.phi -= diffs.pitchDiff;
+						this.cameraController.phi = Math.max(this.cameraController.minPhi, Math.min(this.cameraController.maxPhi, this.cameraController.phi));
+					}
+				}
+				if (diffs.yawDiff !== 0) {
+					if (this.cameraController.isFirstPerson) {
+						this.cameraController.fpYaw += diffs.yawDiff;
+					} else {
+						this.cameraController.theta += diffs.yawDiff;
+					}
+				}
+			} else {
+				const pitchDiff = typeof diffs === "number" ? diffs : 0;
+				if (pitchDiff !== 0) {
+					if (this.cameraController.isFirstPerson) {
+						this.cameraController.fpPitch += pitchDiff;
+						this.cameraController.fpPitch = Math.max(-this.cameraController.maxPitch, Math.min(this.cameraController.maxPitch, this.cameraController.fpPitch));
+					} else {
+						this.cameraController.phi -= pitchDiff;
+						this.cameraController.phi = Math.max(this.cameraController.minPhi, Math.min(this.cameraController.maxPhi, this.cameraController.phi));
+					}
+				}
+			}
+		}
+	}
+
+	if (this.itemDropManager) {
+		this.itemDropManager.update(dt, this.clock.getElapsedTime());
+
+		if (this.character) {
+			const charPos = this.character.getPosition();
+			const collectedFuego = this.itemDropManager.checkAutoPickup(charPos, 1.5, "fuego");
+
+			if (collectedFuego.length > 0) {
+				let valueAdded = 0;
+				collectedFuego.forEach((item: any) => {
+					valueAdded += (item.value || 1);
+				});
+				this.fuegoCount += valueAdded;
+				const counterEl = document.getElementById("fuego-count");
+				if (counterEl) counterEl.textContent = this.fuegoCount;
+				console.log("Recogido fuego! Total:", this.fuegoCount);
+			}
+
+			const nearest = this.itemDropManager.getNearestItem(charPos, 3.0);
+			const promptEl = document.getElementById("interaction-prompt");
+			const promptTextEl = document.getElementById("prompt-text") as HTMLElement | null;
+
+			if (nearest && promptEl && promptTextEl) {
+				promptTextEl.textContent = `Recoger ${nearest.item.name}`;
+				promptEl.style.display = "flex";
+
+				const itemPos = nearest.rigidBody.translation();
+				const vec = new THREE.Vector3(itemPos.x, itemPos.y + 0.5, itemPos.z);
+				vec.project(this.sceneManager.camera);
+
+				const x = (vec.x * 0.5 + 0.5) * window.innerWidth;
+				const y = (-(vec.y * 0.5) + 0.5) * window.innerHeight;
+
+				if (vec.z < 1) {
+					promptEl.style.left = `${x}px`;
+					promptEl.style.top = `${y}px`;
+				} else {
+					promptEl.style.display = "none";
+				}
+			} else if (promptEl) {
+				promptEl.style.display = "none";
+			}
+		}
+	}
+
+	if (this.farmingZone) {
+		this.farmingZone.update(dt);
+
+		if (this.character && !this.isMovingFarmingZone) {
+			const charPos = this.character.getPosition();
+			const zonePos = this.farmingZone.position;
+
+			const dx = charPos.x - zonePos.x;
+			const dz = charPos.z - zonePos.z;
+			const distSq = dx * dx + dz * dz;
+
+			const promptContainer = document.getElementById("move-prompt-container");
+			const progressBar = document.getElementById("move-progress-bar");
+
+			if (distSq < 16.0) {
+				if (promptContainer) promptContainer.style.display = "flex";
+
+				if (this.isFKeyDown) {
+					this.fKeyHeldTime += dt;
+					const progress = Math.min(this.fKeyHeldTime / 5.0, 1.0);
+					if (progressBar) progressBar.style.width = `${progress * 100}%`;
+
+					if (this.fKeyHeldTime >= 5.0) {
+						this.isMovingFarmingZone = true;
+						this.fKeyHeldTime = 0;
+						if (promptContainer) promptContainer.style.display = "none";
+						console.log("Farming Zone Move Mode Activated");
+					}
+				} else {
+					this.fKeyHeldTime = 0;
+					if (progressBar) progressBar.style.width = "0%";
+				}
+			} else {
+				if (promptContainer) promptContainer.style.display = "none";
+				this.fKeyHeldTime = 0;
+			}
+		} else if (this.isMovingFarmingZone) {
+			const raycaster = new THREE.Raycaster();
+			raycaster.setFromCamera(new THREE.Vector2(0, 0), this.sceneManager.camera);
+			const intersects = raycaster.intersectObjects(this.sceneManager.scene.children, true);
+			const hit = intersects.find((h: any) => h.distance < 20 && h.object.type === "Mesh" && h.object !== this.moveGhost);
+
+			if (hit) {
+				this.moveGhost.visible = true;
+				this.moveGhost.position.copy(hit.point);
+				this.moveGhost.position.y += 0.1;
+			} else {
+				this.moveGhost.visible = false;
+			}
+		}
+	}
+
+	if (this.gameMode === "editor" && this.constructionMenu) {
+		if (this.constructionMenu.logicSystem) {
+			this.constructionMenu.logicSystem.update(dt);
+		}
+
+		if (this.constructionMenu.logicSystem && this.constructionMenu.logicSystem.isEditingMap) {
+			if (this.constructionMenu.logicSystem.toolbar.activeTool === "waypoint") {
+				if (this.placementManager && this.character) {
+					this.placementManager.updateLogicGhost(
+						this.constructionMenu.logicSystem.editingObject,
+						this.character.getPosition(),
+						this.placementRotationIndex || 0
+					);
+				}
+			} else {
+				if (this.placementManager) this.placementManager.placementGhost.visible = false;
+			}
+		} else if (!this.constructionMenu.isVisible && this.placementManager && this.inventoryManager) {
+			const currentItem = this.inventoryManager.getCurrentItem();
+			const charPos = this.character ? this.character.getPosition() : null;
+			this.placementManager.update(currentItem, this.placementRotationIndex || 0, charPos);
+		}
+	} else if (this.placementManager && this.inventoryManager) {
+		const currentItem = this.inventoryManager.getCurrentItem();
+		const charPos = this.character ? this.character.getPosition() : null;
+		this.placementManager.update(currentItem, this.placementRotationIndex || 0, charPos);
+	}
+
+	this.updateDebugRender();
+	this.sceneManager.renderer.clear();
+	this.sceneManager.update();
+	this.renderOrientationGizmo();
+}

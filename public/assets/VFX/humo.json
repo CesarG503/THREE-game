@@ -1,0 +1,32 @@
+{
+    "metadata": {
+        "type": "Object"
+    },
+    "object": {
+        "type": "Mesh",
+        "geometry": "plane",
+        "material": "smokeMat",
+        "scale": [
+            2,
+            2,
+            2
+        ]
+    },
+    "geometries": [
+        {
+            "uuid": "plane",
+            "type": "PlaneGeometry",
+            "width": 1,
+            "height": 1
+        }
+    ],
+    "materials": [
+        {
+            "uuid": "smokeMat",
+            "type": "MeshBasicMaterial",
+            "transparent": true,
+            "opacity": 0.5,
+            "color": 11184810
+        }
+    ]
+}

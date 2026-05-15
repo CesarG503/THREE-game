@@ -1,4 +1,4 @@
-export type InputManagerKey = "forward" | "backward" | "left" | "right" | "jump" | "crouch" | "attack";
+export type InputManagerKey = "forward" | "backward" | "left" | "right" | "jump" | "crouch" | "attack" | "aim";
 
 export interface InputState {
 	forward: boolean;
@@ -8,6 +8,7 @@ export interface InputState {
 	jump: boolean;
 	crouch: boolean;
 	attack: boolean;
+	aim: boolean;
 }
 
 export interface InputBinding {

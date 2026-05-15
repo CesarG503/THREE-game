@@ -91,6 +91,8 @@ export function registerHandlers(router: MessageRouter): void {
       customTracerVFX:         msg.customTracerVFX,
       customImpactVFX:         msg.customImpactVFX,
       tracerDestroyOnCollision: msg.tracerDestroyOnCollision,
+      tracerStayForever:       msg.tracerStayForever,
+      tracerCollisionVFX:      msg.tracerCollisionVFX,
     }, playerId)
   })
 

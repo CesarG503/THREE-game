@@ -209,8 +209,11 @@ export function useCurrentItem(this: any, isRightClickOrItem: any = false) {
 	const context = {
 		scene: this.sceneManager.scene,
 		world: this.world,
+		game: this,
 		placementManager: this.placementManager,
 		platforms: this.platforms,
+		farmingZones: this.farmingZones,
+		itemDropManager: this.itemDropManager,
 		rotationIndex: this.placementRotationIndex,
 		origin: origin,
 		direction: direction,

@@ -3,6 +3,7 @@ import RAPIER from "@dimforge/rapier3d-compat";
 import { SceneManager } from "./core/SceneManager";
 import { InputManager } from "./input/InputManager";
 import { CameraController } from "./camera/CameraController";
+import { ScopeController } from "./camera/ScopeController";
 import { CharacterController } from "./character/CharacterController";
 import { NetworkManager } from "./network/NetworkManager";
 import { ChatManager } from "./network/ChatManager";
@@ -13,6 +14,7 @@ import { InventoryManager } from "./items/InventoryManager";
 import { ItemDropManager } from "./items/ItemDropManager";
 import { Item } from "./items/Item";
 import { ImpulseItem } from "./items/ImpulseItem";
+import { FarmingZoneItem } from "./items/FarmingZoneItem";
 import { FarmingZone } from "./entities/FarmingZone";
 import { FuegoItem } from "./items/FuegoItem";
 import { TurretItem } from "./items/TurretItem";
@@ -48,10 +50,12 @@ export class Game {
 	hud: any;
 	floatingTextManager: any;
 	cameraController: any;
+	scopeController: any;
 	networkManager: any;
 	chatManager: any;
 	placementManager: any;
 	platforms: any;
+	farmingZones: any;
 	projectiles: any;
 	fxBlasterSystem: any;
 	constructionMenu: any;
@@ -183,6 +187,7 @@ export class Game {
 			this.sceneManager.camera,
 			this.sceneManager.renderer.domElement
 		);
+		this.scopeController = new ScopeController(this.sceneManager.camera, this);
 		this.sceneManager.renderer.autoClear = false;
 		this.setupOrientationGizmo();
 
@@ -206,6 +211,7 @@ export class Game {
 		}
 
 		this.platforms = [];
+		this.farmingZones = [];
 		this.projectiles = [];
 		this.fxBlasterSystem = new BlasterSystem(this.sceneManager.scene);
 		this._netAttackLatch = false;
@@ -292,9 +298,9 @@ export class Game {
 			}
 		};
 
-		this.networkManager.onPlayerShoot = (playerId: any, startPos: any, direction: any, type: any, speed: any, damage: any, drop: any, rebote: any, hasImpactEffect: any, hasTracer: any, hasTrajectoryLine: any, customTracerVFX = "Ninguno", customImpactVFX = "Ninguno", tracerDestroyOnCollision = false) => {
+		this.networkManager.onPlayerShoot = (playerId: any, startPos: any, direction: any, type: any, speed: any, damage: any, drop: any, rebote: any, hasImpactEffect: any, hasTracer: any, hasTrajectoryLine: any, customTracerVFX = "Ninguno", customImpactVFX = "Ninguno", tracerDestroyOnCollision = false, tracerStayForever = false, tracerCollisionVFX = "Ninguno") => {
 			console.log(`[Collab] Player ${playerId} disparó un ${type}!`);
-			this.handleRemoteShoot(startPos, direction, type, speed, damage, drop, rebote, hasImpactEffect, hasTracer, hasTrajectoryLine, customTracerVFX, customImpactVFX, tracerDestroyOnCollision);
+			this.handleRemoteShoot(startPos, direction, type, speed, damage, drop, rebote, hasImpactEffect, hasTracer, hasTrajectoryLine, customTracerVFX, customImpactVFX, tracerDestroyOnCollision, tracerStayForever, tracerCollisionVFX);
 		};
 
 		this.networkManager.onPlayerAction = (playerId: any, actionType: any, data: any) => {
@@ -427,12 +433,18 @@ export class Game {
 			const floor = new MapObjectItem("floor", "Suelo", "wall", "/assets/textures/impulso.png", 0xFFFFFF, { x: 5, y: 0.5, z: 5 });
 			const ramp = new MapObjectItem("stairs", "Gradas", "stairs", "/assets/textures/impulso.png", 0xFFFFFF, { x: 4, y: 2, z: 4 });
 			const tall = new MapObjectItem("tall", "Torre", "pillar", "/assets/textures/salto.png", 0xFFFFFF, { x: 2, y: 10, z: 2 });
+			const impulseJump = new ImpulseItem("impulse_jump", "Salto", "/assets/textures/salto.png", "jump", 25);
+			const impulseLat = new ImpulseItem("impulse_lat", "Impulso", "/assets/textures/impulso.png", "lateral", 40);
+			const farmingZoneItem = new FarmingZoneItem();
 
 			this.inventoryManager.addItem(wall);
 			this.inventoryManager.addItem(pillar);
 			this.inventoryManager.addItem(floor);
 			this.inventoryManager.addItem(ramp);
 			this.inventoryManager.addItem(tall);
+			this.inventoryManager.addItem(impulseJump);
+			this.inventoryManager.addItem(impulseLat);
+			this.inventoryManager.addItem(farmingZoneItem);
 
 			this.setupEditorUI();
 
@@ -472,6 +484,8 @@ export class Game {
 						}
 					} else if (source instanceof ImpulseItem) {
 						newItem = new ImpulseItem(source.id, source.name, source.iconPath, source.type, source.strength);
+					} else if (source instanceof FarmingZoneItem) {
+						newItem = new FarmingZoneItem();
 					} else {
 						newItem = new MapObjectItem(
 							source.id,

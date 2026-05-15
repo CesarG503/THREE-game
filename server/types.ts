@@ -86,6 +86,8 @@ export interface PlayerShootMessage extends BaseMessage {
   customTracerVFX?: string
   customImpactVFX?: string
   tracerDestroyOnCollision: boolean
+  tracerStayForever?: boolean
+  tracerCollisionVFX?: string
 }
 
 export interface PlayerActionMessage extends BaseMessage {

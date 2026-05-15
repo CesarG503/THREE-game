@@ -122,11 +122,16 @@ export class ParticleSystem {
 
     try {
       this.loader.parse(json, (effect: any) => {
+        if (wrapper.userData.isDestroyed) return;
         console.log(`[VFX] Successfully parsed ${effectName}`);
         QuarksUtil.addToBatchRenderer(effect, this.batchRenderer);
         QuarksUtil.play(effect);
         wrapper.add(effect);
         wrapper.userData.effectRoot = effect;
+
+        if (wrapper.userData.stopEmission) {
+          this.stopLoadedEffectEmission(wrapper);
+        }
 
         if (autoCleanup && !parent) {
           setTimeout(() => {
@@ -142,12 +147,19 @@ export class ParticleSystem {
   }
 
   stopLoadedEffectEmission(wrapper: any) {
-    if (!wrapper || !wrapper.userData.effectRoot) return;
-    wrapper.userData.effectRoot.traverse((child: any) => {
-      if (child.type === "ParticleSystem" || child.isParticleSystem) {
-        child.emissionOverTime = new ConstantValue(0);
-        if (child.emissionBursts) {
-          child.emissionBursts = [];
+    if (!wrapper) return;
+    wrapper.userData.stopEmission = true;
+    if (!wrapper.userData.effectRoot) return;
+
+    QuarksUtil.runOnAllParticleEmitters(wrapper.userData.effectRoot, (ps: any) => {
+      if (ps.system) {
+        if (typeof ps.system.endEmit === "function") {
+          ps.system.endEmit();
+        } else {
+          ps.system.emissionOverTime = new ConstantValue(0);
+          if (ps.system.emissionBursts) {
+            ps.system.emissionBursts = [];
+          }
         }
       }
     });
@@ -156,14 +168,22 @@ export class ParticleSystem {
   destroyLoadedEffect(wrapper: any) {
     if (!wrapper) return;
 
+    wrapper.userData.isDestroyed = true;
+
     if (wrapper.parent) wrapper.parent.remove(wrapper);
+    wrapper.removeFromParent();
 
     if (wrapper.userData.effectRoot) {
-      wrapper.userData.effectRoot.traverse((child: any) => {
-        if (child.type === "ParticleSystem" || child.isParticleSystem) {
-          this.batchRenderer.deleteSystem(child);
+      QuarksUtil.runOnAllParticleEmitters(wrapper.userData.effectRoot, (ps: any) => {
+        if (ps.system) {
+          try {
+            this.batchRenderer.deleteSystem(ps.system);
+          } catch (e) {
+            console.warn("Could not delete particle system", e);
+          }
         }
       });
+      wrapper.userData.effectRoot.visible = false;
     }
   }
 

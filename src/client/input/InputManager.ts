@@ -14,7 +14,8 @@ export class InputManager {
       right: false,
       jump: false,
       crouch: false,
-      attack: false
+      attack: false,
+      aim: false
     };
 
     this.isPaused = false;
@@ -38,11 +39,13 @@ export class InputManager {
 
     document.addEventListener("mousedown", (e) => {
       if (this.isPaused || !this.enabled) return;
-      if (e.button === 0 || e.button === 2) this.keys.attack = true;
+      if (e.button === 0) this.keys.attack = true;
+      if (e.button === 2) this.keys.aim = true;
     });
 
     document.addEventListener("mouseup", (e) => {
-      if (e.button === 0 || e.button === 2) this.keys.attack = false;
+      if (e.button === 0) this.keys.attack = false;
+      if (e.button === 2) this.keys.aim = false;
     });
   }
 
@@ -54,6 +57,7 @@ export class InputManager {
     this.keys.jump = false;
     this.keys.crouch = false;
     this.keys.attack = false;
+    this.keys.aim = false;
   }
 
   onKeyDown(event: KeyboardEvent) {

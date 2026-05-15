@@ -20,8 +20,11 @@ export interface InventoryState {
 export interface ItemContext {
 	scene: Scene;
 	world: unknown;
+	game?: any;
 	placementManager?: any;
 	platforms?: any[];
+	farmingZones?: any[];
+	itemDropManager?: any;
 	rotationIndex?: number;
 	origin: Vector3;
 	direction: Vector3;
@@ -71,8 +74,11 @@ export interface WeaponConfig {
 	hasImpactEffect?: boolean;
 	customTracerVFX?: string;
 	tracerDestroyOnCollision?: boolean;
+	tracerStayForever?: boolean;
+	tracerCollisionVFX?: string;
 	customImpactVFX?: string;
 	hasTrajectoryLine?: boolean;
+	maxScope?: number;
 	hasPlayerImpulseUp?: boolean;
 	playerImpulseUpForce?: number;
 	playerImpulseUpAirReduction?: number;

@@ -12,6 +12,7 @@ export class Projectile {
   hasImpactEffect: boolean;
   customTracerVFX: string;
   customImpactVFX: string;
+  tracerCollisionVFX: string;
   customTracerAttached: boolean;
   customTracerWrapper: any;
   direction: THREE.Vector3;
@@ -30,6 +31,7 @@ export class Projectile {
   initialTracer: any;
   isRemoteBlaster: boolean;
   tracerDestroyOnCollision: boolean;
+  tracerStayForever: boolean;
 
   constructor(
     scene: THREE.Scene,
@@ -43,7 +45,8 @@ export class Projectile {
     rebote = false,
     hasImpactEffect = false,
     customTracerVFX = "Ninguno",
-    customImpactVFX = "Ninguno"
+    customImpactVFX = "Ninguno",
+    tracerCollisionVFX = "Ninguno"
   ) {
     this.scene = scene;
     this.world = world;
@@ -55,6 +58,7 @@ export class Projectile {
     this.hasImpactEffect = hasImpactEffect;
     this.customTracerVFX = customTracerVFX;
     this.customImpactVFX = customImpactVFX;
+    this.tracerCollisionVFX = tracerCollisionVFX;
     this.customTracerAttached = false;
     this.customTracerWrapper = null;
 
@@ -64,6 +68,11 @@ export class Projectile {
     this.hasTracer = false;
     this.hasTrajectoryLine = false;
     this.blasterSystem = null;
+    this.particleSystem = null;
+    this.initialTracer = null;
+    this.isRemoteBlaster = false;
+    this.tracerDestroyOnCollision = false;
+    this.tracerStayForever = false;
     this.lastPosition = origin.clone();
     this.trajectoryPoints = [origin.clone()];
     this.trajectoryLine = null;
@@ -231,8 +240,38 @@ export class Projectile {
       }
     }
 
+    if (hitPos && this.particleSystem && this.tracerCollisionVFX && this.tracerCollisionVFX !== "Ninguno") {
+      const tracerHitPos = new THREE.Vector3(hitPos.x, hitPos.y, hitPos.z);
+      const tracerImpactWrapper = this.particleSystem.spawnLoadedEffect(this.tracerCollisionVFX, tracerHitPos, null, null, false);
+
+      setTimeout(() => {
+        if (this.particleSystem) {
+          this.particleSystem.stopLoadedEffectEmission(tracerImpactWrapper);
+        }
+      }, 500);
+
+      setTimeout(() => {
+        if (this.particleSystem) {
+          this.particleSystem.destroyLoadedEffect(tracerImpactWrapper);
+        }
+      }, 3000);
+    }
+
     if (this.customTracerWrapper && this.particleSystem) {
-      if (this.tracerDestroyOnCollision) {
+      if (this.tracerStayForever) {
+        if (this.customTracerWrapper.parent) {
+          const worldPos = new THREE.Vector3();
+          this.customTracerWrapper.getWorldPosition(worldPos);
+          const worldQuat = new THREE.Quaternion();
+          this.customTracerWrapper.getWorldQuaternion(worldQuat);
+
+          this.customTracerWrapper.parent.remove(this.customTracerWrapper);
+          this.scene.add(this.customTracerWrapper);
+
+          this.customTracerWrapper.position.copy(worldPos);
+          this.customTracerWrapper.quaternion.copy(worldQuat);
+        }
+      } else if (this.tracerDestroyOnCollision && hitPos) {
         if (this.customTracerWrapper.parent) {
           const worldPos = new THREE.Vector3();
           this.customTracerWrapper.getWorldPosition(worldPos);
@@ -246,22 +285,12 @@ export class Projectile {
           this.customTracerWrapper.quaternion.copy(worldQuat);
         }
 
-        let vel = this.direction.clone().normalize().multiplyScalar(this.speed);
-        void vel;
-
         this.particleSystem.stopLoadedEffectEmission(this.customTracerWrapper);
 
         const wrapperToDestroy = this.customTracerWrapper;
         const startTime = Date.now();
-        const duration = 250;
-        const startScale = wrapperToDestroy.scale.clone();
+        const duration = 500;
         const pSys = this.particleSystem;
-
-        setTimeout(() => {
-          if (pSys) {
-            pSys.destroyLoadedEffect(wrapperToDestroy);
-          }
-        }, duration);
 
         const fadeAnim = () => {
           if (!pSys) return;
@@ -270,10 +299,9 @@ export class Projectile {
           const t = Math.min(elapsed / duration, 1.0);
 
           if (t < 1.0) {
-            const s = Math.max(0.01, 1.0 - t);
-            wrapperToDestroy.scale.set(startScale.x * s, startScale.y * s, startScale.z * s);
-
             requestAnimationFrame(fadeAnim);
+          } else {
+            pSys.destroyLoadedEffect(wrapperToDestroy);
           }
         };
         fadeAnim();

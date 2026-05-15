@@ -8,6 +8,7 @@ import { PlayerConfigPanel } from "./PlayerConfigPanel";
 import { GunItem } from "../items/GunItem";
 import { WEAPONS_CONFIG } from "../items/WeaponSettings";
 import { MapShapeEditor } from "./MapShapeEditor";
+import { AdvancedWeaponConfigPanel } from "./AdvancedWeaponConfigPanel";
 
 export class ConstructionMenu {
     constructor(inventoryManager, gameInstance) {
@@ -28,6 +29,7 @@ export class ConstructionMenu {
 
         this.gameConfigPanel = new GameConfigPanel(this.game, this.logicSystem);
         this.playerConfigPanel = new PlayerConfigPanel(this.game, this.logicSystem.playerConfigManager);
+        this.advancedWeaponConfigPanel = null;
 
         this.setupUI();
     }
@@ -1568,12 +1570,46 @@ export class ConstructionMenu {
         `;
 
         // 1. Title
+        this.editorTitleContainer = document.createElement("div");
+        this.editorTitleContainer.style.cssText = `
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 100%;
+            border-bottom: 1px solid #444;
+            padding-bottom: 10px;
+            gap: 10px;
+        `;
+
         this.editorTitle = document.createElement("h3");
         this.editorTitle.style.margin = "0";
-        this.editorTitle.style.borderBottom = "1px solid #444";
-        this.editorTitle.style.width = "100%";
-        this.editorTitle.style.textAlign = "center";
-        this.editorTitle.style.paddingBottom = "10px";
+        this.editorTitle.style.flex = "1";
+        this.editorTitle.style.textAlign = "left";
+
+        this.advancedConfigBtn = document.createElement("button");
+        this.advancedConfigBtn.textContent = "Config. Avanzada";
+        this.advancedConfigBtn.style.cssText = `
+            background: #0078d7;
+            color: white;
+            border: none;
+            padding: 7px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 11px;
+            font-weight: bold;
+            display: none;
+        `;
+        this.advancedConfigBtn.onmouseover = () => this.advancedConfigBtn.style.background = "#005a9e";
+        this.advancedConfigBtn.onmouseout = () => this.advancedConfigBtn.style.background = "#0078d7";
+        this.advancedConfigBtn.onclick = () => {
+            if (!this.advancedWeaponConfigPanel) {
+                this.advancedWeaponConfigPanel = new AdvancedWeaponConfigPanel(this.game, this);
+            }
+            this.advancedWeaponConfigPanel.show(this.currentDraftItem);
+        };
+
+        this.editorTitleContainer.appendChild(this.editorTitle);
+        this.editorTitleContainer.appendChild(this.advancedConfigBtn);
 
         // 2. Large Preview (Draggable)
         this.editorPreview = document.createElement("div");
@@ -1710,7 +1746,7 @@ export class ConstructionMenu {
         controlsContainer.appendChild(this.paletteContainer);
 
         // Add to panel
-        this.panelEditor.appendChild(this.editorTitle);
+        this.panelEditor.appendChild(this.editorTitleContainer);
         this.panelEditor.appendChild(this.editorPreview);
         this.panelEditor.appendChild(controlsContainer);
 
@@ -1979,6 +2015,43 @@ export class ConstructionMenu {
 
         handRow.appendChild(handLabel);
         handRow.appendChild(this.handSelect);
+
+        // --- Max Scope Row ---
+        const maxScopeRow = document.createElement("div");
+        maxScopeRow.style.display = "flex";
+        maxScopeRow.style.alignItems = "center";
+        maxScopeRow.style.justifyContent = "space-between";
+
+        const maxScopeLabel = document.createElement("span");
+        maxScopeLabel.textContent = "Nivel de Mira (Scope):";
+
+        this.maxScopeSelect = document.createElement("select");
+        this.maxScopeSelect.style.cssText = this.handSelect.style.cssText;
+
+        [
+            { value: 1, text: "Ninguno (1x)" },
+            { value: 2, text: "Mira Corta (x2)" },
+            { value: 4, text: "Mira Media (x4)" },
+            { value: 5, text: "Mira Media-Alta (x5)" },
+            { value: 8, text: "Mira Larga (x8)" },
+            { value: 10, text: "Mira Francotirador (x10)" },
+            { value: 16, text: "Mira Avanzada (x16)" }
+        ].forEach(opt => {
+            const el = document.createElement("option");
+            el.value = opt.value;
+            el.textContent = opt.text;
+            this.maxScopeSelect.appendChild(el);
+        });
+
+        this.maxScopeSelect.addEventListener("change", (e) => {
+            const val = parseInt(e.target.value);
+            if (!isNaN(val) && this.currentDraftItem && this.currentDraftItem.type === "weapon") {
+                this.currentDraftItem.maxScope = val;
+            }
+        });
+
+        maxScopeRow.appendChild(maxScopeLabel);
+        maxScopeRow.appendChild(this.maxScopeSelect);
 
         // --- Recoil Row ---
         const recoilRow = document.createElement("div");
@@ -2295,6 +2368,54 @@ export class ConstructionMenu {
         tracerDestroyRow.appendChild(tracerDestroyLabel);
         tracerDestroyRow.appendChild(this.tracerDestroyInput);
 
+        // --- Tracer Stay Forever Row ---
+        const tracerStayForeverRow = document.createElement("div");
+        tracerStayForeverRow.style.display = "flex";
+        tracerStayForeverRow.style.alignItems = "center";
+        tracerStayForeverRow.style.justifyContent = "space-between";
+
+        const tracerStayForeverLabel = document.createElement("span");
+        tracerStayForeverLabel.textContent = "Permanecer para siempre:";
+
+        this.tracerStayForeverInput = document.createElement("input");
+        this.tracerStayForeverInput.type = "checkbox";
+        this.tracerStayForeverInput.addEventListener("change", (e) => {
+            if (this.currentDraftItem && this.currentDraftItem.type === "weapon") {
+                this.currentDraftItem.tracerStayForever = e.target.checked;
+            }
+        });
+
+        tracerStayForeverRow.appendChild(tracerStayForeverLabel);
+        tracerStayForeverRow.appendChild(this.tracerStayForeverInput);
+
+        // --- Tracer Collision VFX Row ---
+        const tracerCollisionRow = document.createElement("div");
+        tracerCollisionRow.style.display = "flex";
+        tracerCollisionRow.style.alignItems = "center";
+        tracerCollisionRow.style.justifyContent = "space-between";
+
+        const tracerCollisionLabel = document.createElement("span");
+        tracerCollisionLabel.textContent = "Efecto VFX al colisionar:";
+
+        this.tracerCollisionSelect = document.createElement("select");
+        this.tracerCollisionSelect.style.cssText = this.projectileTypeSelect.style.cssText;
+
+        ["Ninguno", "Bubble Explosion", "Cartoon Bang", "Dollar Bill Shower", "Cartoon Blood Splash", "Cartoon Fireball Explosion", "Cartoon Purple Lightning", "Explosión de Gas Azul"].forEach(opt => {
+            const el = document.createElement("option");
+            el.value = opt;
+            el.textContent = opt;
+            this.tracerCollisionSelect.appendChild(el);
+        });
+
+        this.tracerCollisionSelect.addEventListener("change", (e) => {
+            if (this.currentDraftItem && this.currentDraftItem.type === "weapon") {
+                this.currentDraftItem.tracerCollisionVFX = e.target.value;
+            }
+        });
+
+        tracerCollisionRow.appendChild(tracerCollisionLabel);
+        tracerCollisionRow.appendChild(this.tracerCollisionSelect);
+
         // --- Custom Impact VFX Row ---
         const customImpactRow = document.createElement("div");
         customImpactRow.style.display = "flex";
@@ -2436,6 +2557,7 @@ export class ConstructionMenu {
         weaponControlsContainer.appendChild(damageRow);
         weaponControlsContainer.appendChild(cooldownRow);
         weaponControlsContainer.appendChild(handRow);
+        weaponControlsContainer.appendChild(maxScopeRow);
         weaponControlsContainer.appendChild(recoilRow);
         weaponControlsContainer.appendChild(recoilModeRow);
         weaponControlsContainer.appendChild(autoRow);
@@ -2447,7 +2569,9 @@ export class ConstructionMenu {
         weaponControlsContainer.appendChild(reboteRow);
         weaponControlsContainer.appendChild(impactRow);
         weaponControlsContainer.appendChild(customTracerRow);
+        weaponControlsContainer.appendChild(tracerStayForeverRow);
         weaponControlsContainer.appendChild(tracerDestroyRow);
+        weaponControlsContainer.appendChild(tracerCollisionRow);
         weaponControlsContainer.appendChild(customImpactRow);
         weaponControlsContainer.appendChild(playerImpulseUpRow);
         weaponControlsContainer.appendChild(playerImpulseUpForceRow);
@@ -2489,6 +2613,7 @@ export class ConstructionMenu {
         this.createDraft(baseItem.id, baseItem.name, baseItem.type, baseItem.color, scaleCopy, baseItem.texturePath, baseItem);
 
         if (baseItem.type === "weapon") {
+            if (this.advancedConfigBtn) this.advancedConfigBtn.style.display = "block";
             this.editorConstructionControls.style.display = "none";
             this.editorTextureContainer.style.display = "none";
             this.editorDimContainer.style.display = "none";
@@ -2497,6 +2622,7 @@ export class ConstructionMenu {
             this.damageInput.value = baseItem.damage !== undefined ? baseItem.damage : 10;
             this.cooldownInput.value = baseItem.cooldown !== undefined ? baseItem.cooldown : 0.5;
             this.handSelect.value = baseItem.equippedHand !== undefined ? baseItem.equippedHand : "right";
+            this.maxScopeSelect.value = baseItem.maxScope !== undefined ? baseItem.maxScope : 1;
             this.recoilInput.value = baseItem.recoil !== undefined ? baseItem.recoil : 5.0;
             this.recoilModeSelect.value = baseItem.recoilMode !== undefined ? baseItem.recoilMode : "hybrid";
             this.autoInput.checked = baseItem.isAuto !== undefined ? baseItem.isAuto : false;
@@ -2512,7 +2638,9 @@ export class ConstructionMenu {
             this.impactInput.checked = baseItem.hasImpactEffect !== undefined ? baseItem.hasImpactEffect : false;
 
             this.customTracerSelect.value = baseItem.customTracerVFX || "Ninguno";
+            this.tracerStayForeverInput.checked = baseItem.tracerStayForever || false;
             this.tracerDestroyInput.checked = baseItem.tracerDestroyOnCollision || false;
+            this.tracerCollisionSelect.value = baseItem.tracerCollisionVFX || "Ninguno";
             this.customImpactSelect.value = baseItem.customImpactVFX || "Ninguno";
 
             this.playerImpulseUpInput.checked = baseItem.hasPlayerImpulseUp !== undefined ? baseItem.hasPlayerImpulseUp : false;
@@ -2522,6 +2650,7 @@ export class ConstructionMenu {
             this.playerImpulseBackInput.checked = baseItem.hasPlayerImpulseBack !== undefined ? baseItem.hasPlayerImpulseBack : false;
             this.playerImpulseBackForceInput.value = baseItem.playerImpulseBackForce !== undefined ? baseItem.playerImpulseBackForce : 5.0;
         } else {
+            if (this.advancedConfigBtn) this.advancedConfigBtn.style.display = "none";
             this.editorConstructionControls.style.display = "flex";
             this.editorTextureContainer.style.display = "flex";
             this.editorDimContainer.style.display = "flex";
@@ -2616,6 +2745,9 @@ export class ConstructionMenu {
 
         // Pause Game Input / Pointer Lock
         if (this.isVisible) {
+            if (this.game.cameraController) {
+                this.game.cameraController.setUIOpen(true);
+            }
             document.exitPointerLock();
             if (this.game.inputManager) {
                 this.game.inputManager.enabled = false;
@@ -2623,6 +2755,9 @@ export class ConstructionMenu {
                 this.game.isMouseDown = false;
             }
         } else {
+            if (this.game.cameraController) {
+                this.game.cameraController.setUIOpen(false);
+            }
             // Resume
             if (this.game.inputManager) {
                 this.game.inputManager.enabled = true;

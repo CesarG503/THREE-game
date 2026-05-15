@@ -73,7 +73,7 @@ export function updateConnectionStatus(this: any, connected: boolean, playerId: 
 	}
 }
 
-export function handleRemoteShoot(this: any, startPos: any, direction: any, type: any, speed: any, damage: any, drop: any, rebote: any, hasImpactEffect: any, hasTracer = false, hasTrajectoryLine = false, customTracerVFX = "Ninguno", customImpactVFX = "Ninguno", tracerDestroyOnCollision = false) {
+export function handleRemoteShoot(this: any, startPos: any, direction: any, type: any, speed: any, damage: any, drop: any, rebote: any, hasImpactEffect: any, hasTracer = false, hasTrajectoryLine = false, customTracerVFX = "Ninguno", customImpactVFX = "Ninguno", tracerDestroyOnCollision = false, tracerStayForever = false, tracerCollisionVFX = "Ninguno") {
 	if (!this.sceneManager || !this.world) return;
 
 	let tempTracer = null;
@@ -107,7 +107,8 @@ export function handleRemoteShoot(this: any, startPos: any, direction: any, type
 		rebote || false,
 		hasImpactEffect || false,
 		customTracerVFX,
-		customImpactVFX
+		customImpactVFX,
+		tracerCollisionVFX
 	);
 	proj.hasTracer = hasTracer;
 	proj.hasTrajectoryLine = hasTrajectoryLine;
@@ -116,6 +117,8 @@ export function handleRemoteShoot(this: any, startPos: any, direction: any, type
 	proj.initialTracer = tempTracer;
 	proj.isRemoteBlaster = true;
 	proj.tracerDestroyOnCollision = tracerDestroyOnCollision;
+	proj.tracerStayForever = tracerStayForever;
+	proj.tracerCollisionVFX = tracerCollisionVFX;
 
 	this.projectiles.push(proj);
 }

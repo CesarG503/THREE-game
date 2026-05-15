@@ -62,6 +62,14 @@ export function animate(this: any) {
 
 	const dt = this.clock.getDelta();
 
+	if (this.scopeController && this.character) {
+		this.scopeController.update(
+			dt,
+			this.inputManager ? this.inputManager.keys.aim : false,
+			this.inventoryManager ? this.inventoryManager.getCurrentItem() : null
+		);
+	}
+
 	// Step Physics
 	this.world.step(this.eventQueue);
 
@@ -213,6 +221,10 @@ export function animate(this: any) {
 		this.platforms.forEach((p: any) => p.update(this.character));
 	}
 
+	if (this.farmingZones) {
+		this.farmingZones.forEach((zone: any) => zone.update(dt));
+	}
+
 	if (this.projectiles) {
 		for (let i = this.projectiles.length - 1; i >= 0; i--) {
 			const proj = this.projectiles[i];
@@ -292,9 +304,9 @@ export function animate(this: any) {
 	if (this.inputManager && this.inputManager.keys.attack && this.inventoryManager) {
 		const currentItem = this.inventoryManager.getCurrentItem();
 		if (currentItem instanceof this.PelotaItemClass) {
-			this.useCurrentItem(currentItem);
+			this.useCurrentItem(false);
 		} else if (currentItem instanceof this.GunItemClass && currentItem.isAuto) {
-			this.useCurrentItem(currentItem);
+			this.useCurrentItem(false);
 		}
 	}
 

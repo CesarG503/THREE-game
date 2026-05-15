@@ -7,6 +7,7 @@ export class Item implements ItemLike {
   iconPath: string;
   count: number;
   maxStack: number;
+  value: number;
 
   constructor(id: string, name: string, iconPath: string) {
     this.id = id;
@@ -14,6 +15,7 @@ export class Item implements ItemLike {
     this.iconPath = iconPath;
     this.count = 1;
     this.maxStack = 64;
+    this.value = 1;
   }
 
   /**

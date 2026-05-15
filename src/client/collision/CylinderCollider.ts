@@ -54,7 +54,7 @@ export class CylinderCollider extends Collider {
   /**
    * Crea el mesh de debug
    */
-  createDebugMesh(scene: any) {
+  createDebugMesh(scene: THREE.Scene) {
     const geometry = new THREE.CylinderGeometry(this.radius, this.radius, this.height, 16);
     const material = new THREE.MeshBasicMaterial({
       color: this.isTrigger ? 0x00ff00 : 0x00ffff,

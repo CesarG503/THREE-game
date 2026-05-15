@@ -1,7 +1,8 @@
 import * as THREE from "three";
 import { GunItem } from "../items/GunItem";
+import type { Game } from "../Game";
 
-export function setupGameInput(this: any) {
+export function setupGameInput(this: Game) {
 	this.placementRotationIndex = 0;
 
 	document.addEventListener("keydown", (e: KeyboardEvent) => {
@@ -69,7 +70,7 @@ export function setupGameInput(this: any) {
 			const charPos = this.character.getPosition();
 
 			let triggeredButton = false;
-			this.sceneManager.scene.children.forEach((obj: any) => {
+			this.sceneManager.scene.children.forEach((obj: THREE.Object3D) => {
 				if (!triggeredButton && obj.userData.mapObjectType === "interaction_button") {
 					const dSq = obj.position.distanceToSquared(charPos);
 					if (dSq < 9.0) {
@@ -97,7 +98,7 @@ export function setupGameInput(this: any) {
 				if (picked.id === "fuego") {
 					this.fuegoCount += (picked.value || 1);
 					const counterEl = document.getElementById("fuego-count");
-					if (counterEl) counterEl.textContent = this.fuegoCount;
+					if (counterEl) counterEl.textContent = this.fuegoCount.toString();
 					console.log("Manual pickup fuego! Total:", this.fuegoCount);
 				} else {
 					const added = this.inventoryManager.addItem(picked);

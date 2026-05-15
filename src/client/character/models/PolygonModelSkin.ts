@@ -1,16 +1,17 @@
 import * as THREE from "three";
+import type { ICharacterModel } from "../../types";
 
-export class PolygonModelSkin {
-  scene: any;
+export class PolygonModelSkin implements ICharacterModel {
+  scene: THREE.Scene;
   isLocal: boolean;
-  model: any;
+  model: THREE.Group | null;
   isVisible: boolean;
-  head: any;
-  body: any;
-  rightArm: any;
-  leftArm: any;
-  rightLeg: any;
-  leftLeg: any;
+  head: THREE.Mesh | null;
+  body: THREE.Mesh | null;
+  rightArm: THREE.Mesh | null;
+  leftArm: THREE.Mesh | null;
+  rightLeg: THREE.Mesh | null;
+  leftLeg: THREE.Mesh | null;
   pivotGroup: THREE.Group | null;
   contentGroup: THREE.Group | null;
   upperBodyGroup: THREE.Group | null;
@@ -21,15 +22,15 @@ export class PolygonModelSkin {
   leftLegGroup: THREE.Group | null;
   skinUrl: string;
   attackWeight: number;
-  textureLoader: THREE.TextureLoader;
+  textureLoader!: THREE.TextureLoader;
   targetHeadPitch: number;
   targetHeadYaw: number;
-  jumpAnimationType: any;
-  fallAnimationType: any;
+  jumpAnimationType: string;
+  fallAnimationType: string;
   currentHeldItem: any;
   isFirstPerson: boolean;
 
-  constructor(scene: any, isLocal = true) {
+  constructor(scene: THREE.Scene, isLocal = true) {
     this.scene = scene;
     this.isLocal = isLocal;
     this.model = null;
@@ -59,6 +60,11 @@ export class PolygonModelSkin {
       "https://raw.githubusercontent.com/InventivetalentDev/minecraft-assets/1.19.3/assets/minecraft/textures/entity/player/wide/steve.png";
 
     this.attackWeight = 0;
+    this.targetHeadPitch = 0;
+    this.targetHeadYaw = 0;
+    this.jumpAnimationType = "";
+    this.fallAnimationType = "";
+    this.isFirstPerson = false;
 
     this.initLoader();
     this.createModel();
@@ -203,13 +209,13 @@ export class PolygonModelSkin {
     this.scene.add(this.model);
   }
 
-  createBoxGeometryWithUVs(w: any, h: any, d: any, u: any, v: any) {
+  createBoxGeometryWithUVs(w: number, h: number, d: number, u: number, v: number) {
     const geometry = new THREE.BoxGeometry(w, h, d);
 
     const width = 64;
     const height = 64;
 
-    const mapUV = (x: any, y: any, w1: any, h1: any) => {
+    const mapUV = (x: number, y: number, w1: number, h1: number) => {
       const u1 = x / width;
       const v1 = 1 - (y + h1) / height;
       const u2 = (x + w1) / width;
@@ -258,36 +264,36 @@ export class PolygonModelSkin {
     return geometry;
   }
 
-  setVisible(visible: any) {
+  setVisible(visible: boolean) {
     this.isVisible = visible;
     if (this.model) {
       this.model.visible = visible;
     }
   }
 
-  setPosition(pos: any) {
+  setPosition(pos: THREE.Vector3) {
     if (this.model) {
       this.model.position.copy(pos);
     }
   }
 
-  setRotation(rot: any) {
+  setRotation(rot: number) {
     if (this.model) {
       this.model.rotation.y = rot + Math.PI;
     }
   }
 
-  getPosition() {
+  getPosition(): THREE.Vector3 {
     return this.model ? this.model.position.clone() : new THREE.Vector3();
   }
 
-  setHeadRotation(pitch: any, yaw: any) {
+  setHeadRotation(pitch: number, yaw: number) {
     if (!this.headGroup) return;
     this.targetHeadPitch = pitch;
     this.targetHeadYaw = yaw;
   }
 
-  setFirstPerson(isFirstPerson: any) {
+  setFirstPerson(isFirstPerson: boolean) {
     if (this.isFirstPerson === isFirstPerson) return;
     this.isFirstPerson = isFirstPerson;
 
@@ -306,11 +312,11 @@ export class PolygonModelSkin {
     }
   }
 
-  setJumpAnimationType(type: any) {
+  setJumpAnimationType(type: string) {
     this.jumpAnimationType = type;
   }
 
-  setFallAnimationType(type: any) {
+  setFallAnimationType(type: string) {
     this.fallAnimationType = type;
   }
 
@@ -319,7 +325,7 @@ export class PolygonModelSkin {
     this.currentHeldItem = item;
   }
 
-  update(dt: any, isMoving: any, isCrouching: any, isAttacking: any, isGrounded: any, verticalVelocity: any) {
+  update(dt: number, isMoving: boolean, isCrouching?: boolean, isAttacking?: boolean, isGrounded?: boolean, verticalVelocity?: number) {
     if (!this.model || !this.isVisible) return;
 
     const walkSpeed = 7;

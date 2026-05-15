@@ -1,16 +1,17 @@
 import * as THREE from "three";
+import type { ICharacterModel } from "../../types";
 
-export class PolygonModel {
-  scene: any;
+export class PolygonModel implements ICharacterModel {
+  scene: THREE.Scene;
   isLocal: boolean;
-  model: any;
+  model: THREE.Group | null;
   isVisible: boolean;
   polyRightArm: THREE.Group | null;
   polyLeftArm: THREE.Group | null;
   polyRightLeg: THREE.Group | null;
   polyLeftLeg: THREE.Group | null;
 
-  constructor(scene: any, isLocal = true) {
+  constructor(scene: THREE.Scene, isLocal = true) {
     this.scene = scene;
     this.isLocal = isLocal;
     this.model = null;
@@ -119,26 +120,26 @@ export class PolygonModel {
     this.scene.add(this.model);
   }
 
-  setVisible(visible: any) {
+  setVisible(visible: boolean) {
     this.isVisible = visible;
     if (this.model) {
       this.model.visible = visible;
     }
   }
 
-  setPosition(pos: any) {
+  setPosition(pos: THREE.Vector3) {
     if (this.model) {
       this.model.position.copy(pos);
     }
   }
 
-  setRotation(rot: any) {
+  setRotation(rot: number) {
     if (this.model) {
       this.model.rotation.y = rot + Math.PI;
     }
   }
 
-  getPosition() {
+  getPosition(): THREE.Vector3 {
     return this.model ? this.model.position.clone() : new THREE.Vector3();
   }
 
@@ -146,7 +147,7 @@ export class PolygonModel {
     void item;
   }
 
-  update(dt: any, isMoving: any) {
+  update(dt: number, isMoving: boolean) {
     if (!this.model || !this.isVisible) return;
 
     if (isMoving) {

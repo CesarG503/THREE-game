@@ -1,8 +1,9 @@
 import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
 import { StairsUtils } from "../utils/StairsUtils";
+import type { Game } from "../Game";
 
-export function regenerateObjectPhysics(this: any, objectMesh: any) {
+export function regenerateObjectPhysics(this: Game, objectMesh: THREE.Object3D) {
 	if (!objectMesh || !this.world) return;
 
 	if (objectMesh.userData.rigidBody) {
@@ -71,6 +72,6 @@ export function regenerateObjectPhysics(this: any, objectMesh: any) {
 	}
 }
 
-export function updateObjectPhysics(this: any, object: any) {
+export function updateObjectPhysics(this: Game, object: THREE.Object3D) {
 	this.regenerateObjectPhysics(object);
 }

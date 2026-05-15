@@ -1,7 +1,10 @@
+import * as THREE from "three";
+import type { FloatingTextItem } from "../types";
+
 export class FloatingTextManager {
   sceneManager: any;
-  container: any;
-  texts: any[];
+  container: HTMLElement;
+  texts: FloatingTextItem[];
 
   constructor(sceneManager: any) {
     this.sceneManager = sceneManager;
@@ -46,16 +49,16 @@ export class FloatingTextManager {
     document.head.appendChild(style);
   }
 
-  spawnText(text: any, position3D: any, color = "#ff4444", duration = 1.0) {
+  spawnText(text: string | number, position3D: THREE.Vector3, color = "#ff4444", duration = 1.0) {
     const el = document.createElement("div");
     el.className = "damage-text";
-    el.textContent = text;
+    el.textContent = text.toString();
     el.style.color = color;
     el.style.animationDuration = `${duration}s`;
 
     this.container.appendChild(el);
 
-    const textObj = {
+    const textObj: FloatingTextItem = {
       el,
       pos3D: position3D.clone(),
       life: duration,
@@ -65,7 +68,7 @@ export class FloatingTextManager {
     this.texts.push(textObj);
   }
 
-  update(dt: any) {
+  update(dt: number) {
     const camera = this.sceneManager.camera;
 
     for (let i = this.texts.length - 1; i >= 0; i--) {

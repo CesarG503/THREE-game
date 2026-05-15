@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import type { CameraModeEventDetail, CameraPauseEventDetail } from "../types";
 
 export class CameraController {
   camera: THREE.Camera;
@@ -40,7 +41,7 @@ export class CameraController {
   dynamicOffset: number;
   smoothedStrafe: number;
 
-  constructor(camera: any, domElement: any) {
+  constructor(camera: THREE.Camera, domElement: HTMLElement) {
     this.camera = camera;
     this.domElement = domElement;
 
@@ -99,7 +100,7 @@ export class CameraController {
   }
 
   setupEventListeners() {
-    document.addEventListener("keydown", (e: any) => {
+    document.addEventListener("keydown", (e: KeyboardEvent) => {
       if (e.code === "Tab" && !this.isPaused && !this.isUIOpen) {
         e.preventDefault();
         this.toggleCameraMode();
@@ -110,7 +111,7 @@ export class CameraController {
       }
     });
 
-    this.domElement.addEventListener("mousedown", (e: any) => {
+    this.domElement.addEventListener("mousedown", (e: MouseEvent) => {
       if (e.button === 2 && !this.isPaused) {
         this.isRightMouseDown = true;
         if (!this.alwaysRotateThirdPerson && !this.isUIOpen) {
@@ -119,7 +120,7 @@ export class CameraController {
       }
     });
 
-    this.domElement.addEventListener("mouseup", (e: any) => {
+    this.domElement.addEventListener("mouseup", (e: MouseEvent) => {
       if (e.button === 2) {
         this.isRightMouseDown = false;
         if (!this.isFirstPerson && !this.alwaysRotateThirdPerson && !this.isUIOpen) {
@@ -128,7 +129,7 @@ export class CameraController {
       }
     });
 
-    document.addEventListener("mousemove", (e: any) => {
+    document.addEventListener("mousemove", (e: MouseEvent) => {
       if (this.isPaused) return;
 
       const isLocked = document.pointerLockElement === this.domElement;
@@ -151,7 +152,7 @@ export class CameraController {
       }
     });
 
-    this.domElement.addEventListener("wheel", (e: any) => {
+    this.domElement.addEventListener("wheel", (e: WheelEvent) => {
       if (!this.isFirstPerson && !this.isPaused && e.shiftKey) {
         let delta = e.deltaY;
         if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
@@ -167,7 +168,7 @@ export class CameraController {
       }
     });
 
-    this.domElement.addEventListener("contextmenu", (e: any) => {
+    this.domElement.addEventListener("contextmenu", (e: MouseEvent) => {
       e.preventDefault();
     });
 
@@ -203,47 +204,49 @@ export class CameraController {
       this.domElement.requestPointerLock();
     }
 
+    const detail: CameraPauseEventDetail = {
+      isPaused: this.isPaused,
+      isFirstPerson: this.isFirstPerson,
+      fpInvertAxisX: this.fpInvertAxisX,
+      fpInvertAxisY: this.fpInvertAxisY,
+      tpInvertAxisX: this.tpInvertAxisX,
+      tpInvertAxisY: this.tpInvertAxisY
+    };
+
     const event = new CustomEvent("gamePauseChanged", {
-      detail: {
-        isPaused: this.isPaused,
-        isFirstPerson: this.isFirstPerson,
-        fpInvertAxisX: this.fpInvertAxisX,
-        fpInvertAxisY: this.fpInvertAxisY,
-        tpInvertAxisX: this.tpInvertAxisX,
-        tpInvertAxisY: this.tpInvertAxisY
-      }
+      detail
     });
     document.dispatchEvent(event);
   }
 
-  setFpInvertAxisX(value: any) {
+  setFpInvertAxisX(value: boolean) {
     this.fpInvertAxisX = value;
   }
 
-  setFpInvertAxisY(value: any) {
+  setFpInvertAxisY(value: boolean) {
     this.fpInvertAxisY = value;
   }
 
-  setTpInvertAxisX(value: any) {
+  setTpInvertAxisX(value: boolean) {
     this.tpInvertAxisX = value;
   }
 
-  setTpInvertAxisY(value: any) {
+  setTpInvertAxisY(value: boolean) {
     this.tpInvertAxisY = value;
   }
 
-  setAlwaysRotateThirdPerson(value: any) {
+  setAlwaysRotateThirdPerson(value: boolean) {
     this.alwaysRotateThirdPerson = value;
     if (!value && !this.isFirstPerson && document.pointerLockElement === this.domElement) {
       document.exitPointerLock();
     }
   }
 
-  setHorizontalOffset(value: any) {
+  setHorizontalOffset(value: number) {
     this.horizontalOffset = value;
   }
 
-  setUIOpen(isOpen: any) {
+  setUIOpen(isOpen: boolean) {
     if (this.isUIOpen === isOpen) return;
     this.isUIOpen = isOpen;
 
@@ -262,7 +265,7 @@ export class CameraController {
     }
   }
 
-  setSmoothing(value: any) {
+  setSmoothing(value: number) {
     this.smoothing = value;
   }
 
@@ -290,14 +293,17 @@ export class CameraController {
       this.phi = Math.max(this.minPhi, Math.min(this.maxPhi, this.phi));
     }
 
+    const detail: CameraModeEventDetail = { isFirstPerson: this.isFirstPerson };
+
     const event = new CustomEvent("cameraModeChanged", {
-      detail: { isFirstPerson: this.isFirstPerson }
+      detail
     });
     document.dispatchEvent(event);
   }
 
-  update(characterPosition: any, characterRotation: any, dt: any) {
+  update(characterPosition: THREE.Vector3 | null, characterRotation: number, dt: number) {
     if (!characterPosition) return;
+    void characterRotation;
 
     this.target.copy(characterPosition);
 
@@ -308,7 +314,7 @@ export class CameraController {
     }
   }
 
-  updateFirstPerson(characterPosition: any) {
+  updateFirstPerson(characterPosition: THREE.Vector3) {
     const headPosition = characterPosition.clone();
     headPosition.y += this.firstPersonHeight;
 
@@ -328,7 +334,7 @@ export class CameraController {
     this.camera.lookAt(lookAt);
   }
 
-  updateThirdPerson(characterPosition: any, dt: any) {
+  updateThirdPerson(characterPosition: THREE.Vector3, dt: number) {
     if (!this.lastCharacterPos) {
       this.lastCharacterPos = characterPosition.clone();
       this.dynamicOffset = 0;

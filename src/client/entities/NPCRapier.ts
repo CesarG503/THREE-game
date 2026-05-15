@@ -3,18 +3,18 @@ import RAPIER from "@dimforge/rapier3d-compat";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 
 export class NPCRapier {
-    scene: any;
-    world: any;
-    position: any;
-    pathPoints: any[];
+    scene: THREE.Scene;
+    world: RAPIER.World;
+    position: THREE.Vector3;
+    pathPoints: THREE.Vector3[];
 
-    model: any;
-    mixer: any;
-    animations: any;
-    currentAction: any;
-    rigidBody: any;
-    characterController: any;
-    collider: any;
+    model: THREE.Group | null;
+    mixer: THREE.AnimationMixer | null;
+    animations: Record<string, THREE.AnimationAction>;
+    currentAction: THREE.AnimationAction | null;
+    rigidBody: RAPIER.RigidBody | null;
+    characterController: RAPIER.KinematicCharacterController | null;
+    collider: RAPIER.Collider | null;
 
     speed: number;
     currentPathIndex: number;
@@ -24,9 +24,9 @@ export class NPCRapier {
     currentRotation: number;
     rotationSmoothness: number;
 
-    placeholder: any;
+    placeholder: THREE.Mesh | null;
 
-    constructor(scene: any, world: any, position: any, pathPoints: any[] = []) {
+    constructor(scene: THREE.Scene, world: RAPIER.World, position: THREE.Vector3, pathPoints: THREE.Vector3[] = []) {
         this.scene = scene;
         this.world = world;
         this.position = position;
@@ -85,7 +85,7 @@ export class NPCRapier {
             this.model = gltf.scene;
             this.scene.add(this.model);
 
-            this.model.traverse((o: any) => { if (o.isMesh) o.castShadow = true; });
+            this.model.traverse((o: THREE.Object3D | any) => { if (o.isMesh) o.castShadow = true; });
 
             this.model.scale.set(1, 1, 1);
 

@@ -4,24 +4,28 @@ import { GLBModel } from "./models/GLBModel";
 import { PolygonModel } from "./models/PolygonModel";
 import { PolygonModelSkin } from "./models/PolygonModelSkin";
 import { ParticleSystem } from "../effects/ParticleSystem";
+import { InputManager } from "../input/InputManager";
+import type { CharacterStats, JumpConfig, FlightConfig, PlayerCollisionMode, RemotePlayerState } from "../types";
+
+type LadderObject = THREE.Object3D & { bounds?: THREE.Box3 };
 
 export class CharacterController {
-  scene: any;
-  world: any;
+  scene: THREE.Scene;
+  world: RAPIER.World;
   camera: THREE.Camera;
   cameraController: any;
   glbModel: GLBModel;
   polygonModel: PolygonModel;
   polygonModelSkin: PolygonModelSkin;
   currentType: string;
-  rigidBody: any;
-  characterController: any;
+  rigidBody: RAPIER.RigidBody | null;
+  characterController: RAPIER.KinematicCharacterController | null;
   speed: number;
   jumpForce: number;
   grounded: boolean;
   verticalVelocity: number;
-  collider: any;
-  ladders: any[];
+  collider: RAPIER.Collider | null;
+  ladders: LadderObject[];
   isClimbing: boolean;
   rotationSmoothness: number;
   currentRotation: number;
@@ -44,9 +48,9 @@ export class CharacterController {
   isDead: boolean;
   particleSystem: ParticleSystem;
   playerCollision: string;
-  listeners: Record<string, any[]>;
+  listeners: Record<string, Function[]>;
 
-  constructor(scene: any, world: any, camera: any, cameraController: any) {
+  constructor(scene: THREE.Scene, world: RAPIER.World, camera: THREE.Camera, cameraController: any) {
     this.scene = scene;
     this.world = world;
     this.camera = camera;
@@ -112,23 +116,23 @@ export class CharacterController {
     this.listeners = {};
   }
 
-  on(event: any, callback: any) {
+  on(event: string, callback: Function) {
     if (!this.listeners[event]) this.listeners[event] = [];
     this.listeners[event].push(callback);
   }
 
-  off(event: any, callback: any) {
+  off(event: string, callback: Function) {
     if (!this.listeners[event]) return;
-    this.listeners[event] = this.listeners[event].filter((cb: any) => cb !== callback);
+    this.listeners[event] = this.listeners[event].filter((cb: Function) => cb !== callback);
   }
 
-  emit(event: any, data: any) {
+  emit(event: string, data?: any) {
     if (this.listeners[event]) {
-      this.listeners[event].forEach((cb: any) => cb(data));
+      this.listeners[event].forEach((cb: Function) => cb(data));
     }
   }
 
-  setModelType(type: any) {
+  setModelType(type: string) {
     console.log("Setting Model Type:", type);
     this.currentType = type;
 
@@ -175,12 +179,12 @@ export class CharacterController {
     this.collider.setSensor(isSensor);
   }
 
-  setNoClip(enabled: any) {
+  setNoClip(enabled: boolean) {
     this.noClip = enabled;
     console.log("No-Clip", enabled ? "Enabled" : "Disabled");
   }
 
-  applyImpulse(force: any) {
+  applyImpulse(force: THREE.Vector3) {
     this.momentum.add(force);
     if (force.y !== 0) {
       this.verticalVelocity = force.y;
@@ -189,7 +193,7 @@ export class CharacterController {
     }
   }
 
-  update(dt: any, input: any, remotePlayers: any) {
+  update(dt: number, input: InputManager, remotePlayers: any[]) {
     if (!this.rigidBody) return;
 
     if (this.noClip) {
@@ -464,7 +468,7 @@ export class CharacterController {
     console.log("Flight Mode:", this.isFlying);
   }
 
-  handleFlightMovement(dt: any, input: any, moveDir: any) {
+  handleFlightMovement(dt: number, input: InputManager, moveDir: THREE.Vector3) {
     this.verticalVelocity = 0;
     const desiredTranslation = new THREE.Vector3();
     const speed = this.speed * 2;
@@ -502,7 +506,7 @@ export class CharacterController {
     this.updateModelVisuals();
   }
 
-  checkFlightToggle(input: any) {
+  checkFlightToggle(input: InputManager) {
     if (input.keys.jump && !this.wasJumpDown) {
       const now = Date.now();
       if (now - this.lastJumpTime < 300) {
@@ -597,7 +601,7 @@ export class CharacterController {
     return this.currentRotation;
   }
 
-  setStats(stats: any) {
+  setStats(stats: Partial<CharacterStats & JumpConfig & FlightConfig & { playerCollision: PlayerCollisionMode }>) {
     if (stats.speed !== undefined) this.speed = stats.speed;
     if (stats.jumpForce !== undefined) this.jumpForce = stats.jumpForce;
     if (stats.maxHealth !== undefined) {
@@ -630,7 +634,7 @@ export class CharacterController {
     }
   }
 
-  takeDamage(amount: any) {
+  takeDamage(amount: number) {
     if (this.isDead || this.noClip) return;
 
     this.currentHealth -= amount;

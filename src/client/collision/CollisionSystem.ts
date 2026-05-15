@@ -6,12 +6,12 @@ import type { Collider } from "./Collider";
 type CollisionPrimitive = Collider<any> & {
   createDebugMesh?: (scene: THREE.Scene) => void;
   updateDebugMesh?: () => void;
-  intersectsSphere?: (other: any) => boolean;
-  intersectsCapsule?: (other: any) => boolean;
-  intersectsBox?: (other: any) => boolean;
-  getCollisionResponse?: (other: any) => CollisionResponse;
-  getCollisionResponseForSphere?: (other: any) => CollisionResponse;
-  getCollisionResponseForBox?: (other: any) => CollisionResponse;
+  intersectsSphere?: (other: { worldPosition: THREE.Vector3; radius?: number } | CollisionPrimitive) => boolean;
+  intersectsCapsule?: (other: CollisionPrimitive) => boolean;
+  intersectsBox?: (other: CollisionPrimitive) => boolean;
+  getCollisionResponse?: (other: CollisionPrimitive) => CollisionResponse;
+  getCollisionResponseForSphere?: (other: { worldPosition: THREE.Vector3; radius?: number } | CollisionPrimitive) => CollisionResponse;
+  getCollisionResponseForBox?: (other: CollisionPrimitive) => CollisionResponse;
   updateBounds?: () => void;
   min?: THREE.Vector3;
   max?: THREE.Vector3;
@@ -346,7 +346,7 @@ export class CollisionSystem {
     }
 
     for (const collider of collidersArray) {
-      const toRemove: any[] = [];
+      const toRemove: ColliderId[] = [];
 
       for (const otherId of collider.activeCollisions) {
         const other = this.colliders.get(otherId);
@@ -375,7 +375,7 @@ export class CollisionSystem {
   /**
    * Raycast contra todos los colisionadores
    */
-  raycast(origin: any, direction: any, maxDistance = Number.POSITIVE_INFINITY, layerMask = CollisionLayer.ALL) {
+  raycast(origin: THREE.Vector3, direction: THREE.Vector3, maxDistance = Number.POSITIVE_INFINITY, layerMask = CollisionLayer.ALL) {
     const results = [];
     const ray = new THREE.Ray(origin, direction.normalize());
 
@@ -445,7 +445,7 @@ export class CollisionSystem {
   /**
    * Obtiene todos los colisionadores en un radio
    */
-  overlapSphere(center: any, radius: number, layerMask = CollisionLayer.ALL) {
+  overlapSphere(center: THREE.Vector3, radius: number, layerMask = CollisionLayer.ALL) {
     const results = [];
 
     for (const collider of this.colliders.values()) {

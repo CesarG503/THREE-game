@@ -96,7 +96,7 @@ export class Collider<TUser = any> {
   /**
    * Activa/desactiva visualizacion de debug
    */
-  setDebugVisible(visible: boolean, scene: any) {
+  setDebugVisible(visible: boolean, scene: THREE.Scene) {
     this.showDebug = visible;
     if (this.debugMesh) {
       this.debugMesh.visible = visible;

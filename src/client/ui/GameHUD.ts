@@ -1,8 +1,14 @@
-// @ts-nocheck
-
 import { animate } from 'animejs'
+import type { HUDConfig, UIPosition, UIPositionObject } from '../types'
 
 export class GameHUD {
+    container: HTMLElement;
+    timerElement: HTMLElement | null;
+    healthElement: HTMLElement | null;
+    jumpElement: HTMLElement | null;
+    inventoryElement: HTMLElement | null;
+    settings: HUDConfig;
+
     constructor() {
         this.container = document.createElement('div')
         this.container.id = 'game-hud-layer'
@@ -20,7 +26,7 @@ export class GameHUD {
         this.settings = {}
     }
 
-    createHUD(settings) {
+    createHUD(settings: HUDConfig) {
         this.settings = settings || {};
 
         // Clear existing (except timer)
@@ -54,7 +60,7 @@ export class GameHUD {
         }
     }
 
-    createHealth(s) {
+    createHealth(s: HUDConfig) {
         const el = document.createElement('div');
         el.id = 'hud-health';
         el.style.cssText = `display: flex; gap: 5px; position: absolute; pointer-events: none;`; // Add pointer-events none to container
@@ -93,7 +99,7 @@ export class GameHUD {
         this.healthElement = el;
     }
 
-    createJump(s) {
+    createJump(s: HUDConfig) {
         const el = document.createElement('div');
         el.id = 'hud-jump';
         el.style.cssText = `display: flex; align-items: center; position: absolute; pointer-events: none;`;
@@ -133,7 +139,7 @@ export class GameHUD {
         this.jumpElement = el;
     }
 
-    createInventory(s) {
+    createInventory(s: HUDConfig) {
         // Use existing inventory container from game.html
         const el = document.getElementById('inventory-container');
 
@@ -198,7 +204,7 @@ export class GameHUD {
             }
 
             // Handle slot visibility and size based on settings
-            const slots = el.querySelectorAll('.inventory-slot');
+            const slots = el.querySelectorAll<HTMLElement>('.inventory-slot');
             const targetCount = s.inventorySlots || 9;
             const slotSize = s.inventorySlotSize || 50;
 
@@ -209,7 +215,7 @@ export class GameHUD {
                 slot.style.boxSizing = 'border-box';
 
                 // Update Number Font Size
-                const num = slot.querySelector('.slot-number');
+                const num = slot.querySelector<HTMLElement>('.slot-number');
                 if (num) {
                     num.style.fontSize = `${Math.max(10, slotSize / 5)}px`;
                     // Restore numbers if they were moved
@@ -246,7 +252,7 @@ export class GameHUD {
         }
     }
 
-    updateHealth(current, max) {
+    updateHealth(current: number, max: number) {
         if (!this.healthElement) return;
 
         // Ensure valid numbers
@@ -255,8 +261,8 @@ export class GameHUD {
 
         // Health Bar
         if (this.settings.healthStyle === 'bar') {
-            const fill = this.healthElement.querySelector('#health-bar-fill');
-            const text = this.healthElement.querySelector('#health-text');
+            const fill = this.healthElement.querySelector<HTMLElement>('#health-bar-fill');
+            const text = this.healthElement.querySelector<HTMLElement>('#health-text');
             const percentage = Math.max(0, Math.min(100, (current / max) * 100));
 
             if (fill) {
@@ -286,12 +292,12 @@ export class GameHUD {
 
         } else {
             // Simple Text
-            const txt = this.healthElement.querySelector('#health-text-simple');
-            if (txt) txt.textContent = Math.round(current);
+            const txt = this.healthElement.querySelector<HTMLElement>('#health-text-simple');
+            if (txt) txt.textContent = Math.round(current).toString();
         }
     }
 
-    updateJump(current, max) {
+    updateJump(current: number, max: number) {
         if (!this.jumpElement) return;
 
         // Ensure valid numbers
@@ -299,8 +305,8 @@ export class GameHUD {
         max = (typeof max === 'number' && max > 0) ? max : 1;
 
         if (this.settings.jumpStyle === 'bar') {
-            const fill = this.jumpElement.querySelector('#jump-bar-fill');
-            const text = this.jumpElement.querySelector('#jump-text'); // If text is enabled
+            const fill = this.jumpElement.querySelector<HTMLElement>('#jump-bar-fill');
+            const text = this.jumpElement.querySelector<HTMLElement>('#jump-text'); // If text is enabled
             const percentage = Math.max(0, Math.min(100, (current / max) * 100));
 
             if (fill) {
@@ -315,19 +321,19 @@ export class GameHUD {
                 });
             }
             if (text) {
-                text.textContent = Math.floor(current);
+                text.textContent = Math.floor(current).toString();
             }
 
         } else {
             // Circle
-            const circle = this.jumpElement.querySelector('#jump-circle-fill');
+            const circle = this.jumpElement.querySelector<HTMLElement>('#jump-circle-fill');
             if (circle) {
                 const circumference = 2 * Math.PI * 20; // r=20
                 const offset = circumference - ((current / max) * circumference);
 
                 // API v4: animate(targets, parameters)
                 animate(circle, {
-                    strokeDashoffset: offset,
+                    strokeDashoffset: offset.toString(),
                     easing: 'linear',
                     duration: 100
                 });
@@ -335,24 +341,28 @@ export class GameHUD {
         }
     }
 
-    applyPosition(el, pos) {
+    applyPosition(el: HTMLElement, pos?: UIPosition) {
         if (!pos) return;
-        // Check if explicit top/left props exist in pos object
-        if (pos.top) { el.style.top = pos.top; el.style.bottom = 'auto'; }
-        if (pos.left) { el.style.left = pos.left; el.style.right = 'auto'; }
-        if (pos.bottom) { el.style.bottom = pos.bottom; el.style.top = 'auto'; }
-        if (pos.right) { el.style.right = pos.right; el.style.left = 'auto'; }
+        
+        // Handle position object
+        if (typeof pos === 'object' && pos !== null) {
+            const p = pos as UIPositionObject;
+            if (p.top) { el.style.top = p.top; el.style.bottom = 'auto'; }
+            if (p.left) { el.style.left = p.left; el.style.right = 'auto'; }
+            if (p.bottom) { el.style.bottom = p.bottom; el.style.top = 'auto'; }
+            if (p.right) { el.style.right = p.right; el.style.left = 'auto'; }
 
-        if (pos.transform) el.style.transform = pos.transform;
-        else el.style.transform = 'none';
-
-        // Backward compatibility if only using predefined strings 
+            if (p.transform) el.style.transform = p.transform;
+            else el.style.transform = 'none';
+        }
+        
+        // Handle predefined strings
         if (typeof pos === 'string') {
             this.applyPresetPosition(el, pos);
         }
     }
 
-    applyPresetPosition(el, pos) {
+    applyPresetPosition(el: HTMLElement, pos: string) {
         const margin = "20px"
         switch (pos) {
             case 'top-left':
@@ -388,7 +398,7 @@ export class GameHUD {
         }
     }
 
-    updateTimer(timeSeconds, style, position = 'top-center') {
+    updateTimer(timeSeconds: number, style: string, position: UIPosition = 'top-center') {
         if (!this.timerElement) {
             this.timerElement = document.createElement('div')
             this.timerElement.id = 'game-timer-display'
@@ -399,7 +409,7 @@ export class GameHUD {
         const m = Math.floor((timeSeconds % 3600) / 60)
         const s = Math.ceil(timeSeconds % 60)
 
-        const pad = (n) => n.toString().padStart(2, '0')
+        const pad = (n: number) => n.toString().padStart(2, '0')
         const text = (h > 0 ? `${pad(h)}:` : '') + `${pad(m)}:${pad(s)}`
 
         this.timerElement.textContent = text
@@ -434,7 +444,7 @@ export class GameHUD {
 
     // --- STYLES ---
 
-    applyNeonStyle(el) {
+    applyNeonStyle(el: HTMLElement) {
         el.style.fontFamily = "'Courier New', monospace"
         el.style.fontSize = "40px"
         el.style.fontWeight = "bold"
@@ -447,7 +457,7 @@ export class GameHUD {
         el.style.boxShadow = "0 0 15px rgba(0, 255, 255, 0.3)"
     }
 
-    applyMinimalStyle(el) {
+    applyMinimalStyle(el: HTMLElement) {
         el.style.fontFamily = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
         el.style.fontSize = "48px"
         el.style.fontWeight = "300"
@@ -455,7 +465,7 @@ export class GameHUD {
         el.style.textShadow = "0 2px 4px rgba(0,0,0,0.5)"
     }
 
-    applySportsStyle(el) {
+    applySportsStyle(el: HTMLElement) {
         el.style.fontFamily = "Impact, sans-serif"
         el.style.fontSize = "36px"
         el.style.color = "#FFD700" // Gold

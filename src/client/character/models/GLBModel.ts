@@ -1,16 +1,17 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import type { ICharacterModel } from "../../types";
 
-export class GLBModel {
-  scene: any;
+export class GLBModel implements ICharacterModel {
+  scene: THREE.Scene;
   isLocal: boolean;
-  model: any;
-  mixer: any;
-  animations: Record<string, any>;
-  currentAction: any;
+  model: THREE.Group | null;
+  mixer: THREE.AnimationMixer | null;
+  animations: Record<string, THREE.AnimationAction>;
+  currentAction: THREE.AnimationAction | null;
   isVisible: boolean;
 
-  constructor(scene: any, isLocal = true) {
+  constructor(scene: THREE.Scene, isLocal = true) {
     this.scene = scene;
     this.isLocal = isLocal;
     this.model = null;
@@ -48,7 +49,7 @@ export class GLBModel {
     });
   }
 
-  setVisible(visible: any) {
+  setVisible(visible: boolean) {
     this.isVisible = visible;
     if (this.model) {
       this.model.visible = visible;
@@ -58,19 +59,19 @@ export class GLBModel {
     }
   }
 
-  setPosition(pos: any) {
+  setPosition(pos: THREE.Vector3) {
     if (this.model) {
       this.model.position.copy(pos);
     }
   }
 
-  setRotation(rot: any) {
+  setRotation(rot: number) {
     if (this.model) {
       this.model.rotation.y = rot;
     }
   }
 
-  getPosition() {
+  getPosition(): THREE.Vector3 {
     return this.model ? this.model.position.clone() : new THREE.Vector3();
   }
 
@@ -78,7 +79,7 @@ export class GLBModel {
     void item;
   }
 
-  switchAnimation(name: any) {
+  switchAnimation(name: string) {
     if (!this.mixer || !this.animations[name]) return;
     const action = this.animations[name];
     if (this.currentAction === action) return;
@@ -87,7 +88,7 @@ export class GLBModel {
     this.currentAction = action;
   }
 
-  update(dt: any, isMoving: any) {
+  update(dt: number, isMoving: boolean) {
     if (!this.model || !this.isVisible) return;
 
     if (isMoving) {

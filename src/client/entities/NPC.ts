@@ -3,20 +3,20 @@ import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { CapsuleCollider, CollisionLayer } from "../collision";
 
 export class NPC {
-    scene: any;
-    position: any;
+    scene: THREE.Scene;
+    position: THREE.Vector3;
     id: string;
-    model: any;
-    mixer: any;
-    animations: any;
-    currentAction: any;
+    model: THREE.Group | null;
+    mixer: THREE.AnimationMixer | null;
+    animations: Record<string, THREE.AnimationAction>;
+    currentAction: THREE.AnimationAction | null;
     rotationOffset: number;
     scale: number;
     emissiveIntensity: number;
     heightOffset: number;
-    collider: any;
+    collider: CapsuleCollider | null;
 
-    constructor(scene: any, position: any = new THREE.Vector3(0, 0, 0), id: string = "npc-default") {
+    constructor(scene: THREE.Scene, position: THREE.Vector3 = new THREE.Vector3(0, 0, 0), id: string = "npc-default") {
         this.scene = scene;
         this.position = position;
         this.id = id;
@@ -46,7 +46,7 @@ export class NPC {
                 this.model.scale.set(this.scale, this.scale, this.scale);
                 this.scene.add(this.model);
 
-                this.model.traverse((object: any) => {
+                this.model.traverse((object: THREE.Object3D | any) => {
                     if (object.isMesh) {
                         object.castShadow = true;
                         object.receiveShadow = true;

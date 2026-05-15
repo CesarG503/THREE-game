@@ -16,7 +16,7 @@ export class SphereCollider extends Collider {
   /**
    * Crea el mesh de debug
    */
-  createDebugMesh(scene: any) {
+  createDebugMesh(scene: THREE.Scene) {
     const geometry = new THREE.SphereGeometry(this.radius, 16, 16);
     const material = new THREE.MeshBasicMaterial({
       color: this.isTrigger ? 0x00ff00 : 0xff0000,

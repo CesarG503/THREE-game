@@ -280,9 +280,10 @@ export class LogicSystem {
 				const isButton = child.userData.mapObjectType === "interaction_button";
 				const isCollision = child.userData.mapObjectType === "interactive_collision";
 				const isTarget = child.userData.mapObjectType === "target";
+				const isInteractiveZone = ["impulse_jump", "impulse_lateral", "farming_zone"].includes(child.userData.mapObjectType);
 				const hasWaypoints = child.userData.logicProperties && child.userData.logicProperties.waypoints;
 
-				if (isSpawn || isButton || isCollision || isTarget || hasWaypoints) {
+				if (isSpawn || isButton || isCollision || isTarget || isInteractiveZone || hasWaypoints) {
 					logicObjects.push(child);
 				}
 			}
@@ -343,6 +344,14 @@ export class LogicSystem {
 				if (refreshCallback) refreshCallback();
 			});
 		}
+
+		if (object.userData.mapObjectType === "impulse_jump" || object.userData.mapObjectType === "impulse_lateral") {
+			this.renderImpulsePadUI(container, object, props);
+		}
+
+		if (object.userData.mapObjectType === "farming_zone") {
+			this.renderFarmingZoneUI(container, object, props);
+		}
 	}
 
 	renderButtonUI(container: HTMLElement, object: any, props: any) {
@@ -354,6 +363,40 @@ export class LogicSystem {
 		info.textContent = `UUID: ${object.userData.uuid.substring(0, 8)}...`;
 		info.style.cssText = "font-size:10px; color:#aaa; margin-top:10px;";
 		container.appendChild(info);
+	}
+
+	renderImpulsePadUI(container: HTMLElement, object: any, props: any) {
+		if (props.name === undefined) {
+			props.name = object.userData.mapObjectType === "impulse_jump" ? "Pad de Salto" : "Pad de Empuje";
+		}
+		if (props.strength === undefined) {
+			props.strength = object.userData.mapObjectType === "impulse_jump" ? 25 : 40;
+		}
+		if (props.cooldown === undefined) props.cooldown = 0.25;
+		props.padKind = object.userData.mapObjectType === "impulse_jump" ? "jump" : "lateral";
+
+		this.createInput(container, object, "name", props.name, "text", "Nombre");
+		this.createInput(container, object, "strength", props.strength, "number", "Fuerza");
+		this.createInput(container, object, "cooldown", props.cooldown, "number", "Cooldown (s)");
+
+		const hint = document.createElement("div");
+		hint.textContent = props.padKind === "lateral"
+			? "La rotación Y del objeto controla la dirección del empuje."
+			: "Impulsa al jugador hacia arriba al entrar en el pad.";
+		hint.style.cssText = "font-size:11px; color:#aaa; margin-top:8px; line-height:1.35;";
+		container.appendChild(hint);
+	}
+
+	renderFarmingZoneUI(container: HTMLElement, object: any, props: any) {
+		if (props.name === undefined) props.name = "Zona de Farmeo";
+		if (props.spawnInterval === undefined) props.spawnInterval = 1.0;
+		if (props.itemsPerSpawn === undefined) props.itemsPerSpawn = 1;
+		if (props.itemValue === undefined) props.itemValue = 1;
+
+		this.createInput(container, object, "name", props.name, "text", "Nombre");
+		this.createInput(container, object, "spawnInterval", props.spawnInterval, "number", "Intervalo Spawn (s)");
+		this.createInput(container, object, "itemsPerSpawn", props.itemsPerSpawn, "number", "Items por Spawn");
+		this.createInput(container, object, "itemValue", props.itemValue, "number", "Valor de Fuego");
 	}
 
 	renderSpawnUI(container: HTMLElement, object: any, props: any) {
@@ -760,6 +803,11 @@ export class LogicSystem {
 			case "interaction_button": return "Botones Interactivos";
 			case "target": return "Diana Interactiva";
 			case "movement_controller": return "Animador";
+			case "interactive_collision": return "Colisión Interactiva";
+			case "interactive_zones": return "Pads y Zonas";
+			case "impulse_jump": return "Pad de Salto";
+			case "impulse_lateral": return "Pad de Empuje";
+			case "farming_zone": return "Zona de Farmeo";
 			default: return type ? (type.charAt(0).toUpperCase() + type.slice(1)) : "Objeto";
 		}
 	}

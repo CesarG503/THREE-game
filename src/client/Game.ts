@@ -433,18 +433,12 @@ export class Game {
 			const floor = new MapObjectItem("floor", "Suelo", "wall", "/assets/textures/impulso.png", 0xFFFFFF, { x: 5, y: 0.5, z: 5 });
 			const ramp = new MapObjectItem("stairs", "Gradas", "stairs", "/assets/textures/impulso.png", 0xFFFFFF, { x: 4, y: 2, z: 4 });
 			const tall = new MapObjectItem("tall", "Torre", "pillar", "/assets/textures/salto.png", 0xFFFFFF, { x: 2, y: 10, z: 2 });
-			const impulseJump = new ImpulseItem("impulse_jump", "Salto", "/assets/textures/salto.png", "jump", 25);
-			const impulseLat = new ImpulseItem("impulse_lat", "Impulso", "/assets/textures/impulso.png", "lateral", 40);
-			const farmingZoneItem = new FarmingZoneItem();
 
 			this.inventoryManager.addItem(wall);
 			this.inventoryManager.addItem(pillar);
 			this.inventoryManager.addItem(floor);
 			this.inventoryManager.addItem(ramp);
 			this.inventoryManager.addItem(tall);
-			this.inventoryManager.addItem(impulseJump);
-			this.inventoryManager.addItem(impulseLat);
-			this.inventoryManager.addItem(farmingZoneItem);
 
 			this.setupEditorUI();
 

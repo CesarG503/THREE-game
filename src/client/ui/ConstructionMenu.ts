@@ -160,6 +160,55 @@ export class ConstructionMenu {
             ringMultipliers: [1, 2, 3]
         };
         this.logicItems.push(target);
+
+        const impulseJump = new MapObjectItem(
+            "impulse_jump",
+            "Pad de Salto",
+            "impulse_jump",
+            "",
+            0x00FFFF,
+            { x: 3, y: 0.2, z: 3 }
+        );
+        impulseJump.logicProperties = {
+            name: "Pad de Salto",
+            strength: 25,
+            cooldown: 0.25,
+            padKind: "jump"
+        };
+        this.logicItems.push(impulseJump);
+
+        const impulseLateral = new MapObjectItem(
+            "impulse_lateral",
+            "Pad de Empuje",
+            "impulse_lateral",
+            "",
+            0x00FF00,
+            { x: 3, y: 0.2, z: 3 }
+        );
+        impulseLateral.logicProperties = {
+            name: "Pad de Empuje",
+            strength: 40,
+            cooldown: 0.25,
+            padKind: "lateral"
+        };
+        this.logicItems.push(impulseLateral);
+
+        const farmingZone = new MapObjectItem(
+            "farming_zone",
+            "Zona de Farmeo",
+            "farming_zone",
+            "",
+            0xFF4500,
+            { x: 3, y: 0.2, z: 3 }
+        );
+        farmingZone.opacity = 0.7;
+        farmingZone.logicProperties = {
+            name: "Zona de Farmeo",
+            spawnInterval: 1.0,
+            itemsPerSpawn: 1,
+            itemValue: 1
+        };
+        this.logicItems.push(farmingZone);
     }
 
     setupUI() {
@@ -380,14 +429,13 @@ export class ConstructionMenu {
         this.logicGrid = document.createElement("div");
         this.logicGrid.style.cssText = `
             flex: 1;
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-            grid-auto-rows: 120px;
-            gap: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
             overflow-y: auto;
-            align-content: start;
+            padding-right: 5px;
         `;
-        this.renderLibraryGrid(this.logicGrid, this.logicItems);
+        this.renderLogicLibraryGrid(this.logicGrid);
         leftContainer.appendChild(this.logicGrid);
 
         this.contentLogic.appendChild(leftContainer);
@@ -1543,6 +1591,58 @@ export class ConstructionMenu {
             });
 
             container.appendChild(card);
+        });
+    }
+
+    renderLogicLibraryGrid(container) {
+        container.innerHTML = "";
+
+        const groups = [
+            {
+                title: "Bases y Señales",
+                types: ["spawn_point", "movement_controller", "interaction_button", "interactive_collision", "target"]
+            },
+            {
+                title: "Pads y Zonas",
+                types: ["impulse_jump", "impulse_lateral", "farming_zone"]
+            }
+        ];
+
+        groups.forEach(group => {
+            const items = this.logicItems.filter(item => group.types.includes(item.type));
+            if (items.length === 0) return;
+
+            const section = document.createElement("details");
+            section.open = true;
+            section.style.cssText = `
+                background: #2a2a2a;
+                border: 1px solid #444;
+                border-radius: 8px;
+                padding: 10px;
+            `;
+
+            const summary = document.createElement("summary");
+            summary.textContent = group.title;
+            summary.style.cssText = `
+                cursor: pointer;
+                color: #fff;
+                font-weight: bold;
+                user-select: none;
+                padding-bottom: 8px;
+            `;
+
+            const grid = document.createElement("div");
+            grid.style.cssText = `
+                display: grid;
+                grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+                grid-auto-rows: 120px;
+                gap: 10px;
+            `;
+
+            this.renderLibraryGrid(grid, items);
+            section.appendChild(summary);
+            section.appendChild(grid);
+            container.appendChild(section);
         });
     }
 
@@ -2800,6 +2900,8 @@ export class ConstructionMenu {
             // Determine primary logic category
             if (obj.userData.mapObjectType === "spawn_point") {
                 type = "spawn_point";
+            } else if (["impulse_jump", "impulse_lateral", "farming_zone"].includes(obj.userData.mapObjectType)) {
+                type = "interactive_zones";
             } else if (obj.userData.logicProperties && obj.userData.logicProperties.waypoints) {
                 type = "movement_object";
             } else {

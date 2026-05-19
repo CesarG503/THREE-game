@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { FuegoItem } from "../items/FuegoItem";
 
 export function setupDebugRender(this: any) {
 	this.debugMesh = new THREE.LineSegments(
@@ -55,6 +56,100 @@ export function renderOrientationGizmo(this: any) {
 
 	renderer.setScissorTest(false);
 	renderer.setViewport(0, 0, width, height);
+}
+
+function getEditableMapObjects(scene: THREE.Scene, types: string[]) {
+	const objects: any[] = [];
+	scene.children.forEach((obj: any) => {
+		if (obj.userData?.isEditableMapObject && types.includes(obj.userData.mapObjectType)) {
+			objects.push(obj);
+		}
+	});
+	return objects;
+}
+
+function updateMapImpulsePads(game: any) {
+	if (!game.character || !game.sceneManager?.scene) return;
+
+	const charPos = game.character.getPosition();
+	const now = game.clock ? game.clock.getElapsedTime() : performance.now() / 1000;
+	const pads = getEditableMapObjects(game.sceneManager.scene, ["impulse_jump", "impulse_lateral"]);
+
+	pads.forEach((pad: any) => {
+		if (!pad.userData.logicProperties) pad.userData.logicProperties = {};
+		const props = pad.userData.logicProperties;
+		if (!pad.userData.runtimeState) pad.userData.runtimeState = {};
+		const state = pad.userData.runtimeState;
+		const dims = pad.userData.originalScale || { x: 3, y: 0.2, z: 3 };
+		const localPos = pad.worldToLocal(charPos.clone());
+
+		const inZone =
+			Math.abs(localPos.x) < dims.x / 2 &&
+			Math.abs(localPos.z) < dims.z / 2 &&
+			localPos.y >= -dims.y / 2 - 0.15 &&
+			localPos.y < dims.y / 2 + 0.75;
+
+		if (!inZone) {
+			state.wasInZone = false;
+			return;
+		}
+
+		const cooldown = Math.max(0, Number(props.cooldown ?? 0.25));
+		const canTrigger = !state.wasInZone && (!state.lastImpulseTime || now - state.lastImpulseTime >= cooldown);
+		if (!canTrigger) return;
+
+		const strength = Number(props.strength ?? (pad.userData.mapObjectType === "impulse_jump" ? 25 : 40));
+		let direction: THREE.Vector3;
+
+		if (pad.userData.mapObjectType === "impulse_jump") {
+			direction = new THREE.Vector3(0, 1, 0);
+		} else {
+			direction = new THREE.Vector3(0, 0, -1).applyQuaternion(pad.quaternion);
+			direction.y = 0;
+			if (direction.lengthSq() < 0.001) direction.set(0, 0, -1);
+			direction.normalize();
+		}
+
+		game.character.applyImpulse(direction.multiplyScalar(strength));
+		state.wasInZone = true;
+		state.lastImpulseTime = now;
+	});
+}
+
+function updateMapFarmingZones(game: any, dt: number) {
+	if (!game.itemDropManager || !game.sceneManager?.scene) return;
+
+	const zones = getEditableMapObjects(game.sceneManager.scene, ["farming_zone"]);
+	zones.forEach((zone: any) => {
+		if (!zone.userData.logicProperties) zone.userData.logicProperties = {};
+		const props = zone.userData.logicProperties;
+		if (!zone.userData.runtimeState) zone.userData.runtimeState = {};
+		const state = zone.userData.runtimeState;
+		const dims = zone.userData.originalScale || { x: 3, y: 0.2, z: 3 };
+		const interval = Math.max(0.1, Number(props.spawnInterval ?? 1.0));
+		const itemsPerSpawn = Math.max(1, Math.floor(Number(props.itemsPerSpawn ?? 1)));
+		const itemValue = Math.floor(Number(props.itemValue ?? 1));
+
+		state.accumulatedTime = (state.accumulatedTime || 0) + dt;
+		if (state.accumulatedTime < interval) return;
+
+		state.accumulatedTime %= interval;
+
+		for (let i = 0; i < itemsPerSpawn; i++) {
+			const item = new FuegoItem();
+			item.value = itemValue;
+
+			const localOffset = new THREE.Vector3(
+				(Math.random() - 0.5) * dims.x * 0.8,
+				dims.y / 2,
+				(Math.random() - 0.5) * dims.z * 0.8
+			);
+			localOffset.applyQuaternion(zone.quaternion);
+
+			const spawnPos = zone.position.clone().add(localOffset);
+			game.itemDropManager.dropItem(item, spawnPos, new THREE.Vector3(0, 1, 0));
+		}
+	});
 }
 
 export function animate(this: any) {
@@ -224,6 +319,9 @@ export function animate(this: any) {
 	if (this.farmingZones) {
 		this.farmingZones.forEach((zone: any) => zone.update(dt));
 	}
+
+	updateMapImpulsePads(this);
+	updateMapFarmingZones(this, dt);
 
 	if (this.projectiles) {
 		for (let i = this.projectiles.length - 1; i >= 0; i--) {

@@ -150,6 +150,43 @@ export class MapObjectItem extends Item {
       ctx.beginPath();
       ctx.arc(32, 32, 8, 0, Math.PI * 2);
       ctx.fill();
+    } else if (this.type === "impulse_jump" || this.type === "impulse_lateral") {
+      const isJump = this.type === "impulse_jump";
+      ctx.fillStyle = isJump ? "#00ffff" : "#00ff00";
+      ctx.fillRect(10, 36, 44, 12);
+      ctx.strokeRect(10, 36, 44, 12);
+
+      ctx.strokeStyle = "white";
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      if (isJump) {
+        ctx.moveTo(32, 46);
+        ctx.lineTo(32, 14);
+        ctx.moveTo(32, 14);
+        ctx.lineTo(20, 26);
+        ctx.moveTo(32, 14);
+        ctx.lineTo(44, 26);
+      } else {
+        ctx.moveTo(14, 32);
+        ctx.lineTo(50, 32);
+        ctx.moveTo(50, 32);
+        ctx.lineTo(38, 20);
+        ctx.moveTo(50, 32);
+        ctx.lineTo(38, 44);
+      }
+      ctx.stroke();
+    } else if (this.type === "farming_zone") {
+      ctx.fillStyle = "#ff4500";
+      ctx.globalAlpha = 0.75;
+      ctx.fillRect(12, 24, 40, 24);
+      ctx.globalAlpha = 1;
+      ctx.strokeRect(12, 24, 40, 24);
+
+      ctx.fillStyle = "white";
+      ctx.font = "bold 18px Arial";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("$", 32, 36);
     } else if (this.type === "ladder") {
       ctx.strokeStyle = ctx.fillStyle;
       ctx.beginPath();
@@ -555,6 +592,68 @@ export class MapObjectItem extends Item {
       const initialRadius = this.logicProperties && this.logicProperties.radius ? this.logicProperties.radius : radius;
       const col = RAPIER.ColliderDesc.cylinder(thickness / 2, initialRadius);
       collidersDesc.push(col);
+    } else if (this.type === "impulse_jump" || this.type === "impulse_lateral") {
+      const isJump = this.type === "impulse_jump";
+      const geometry = new THREE.BoxGeometry(this.scale.x, this.scale.y, this.scale.z);
+      const material = new THREE.MeshStandardMaterial({
+        color: isJump ? 0x00ffff : 0x00ff00,
+        roughness: 0.8,
+        emissive: isJump ? 0x004444 : 0x004400,
+        emissiveIntensity: 0.35
+      });
+
+      object3D = new THREE.Mesh(geometry, material);
+      object3D.receiveShadow = true;
+
+      const textureLoader = new THREE.TextureLoader();
+      const texturePath = isJump ? "/assets/textures/salto.png" : "/assets/textures/impulso.png";
+      const texture = textureLoader.load(texturePath);
+      const arrowGeometry = new THREE.PlaneGeometry(this.scale.x * 0.8, this.scale.z * 0.8);
+      const arrowMaterial = new THREE.MeshBasicMaterial({
+        map: texture,
+        transparent: true,
+        opacity: 0.85,
+        side: THREE.DoubleSide
+      });
+      const arrowMesh = new THREE.Mesh(arrowGeometry, arrowMaterial);
+      arrowMesh.position.y = this.scale.y / 2 + 0.01;
+      arrowMesh.rotation.x = -Math.PI / 2;
+      if (!isJump) arrowMesh.rotation.z = Math.PI;
+      object3D.add(arrowMesh);
+
+      const col = RAPIER.ColliderDesc.cuboid(this.scale.x / 2, this.scale.y / 2, this.scale.z / 2).setSensor(true);
+      collidersDesc.push(col);
+
+      if (!this.logicProperties) this.logicProperties = {};
+      if (this.logicProperties.strength === undefined) this.logicProperties.strength = isJump ? 25 : 40;
+      if (this.logicProperties.cooldown === undefined) this.logicProperties.cooldown = 0.25;
+      this.logicProperties.padKind = isJump ? "jump" : "lateral";
+    } else if (this.type === "farming_zone") {
+      const geometry = new THREE.BoxGeometry(this.scale.x, this.scale.y, this.scale.z);
+      const material = new THREE.MeshStandardMaterial({
+        color: this.color || 0xff4500,
+        roughness: 0.8,
+        transparent: true,
+        opacity: this.opacity !== undefined ? this.opacity : 0.7,
+        emissive: 0x552000,
+        emissiveIntensity: 0.25
+      });
+
+      object3D = new THREE.Mesh(geometry, material);
+      object3D.receiveShadow = true;
+
+      const wiregeo = new THREE.EdgesGeometry(geometry);
+      const wiremat = new THREE.LineBasicMaterial({ color: 0xffaa00 });
+      const wire = new THREE.LineSegments(wiregeo, wiremat);
+      object3D.add(wire);
+
+      const col = RAPIER.ColliderDesc.cuboid(this.scale.x / 2, this.scale.y / 2, this.scale.z / 2).setSensor(true);
+      collidersDesc.push(col);
+
+      if (!this.logicProperties) this.logicProperties = {};
+      if (this.logicProperties.spawnInterval === undefined) this.logicProperties.spawnInterval = 1.0;
+      if (this.logicProperties.itemsPerSpawn === undefined) this.logicProperties.itemsPerSpawn = 1;
+      if (this.logicProperties.itemValue === undefined) this.logicProperties.itemValue = 1;
     } else if (this.type === "ladder") {
       const height = this.scale.y;
       const width = this.scale.x;

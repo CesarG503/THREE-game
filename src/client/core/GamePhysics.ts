@@ -47,6 +47,10 @@ export function regenerateObjectPhysics(this: Game, objectMesh: THREE.Object3D) 
 		const rightRailCol = RAPIER.ColliderDesc.cuboid(railHalfW, railHalfH, railHalfD)
 			.setTranslation(dims.x / 2, 0, 0);
 		this.world.createCollider(rightRailCol, rigidBody);
+	} else if (["impulse_jump", "impulse_lateral", "farming_zone"].includes(objectMesh.userData.mapObjectType)) {
+		colDesc = RAPIER.ColliderDesc.cuboid(dims.x / 2, dims.y / 2, dims.z / 2)
+			.setSensor(true);
+		this.world.createCollider(colDesc, rigidBody);
 	} else if (objectMesh.userData.shapeType === "sphere" || objectMesh.userData.logicProperties?.shapeType === "sphere") {
 		let r = 1.0;
 		if (objectMesh.userData.logicProperties && objectMesh.userData.logicProperties.radius) {

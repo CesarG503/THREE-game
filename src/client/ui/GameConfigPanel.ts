@@ -611,15 +611,27 @@ export class GameConfigPanel {
     highlightBlock(index) {
         if (!this.sequenceList) return
         const children = Array.from(this.sequenceList.children)
+        const shouldScroll = this.lastHighlightedIndex !== index && this.container && this.container.offsetParent !== null
+        let activeChild = null
 
         children.forEach((child, idx) => {
             if (idx === index) {
                 child.classList.add('active-logic-block')
-                child.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                activeChild = child
             } else {
                 child.classList.remove('active-logic-block')
             }
         })
+
+        if (shouldScroll && activeChild) {
+            const targetTop = activeChild.offsetTop - (this.sequenceList.clientHeight / 2) + (activeChild.clientHeight / 2)
+            this.sequenceList.scrollTo({
+                top: Math.max(0, targetTop),
+                behavior: 'smooth'
+            })
+        }
+
+        this.lastHighlightedIndex = index
     }
 
     createAddBtn(container, text, color, onClick) {

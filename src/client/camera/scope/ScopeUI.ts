@@ -15,15 +15,17 @@ export class ScopeUI {
   createUI() {
     this.overlay = document.createElement("div");
     this.overlay.style.cssText = `
-      position: absolute;
+      position: fixed;
       inset: 0;
       pointer-events: none;
       display: flex;
       align-items: center;
       justify-content: center;
+      overflow: hidden;
       opacity: 0;
       transform: scale(1.1);
       z-index: 100;
+      contain: layout paint size;
       will-change: opacity, transform;
     `;
 

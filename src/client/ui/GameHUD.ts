@@ -13,7 +13,8 @@ export class GameHUD {
         this.container = document.createElement('div')
         this.container.id = 'game-hud-layer'
         this.container.style.cssText = `
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            overflow: hidden;
             pointer-events: none; z-index: 1000;
         `
         document.body.appendChild(this.container)
@@ -174,8 +175,9 @@ export class GameHUD {
             // Layout Mode
             if (isFree) {
                 el.style.display = 'block'; // Block to allow absolute children relative to it
-                el.style.position = 'absolute'; // Already absolute via applyPosition
+                el.style.position = 'fixed';
             } else {
+                el.style.position = 'fixed';
                 el.style.display = 'flex';
                 el.style.gap = '10px';
                 el.style.flexWrap = 'wrap';

@@ -11,7 +11,7 @@ export class FloatingTextManager {
     this.container = document.createElement("div");
     this.container.id = "floating-text-container";
     this.container.style.cssText = `
-            position: absolute;
+            position: fixed;
             top: 0;
             left: 0;
             width: 100%;

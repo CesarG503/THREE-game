@@ -2681,6 +2681,19 @@ export class ConstructionMenu {
 
         this.panelEditor.appendChild(weaponControlsContainer);
 
+        // --- NEW: Logic Controls ---
+        const logicControlsContainer = document.createElement("div");
+        logicControlsContainer.style.cssText = `
+            width: 100%;
+            display: none;
+            flex-direction: column;
+            gap: 10px;
+            border-top: 1px solid #444;
+            padding-top: 10px;
+        `;
+        this.panelEditor.appendChild(logicControlsContainer);
+        this.editorLogicControlsContainer = logicControlsContainer;
+
         // Save References for toggling
         this.editorConstructionControls = controlsContainer;
         this.editorTextureContainer = textureContainer;
@@ -2778,6 +2791,9 @@ export class ConstructionMenu {
         if (this.inputDimx) this.inputDimx.value = scaleCopy.x;
         if (this.inputDimy) this.inputDimy.value = scaleCopy.y;
         if (this.inputDimz) this.inputDimz.value = scaleCopy.z;
+
+        // Update Logic Controls
+        this.updateLogicControls(baseItem);
     }
 
     createDraft(id, name, type, color, scale, texturePath = null, baseItem = null) {
@@ -2785,6 +2801,9 @@ export class ConstructionMenu {
             this.currentDraftItem = baseItem.clone();
         } else {
             this.currentDraftItem = new MapObjectItem(id, name, type, "", color, scale, texturePath);
+            if (baseItem && baseItem.logicProperties) {
+                this.currentDraftItem.logicProperties = JSON.parse(JSON.stringify(baseItem.logicProperties));
+            }
         }
 
         // Marcar el ID base para que el dragstart del card pueda comparar
@@ -2794,6 +2813,116 @@ export class ConstructionMenu {
         if (this.editorImg) {
             this.editorImg.src = this.currentDraftItem.iconPath;
         }
+    }
+
+    updateLogicControls(baseItem) {
+        this.editorLogicControlsContainer.innerHTML = "";
+        
+        const logicTypes = ["spawn_point", "movement_controller", "interaction_button", "interactive_collision", "target", "impulse_jump", "impulse_lateral", "farming_zone"];
+        if (!logicTypes.includes(baseItem.type) && !baseItem.logicProperties) {
+            this.editorLogicControlsContainer.style.display = "none";
+            return;
+        }
+
+        this.editorLogicControlsContainer.style.display = "flex";
+
+        const header = document.createElement("div");
+        header.textContent = "Propiedades Lógicas";
+        header.style.cssText = "font-weight: bold; color: #ffaa00; border-bottom: 1px dashed #555; padding-bottom: 5px; margin-bottom: 10px; font-size: 14px; text-align: left; width: 100%;";
+        this.editorLogicControlsContainer.appendChild(header);
+
+        if (!this.currentDraftItem.logicProperties) {
+            this.currentDraftItem.logicProperties = baseItem.logicProperties ? { ...baseItem.logicProperties } : {};
+        }
+
+        const type = baseItem.type;
+
+        if (type === "spawn_point") {
+            this.createLogicDraftInput(this.editorLogicControlsContainer, "Equipo:", "team", "number", 1);
+            this.createLogicDraftInput(this.editorLogicControlsContainer, "Capacidad:", "capacity", "number", 1);
+            this.createLogicDraftInput(this.editorLogicControlsContainer, "Orden:", "order", "number", 1);
+        } else if (type === "movement_controller") {
+            this.createLogicDraftInput(this.editorLogicControlsContainer, "Velocidad:", "speed", "number", 2.0);
+            this.createLogicDraftInput(this.editorLogicControlsContainer, "Bucle Infinito:", "loop", "boolean", true);
+            this.createLogicDraftInput(this.editorLogicControlsContainer, "Activo al Inicio:", "active", "boolean", true);
+        } else if (type === "interaction_button") {
+            this.createLogicDraftInput(this.editorLogicControlsContainer, "Tiempo Retener (s):", "holdTime", "number", 1.0);
+            this.createLogicDraftInput(this.editorLogicControlsContainer, "Un Solo Uso:", "oneShot", "boolean", false);
+            this.createLogicDraftInput(this.editorLogicControlsContainer, "Modo Pulsación:", "pulsationMode", "boolean", false);
+        } else if (type === "interactive_collision") {
+            this.createLogicDraftInput(this.editorLogicControlsContainer, "Travesable (Sin colisión):", "isTraversable", "boolean", false);
+            this.createLogicDraftInput(this.editorLogicControlsContainer, "Disparar al Tocar:", "triggerOnTouch", "boolean", false);
+            this.createLogicDraftInput(this.editorLogicControlsContainer, "Disparar al Entrar:", "triggerOnEnter", "boolean", false);
+        } else if (type === "target") {
+            this.createLogicDraftInput(this.editorLogicControlsContainer, "Anillos:", "rings", "number", 3);
+            this.createLogicDraftInput(this.editorLogicControlsContainer, "Daño Base:", "baseDamage", "number", 10);
+        } else if (type === "impulse_jump" || type === "impulse_lateral") {
+            const isJump = type === "impulse_jump";
+            this.createLogicDraftInput(this.editorLogicControlsContainer, "Nombre:", "name", "text", isJump ? "Pad de Salto" : "Pad de Empuje");
+            this.createLogicDraftInput(this.editorLogicControlsContainer, "Fuerza:", "strength", "number", isJump ? 25 : 40);
+            this.createLogicDraftInput(this.editorLogicControlsContainer, "Recarga (s):", "cooldown", "number", 0.25);
+        } else if (type === "farming_zone") {
+            this.createLogicDraftInput(this.editorLogicControlsContainer, "Nombre:", "name", "text", "Zona de Farmeo");
+            this.createLogicDraftInput(this.editorLogicControlsContainer, "Intervalo Spawn (s):", "spawnInterval", "number", 1.0);
+            this.createLogicDraftInput(this.editorLogicControlsContainer, "Items por Spawn:", "itemsPerSpawn", "number", 1);
+            this.createLogicDraftInput(this.editorLogicControlsContainer, "Valor de Fuego:", "itemValue", "number", 1);
+        }
+    }
+
+    createLogicDraftInput(container, labelText, key, type, defaultValue) {
+        const row = document.createElement("div");
+        row.style.cssText = "display: flex; gap: 10px; align-items: center; justify-content: space-between; margin-bottom:5px; width: 100%;";
+
+        const label = document.createElement("span");
+        label.textContent = labelText;
+        label.style.color = "#aaa";
+        label.style.fontSize = "13px";
+
+        if (!this.currentDraftItem.logicProperties) {
+            this.currentDraftItem.logicProperties = {};
+        }
+        
+        if (this.currentDraftItem.logicProperties[key] === undefined) {
+            this.currentDraftItem.logicProperties[key] = defaultValue;
+        }
+
+        const currentVal = this.currentDraftItem.logicProperties[key];
+
+        const input = document.createElement("input");
+        input.style.cssText = "background: #333; border: 1px solid #555; color: white; padding: 4px; border-radius: 4px; width: 100px; text-align: right;";
+
+        if (type === "number") {
+            input.type = "number";
+            input.step = "0.1";
+            input.value = currentVal;
+            input.addEventListener("input", (e) => {
+                const val = parseFloat(e.target.value);
+                if (!isNaN(val)) {
+                    this.currentDraftItem.logicProperties[key] = val;
+                }
+            });
+        } else if (type === "boolean") {
+            input.type = "checkbox";
+            input.checked = currentVal;
+            input.style.width = "18px";
+            input.style.height = "18px";
+            input.style.cursor = "pointer";
+            input.addEventListener("change", (e) => {
+                this.currentDraftItem.logicProperties[key] = e.target.checked;
+            });
+        } else {
+            input.type = "text";
+            input.value = currentVal;
+            input.style.textAlign = "left";
+            input.style.width = "120px";
+            input.addEventListener("input", (e) => {
+                this.currentDraftItem.logicProperties[key] = e.target.value;
+            });
+        }
+
+        row.appendChild(label);
+        row.appendChild(input);
+        container.appendChild(row);
     }
 
     updateDraftColor(hexColor) {

@@ -43,6 +43,13 @@ export class MapObjectItem extends Item {
   }
 
   generateIcon() {
+    if (this.type === "impulse_jump") {
+      return "/assets/textures/salto.png";
+    }
+    if (this.type === "impulse_lateral") {
+      return "/assets/textures/impulso.png";
+    }
+
     const canvas = document.createElement("canvas");
     canvas.width = 64;
     canvas.height = 64;

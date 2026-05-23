@@ -1274,12 +1274,33 @@ export class PlacementManager {
 
             // Adjust visual geometry matches RealSize
             if (item.constructor.name === "MapObjectItem") {
-                this.ghostArrow.visible = false;
                 this.ghostBaseMat.visible = true;
                 this.ghostRampMesh.visible = false;
                 this.ghostBoxMesh.visible = false;
                 if (this.ghostStairsGroup) {
                     this.ghostStairsGroup.visible = false;
+                }
+
+                if (item.type === "impulse_jump" || item.type === "impulse_lateral") {
+                    const isJump = (item.type === "impulse_jump");
+                    this.ghostArrow.visible = true;
+                    
+                    // Assign texture
+                    this.ghostArrowMat.map = isJump ? this.texSalto : this.texImpulso;
+                    this.ghostArrowMat.needsUpdate = true;
+                    
+                    // Size the plane according to the scale of the pad
+                    this.ghostArrow.scale.set(item.scale.x * 0.8 / 2.4, item.scale.z * 0.8 / 2.4, 1);
+                    
+                    // Set position on top of the ghost box
+                    this.ghostArrow.position.y = item.scale.y / 2 + 0.01;
+                    
+                    // Set rotation:
+                    this.ghostArrow.rotation.x = -Math.PI / 2;
+                    this.ghostArrow.rotation.y = 0;
+                    this.ghostArrow.rotation.z = isJump ? 0 : Math.PI;
+                } else {
+                    this.ghostArrow.visible = false;
                 }
 
                 if (item.type === "ramp") {
@@ -1413,6 +1434,7 @@ export class PlacementManager {
             if (isValid) {
                 if (item.constructor.name === "MapObjectItem") {
                     this.ghostBaseMat.color.setHex(0x00ff00);
+                    this.ghostArrowMat.color.setHex(0xffffff);
                 } else {
                     const isJump = (item.id === "pad_jump");
                     const color = isJump ? 0x00ffff : 0x00ff00;

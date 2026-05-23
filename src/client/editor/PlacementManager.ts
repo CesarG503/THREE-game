@@ -1298,7 +1298,7 @@ export class PlacementManager {
                     // Set rotation:
                     this.ghostArrow.rotation.x = -Math.PI / 2;
                     this.ghostArrow.rotation.y = 0;
-                    this.ghostArrow.rotation.z = isJump ? 0 : Math.PI;
+                    this.ghostArrow.rotation.z = isJump ? 0 : 0;
                 } else {
                     this.ghostArrow.visible = false;
                 }

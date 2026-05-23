@@ -625,7 +625,7 @@ export class MapObjectItem extends Item {
       const arrowMesh = new THREE.Mesh(arrowGeometry, arrowMaterial);
       arrowMesh.position.y = this.scale.y / 2 + 0.01;
       arrowMesh.rotation.x = -Math.PI / 2;
-      if (!isJump) arrowMesh.rotation.z = Math.PI;
+      if (!isJump) arrowMesh.rotation.z = 0;
       object3D.add(arrowMesh);
 
       const col = RAPIER.ColliderDesc.cuboid(this.scale.x / 2, this.scale.y / 2, this.scale.z / 2).setSensor(true);

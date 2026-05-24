@@ -602,10 +602,16 @@ export class MapObjectItem extends Item {
     } else if (this.type === "impulse_jump" || this.type === "impulse_lateral") {
       const isJump = this.type === "impulse_jump";
       const geometry = new THREE.BoxGeometry(this.scale.x, this.scale.y, this.scale.z);
+      const defaultColor = isJump ? 0x00ffff : 0x00ff00;
+      const padColor = this.color !== undefined ? this.color : defaultColor;
+      
+      const parsedColor = new THREE.Color(padColor);
+      const emissiveColor = parsedColor.clone().multiplyScalar(0.25);
+
       const material = new THREE.MeshStandardMaterial({
-        color: isJump ? 0x00ffff : 0x00ff00,
+        color: padColor,
         roughness: 0.8,
-        emissive: isJump ? 0x004444 : 0x004400,
+        emissive: emissiveColor,
         emissiveIntensity: 0.35
       });
 

@@ -14,6 +14,8 @@ export class FarmingZone {
     spawnInterval: number;
     itemsPerSpawn: number;
     itemValue: number;
+    groupId: string;
+    itemTexture: string;
 
     mesh: any;
 
@@ -30,6 +32,8 @@ export class FarmingZone {
         this.spawnInterval = 1.0;
         this.itemsPerSpawn = 1;
         this.itemValue = 1;
+        this.groupId = "Grupo 1";
+        this.itemTexture = "/assets/textures/fuego.png";
 
         this.initVisuals();
     }
@@ -40,11 +44,19 @@ export class FarmingZone {
     }
 
     setItemsPerSpawn(count: number) {
-        this.itemsPerSpawn = Math.max(1, Math.floor(count));
+        this.itemsPerSpawn = Math.max(0, Math.floor(count));
     }
 
     setItemValue(val: number) {
         this.itemValue = Math.floor(val);
+    }
+
+    setGroupId(grp: string) {
+        this.groupId = grp;
+    }
+
+    setItemTexture(tex: string) {
+        this.itemTexture = tex;
     }
 
     initVisuals() {
@@ -73,7 +85,7 @@ export class FarmingZone {
     }
 
     spawnItem() {
-        const item = new FuegoItem();
+        const item = new FuegoItem(this.groupId, this.itemTexture);
         item.value = this.itemValue;
 
         const halfW = this.width / 2 * 0.8;

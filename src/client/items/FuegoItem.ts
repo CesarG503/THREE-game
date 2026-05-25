@@ -4,11 +4,15 @@ import { Item } from "./Item";
 export class FuegoItem extends Item {
   type: string;
   value: number;
+  groupId: string;
+  itemTexture: string;
 
-  constructor() {
-    super("fuego", "Fuego", "/assets/textures/fuego.png");
+  constructor(groupId: string = "Grupo 1", itemTexture: string = "/assets/textures/fuego.png") {
+    super("fuego", "Fuego", itemTexture);
     this.type = "collectible";
     this.value = 0;
+    this.groupId = groupId;
+    this.itemTexture = itemTexture;
   }
 
   getDisplayMesh() {

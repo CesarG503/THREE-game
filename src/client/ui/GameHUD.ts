@@ -479,4 +479,155 @@ export class GameHUD {
         el.style.boxShadow = "0 4px 10px rgba(0,0,0,0.5)"
         el.style.letterSpacing = "2px"
     }
+
+    updateFarmingCounters(game: any) {
+        if (!game) return;
+
+        // Hide standard fire counter if it exists
+        const oldCounter = document.getElementById("fuego-counter");
+        if (oldCounter) {
+            oldCounter.style.display = "none";
+        }
+
+        const activeGroups = getActiveFarmingGroups(game);
+
+        // 1. Remove counters for groups that are no longer active
+        const activeGroupIds = new Set(activeGroups.map(g => g.groupId));
+        const existingCounterEls = this.container.querySelectorAll('[id^="fz-counter-"]');
+        existingCounterEls.forEach((el: any) => {
+            const gId = el.id.substring("fz-counter-".length);
+            if (!activeGroupIds.has(gId)) {
+                el.remove();
+            }
+        });
+
+        // 2. Add or update active group counters
+        const settings = this.settings || {};
+        const profile = game.playerConfigManager?.getCurrentProfile?.() || {};
+        const hudSettings = profile.hudSettings || settings;
+
+        activeGroups.forEach((group, idx) => {
+            const gId = group.groupId;
+            const count = game.farmingZoneCounts[gId] || 0;
+
+            // Check if this group's counter is hidden in settings
+            const showKey = "show_fz_" + gId;
+            if (hudSettings[showKey] === false) {
+                const el = document.getElementById(`fz-counter-${gId}`);
+                if (el) el.remove();
+                return;
+            }
+
+            let el = document.getElementById(`fz-counter-${gId}`);
+            if (!el) {
+                el = document.createElement("div");
+                el.id = `fz-counter-${gId}`;
+                el.style.cssText = `
+                    position: absolute;
+                    display: flex;
+                    gap: 8px;
+                    align-items: center;
+                    background: rgba(30, 30, 30, 0.65);
+                    backdrop-filter: blur(10px);
+                    border: 1px solid rgba(255, 255, 255, 0.1);
+                    border-radius: 12px;
+                    padding: 8px 16px;
+                    color: #ff4500;
+                    font-family: sans-serif;
+                    font-size: 20px;
+                    font-weight: bold;
+                    pointer-events: none;
+                    user-select: none;
+                    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+                    z-index: 1000;
+                    transition: transform 0.1s ease;
+                `;
+                this.container.appendChild(el);
+            }
+
+            // Update texture/icon and text if changed
+            const imgEl = el.querySelector("img");
+            const spanEl = el.querySelector("span");
+
+            const currentTex = imgEl ? imgEl.src : "";
+            const expectedTex = group.itemTexture;
+
+            if (!imgEl || !spanEl || !currentTex.includes(expectedTex)) {
+                el.innerHTML = `
+                    <img src="${expectedTex}" style="width: 24px; height: 24px; object-fit: contain;">
+                    <span>${count}</span>
+                `;
+            } else {
+                const oldCount = parseInt(spanEl.textContent || "0");
+                if (oldCount !== count) {
+                    spanEl.textContent = count.toString();
+
+                    // Beautiful micro-animation on update!
+                    el.style.transform = "scale(1.2)";
+                    setTimeout(() => {
+                        if (el) el.style.transform = "scale(1.0)";
+                    }, 100);
+                }
+            }
+
+            // Position the counter
+            const posKey = "pos_fz_" + gId;
+            const customPos = hudSettings[posKey];
+            if (customPos) {
+                this.applyPosition(el, customPos);
+            } else {
+                // Default position staggered vertically
+                const topOffset = 20 + idx * 55;
+                el.style.top = `${topOffset}px`;
+                el.style.left = "50%";
+                el.style.bottom = "auto";
+                el.style.right = "auto";
+                el.style.transform = "translateX(-50%)";
+            }
+        });
+    }
+}
+
+export function getActiveFarmingGroups(game: any) {
+    const groups: { [id: string]: { groupId: string; itemTexture: string; itemValue: number } } = {};
+
+    // 1. Scan from editable map objects (if in scene)
+    if (game.sceneManager?.scene) {
+        game.sceneManager.scene.children.forEach((obj: any) => {
+            if (obj.userData?.isEditableMapObject && obj.userData.mapObjectType === "farming_zone") {
+                const props = obj.userData.logicProperties || {};
+                const gId = props.groupId || "Grupo 1";
+                const tex = props.itemTexture || "/assets/textures/fuego.png";
+                const val = props.itemValue || 1;
+                if (!groups[gId]) {
+                    groups[gId] = { groupId: gId, itemTexture: tex, itemValue: val };
+                }
+            }
+        });
+    }
+
+    // 2. Scan from game.farmingZones array
+    if (game.farmingZones && Array.isArray(game.farmingZones)) {
+        game.farmingZones.forEach((zone: any) => {
+            const gId = zone.groupId || "Grupo 1";
+            const tex = zone.itemTexture || "/assets/textures/fuego.png";
+            const val = zone.itemValue || 1;
+            if (!groups[gId]) {
+                groups[gId] = { groupId: gId, itemTexture: tex, itemValue: val };
+            }
+        });
+    }
+
+    // 3. Scan from game.farmingZone (single direct reference if active)
+    if (game.farmingZone) {
+        const zone = game.farmingZone;
+        const gId = zone.groupId || "Grupo 1";
+        const tex = zone.itemTexture || "/assets/textures/fuego.png";
+        const val = zone.itemValue || 1;
+        if (!groups[gId]) {
+            groups[gId] = { groupId: gId, itemTexture: tex, itemValue: val };
+        }
+    }
+
+    return Object.values(groups);
 }

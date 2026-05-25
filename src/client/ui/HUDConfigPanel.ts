@@ -2,6 +2,7 @@
 
 import { animate, stagger } from 'animejs'
 import { HUDLayoutSystem } from './modules/HUDLayoutSystem'
+import { getActiveFarmingGroups } from './GameHUD'
 
 export class HUDConfigPanel {
     constructor(game, manager, onClose) {
@@ -21,6 +22,8 @@ export class HUDConfigPanel {
         this.profile = profile;
         this.tempSettings = JSON.parse(JSON.stringify(profile.hudSettings || {}));
         this.selectedId = 'health'; // Default selection
+        this.contentWrapper = null;
+        this.uiInputs = {};
 
         // Initialize Defaults (Keep existing defaults logic...)
         // Health
@@ -194,12 +197,25 @@ export class HUDConfigPanel {
 
     renderSidebar() {
         this.sidebar.innerHTML = '';
-        const order = this.tempSettings.layerOrder || ['health', 'jump', 'inventory'];
+        const activeGroups = getActiveFarmingGroups(this.game);
+        const order = [...(this.tempSettings.layerOrder || ['health', 'jump', 'inventory'])];
+        activeGroups.forEach(g => {
+            const id = "fz_" + g.groupId;
+            if (!order.includes(id)) {
+                order.push(id);
+            }
+        });
         // Ensure layerOrder is initialized if missing
         if (!this.tempSettings.layerOrder) this.tempSettings.layerOrder = order;
 
         const labels = { 'health': 'Salud', 'jump': 'Salto', 'inventory': 'Inventario' };
-        const items = order.map(id => ({ id: id, label: labels[id] || id }));
+        const items = order.map(id => {
+            if (id.startsWith("fz_")) {
+                const gId = id.substring(3);
+                return { id: id, label: `Farmeo: ${gId}` };
+            }
+            return { id: id, label: labels[id] || id };
+        });
 
         let draggedItem = null;
 
@@ -279,7 +295,10 @@ export class HUDConfigPanel {
             // Vis Checkbox (Stop propagation so we don't select row when checking)
             const check = document.createElement('input');
             check.type = "checkbox";
-            const vKey = item.id === 'health' ? 'showHealth' : (item.id === 'jump' ? 'showJump' : 'showInventory');
+            const vKey = item.id.startsWith("fz_") ? "show_" + item.id : (item.id === 'health' ? 'showHealth' : (item.id === 'jump' ? 'showJump' : 'showInventory'));
+            if (this.tempSettings[vKey] === undefined) {
+                this.tempSettings[vKey] = true;
+            }
             check.checked = this.tempSettings[vKey];
             check.style.cursor = "pointer";
             check.onclick = (e) => e.stopPropagation();
@@ -330,6 +349,12 @@ export class HUDConfigPanel {
         }
 
         const type = this.selectedId;
+        if (type.startsWith("fz_")) {
+            const gId = type.substring(3);
+            this.renderFarmingZoneGroupProperties(this.propertyPanel, gId);
+            return;
+        }
+
         const title = type === 'health' ? "Salud (Vida)" : (type === 'jump' ? "Salto (Carga)" : "Inventario");
 
         // Re-use logic from createSection but adapt to just render one
@@ -822,7 +847,14 @@ export class HUDConfigPanel {
         this.contentWrapper.innerHTML = '';
         this.contentWrapper.style.zIndex = '10';
 
-        const layerOrder = this.tempSettings.layerOrder || ['health', 'jump', 'inventory'];
+        const activeGroups = getActiveFarmingGroups(this.game);
+        const layerOrder = [...(this.tempSettings.layerOrder || ['health', 'jump', 'inventory'])];
+        activeGroups.forEach(g => {
+            const id = "fz_" + g.groupId;
+            if (!layerOrder.includes(id)) {
+                layerOrder.push(id);
+            }
+        });
         // Append in reverse order (Bottom Layer first)
         // List: [Top, Middle, Bottom] -> Append: Bottom, Middle, Top
         for (let i = layerOrder.length - 1; i >= 0; i--) {
@@ -830,6 +862,13 @@ export class HUDConfigPanel {
             if (id === 'health' && this.tempSettings.showHealth) this.renderPreviewHealth();
             else if (id === 'jump' && this.tempSettings.showJump) this.renderPreviewJump();
             else if (id === 'inventory' && this.tempSettings.showInventory) this.renderPreviewInventory();
+            else if (id.startsWith("fz_")) {
+                const gId = id.substring(3);
+                const showKey = "show_fz_" + gId;
+                if (this.tempSettings[showKey] !== false) {
+                    this.renderPreviewFarmingCounter(gId);
+                }
+            }
         }
 
         const children = this.contentWrapper.children;
@@ -1133,5 +1172,90 @@ export class HUDConfigPanel {
             minBtn.innerHTML = '+';
             this.isMinimized = true;
         }
+    }
+
+    renderFarmingZoneGroupProperties(parent, groupId) {
+        const sec = document.createElement('div');
+        sec.style.marginBottom = "20px";
+
+        const h3 = document.createElement('h3');
+        h3.textContent = `Contador Farmeo: ${groupId}`;
+        h3.style.cssText = "color: #ddd; border-bottom: 1px solid #444; padding-bottom: 5px; margin-bottom: 10px; font-size:14px;";
+        sec.appendChild(h3);
+
+        // Visibility Checkbox
+        const visRow = document.createElement('div');
+        visRow.style.cssText = "margin-bottom: 10px; display: flex; align-items: center; gap: 10px;";
+
+        const visCheck = document.createElement('input');
+        visCheck.type = "checkbox";
+        const vKey = "show_fz_" + groupId;
+        if (this.tempSettings[vKey] === undefined) this.tempSettings[vKey] = true;
+        visCheck.checked = this.tempSettings[vKey];
+        visCheck.onchange = (e) => {
+            this.tempSettings[vKey] = e.target.checked;
+            this.updatePreview();
+            this.renderSidebar(); // Sync with Sidebar
+        };
+
+        const visLabel = document.createElement('label');
+        visLabel.textContent = "Mostrar en HUD";
+        visLabel.style.color = "#aaa";
+
+        visRow.appendChild(visCheck);
+        visRow.appendChild(visLabel);
+        sec.appendChild(visRow);
+
+        // Description
+        const desc = document.createElement('div');
+        desc.textContent = "Este elemento muestra la cantidad de items recolectados por las zonas de farmeo conectadas a este grupo. Puedes arrastrar el contador en la pantalla para cambiar su posición.";
+        desc.style.cssText = "font-size:12px; color:#888; line-height:1.4; margin-top:10px;";
+        sec.appendChild(desc);
+
+        parent.appendChild(sec);
+    }
+
+    renderPreviewFarmingCounter(groupId) {
+        const activeGroups = getActiveFarmingGroups(this.game);
+        const group = activeGroups.find(g => g.groupId === groupId) || { itemTexture: "/assets/textures/fuego.png", itemValue: 1 };
+
+        const el = document.createElement('div');
+        el.id = `fz-counter-preview-${groupId}`;
+        el.style.cssText = `
+            display: flex; gap: 8px; align-items: center;
+            background: rgba(30, 30, 30, 0.65);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 8px 16px;
+            color: #ff4500;
+            font-family: sans-serif;
+            font-size: 20px;
+            font-weight: bold;
+            pointer-events: auto;
+            user-select: none;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        `;
+
+        el.innerHTML = `
+            <img src="${group.itemTexture}" style="width: 24px; height: 24px; object-fit: contain;">
+            <span>42</span>
+        `;
+
+        this.contentWrapper.appendChild(el);
+
+        const posKey = "pos_fz_" + groupId;
+        let initialPos = this.tempSettings[posKey];
+        if (!initialPos) {
+            // Stagger default position to prevent overlapping
+            const idx = activeGroups.findIndex(g => g.groupId === groupId);
+            const topOffset = 20 + (idx >= 0 ? idx : 0) * 55;
+            initialPos = { top: `${topOffset}px`, left: "50%", transform: "translateX(-50%)" };
+            this.tempSettings[posKey] = initialPos;
+        }
+
+        this.layoutSystem.registerElement(el, `fz_${groupId}`, initialPos, (newPos) => {
+            this.tempSettings[posKey] = newPos;
+        });
     }
 }

@@ -4,6 +4,7 @@ import { LogicSequenceEditor } from "../ui/LogicSequenceEditor";
 import { InteractiveCollisionLogic } from "../ui/logic_items/InteractiveCollisionLogic";
 import { TargetLogic } from "../ui/logic_items/TargetLogic";
 import { PlayerConfigManager } from "./PlayerConfigManager";
+import { getActiveFarmingGroups } from "../ui/GameHUD";
 
 export class LogicSystem {
 	game: any;
@@ -392,11 +393,178 @@ export class LogicSystem {
 		if (props.spawnInterval === undefined) props.spawnInterval = 1.0;
 		if (props.itemsPerSpawn === undefined) props.itemsPerSpawn = 1;
 		if (props.itemValue === undefined) props.itemValue = 1;
+		if (props.groupId === undefined) props.groupId = "Grupo 1";
+		if (props.itemTexture === undefined) props.itemTexture = "/assets/textures/fuego.png";
 
 		this.createInput(container, object, "name", props.name, "text", "Nombre");
 		this.createInput(container, object, "spawnInterval", props.spawnInterval, "number", "Intervalo Spawn (s)");
 		this.createInput(container, object, "itemsPerSpawn", props.itemsPerSpawn, "number", "Items por Spawn");
 		this.createInput(container, object, "itemValue", props.itemValue, "number", "Valor de Fuego");
+
+		this.createGroupSelector(container, object, props);
+		this.createTextureSelector(container, object, props);
+	}
+
+	createGroupSelector(container: HTMLElement, object: any, props: any) {
+		const row = document.createElement("div");
+		row.style.cssText = "display: flex; flex-direction: column; gap: 4px; margin-top: 8px; margin-bottom: 5px;";
+
+		const label = document.createElement("label");
+		label.textContent = "Grupo de Conexión";
+		label.style.color = "#aaa";
+		label.style.fontSize = "14px";
+		row.appendChild(label);
+
+		const existingGroups = new Set<string>();
+		existingGroups.add("Grupo 1");
+
+		if (this.game) {
+			const activeGroups = getActiveFarmingGroups(this.game);
+			activeGroups.forEach(g => existingGroups.add(g.groupId));
+		}
+		if (props.groupId) existingGroups.add(props.groupId);
+
+		const select = document.createElement("select");
+		select.style.cssText = "background: #111; border: 1px solid #444; color: white; padding: 4px; border-radius: 4px; width: 100%; cursor: pointer;";
+
+		existingGroups.forEach(g => {
+			const opt = document.createElement("option");
+			opt.value = g;
+			opt.textContent = g;
+			if (g === props.groupId) opt.selected = true;
+			select.appendChild(opt);
+		});
+
+		const customOpt = document.createElement("option");
+		customOpt.value = "__NEW__";
+		customOpt.textContent = "+ Crear Nuevo Grupo...";
+		select.appendChild(customOpt);
+
+		row.appendChild(select);
+
+		const customInputRow = document.createElement("div");
+		customInputRow.style.cssText = "display: none; gap: 5px; margin-top: 5px;";
+
+		const customInput = document.createElement("input");
+		customInput.type = "text";
+		customInput.placeholder = "Nombre del nuevo grupo";
+		customInput.style.cssText = "background: #111; border: 1px solid #444; color: white; padding: 4px; border-radius: 4px; flex: 1;";
+
+		const customBtn = document.createElement("button");
+		customBtn.textContent = "Crear";
+		customBtn.style.cssText = "background: #00aa00; border: none; color: white; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-weight: bold;";
+
+		customInputRow.appendChild(customInput);
+		customInputRow.appendChild(customBtn);
+		row.appendChild(customInputRow);
+
+		select.onchange = (e: any) => {
+			const val = e.target.value;
+			if (val === "__NEW__") {
+				customInputRow.style.display = "flex";
+			} else {
+				customInputRow.style.display = "none";
+				props.groupId = val;
+				if (this.game && this.game.hud) {
+					this.game.hud.updateFarmingCounters(this.game);
+				}
+			}
+		};
+
+		customBtn.onclick = () => {
+			const newName = customInput.value.trim();
+			if (newName) {
+				const opt = document.createElement("option");
+				opt.value = newName;
+				opt.textContent = newName;
+				select.insertBefore(opt, customOpt);
+				select.value = newName;
+				props.groupId = newName;
+				customInputRow.style.display = "none";
+				customInput.value = "";
+				if (this.game && this.game.hud) {
+					this.game.hud.updateFarmingCounters(this.game);
+				}
+			}
+		};
+
+		container.appendChild(row);
+	}
+
+	createTextureSelector(container: HTMLElement, object: any, props: any) {
+		const row = document.createElement("div");
+		row.style.cssText = "display: flex; flex-direction: column; gap: 4px; margin-top: 8px; margin-bottom: 5px;";
+
+		const label = document.createElement("label");
+		label.textContent = "Textura del Item";
+		label.style.color = "#aaa";
+		label.style.fontSize = "14px";
+		row.appendChild(label);
+
+		const select = document.createElement("select");
+		select.style.cssText = "background: #111; border: 1px solid #444; color: white; padding: 4px; border-radius: 4px; width: 100%; cursor: pointer;";
+
+		const options = [
+			{ name: "Fuego", val: "/assets/textures/fuego.png" },
+			{ name: "Pelota", val: "/assets/textures/pelota.png" },
+			{ name: "Custom PNG / URL...", val: "__CUSTOM__" }
+		];
+
+		let isCustomTexture = true;
+		options.forEach(opt => {
+			const o = document.createElement("option");
+			o.value = opt.val;
+			o.textContent = opt.name;
+			if (props.itemTexture === opt.val) {
+				o.selected = true;
+				isCustomTexture = false;
+			}
+			select.appendChild(o);
+		});
+
+		if (isCustomTexture && props.itemTexture) {
+			select.value = "__CUSTOM__";
+		}
+
+		row.appendChild(select);
+
+		const customInputRow = document.createElement("div");
+		customInputRow.style.cssText = isCustomTexture ? "display: flex; gap: 5px; margin-top: 5px;" : "display: none; gap: 5px; margin-top: 5px;";
+
+		const customInput = document.createElement("input");
+		customInput.type = "text";
+		customInput.placeholder = "Ruta o URL (PNG)";
+		customInput.value = isCustomTexture ? (props.itemTexture || "") : "";
+		customInput.style.cssText = "background: #111; border: 1px solid #444; color: white; padding: 4px; border-radius: 4px; flex: 1;";
+
+		customInputRow.appendChild(customInput);
+		row.appendChild(customInputRow);
+
+		select.onchange = (e: any) => {
+			const val = e.target.value;
+			if (val === "__CUSTOM__") {
+				customInputRow.style.display = "flex";
+				props.itemTexture = customInput.value.trim() || "/assets/textures/fuego.png";
+			} else {
+				customInputRow.style.display = "none";
+				props.itemTexture = val;
+				if (this.game && this.game.hud) {
+					this.game.hud.updateFarmingCounters(this.game);
+				}
+			}
+		};
+
+		customInput.onchange = () => {
+			const val = customInput.value.trim();
+			if (val) {
+				props.itemTexture = val;
+				if (this.game && this.game.hud) {
+					this.game.hud.updateFarmingCounters(this.game);
+				}
+			}
+		};
+
+		container.appendChild(row);
 	}
 
 	renderSpawnUI(container: HTMLElement, object: any, props: any) {

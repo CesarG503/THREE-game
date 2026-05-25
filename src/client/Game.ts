@@ -63,6 +63,7 @@ export class Game {
 	inventoryManager: any;
 	itemDropManager: any;
 	fuegoCount: number;
+	farmingZoneCounts: { [groupId: string]: number };
 	environmentConfig: any;
 	invisibleWallMeshes: any;
 	invisibleWallBodies: any;
@@ -403,6 +404,7 @@ export class Game {
 		this.itemDropManager = new ItemDropManager(this.sceneManager.scene, this.world);
 
 		this.fuegoCount = 0;
+		this.farmingZoneCounts = {};
 		if (this.gameMode !== "editor") {
 			// Farming Zone removida temporalmente
 		}

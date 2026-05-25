@@ -2866,6 +2866,8 @@ export class ConstructionMenu {
             this.createLogicDraftInput(this.editorLogicControlsContainer, "Intervalo Spawn (s):", "spawnInterval", "number", 1.0);
             this.createLogicDraftInput(this.editorLogicControlsContainer, "Items por Spawn:", "itemsPerSpawn", "number", 1);
             this.createLogicDraftInput(this.editorLogicControlsContainer, "Valor de Fuego:", "itemValue", "number", 1);
+            this.createLogicDraftInput(this.editorLogicControlsContainer, "Grupo:", "groupId", "text", "Grupo 1");
+            this.createLogicDraftInput(this.editorLogicControlsContainer, "Textura PNG:", "itemTexture", "text", "/assets/textures/fuego.png");
         }
     }
 

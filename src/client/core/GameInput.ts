@@ -96,10 +96,25 @@ export function setupGameInput(this: Game) {
 				}
 
 				if (picked.id === "fuego") {
-					this.fuegoCount += (picked.value || 1);
+					const valueAdded = picked.value || 1;
+					const gId = picked.groupId || "Grupo 1";
+
+					this.fuegoCount += valueAdded;
+
+					if (!this.farmingZoneCounts) this.farmingZoneCounts = {};
+					if (this.farmingZoneCounts[gId] === undefined) {
+						this.farmingZoneCounts[gId] = 0;
+					}
+					this.farmingZoneCounts[gId] += valueAdded;
+
 					const counterEl = document.getElementById("fuego-count");
 					if (counterEl) counterEl.textContent = this.fuegoCount.toString();
-					console.log("Manual pickup fuego! Total:", this.fuegoCount);
+
+					if (this.hud && this.hud.updateFarmingCounters) {
+						this.hud.updateFarmingCounters(this);
+					}
+
+					console.log(`Manual pickup item del grupo ${gId}! Total:`, this.farmingZoneCounts[gId]);
 				} else {
 					const added = this.inventoryManager.addItem(picked);
 					if (!added) {

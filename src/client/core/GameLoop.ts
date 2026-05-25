@@ -127,8 +127,10 @@ function updateMapFarmingZones(game: any, dt: number) {
 		const state = zone.userData.runtimeState;
 		const dims = zone.userData.originalScale || { x: 3, y: 0.2, z: 3 };
 		const interval = Math.max(0.1, Number(props.spawnInterval ?? 1.0));
-		const itemsPerSpawn = Math.max(1, Math.floor(Number(props.itemsPerSpawn ?? 1)));
+		const itemsPerSpawn = Math.max(0, Math.floor(Number(props.itemsPerSpawn ?? 1)));
 		const itemValue = Math.floor(Number(props.itemValue ?? 1));
+		const itemTexture = props.itemTexture ?? "/assets/textures/fuego.png";
+		const groupId = props.groupId ?? "Grupo 1";
 
 		state.accumulatedTime = (state.accumulatedTime || 0) + dt;
 		if (state.accumulatedTime < interval) return;
@@ -136,7 +138,7 @@ function updateMapFarmingZones(game: any, dt: number) {
 		state.accumulatedTime %= interval;
 
 		for (let i = 0; i < itemsPerSpawn; i++) {
-			const item = new FuegoItem();
+			const item = new FuegoItem(groupId, itemTexture);
 			item.value = itemValue;
 
 			const localOffset = new THREE.Vector3(
@@ -150,6 +152,10 @@ function updateMapFarmingZones(game: any, dt: number) {
 			game.itemDropManager.dropItem(item, spawnPos, new THREE.Vector3(0, 1, 0));
 		}
 	});
+
+	if (game.hud && game.hud.updateFarmingCounters) {
+		game.hud.updateFarmingCounters(game);
+	}
 }
 
 export function animate(this: any) {
@@ -454,13 +460,26 @@ export function animate(this: any) {
 			const collectedFuego = this.itemDropManager.checkAutoPickup(charPos, 1.5, "fuego");
 
 			if (collectedFuego.length > 0) {
-				let valueAdded = 0;
 				collectedFuego.forEach((item: any) => {
-					valueAdded += (item.value || 1);
+					const valueAdded = item.value || 1;
+					const gId = item.groupId || "Grupo 1";
+
+					this.fuegoCount += valueAdded;
+
+					if (!this.farmingZoneCounts) this.farmingZoneCounts = {};
+					if (this.farmingZoneCounts[gId] === undefined) {
+						this.farmingZoneCounts[gId] = 0;
+					}
+					this.farmingZoneCounts[gId] += valueAdded;
 				});
-				this.fuegoCount += valueAdded;
+
 				const counterEl = document.getElementById("fuego-count");
-				if (counterEl) counterEl.textContent = this.fuegoCount;
+				if (counterEl) counterEl.textContent = this.fuegoCount.toString();
+
+				if (this.hud && this.hud.updateFarmingCounters) {
+					this.hud.updateFarmingCounters(this);
+				}
+
 				console.log("Recogido fuego! Total:", this.fuegoCount);
 			}
 

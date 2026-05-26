@@ -971,160 +971,239 @@ export class HUDConfigPanel {
     }
 
     renderPreviewInventory() {
-        const container = document.createElement('div');
-        container.className = 'inventory-container-preview';
+        const el = document.createElement('div');
+        el.className = "inventory-container-preview";
 
-        // Free Layout Mode
-        const isFree = this.tempSettings.inventoryFreeLayout;
-
-        let slots = this.tempSettings.inventorySlots || 9;
-        let size = this.tempSettings.inventorySlotSize || 50;
         const padding = this.tempSettings.inventoryPadding !== undefined ? this.tempSettings.inventoryPadding : 10;
+        let width = this.tempSettings.inventoryContainerWidth;
+        let height = this.tempSettings.inventoryContainerHeight;
+        const isFree = this.tempSettings.inventoryFreeLayout;
+        const slots = this.tempSettings.inventorySlots || 9;
+        const size = this.tempSettings.inventorySlotSize || 50;
+
+        const autoWidth = slots * size + Math.max(0, slots - 1) * padding + padding * 2;
+        const autoHeight = size + padding * 2;
+        let cssWidth = width ? `${width}px` : `${autoWidth}px`;
+        let cssHeight = height ? `${height}px` : `${autoHeight}px`;
+
+        el.style.cssText = `
+            background: rgba(0, 0, 0, 0.5);
+            padding: ${padding}px;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            width: ${cssWidth};
+            height: ${cssHeight};
+            position: relative;
+            box-sizing: border-box;
+        `;
 
         if (isFree) {
-            // Use custom dimensions if set
-            const containerWidth = this.tempSettings.inventoryContainerWidth || (slots * (size + padding) + padding);
-            const containerHeight = this.tempSettings.inventoryContainerHeight || (size + padding * 2);
-
-            container.style.cssText = `
-                width: ${containerWidth}px; height: ${containerHeight}px;
-                background: rgba(0,0,0,0.6); border: 1px solid #555;
-                display: block; position: relative; border-radius: 6px;
-            `;
-
-            for (let i = 0; i < slots; i++) {
-                const slot = document.createElement('div');
-                slot.className = 'inventory-slot';
-                const pos = this.tempSettings.inventorySlotPositions[i] || { left: (i * (size + padding) + padding) + 'px', top: padding + 'px' };
-                slot.style.cssText = `
-                    width:${size}px; height:${size}px; border:1px solid #444;
-                    background: rgba(255,255,255,0.05);
-                    position: absolute; left: ${pos.left}; top: ${pos.top};
-                    border-radius: 4px; box-sizing: border-box;
-                `;
-                container.appendChild(slot);
-            }
+            el.style.display = 'block';
+            if (!width) width = 300;
+            if (!height) height = 100;
+            el.style.width = width + 'px';
+            el.style.height = height + 'px';
         } else {
-            // Auto Layout
-            // Determine container size if not explicitly set
-            const containerWidth = this.tempSettings.inventoryContainerWidth || (slots * size + (slots - 1) * padding + padding * 2);
-            const containerHeight = this.tempSettings.inventoryContainerHeight || (size + padding * 2);
+            el.style.display = 'grid';
+            el.style.gridTemplateColumns = `repeat(auto-fit, minmax(${size}px, ${size}px))`;
+            el.style.gridAutoRows = `${size}px`;
+            el.style.gap = `${padding}px`;
 
-            container.style.cssText = `
-                width: ${containerWidth}px; height: ${containerHeight}px;
-                background: rgba(0,0,0,0.6); border: 1px solid #555;
-                display: flex; gap: ${padding}px; padding: ${padding}px;
-                border-radius: 6px; align-items: center; justify-content: center;
-            `;
-
-            for (let i = 0; i < slots; i++) {
-                const slot = document.createElement('div');
-                slot.className = 'inventory-slot';
-                slot.style.cssText = `
-                    width:${size}px; height:${size}px; border:1px solid #444;
-                    background: rgba(255,255,255,0.05);
-                    border-radius: 4px; box-sizing: border-box;
-                `;
-                container.appendChild(slot);
-            }
-
-            // Alignment
             const align = this.tempSettings.inventorySlotAlignment || 'center';
             const alignMap = {
-                'top-left': ['flex-start', 'flex-start'],
-                'top-center': ['center', 'flex-start'],
-                'top-right': ['flex-end', 'flex-start'],
-                'center-left': ['flex-start', 'center'],
+                'top-left': ['start', 'start'],
+                'top-center': ['center', 'start'],
+                'top-right': ['end', 'start'],
+                'center-left': ['start', 'center'],
                 'center': ['center', 'center'],
-                'center-right': ['flex-end', 'center'],
-                'bottom-left': ['flex-start', 'flex-end'],
-                'bottom-center': ['center', 'flex-end'],
-                'bottom-right': ['flex-end', 'flex-end']
+                'center-right': ['end', 'center'],
+                'bottom-left': ['start', 'end'],
+                'bottom-center': ['center', 'end'],
+                'bottom-right': ['end', 'end']
             };
 
-            const [justify, alignItems] = alignMap[align] || ['center', 'center'];
-            container.style.justifyContent = justify;
-            container.style.alignItems = alignItems;
+            const [justify, alignContent] = alignMap[align] || ['center', 'center'];
+            el.style.justifyContent = justify;
+            el.style.alignContent = alignContent;
+            el.style.justifyItems = 'center';
+            el.style.alignItems = 'center';
+
+            requestAnimationFrame(() => {
+                if (el.offsetWidth > 0 && el.offsetHeight > 0) {
+                    if (this.uiInputs['inventoryContainerWidth']) this.uiInputs['inventoryContainerWidth'].value = el.offsetWidth;
+                    if (this.uiInputs['inventoryContainerHeight']) this.uiInputs['inventoryContainerHeight'].value = el.offsetHeight;
+                }
+            });
         }
 
-        this.contentWrapper.appendChild(container);
+        if (!this.tempSettings.inventorySlotPositions) this.tempSettings.inventorySlotPositions = [];
 
-        this.makeResizable(container, 'inventory');
+        for (let i = 0; i < this.tempSettings.inventorySlots; i++) {
+            const slot = document.createElement('div');
+            slot.className = `inventory-slot ${i === 0 ? 'active' : ''}`;
+            slot.style.width = size + 'px';
+            slot.style.height = size + 'px';
+            slot.style.display = 'flex';
+            slot.style.alignItems = 'center';
+            slot.style.justifyContent = 'center';
+            slot.style.backgroundColor = 'rgba(0,0,0,0.3)';
+            slot.style.border = '1px solid #444';
+            slot.style.borderRadius = '8px';
+            slot.style.boxSizing = 'border-box';
+            slot.style.userSelect = 'none';
 
-        this.layoutSystem.registerElement(container, 'inventory', this.tempSettings.inventoryPos, (newPos) => {
+            if (isFree) {
+                slot.style.position = 'absolute';
+                let pos = this.tempSettings.inventorySlotPositions[i];
+                if (!pos) {
+                    const cols = Math.max(1, Math.floor(((width || 300) - padding * 2) / (size + padding)));
+                    const row = Math.floor(i / cols);
+                    const col = i % cols;
+                    pos = {
+                        left: (padding + col * (size + padding)) + 'px',
+                        top: (padding + row * (size + padding)) + 'px'
+                    };
+                    this.tempSettings.inventorySlotPositions[i] = pos;
+                }
+                slot.style.left = pos.left;
+                slot.style.top = pos.top;
+                this.makeSlotDraggable(slot, el, i);
+            } else {
+                slot.style.position = 'relative';
+            }
+
+            slot.innerHTML = `
+                <span class="slot-number" style="font-size: ${Math.max(10, size / 5)}px; position:absolute; top:2px; left:5px; color:rgba(255,255,255,0.7);">${i + 1}</span>
+                ${i < 2 ? `<div style="width:70%; height:70%; background:rgba(255,255,255,0.2); border-radius:4px;"></div>` : ''}
+            `;
+            el.appendChild(slot);
+        }
+
+        this.contentWrapper.appendChild(el);
+
+        this.makeResizable(el, 'inventoryContainer');
+
+        this.layoutSystem.registerElement(el, 'inventory', this.tempSettings.inventoryPos, (newPos) => {
             this.tempSettings.inventoryPos = newPos;
         });
     }
 
-    // --- Resize / Drag Helpers ---
-
-    makeResizable(el, type) {
-        // Add bottom-right corner resize handle
-        const handle = document.createElement('div');
-        handle.style.cssText = `
-            position: absolute; width: 10px; height: 10px; background: #4CAF50;
-            right: -5px; bottom: -5px; cursor: se-resize; z-index: 5;
-        `;
-        el.style.position = 'relative';
-        el.appendChild(handle);
-
-        let startX, startY, startW, startH;
-
-        const onMouseDown = (e) => {
+    makeSlotDraggable(slot, container, index) {
+        slot.onmousedown = (e) => {
             e.preventDefault();
             e.stopPropagation();
-            startX = e.clientX;
-            startY = e.clientY;
-            startW = el.offsetWidth;
-            startH = el.offsetHeight;
+
+            const startX = e.clientX;
+            const startY = e.clientY;
+            const rect = slot.getBoundingClientRect();
+            const parentRect = container.getBoundingClientRect();
+            const offsetX = startX - rect.left;
+            const offsetY = startY - rect.top;
+
+            const onMouseMove = (ev) => {
+                const x = ev.clientX - parentRect.left - offsetX;
+                const y = ev.clientY - parentRect.top - offsetY;
+                const maxW = parentRect.width - slot.offsetWidth;
+                const maxH = parentRect.height - slot.offsetHeight;
+                const clampedX = Math.max(0, Math.min(x, maxW));
+                const clampedY = Math.max(0, Math.min(y, maxH));
+
+                slot.style.left = clampedX + 'px';
+                slot.style.top = clampedY + 'px';
+                this.tempSettings.inventorySlotPositions[index] = {
+                    left: clampedX + 'px',
+                    top: clampedY + 'px'
+                };
+            };
+
+            const onMouseUp = () => {
+                document.removeEventListener('mousemove', onMouseMove);
+                document.removeEventListener('mouseup', onMouseUp);
+            };
+
             document.addEventListener('mousemove', onMouseMove);
             document.addEventListener('mouseup', onMouseUp);
         };
+    }
 
-        const onMouseMove = (e) => {
-            const dx = e.clientX - startX;
-            const dy = e.clientY - startY;
+    // --- Resize / Drag Helpers ---
 
-            if (type === 'health' || type === 'jump') {
-                const wKey = type + 'Width';
-                const hKey = type + 'Height';
+    makeResizable(el, prefix) {
+        const handle = document.createElement('div');
+        handle.style.cssText = `
+            position: absolute; bottom: 0; right: 0;
+            width: 16px; height: 16px;
+            background: white; border: 1px solid #333;
+            cursor: nwse-resize; z-index: 10;
+            pointer-events: auto; touch-action: none;
+            clip-path: polygon(100% 0, 100% 100%, 0 100%);
+        `;
+        el.appendChild(handle);
 
-                let newW = startW + dx;
-                let newH = startH + dy;
+        handle.onmousedown = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
 
-                if (newW < 5) newW = 5;
-                if (newH < 5) newH = 5;
+            const startX = e.clientX;
+            const startY = e.clientY;
 
-                this.tempSettings[wKey] = newW;
-                this.tempSettings[hKey] = newH;
-
-                if (this.uiInputs[wKey]) this.uiInputs[wKey].value = newW;
-                if (this.uiInputs[hKey]) this.uiInputs[hKey].value = newH;
-
-                this.updatePreview();
-
-            } else if (type === 'inventory') {
-                let newW = startW + dx;
-                let newH = startH + dy;
-                if (newW < 50) newW = 50;
-                if (newH < 50) newH = 50;
-
-                this.tempSettings.inventoryContainerWidth = newW;
-                this.tempSettings.inventoryContainerHeight = newH;
-
-                if (this.uiInputs['inventoryContainerWidth']) this.uiInputs['inventoryContainerWidth'].value = newW;
-                if (this.uiInputs['inventoryContainerHeight']) this.uiInputs['inventoryContainerHeight'].value = newH;
-
-                this.updatePreview();
+            let startW, startH;
+            if (prefix === 'inventoryContainer') {
+                startW = this.tempSettings.inventoryContainerWidth || el.offsetWidth;
+                startH = this.tempSettings.inventoryContainerHeight || el.offsetHeight;
+            } else {
+                startW = this.tempSettings[prefix + 'Width'] || el.offsetWidth || 300;
+                startH = this.tempSettings[prefix + 'Height'] || el.offsetHeight || 20;
             }
-        };
 
-        const onMouseUp = () => {
-            document.removeEventListener('mousemove', onMouseMove);
-            document.removeEventListener('mouseup', onMouseUp);
-        };
+            const onMouseMove = (ev) => {
+                const dx = ev.clientX - startX;
+                const dy = ev.clientY - startY;
 
-        handle.addEventListener('mousedown', onMouseDown);
+                if (prefix === 'inventoryContainer') {
+                    let newW = startW + dx;
+                    let newH = startH + dy;
+                    if (newW < 50) newW = 50;
+                    if (newH < 50) newH = 50;
+
+                    this.tempSettings.inventoryContainerWidth = newW;
+                    this.tempSettings.inventoryContainerHeight = newH;
+
+                    el.style.width = newW + 'px';
+                    el.style.height = newH + 'px';
+
+                    if (this.uiInputs['inventoryContainerWidth']) this.uiInputs['inventoryContainerWidth'].value = Math.round(newW);
+                    if (this.uiInputs['inventoryContainerHeight']) this.uiInputs['inventoryContainerHeight'].value = Math.round(newH);
+                } else {
+                    let newW = startW + dx;
+                    let newH = startH + dy;
+                    if (newW < 5) newW = 5;
+                    if (newH < 5) newH = 5;
+
+                    this.tempSettings[prefix + 'Width'] = newW;
+                    this.tempSettings[prefix + 'Height'] = newH;
+
+                    if (this.uiInputs[prefix + 'Width']) this.uiInputs[prefix + 'Width'].value = Math.round(newW);
+                    if (this.uiInputs[prefix + 'Height']) this.uiInputs[prefix + 'Height'].value = Math.round(newH);
+
+                    const inner = el.firstElementChild;
+                    if (inner) {
+                        inner.style.width = newW + 'px';
+                        inner.style.height = newH + 'px';
+                        inner.style.borderRadius = (Math.min(newW, newH) / 2) + 'px';
+                    }
+                }
+            };
+
+            const onMouseUp = () => {
+                document.removeEventListener('mousemove', onMouseMove);
+                document.removeEventListener('mouseup', onMouseUp);
+                this.updatePreview();
+            };
+
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+        };
     }
 
     // --- Save / Close ---

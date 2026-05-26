@@ -159,15 +159,19 @@ export class GameHUD {
             const width = s.inventoryContainerWidth || 300;
             const height = s.inventoryContainerHeight || 100;
             const isFree = s.inventoryFreeLayout;
+            const targetCount = s.inventorySlots || 9;
+            const slotSize = s.inventorySlotSize || 50;
+            const autoWidth = targetCount * slotSize + Math.max(0, targetCount - 1) * padding + padding * 2;
+            const autoHeight = slotSize + padding * 2;
 
             // Allow container configuration
             // If user has set specific width/height in config, use it. Otherwise use max-content or similar?
             // If free layout is ON, we definitely need dimensions.
             if (s.inventoryContainerWidth) el.style.width = `${width}px`;
-            else el.style.width = 'max-content';
+            else el.style.width = isFree ? `${width}px` : `${autoWidth}px`;
 
             if (s.inventoryContainerHeight) el.style.height = `${height}px`;
-            else el.style.height = 'max-content';
+            else el.style.height = isFree ? `${height}px` : `${autoHeight}px`;
 
             el.style.padding = `${padding}px`;
             el.style.boxSizing = 'border-box'; // Ensure padding doesn't expand width if set
@@ -178,38 +182,38 @@ export class GameHUD {
                 el.style.position = 'fixed';
             } else {
                 el.style.position = 'fixed';
-                el.style.display = 'flex';
-                el.style.gap = '10px';
-                el.style.flexWrap = 'wrap';
+                el.style.display = 'grid';
+                el.style.gap = `${padding}px`;
+                el.style.gridTemplateColumns = `repeat(auto-fit, minmax(${slotSize}px, ${slotSize}px))`;
+                el.style.gridAutoRows = `${slotSize}px`;
 
                 // Apply Alignment
                 const align = s.inventorySlotAlignment || 'center';
                 let justify = 'center';
-                let alignItems = 'center';
                 let alignContent = 'center';
+                let justifyItems = 'center';
+                let alignItems = 'center';
 
                 switch (align) {
-                    case 'top-left': justify = 'flex-start'; alignContent = 'flex-start'; alignItems = 'flex-start'; break;
-                    case 'top-center': justify = 'center'; alignContent = 'flex-start'; alignItems = 'flex-start'; break;
-                    case 'top-right': justify = 'flex-end'; alignContent = 'flex-start'; alignItems = 'flex-start'; break;
-                    case 'center-left': justify = 'flex-start'; alignContent = 'center'; alignItems = 'center'; break;
+                    case 'top-left': justify = 'start'; alignContent = 'start'; break;
+                    case 'top-center': justify = 'center'; alignContent = 'start'; break;
+                    case 'top-right': justify = 'end'; alignContent = 'start'; break;
+                    case 'center-left': justify = 'start'; alignContent = 'center'; break;
                     case 'center': justify = 'center'; alignContent = 'center'; alignItems = 'center'; break;
-                    case 'center-right': justify = 'flex-end'; alignContent = 'center'; alignItems = 'center'; break;
-                    case 'bottom-left': justify = 'flex-start'; alignContent = 'flex-end'; alignItems = 'flex-end'; break;
-                    case 'bottom-center': justify = 'center'; alignContent = 'flex-end'; alignItems = 'flex-end'; break;
-                    case 'bottom-right': justify = 'flex-end'; alignContent = 'flex-end'; alignItems = 'flex-end'; break;
+                    case 'center-right': justify = 'end'; alignContent = 'center'; break;
+                    case 'bottom-left': justify = 'start'; alignContent = 'end'; break;
+                    case 'bottom-center': justify = 'center'; alignContent = 'end'; break;
+                    case 'bottom-right': justify = 'end'; alignContent = 'end'; break;
                 }
 
                 el.style.justifyContent = justify;
                 el.style.alignContent = alignContent;
+                el.style.justifyItems = justifyItems;
                 el.style.alignItems = alignItems;
             }
 
             // Handle slot visibility and size based on settings
             const slots = el.querySelectorAll<HTMLElement>('.inventory-slot');
-            const targetCount = s.inventorySlots || 9;
-            const slotSize = s.inventorySlotSize || 50;
-
             slots.forEach((slot, index) => {
                 // Apply Size
                 slot.style.width = `${slotSize}px`;
@@ -233,7 +237,7 @@ export class GameHUD {
                         slot.style.position = 'absolute';
                         const pos = (s.inventorySlotPositions && s.inventorySlotPositions[index])
                             ? s.inventorySlotPositions[index]
-                            : { left: `${padding + (index * (slotSize + 10))}px`, top: `${padding}px` }; // Fallback simple internal layout
+                            : { left: `${padding + (index * (slotSize + padding))}px`, top: `${padding}px` }; // Fallback simple internal layout
 
                         slot.style.left = pos.left;
                         slot.style.top = pos.top;

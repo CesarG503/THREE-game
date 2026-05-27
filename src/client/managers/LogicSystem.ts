@@ -409,85 +409,160 @@ export class LogicSystem {
 		const row = document.createElement("div");
 		row.style.cssText = "display: flex; flex-direction: column; gap: 4px; margin-top: 8px; margin-bottom: 5px;";
 
-		const label = document.createElement("label");
-		label.textContent = "Grupo de Conexión";
-		label.style.color = "#aaa";
-		label.style.fontSize = "14px";
-		row.appendChild(label);
-
 		const existingGroups = new Set<string>();
-		existingGroups.add("Grupo 1");
-
 		if (this.game) {
 			const activeGroups = getActiveFarmingGroups(this.game);
-			activeGroups.forEach(g => existingGroups.add(g.groupId));
+			activeGroups.forEach(g => {
+				if (g.groupId && g.groupId.trim()) {
+					existingGroups.add(g.groupId);
+				}
+			});
 		}
-		if (props.groupId) existingGroups.add(props.groupId);
+		if (props.groupId && props.groupId.trim()) {
+			existingGroups.add(props.groupId);
+		}
 
-		const select = document.createElement("select");
-		select.style.cssText = "background: #111; border: 1px solid #444; color: white; padding: 4px; border-radius: 4px; width: 100%; cursor: pointer;";
+		const groupsArray = Array.from(existingGroups);
+		const selectContainer = document.createElement("div");
+		selectContainer.style.cssText = "display: flex; flex-direction: column; gap: 5px; width: 100%;";
 
-		existingGroups.forEach(g => {
-			const opt = document.createElement("option");
-			opt.value = g;
-			opt.textContent = g;
-			if (g === props.groupId) opt.selected = true;
-			select.appendChild(opt);
-		});
+		if (groupsArray.length === 0) {
+			const label = document.createElement("label");
+			label.textContent = "Grupo de Conexión";
+			label.style.color = "#aaa";
+			label.style.fontSize = "14px";
+			row.appendChild(label);
 
-		const customOpt = document.createElement("option");
-		customOpt.value = "__NEW__";
-		customOpt.textContent = "+ Crear Nuevo Grupo...";
-		select.appendChild(customOpt);
-
-		row.appendChild(select);
-
-		const customInputRow = document.createElement("div");
-		customInputRow.style.cssText = "display: none; gap: 5px; margin-top: 5px;";
-
-		const customInput = document.createElement("input");
-		customInput.type = "text";
-		customInput.placeholder = "Nombre del nuevo grupo";
-		customInput.style.cssText = "background: #111; border: 1px solid #444; color: white; padding: 4px; border-radius: 4px; flex: 1;";
-
-		const customBtn = document.createElement("button");
-		customBtn.textContent = "Crear";
-		customBtn.style.cssText = "background: #00aa00; border: none; color: white; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-weight: bold;";
-
-		customInputRow.appendChild(customInput);
-		customInputRow.appendChild(customBtn);
-		row.appendChild(customInputRow);
-
-		select.onchange = (e: any) => {
-			const val = e.target.value;
-			if (val === "__NEW__") {
-				customInputRow.style.display = "flex";
-			} else {
-				customInputRow.style.display = "none";
-				props.groupId = val;
+			const input = document.createElement("input");
+			input.type = "text";
+			input.value = props.groupId || "Grupo 1";
+			input.placeholder = "Escribe el nombre del grupo";
+			input.style.cssText = "background: #111; border: 1px solid #444; color: white; padding: 4px; border-radius: 4px; width: 100%; box-sizing: border-box;";
+			input.addEventListener("input", (e: any) => {
+				props.groupId = e.target.value;
 				if (this.game && this.game.hud) {
 					this.game.hud.updateFarmingCounters(this.game);
 				}
-			}
-		};
+			});
+			selectContainer.appendChild(input);
 
-		customBtn.onclick = () => {
-			const newName = customInput.value.trim();
-			if (newName) {
+			const info = document.createElement("div");
+			info.textContent = "No hay otros grupos creados. Escribe un nombre para este grupo.";
+			info.style.cssText = "font-size: 10px; color: #888; margin-top: 2px; line-height: 1.2;";
+			selectContainer.appendChild(info);
+		} else {
+			const labelRow = document.createElement("div");
+			labelRow.style.cssText = "display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 4px;";
+
+			const titleSpan = document.createElement("span");
+			titleSpan.textContent = "Grupo de Conexión";
+			titleSpan.style.color = "#aaa";
+			titleSpan.style.fontSize = "14px";
+			labelRow.appendChild(titleSpan);
+
+			const modeTabs = document.createElement("div");
+			modeTabs.style.cssText = "display: flex; gap: 2px; background: #222; border-radius: 4px; padding: 2px;";
+
+			const tabSelect = document.createElement("button");
+			tabSelect.textContent = "Elegir";
+			tabSelect.style.cssText = "background: #333; border: none; color: white; padding: 2px 8px; font-size: 10px; border-radius: 3px; cursor: pointer; font-weight: bold;";
+
+			const tabCreate = document.createElement("button");
+			tabCreate.textContent = "Crear";
+			tabCreate.style.cssText = "background: transparent; border: none; color: #aaa; padding: 2px 8px; font-size: 10px; border-radius: 3px; cursor: pointer;";
+
+			modeTabs.appendChild(tabSelect);
+			modeTabs.appendChild(tabCreate);
+			labelRow.appendChild(modeTabs);
+			row.appendChild(labelRow);
+
+			const select = document.createElement("select");
+			select.style.cssText = "background: #111; border: 1px solid #444; color: white; padding: 4px; border-radius: 4px; width: 100%; cursor: pointer; box-sizing: border-box;";
+
+			groupsArray.forEach(g => {
 				const opt = document.createElement("option");
-				opt.value = newName;
-				opt.textContent = newName;
-				select.insertBefore(opt, customOpt);
-				select.value = newName;
-				props.groupId = newName;
-				customInputRow.style.display = "none";
-				customInput.value = "";
+				opt.value = g;
+				opt.textContent = g;
+				if (g === props.groupId) opt.selected = true;
+				select.appendChild(opt);
+			});
+
+			const inputContainer = document.createElement("div");
+			inputContainer.style.cssText = "display: none; flex-direction: column; gap: 4px; width: 100%;";
+
+			const input = document.createElement("input");
+			input.type = "text";
+			input.placeholder = "Nombre del nuevo grupo";
+			input.style.cssText = "background: #111; border: 1px solid #444; color: white; padding: 4px; border-radius: 4px; width: 100%; box-sizing: border-box;";
+
+			inputContainer.appendChild(input);
+
+			const isExisting = groupsArray.includes(props.groupId);
+			if (isExisting) {
+				tabSelect.style.background = "#333";
+				tabSelect.style.color = "white";
+				tabCreate.style.background = "transparent";
+				tabCreate.style.color = "#aaa";
+				select.style.display = "block";
+				inputContainer.style.display = "none";
+			} else {
+				tabSelect.style.background = "transparent";
+				tabSelect.style.color = "#aaa";
+				tabCreate.style.background = "#333";
+				tabCreate.style.color = "white";
+				select.style.display = "none";
+				inputContainer.style.display = "flex";
+				input.value = props.groupId;
+			}
+
+			// Events
+			tabSelect.onclick = (e) => {
+				e.preventDefault();
+				tabSelect.style.background = "#333";
+				tabSelect.style.color = "white";
+				tabCreate.style.background = "transparent";
+				tabCreate.style.color = "#aaa";
+				select.style.display = "block";
+				inputContainer.style.display = "none";
+				props.groupId = select.value;
 				if (this.game && this.game.hud) {
 					this.game.hud.updateFarmingCounters(this.game);
 				}
-			}
-		};
+			};
 
+			tabCreate.onclick = (e) => {
+				e.preventDefault();
+				tabSelect.style.background = "transparent";
+				tabSelect.style.color = "#aaa";
+				tabCreate.style.background = "#333";
+				tabCreate.style.color = "white";
+				select.style.display = "none";
+				inputContainer.style.display = "flex";
+				props.groupId = input.value.trim() || "Grupo 1";
+				if (this.game && this.game.hud) {
+					this.game.hud.updateFarmingCounters(this.game);
+				}
+			};
+
+			select.onchange = (e: any) => {
+				props.groupId = e.target.value;
+				if (this.game && this.game.hud) {
+					this.game.hud.updateFarmingCounters(this.game);
+				}
+			};
+
+			input.oninput = (e: any) => {
+				props.groupId = e.target.value.trim() || "Grupo 1";
+				if (this.game && this.game.hud) {
+					this.game.hud.updateFarmingCounters(this.game);
+				}
+			};
+
+			selectContainer.appendChild(select);
+			selectContainer.appendChild(inputContainer);
+		}
+
+		row.appendChild(selectContainer);
 		container.appendChild(row);
 	}
 

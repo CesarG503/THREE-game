@@ -9,6 +9,7 @@ import { GunItem } from "../items/GunItem";
 import { WEAPONS_CONFIG } from "../items/WeaponSettings";
 import { MapShapeEditor } from "./MapShapeEditor";
 import { AdvancedWeaponConfigPanel } from "./AdvancedWeaponConfigPanel";
+import { getActiveFarmingGroups } from "./GameHUD";
 
 export class ConstructionMenu {
     constructor(inventoryManager, gameInstance) {
@@ -2866,8 +2867,8 @@ export class ConstructionMenu {
             this.createLogicDraftInput(this.editorLogicControlsContainer, "Intervalo Spawn (s):", "spawnInterval", "number", 1.0);
             this.createLogicDraftInput(this.editorLogicControlsContainer, "Items por Spawn:", "itemsPerSpawn", "number", 1);
             this.createLogicDraftInput(this.editorLogicControlsContainer, "Valor de Fuego:", "itemValue", "number", 1);
-            this.createLogicDraftInput(this.editorLogicControlsContainer, "Grupo:", "groupId", "text", "Grupo 1");
-            this.createLogicDraftInput(this.editorLogicControlsContainer, "Textura PNG:", "itemTexture", "text", "/assets/textures/fuego.png");
+            this.createLogicDraftGroupSelector(this.editorLogicControlsContainer);
+            this.createLogicDraftTextureSelector(this.editorLogicControlsContainer);
         }
     }
 
@@ -2924,6 +2925,235 @@ export class ConstructionMenu {
 
         row.appendChild(label);
         row.appendChild(input);
+        container.appendChild(row);
+    }
+
+    createLogicDraftGroupSelector(container) {
+        if (!this.currentDraftItem.logicProperties) {
+            this.currentDraftItem.logicProperties = {};
+        }
+        if (this.currentDraftItem.logicProperties.groupId === undefined) {
+            this.currentDraftItem.logicProperties.groupId = "Grupo 1";
+        }
+        const props = this.currentDraftItem.logicProperties;
+
+        const row = document.createElement("div");
+        row.style.cssText = "display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px; width: 100%;";
+
+        const labelRow = document.createElement("div");
+        labelRow.style.cssText = "display: flex; justify-content: space-between; align-items: center; width: 100%;";
+
+        const label = document.createElement("span");
+        label.textContent = "Grupo:";
+        label.style.color = "#aaa";
+        label.style.fontSize = "13px";
+        labelRow.appendChild(label);
+
+        row.appendChild(labelRow);
+
+        // Get existing groups
+        const activeGroups = getActiveFarmingGroups(this.game);
+        const uniqueGroups = new Set();
+        activeGroups.forEach(g => {
+            if (g.groupId && g.groupId.trim()) {
+                uniqueGroups.add(g.groupId);
+            }
+        });
+
+        // Add the current draft's groupId to uniqueGroups if it's not empty
+        if (props.groupId && props.groupId.trim()) {
+            uniqueGroups.add(props.groupId);
+        }
+
+        const groupsArray = Array.from(uniqueGroups);
+
+        const selectContainer = document.createElement("div");
+        selectContainer.style.cssText = "display: flex; flex-direction: column; gap: 5px; width: 100%;";
+
+        // Mode toggling: if no groups exist, we only show standard text input mode
+        if (groupsArray.length === 0) {
+            const input = document.createElement("input");
+            input.type = "text";
+            input.value = props.groupId;
+            input.placeholder = "Escribe el nombre del grupo";
+            input.style.cssText = "background: #333; border: 1px solid #555; color: white; padding: 5px; border-radius: 4px; width: 100%; box-sizing: border-box;";
+            input.addEventListener("input", (e) => {
+                props.groupId = e.target.value;
+            });
+            selectContainer.appendChild(input);
+
+            const info = document.createElement("div");
+            info.textContent = "No hay grupos creados aún. Escribe un nombre para crearlo al colocar la zona.";
+            info.style.cssText = "font-size: 10px; color: #888; margin-top: 2px; line-height: 1.2;";
+            selectContainer.appendChild(info);
+        } else {
+            // Options: "Elegir" (Dropdown) or "Crear" (New group input)
+            const modeTabs = document.createElement("div");
+            modeTabs.style.cssText = "display: flex; gap: 2px; background: #222; border-radius: 4px; padding: 2px;";
+
+            const tabSelect = document.createElement("button");
+            tabSelect.textContent = "Elegir";
+            tabSelect.style.cssText = "background: #333; border: none; color: white; padding: 2px 8px; font-size: 10px; border-radius: 3px; cursor: pointer; font-weight: bold;";
+
+            const tabCreate = document.createElement("button");
+            tabCreate.textContent = "Crear";
+            tabCreate.style.cssText = "background: transparent; border: none; color: #aaa; padding: 2px 8px; font-size: 10px; border-radius: 3px; cursor: pointer;";
+
+            modeTabs.appendChild(tabSelect);
+            modeTabs.appendChild(tabCreate);
+            labelRow.appendChild(modeTabs);
+
+            const select = document.createElement("select");
+            select.style.cssText = "background: #333; border: 1px solid #555; color: white; padding: 5px; border-radius: 4px; width: 100%; box-sizing: border-box; cursor: pointer;";
+
+            groupsArray.forEach(g => {
+                const opt = document.createElement("option");
+                opt.value = g;
+                opt.textContent = g;
+                if (g === props.groupId) opt.selected = true;
+                select.appendChild(opt);
+            });
+
+            const inputContainer = document.createElement("div");
+            inputContainer.style.cssText = "display: none; flex-direction: column; gap: 4px; width: 100%;";
+
+            const input = document.createElement("input");
+            input.type = "text";
+            input.placeholder = "Nombre del nuevo grupo";
+            input.style.cssText = "background: #333; border: 1px solid #555; color: white; padding: 5px; border-radius: 4px; width: 100%; box-sizing: border-box;";
+
+            inputContainer.appendChild(input);
+
+            // Set current state based on if props.groupId is one of the existing groups or a new one
+            const isExisting = groupsArray.includes(props.groupId);
+            if (isExisting) {
+                tabSelect.style.background = "#333";
+                tabSelect.style.color = "white";
+                tabCreate.style.background = "transparent";
+                tabCreate.style.color = "#aaa";
+                select.style.display = "block";
+                inputContainer.style.display = "none";
+            } else {
+                tabSelect.style.background = "transparent";
+                tabSelect.style.color = "#aaa";
+                tabCreate.style.background = "#333";
+                tabCreate.style.color = "white";
+                select.style.display = "none";
+                inputContainer.style.display = "flex";
+                input.value = props.groupId;
+            }
+
+            // Events
+            tabSelect.onclick = (e) => {
+                e.preventDefault();
+                tabSelect.style.background = "#333";
+                tabSelect.style.color = "white";
+                tabCreate.style.background = "transparent";
+                tabCreate.style.color = "#aaa";
+                select.style.display = "block";
+                inputContainer.style.display = "none";
+                props.groupId = select.value;
+            };
+
+            tabCreate.onclick = (e) => {
+                e.preventDefault();
+                tabSelect.style.background = "transparent";
+                tabSelect.style.color = "#aaa";
+                tabCreate.style.background = "#333";
+                tabCreate.style.color = "white";
+                select.style.display = "none";
+                inputContainer.style.display = "flex";
+                props.groupId = input.value.trim() || "Grupo 1";
+            };
+
+            select.onchange = (e) => {
+                props.groupId = e.target.value;
+            };
+
+            input.oninput = (e) => {
+                props.groupId = e.target.value.trim() || "Grupo 1";
+            };
+
+            selectContainer.appendChild(select);
+            selectContainer.appendChild(inputContainer);
+        }
+
+        row.appendChild(selectContainer);
+        container.appendChild(row);
+    }
+
+    createLogicDraftTextureSelector(container) {
+        if (!this.currentDraftItem.logicProperties) {
+            this.currentDraftItem.logicProperties = {};
+        }
+        if (this.currentDraftItem.logicProperties.itemTexture === undefined) {
+            this.currentDraftItem.logicProperties.itemTexture = "/assets/textures/fuego.png";
+        }
+        const props = this.currentDraftItem.logicProperties;
+
+        const row = document.createElement("div");
+        row.style.cssText = "display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px; width: 100%;";
+
+        const label = document.createElement("span");
+        label.textContent = "Textura PNG:";
+        label.style.color = "#aaa";
+        label.style.fontSize = "13px";
+        row.appendChild(label);
+
+        const select = document.createElement("select");
+        select.style.cssText = "background: #333; border: 1px solid #555; color: white; padding: 5px; border-radius: 4px; width: 100%; box-sizing: border-box; cursor: pointer;";
+
+        const textures = [
+            { name: "Fuego", val: "/assets/textures/fuego.png" },
+            { name: "Pelota", val: "/assets/textures/pelota.png" },
+            { name: "URL / Ruta Personalizada...", val: "__CUSTOM__" }
+        ];
+
+        let isCustom = true;
+        textures.forEach(t => {
+            const opt = document.createElement("option");
+            opt.value = t.val;
+            opt.textContent = t.name;
+            if (props.itemTexture === t.val) {
+                opt.selected = true;
+                isCustom = false;
+            }
+            select.appendChild(opt);
+        });
+
+        if (isCustom && props.itemTexture) {
+            select.value = "__CUSTOM__";
+        }
+
+        const inputContainer = document.createElement("div");
+        inputContainer.style.cssText = isCustom ? "display: flex; margin-top: 4px; width: 100%;" : "display: none; margin-top: 4px; width: 100%;";
+
+        const input = document.createElement("input");
+        input.type = "text";
+        input.placeholder = "Ruta o URL (PNG)";
+        input.value = isCustom ? props.itemTexture : "";
+        input.style.cssText = "background: #333; border: 1px solid #555; color: white; padding: 5px; border-radius: 4px; width: 100%; box-sizing: border-box;";
+
+        inputContainer.appendChild(input);
+
+        // Events
+        select.onchange = (e) => {
+            const val = e.target.value;
+            if (val === "__CUSTOM__") {
+                inputContainer.style.display = "flex";
+                props.itemTexture = input.value.trim() || "/assets/textures/fuego.png";
+            } else {
+                inputContainer.style.display = "none";
+                props.itemTexture = val;
+            }
+        };
+
+        input.oninput = (e) => {
+            props.itemTexture = e.target.value.trim() || "/assets/textures/fuego.png";
+        };
+
+        row.appendChild(select);
+        row.appendChild(inputContainer);
         container.appendChild(row);
     }
 

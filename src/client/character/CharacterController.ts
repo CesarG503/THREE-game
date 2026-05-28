@@ -452,9 +452,10 @@ export class CharacterController {
         const jetpackMesh = this.polygonModelSkin.backItemMesh;
         const leftNozzleWorld = new THREE.Vector3();
         const rightNozzleWorld = new THREE.Vector3();
-        const leftOffset = new THREE.Vector3(-0.15, -0.4, 0.15);
-        const rightOffset = new THREE.Vector3(0.15, -0.4, 0.15);
+        const leftOffset = new THREE.Vector3(-0.15, 0.1, 0.5);
+        const rightOffset = new THREE.Vector3(0.15, 0.1, 0.5);
 
+        jetpackMesh.updateMatrixWorld(true);
         jetpackMesh.localToWorld(leftNozzleWorld.copy(leftOffset));
         jetpackMesh.localToWorld(rightNozzleWorld.copy(rightOffset));
 
@@ -514,9 +515,10 @@ export class CharacterController {
           const jetpackMesh = this.polygonModelSkin.backItemMesh;
           const leftNozzleWorld = new THREE.Vector3();
           const rightNozzleWorld = new THREE.Vector3();
-          const leftOffset = new THREE.Vector3(-0.15, -0.4, 0.15);
-          const rightOffset = new THREE.Vector3(0.15, -0.4, 0.15);
+          const leftOffset = new THREE.Vector3(-0.15, 0.1, 0.5);
+          const rightOffset = new THREE.Vector3(0.15, 0.1, 0.5);
 
+          jetpackMesh.updateMatrixWorld(true);
           jetpackMesh.localToWorld(leftNozzleWorld.copy(leftOffset));
           jetpackMesh.localToWorld(rightNozzleWorld.copy(rightOffset));
 

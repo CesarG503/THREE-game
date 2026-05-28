@@ -298,7 +298,7 @@ export class RemotePlayer {
         this.glbModel.update(dt, hasInput);
         this.polygonModel.update(dt, hasInput);
         const isUsingJetpack = this.state.equippedWeapon && (this.state.equippedWeapon === "jetpack" || this.state.equippedWeapon.startsWith("jetpack"));
-        const isSuperman = !!(isUsingJetpack && this.state.isCrouching && !this.state.isGrounded);
+        const isSuperman = this.state.isSuperman !== undefined ? !!this.state.isSuperman : !!(isUsingJetpack && this.state.isCrouching && !this.state.isGrounded);
         const visualCrouch = !!(this.state.isCrouching && !isSuperman);
 
         this.polygonModelSkin.update(

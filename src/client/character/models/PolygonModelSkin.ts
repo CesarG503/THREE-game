@@ -35,12 +35,14 @@ export class PolygonModelSkin implements ICharacterModel {
   isFirstPerson: boolean;
   airTime: number;
   backItemMesh: THREE.Object3D | null;
+  isSuperman: boolean;
 
   constructor(scene: THREE.Scene, isLocal = true) {
     this.scene = scene;
     this.isLocal = isLocal;
     this.model = null;
     this.isVisible = false;
+    this.isSuperman = false;
 
     // Body Parts
     this.head = null;
@@ -384,6 +386,7 @@ export class PolygonModelSkin implements ICharacterModel {
   }
 
   update(dt: number, isMoving: boolean, isCrouching = false, isAttacking = false, isGrounded = true, verticalVelocity = 0, isSuperman = false) {
+    this.isSuperman = isSuperman;
     if (!this.model || !this.isVisible) return;
     if (
       !this.headGroup ||

@@ -2937,6 +2937,35 @@ export class ConstructionMenu {
         cooldownValueRow.appendChild(cooldownValueLabel);
         cooldownValueRow.appendChild(cooldownValueInput);
 
+        // Pointer follow checkbox
+        const jetpackPointerFollowRow = document.createElement("div");
+        jetpackPointerFollowRow.style.cssText = "display: flex; align-items: center; gap: 10px; font-size: 13px; text-align: left; margin-top: 5px; cursor: pointer; user-select: none;";
+
+        const pointerFollowCheck = document.createElement("input");
+        pointerFollowCheck.type = "checkbox";
+        pointerFollowCheck.checked = true; // Activado por defecto
+        pointerFollowCheck.style.cssText = "width: 16px; height: 16px; cursor: pointer; flex-shrink: 0;";
+        pointerFollowCheck.addEventListener("change", (e: any) => {
+            if (this.currentDraftItem) {
+                this.currentDraftItem.pointerFollowEnabled = e.target.checked;
+            }
+        });
+        this.pointerFollowCheck = pointerFollowCheck;
+
+        const jetpackPointerFollowLabel = document.createElement("span");
+        jetpackPointerFollowLabel.textContent = "Seguimiento del puntero al volar";
+        jetpackPointerFollowLabel.style.color = "#ccc";
+
+        jetpackPointerFollowRow.appendChild(pointerFollowCheck);
+        jetpackPointerFollowRow.appendChild(jetpackPointerFollowLabel);
+
+        jetpackPointerFollowRow.addEventListener("click", (e) => {
+            if (e.target !== pointerFollowCheck) {
+                pointerFollowCheck.checked = !pointerFollowCheck.checked;
+                pointerFollowCheck.dispatchEvent(new Event("change"));
+            }
+        });
+
         consumableControlsContainer.appendChild(airLimitMix.row);
         consumableControlsContainer.appendChild(consumableUseMix.row);
         consumableControlsContainer.appendChild(thrustMix.row);
@@ -2945,6 +2974,7 @@ export class ConstructionMenu {
         consumableControlsContainer.appendChild(heightValueRow);
         consumableControlsContainer.appendChild(jetpackCooldownRow);
         consumableControlsContainer.appendChild(cooldownValueRow);
+        consumableControlsContainer.appendChild(jetpackPointerFollowRow);
 
         this.panelEditor.appendChild(consumableControlsContainer);
         this.editorConsumableControlsContainer = consumableControlsContainer;
@@ -3048,6 +3078,7 @@ export class ConstructionMenu {
             const maxHt = baseItem.maxFlightHeight !== undefined ? baseItem.maxFlightHeight : 20.0;
             const coolEnabled = baseItem.cooldownEnabled !== undefined ? baseItem.cooldownEnabled : false;
             const coolTime = baseItem.cooldownTime !== undefined ? baseItem.cooldownTime : 3.0;
+            const pointerFollow = baseItem.pointerFollowEnabled !== undefined ? baseItem.pointerFollowEnabled : true;
 
             this.airLimitSlider.value = String(airLim);
             this.airLimitNumBox.value = String(airLim);
@@ -3067,6 +3098,10 @@ export class ConstructionMenu {
             this.cooldownValueInput.value = String(coolTime);
             this.cooldownValueInput.parentElement.style.display = coolEnabled ? "flex" : "none";
 
+            if (this.pointerFollowCheck) {
+                this.pointerFollowCheck.checked = pointerFollow;
+            }
+
             if (this.currentDraftItem) {
                 this.currentDraftItem.airLimit = airLim;
                 this.currentDraftItem.consumableUse = consUse;
@@ -3077,6 +3112,7 @@ export class ConstructionMenu {
                 this.currentDraftItem.maxFlightHeight = maxHt;
                 this.currentDraftItem.cooldownEnabled = coolEnabled;
                 this.currentDraftItem.cooldownTime = coolTime;
+                this.currentDraftItem.pointerFollowEnabled = pointerFollow;
             }
         } else {
             if (this.advancedConfigBtn) this.advancedConfigBtn.style.display = "none";

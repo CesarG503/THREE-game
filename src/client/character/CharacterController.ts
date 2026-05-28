@@ -353,15 +353,16 @@ export class CharacterController {
 
     const cooldownReady = !hasJetpack || !this.equippedItem.cooldownEnabled || this.consecutiveAirTime > 0 || this.jetpackCooldownTimer >= (this.equippedItem.cooldownTime !== undefined ? this.equippedItem.cooldownTime : 3.0);
 
-    const isUsingJetpackCameraDir = hasJetpack && input.keys.jump && input.keys.crouch && hasFuel && withinAirLimit && cooldownReady;
-    const isUsingJetpackNormal = hasJetpack && input.keys.jump && !isGrounded && hasFuel && withinAirLimit && !input.keys.crouch && cooldownReady;
+    const pointerFollow = hasJetpack && (this.equippedItem.pointerFollowEnabled !== false);
+    const isUsingJetpackCameraDir = hasJetpack && input.keys.jump && input.keys.crouch && hasFuel && withinAirLimit && cooldownReady && pointerFollow;
+    const isUsingJetpackNormal = hasJetpack && input.keys.jump && !isGrounded && hasFuel && withinAirLimit && cooldownReady && (!input.keys.crouch || !pointerFollow);
     let isUsingJetpack = isUsingJetpackCameraDir || isUsingJetpackNormal;
 
     if (isUsingJetpack) {
       this.jetpackCooldownTimer = 0;
     }
 
-    const isSuperman = isUsingJetpack && input.keys.crouch;
+    const isSuperman = isUsingJetpackCameraDir;
     const visualCrouch = input.keys.crouch && !isSuperman;
 
     this.glbModel.update(dt, hasInput);
@@ -497,6 +498,9 @@ export class CharacterController {
         if (limitActive) {
           this.verticalVelocity = Math.min(this.verticalVelocity, 0);
         } else {
+          if (this.verticalVelocity < 0) {
+            this.verticalVelocity = 0;
+          }
           this.verticalVelocity += (this.equippedItem.thrust - 35) * dt;
 
           if (this.verticalVelocity > this.equippedItem.thrust) {

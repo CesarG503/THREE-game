@@ -49,6 +49,8 @@ export class CharacterController {
   particleSystem: ParticleSystem;
   playerCollision: string;
   listeners: Record<string, Function[]>;
+  equippedItem: any;
+  consecutiveAirTime: number;
 
   constructor(scene: THREE.Scene, world: RAPIER.World, camera: THREE.Camera, cameraController: any) {
     this.scene = scene;
@@ -114,6 +116,8 @@ export class CharacterController {
 
     // Event System
     this.listeners = {};
+    this.equippedItem = null;
+    this.consecutiveAirTime = 0;
   }
 
   on(event: string, callback: Function) {
@@ -327,9 +331,20 @@ export class CharacterController {
     }
 
     const isGrounded = this.characterController.computedGrounded();
+
+    const hasJetpack = this.equippedItem && (this.equippedItem.id === "jetpack" || this.equippedItem.id.startsWith("jetpack_"));
+    const hasFuel = hasJetpack && this.equippedItem.consumableUse > 0;
+    const withinAirLimit = hasJetpack && this.consecutiveAirTime < this.equippedItem.airLimit;
+    const isUsingJetpackCameraDir = hasJetpack && input.keys.jump && input.keys.crouch && hasFuel && withinAirLimit;
+    const isUsingJetpackNormal = hasJetpack && input.keys.jump && !isGrounded && hasFuel && withinAirLimit && !input.keys.crouch;
+    let isUsingJetpack = isUsingJetpackCameraDir || isUsingJetpackNormal;
+
+    const isSuperman = isUsingJetpack && input.keys.crouch;
+    const visualCrouch = input.keys.crouch && !isSuperman;
+
     this.glbModel.update(dt, hasInput);
     this.polygonModel.update(dt, hasInput);
-    this.polygonModelSkin.update(dt, hasInput, input.keys.crouch, input.keys.attack, isGrounded, this.verticalVelocity);
+    this.polygonModelSkin.update(dt, hasInput, visualCrouch, input.keys.attack, isGrounded, this.verticalVelocity, isSuperman);
 
     if (this.particleSystem) this.particleSystem.update(dt);
 
@@ -352,6 +367,7 @@ export class CharacterController {
 
     if (isGrounded) {
       this.airWeaponMultiplier = 1.0;
+      this.consecutiveAirTime = 0;
       if (this.jumpCount > 0) {
         this.jumpCount = 0;
         this.emit("jumpChanged", { current: this.maxMultiJumps, max: this.maxMultiJumps, type: "reset" });
@@ -360,32 +376,129 @@ export class CharacterController {
 
     const jumpJustPressed = input.keys.jump && !this.wasJumpDown;
 
+    isUsingJetpack = false;
+
     if (this.isClimbing) {
       if (input.keys.jump) {
         this.isClimbing = false;
         this.verticalVelocity = 5;
       }
+    } else if (isUsingJetpackCameraDir) {
+      isUsingJetpack = true;
+      this.consecutiveAirTime += dt;
+
+      const flyDir = new THREE.Vector3();
+      this.camera.getWorldDirection(flyDir);
+
+      const velocity = flyDir.clone().multiplyScalar(this.equippedItem.thrust);
+      desiredTranslation.copy(velocity.multiplyScalar(dt));
+      this.verticalVelocity = velocity.y;
+
+      const targetRotation = Math.atan2(flyDir.x, flyDir.z) + Math.PI;
+      let rotDiff = targetRotation - this.currentRotation;
+      while (rotDiff > Math.PI) rotDiff -= Math.PI * 2;
+      while (rotDiff < -Math.PI) rotDiff += Math.PI * 2;
+      this.currentRotation += rotDiff * 0.3;
+
+      this.equippedItem.consumeFuel(dt);
+
+      if (this.particleSystem && this.polygonModelSkin && this.polygonModelSkin.backItemMesh) {
+        const jetpackMesh = this.polygonModelSkin.backItemMesh;
+        const leftNozzleWorld = new THREE.Vector3();
+        const rightNozzleWorld = new THREE.Vector3();
+        const leftOffset = new THREE.Vector3(-0.15, -0.4, 0.15);
+        const rightOffset = new THREE.Vector3(0.15, -0.4, 0.15);
+
+        jetpackMesh.localToWorld(leftNozzleWorld.copy(leftOffset));
+        jetpackMesh.localToWorld(rightNozzleWorld.copy(rightOffset));
+
+        const normal = new THREE.Vector3(0, -1, 0);
+        this.particleSystem.spawnJetpackEffect(leftNozzleWorld, normal, this.equippedItem.particleVFX);
+        this.particleSystem.spawnJetpackEffect(rightNozzleWorld, normal, this.equippedItem.particleVFX);
+      }
+
+      this.emit("jetpackUpdate", {
+        fuel: this.equippedItem.consumableUse,
+        maxFuel: this.equippedItem.maxConsumableUse,
+        airTime: this.consecutiveAirTime,
+        maxAirTime: this.equippedItem.airLimit
+      });
+
+      if (this.equippedItem.consumableUse <= 0) {
+        console.log("Jetpack exhausted!");
+        const game = (this.scene as any).userData?.game || (this as any).game;
+        if (game && game.inventoryManager) {
+          game.inventoryManager.removeCurrentItem();
+        } else {
+          this.setHeldItem(null);
+        }
+      }
     } else if (isGrounded && input.keys.jump) {
       this.verticalVelocity = this.jumpForce;
     } else if (!isGrounded && !this.isFlying) {
-      if (jumpJustPressed && this.jumpCount < this.maxMultiJumps) {
-        this.verticalVelocity = this.jumpForce;
-        this.jumpCount++;
-        console.log(`Multi-Jump: ${this.jumpCount}/${this.maxMultiJumps}`);
+      if (hasJetpack && input.keys.jump && hasFuel && withinAirLimit) {
+        isUsingJetpack = true;
+        this.consecutiveAirTime += dt;
 
-        this.emit("jumpChanged", {
-          current: this.maxMultiJumps - this.jumpCount,
-          max: this.maxMultiJumps,
-          type: "air-jump"
+        this.verticalVelocity += (this.equippedItem.thrust - 35) * dt;
+
+        if (this.verticalVelocity > this.equippedItem.thrust) {
+          this.verticalVelocity = this.equippedItem.thrust;
+        }
+
+        this.equippedItem.consumeFuel(dt);
+
+        if (this.particleSystem && this.polygonModelSkin && this.polygonModelSkin.backItemMesh) {
+          const jetpackMesh = this.polygonModelSkin.backItemMesh;
+          const leftNozzleWorld = new THREE.Vector3();
+          const rightNozzleWorld = new THREE.Vector3();
+          const leftOffset = new THREE.Vector3(-0.15, -0.4, 0.15);
+          const rightOffset = new THREE.Vector3(0.15, -0.4, 0.15);
+
+          jetpackMesh.localToWorld(leftNozzleWorld.copy(leftOffset));
+          jetpackMesh.localToWorld(rightNozzleWorld.copy(rightOffset));
+
+          const normal = new THREE.Vector3(0, -1, 0);
+          this.particleSystem.spawnJetpackEffect(leftNozzleWorld, normal, this.equippedItem.particleVFX);
+          this.particleSystem.spawnJetpackEffect(rightNozzleWorld, normal, this.equippedItem.particleVFX);
+        }
+
+        this.emit("jetpackUpdate", {
+          fuel: this.equippedItem.consumableUse,
+          maxFuel: this.equippedItem.maxConsumableUse,
+          airTime: this.consecutiveAirTime,
+          maxAirTime: this.equippedItem.airLimit
         });
 
-        if (this.particleSystem) {
-          this.particleSystem.spawnJumpEffect(this.getPosition());
+        if (this.equippedItem.consumableUse <= 0) {
+          console.log("Jetpack exhausted!");
+          const game = (this.scene as any).userData?.game || (this as any).game;
+          if (game && game.inventoryManager) {
+            game.inventoryManager.removeCurrentItem();
+          } else {
+            this.setHeldItem(null);
+          }
         }
-      }
+      } else {
+        if (jumpJustPressed && this.jumpCount < this.maxMultiJumps) {
+          this.verticalVelocity = this.jumpForce;
+          this.jumpCount++;
+          console.log(`Multi-Jump: ${this.jumpCount}/${this.maxMultiJumps}`);
 
-      if (this.verticalVelocity > -20) {
-        this.verticalVelocity -= 50 * dt;
+          this.emit("jumpChanged", {
+            current: this.maxMultiJumps - this.jumpCount,
+            max: this.maxMultiJumps,
+            type: "air-jump"
+          });
+
+          if (this.particleSystem) {
+            this.particleSystem.spawnJumpEffect(this.getPosition());
+          }
+        }
+
+        if (this.verticalVelocity > -20) {
+          this.verticalVelocity -= 50 * dt;
+        }
       }
     }
 
@@ -627,6 +740,7 @@ export class CharacterController {
   }
 
   setHeldItem(item: any) {
+    this.equippedItem = item;
     this.emit("itemEquipped", item);
 
     if (this.polygonModelSkin) {

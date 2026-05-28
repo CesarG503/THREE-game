@@ -27,6 +27,7 @@ import { Projectile } from "./weapons/Projectile";
 import { BlasterSystem } from "./fx/BlasterSystem";
 import { Router } from "./routing/Router";
 import { GunItem } from "./items/GunItem";
+import { JetpackItem } from "./items/JetpackItem";
 import { setupGameInput } from "./core/GameInput";
 import { animate, setupDebugRender, setupOrientationGizmo, updateDebugRender, renderOrientationGizmo } from "./core/GameLoop";
 import { setupMultiplayerUI, updateConnectionStatus, handleRemoteShoot } from "./core/GameNetwork";
@@ -482,6 +483,12 @@ export class Game {
 						newItem = new ImpulseItem(source.id, source.name, source.iconPath, source.type, source.strength);
 					} else if (source instanceof FarmingZoneItem) {
 						newItem = new FarmingZoneItem();
+					} else if (source instanceof JetpackItem || source.type === "consumable") {
+						if (source.clone) {
+							newItem = source.clone();
+						} else {
+							newItem = new JetpackItem(source);
+						}
 					} else {
 						newItem = new MapObjectItem(
 							source.id,

@@ -6,6 +6,7 @@ import { PolygonModelSkin } from "../character/models/PolygonModelSkin";
 import { GunItem } from "../items/GunItem";
 import { WEAPONS_CONFIG } from "../items/WeaponSettings";
 import { PelotaItem } from "../items/PelotaItem";
+import { JetpackItem } from "../items/JetpackItem";
 import type { GunConfig } from "../types";
 
 export class RemotePlayer {
@@ -231,6 +232,14 @@ export class RemotePlayer {
                     this.glbModel.setHeldItem(this.currentWeaponInstance);
                     this.polygonModel.setHeldItem(this.currentWeaponInstance);
                     this.polygonModelSkin.setHeldItem(this.currentWeaponInstance);
+                } else if (state.equippedWeapon === "jetpack" || (state.equippedWeapon && state.equippedWeapon.startsWith("jetpack"))) {
+                    if (!this.weaponsCache[state.equippedWeapon]) {
+                        this.weaponsCache[state.equippedWeapon] = new JetpackItem({ id: state.equippedWeapon });
+                    }
+                    this.currentWeaponInstance = this.weaponsCache[state.equippedWeapon];
+                    this.glbModel.setHeldItem(this.currentWeaponInstance);
+                    this.polygonModel.setHeldItem(this.currentWeaponInstance);
+                    this.polygonModelSkin.setHeldItem(this.currentWeaponInstance);
                 } else {
                     this.currentWeaponInstance = null;
                     this.glbModel.setHeldItem(null);
@@ -288,13 +297,18 @@ export class RemotePlayer {
 
         this.glbModel.update(dt, hasInput);
         this.polygonModel.update(dt, hasInput);
+        const isUsingJetpack = this.state.equippedWeapon && (this.state.equippedWeapon === "jetpack" || this.state.equippedWeapon.startsWith("jetpack"));
+        const isSuperman = !!(isUsingJetpack && this.state.isCrouching && !this.state.isGrounded);
+        const visualCrouch = !!(this.state.isCrouching && !isSuperman);
+
         this.polygonModelSkin.update(
             dt,
             hasInput,
-            (this.state.isCrouching || false),
+            visualCrouch,
             (effectivelyAttacking || false),
             (this.state.isGrounded !== undefined ? this.state.isGrounded : true),
-            this.state.verticalVelocity || 0
+            this.state.verticalVelocity || 0,
+            isSuperman
         );
         if (this.currentWeaponInstance && typeof this.currentWeaponInstance.updateAnim === "function") {
             this.currentWeaponInstance.updateAnim(dt, 0);

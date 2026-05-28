@@ -34,6 +34,7 @@ export class PolygonModelSkin implements ICharacterModel {
   currentWeaponHand: "left" | "right";
   isFirstPerson: boolean;
   airTime: number;
+  backItemMesh: THREE.Object3D | null;
 
   constructor(scene: THREE.Scene, isLocal = true) {
     this.scene = scene;
@@ -70,8 +71,8 @@ export class PolygonModelSkin implements ICharacterModel {
     this.jumpAnimationType = "";
     this.fallAnimationType = "";
     this.currentHeldItem = null;
-    this.heldItem = null;
     this.heldItemMesh = null;
+    this.backItemMesh = null;
     this.isHoldingWeapon = false;
     this.currentWeaponHand = "right";
     this.isFirstPerson = false;
@@ -343,6 +344,11 @@ export class PolygonModelSkin implements ICharacterModel {
       this.heldItemMesh = null;
     }
 
+    if (this.backItemMesh) {
+      this.upperBodyGroup.remove(this.backItemMesh);
+      this.backItemMesh = null;
+    }
+
     this.currentHeldItem = item;
     this.isHoldingWeapon = item !== null && item.type === "weapon";
     this.heldItem = item;
@@ -352,23 +358,32 @@ export class PolygonModelSkin implements ICharacterModel {
     const mesh = item.getEquipMesh();
     if (!mesh) return;
 
-    this.heldItemMesh = mesh;
-
-    const pixelScale = (1 / 16) * 0.9;
-    mesh.position.set(0, -10 * pixelScale, 2 * pixelScale);
-    mesh.rotation.set(Math.PI / 2, 1.5, Math.PI);
-
-    const intendedHand = item.equippedHand || "right";
-    this.currentWeaponHand = intendedHand === "left" ? "right" : "left";
-
-    if (this.currentWeaponHand === "left") {
-      this.leftArmGroup.add(mesh);
+    if (item.equipSlot === "back") {
+      this.backItemMesh = mesh;
+      const pixelScale = (1 / 16) * 0.9;
+      // Position it exactly on the Steve model's back!
+      mesh.position.set(0, 1.3 - 6 * pixelScale, 2.3 * pixelScale);
+      // Face 180 degrees backwards
+      mesh.rotation.set(0, Math.PI, 0);
+      this.upperBodyGroup.add(mesh);
     } else {
-      this.rightArmGroup.add(mesh);
+      this.heldItemMesh = mesh;
+      const pixelScale = (1 / 16) * 0.9;
+      mesh.position.set(0, -10 * pixelScale, 2 * pixelScale);
+      mesh.rotation.set(Math.PI / 2, 1.5, Math.PI);
+
+      const intendedHand = item.equippedHand || "right";
+      this.currentWeaponHand = intendedHand === "left" ? "right" : "left";
+
+      if (this.currentWeaponHand === "left") {
+        this.leftArmGroup.add(mesh);
+      } else {
+        this.rightArmGroup.add(mesh);
+      }
     }
   }
 
-  update(dt: number, isMoving: boolean, isCrouching = false, isAttacking = false, isGrounded = true, verticalVelocity = 0) {
+  update(dt: number, isMoving: boolean, isCrouching = false, isAttacking = false, isGrounded = true, verticalVelocity = 0, isSuperman = false) {
     if (!this.model || !this.isVisible) return;
     if (
       !this.headGroup ||
@@ -454,165 +469,191 @@ export class PolygonModelSkin implements ICharacterModel {
     const targetHeadRotX = targetBodyRotX - (this.targetHeadPitch || 0);
     this.headGroup.rotation.x = THREE.MathUtils.lerp(this.headGroup.rotation.x, targetHeadRotX, lerpSpeed * 2.0);
 
-    let baseRArmX = 0;
-    let baseLArmX = 0;
-    let baseRLegX = 0;
-    let baseLLegX = 0;
-    let baseRArmZ = 0;
-    let baseLArmZ = 0;
+    if (isSuperman) {
+      const targetPivotRotX = Math.PI / 2.2;
+      this.pivotGroup.rotation.x = THREE.MathUtils.lerp(this.pivotGroup.rotation.x, targetPivotRotX, 10 * dt);
 
-    if (isMoving) {
-      const speed = isCrouching ? 5 : 10;
-      const time = (Date.now() / 1000) * speed;
-      const sinVal = Math.sin(time);
-
-      baseRArmX = sinVal * 0.8;
-      baseLArmX = -sinVal * 0.8;
-      baseRLegX = -sinVal * 0.8;
-      baseLLegX = sinVal * 0.8;
-
-      if (isCrouching) {
-        baseRArmX += 0.2;
-        baseLArmX += 0.2;
-      }
-    } else {
-      const time = Date.now() / 1000;
-      baseRArmZ = Math.sin(time) * 0.05 + 0.05;
-      baseLArmZ = -Math.sin(time) * 0.05 - 0.05;
-
-      if (isCrouching) {
-        baseRArmX = 0.2;
-        baseLArmX = 0.2;
-      }
-    }
-
-    const animLerp = 0.2;
-    this.rightLegGroup.rotation.x = THREE.MathUtils.lerp(this.rightLegGroup.rotation.x, baseRLegX, animLerp);
-    this.leftLegGroup.rotation.x = THREE.MathUtils.lerp(this.leftLegGroup.rotation.x, baseLLegX, animLerp);
-
-    if (this.attackWeight > 0.01) {
-      const blend = this.attackWeight;
-      const punchRotX = -swing * 2.5 - 0.2;
-      const recoilRotX = swing * 0.5 + 0.5;
-      const targetTwist = swing * 0.4;
-
-      const finalLArmX = THREE.MathUtils.lerp(baseLArmX, punchRotX, blend);
-      const finalRArmX = THREE.MathUtils.lerp(baseRArmX, recoilRotX, blend);
-      const finalTwist = THREE.MathUtils.lerp(0, targetTwist, blend);
-
-      this.leftArmGroup.rotation.x = finalLArmX;
-      this.rightArmGroup.rotation.x = finalRArmX;
-      this.body.rotation.y = 0;
-      this.upperBodyGroup.rotation.y = finalTwist;
-      this.headGroup.rotation.y = this.targetHeadYaw || 0;
-      this.leftArmGroup.rotation.y = 0;
-      this.rightArmGroup.rotation.y = 0;
-    } else if (this.isHoldingWeapon) {
       const currentPitch = this.targetHeadPitch || 0;
-      const pointAimAngle = -Math.PI / 2 - currentPitch;
-      const aimBob = isMoving ? Math.sin((Date.now() / 100) * 0.5) * 0.05 : Math.sin(Date.now() / 500) * 0.02;
+      const targetHeadRotX = -Math.PI / 2 - currentPitch;
+      this.headGroup.rotation.x = THREE.MathUtils.lerp(this.headGroup.rotation.x, targetHeadRotX, 10 * dt);
 
-      let freeArmTargetRotX = this.currentWeaponHand === "left" ? baseRArmX : baseLArmX;
-      let freeArmTargetRotZ = this.currentWeaponHand === "left" ? baseRArmZ : baseLArmZ;
-      let weaponArmRotZ = 0;
-      let weaponArmRotY = 0;
+      const armFlyRotX = -Math.PI + 0.2;
+      this.leftArmGroup.rotation.x = THREE.MathUtils.lerp(this.leftArmGroup.rotation.x, armFlyRotX, 10 * dt);
+      this.rightArmGroup.rotation.x = THREE.MathUtils.lerp(this.rightArmGroup.rotation.x, armFlyRotX, 10 * dt);
 
-      if (this.isFirstPerson) {
-        const pitchOffset = currentPitch * 0.3;
-        if (this.currentWeaponHand === "left") {
-          weaponArmRotZ = -0.1 - pitchOffset * 0.5;
-          weaponArmRotY = 0.15 + pitchOffset * 0.5;
-        } else {
-          weaponArmRotZ = 0.1 + pitchOffset * 0.5;
-          weaponArmRotY = -0.15 - pitchOffset * 0.5;
-        }
-      }
+      this.leftArmGroup.rotation.z = THREE.MathUtils.lerp(this.leftArmGroup.rotation.z, -0.15, 10 * dt);
+      this.rightArmGroup.rotation.z = THREE.MathUtils.lerp(this.rightArmGroup.rotation.z, 0.15, 10 * dt);
 
-      if (this.heldItem && this.heldItem.isReloading) {
-        if (!this.heldItem._reloadStartTime) {
-          this.heldItem._reloadStartTime = Date.now();
-        }
+      this.leftArmGroup.rotation.y = THREE.MathUtils.lerp(this.leftArmGroup.rotation.y, 0, 10 * dt);
+      this.rightArmGroup.rotation.y = THREE.MathUtils.lerp(this.rightArmGroup.rotation.y, 0, 10 * dt);
 
-        const t = (Date.now() - this.heldItem._reloadStartTime) / 700;
-        const targetRotX = -Math.PI / 2;
-        const targetRotZ = this.currentWeaponHand === "left" ? -0.8 : 0.8;
+      this.leftLegGroup.rotation.x = THREE.MathUtils.lerp(this.leftLegGroup.rotation.x, 0.05, 10 * dt);
+      this.rightLegGroup.rotation.x = THREE.MathUtils.lerp(this.rightLegGroup.rotation.x, -0.05, 10 * dt);
 
-        if (t < 1.0) {
-          const localLerp = t / 1.0;
-          const ease = localLerp * localLerp * (3 - 2 * localLerp);
-          freeArmTargetRotX = THREE.MathUtils.lerp(freeArmTargetRotX, targetRotX, ease);
-          freeArmTargetRotZ = THREE.MathUtils.lerp(freeArmTargetRotZ, targetRotZ, ease);
-        } else if (t < 1.5) {
-          const dipLerp = (t - 1.0) / 0.5;
-          const dip = Math.sin(dipLerp * Math.PI) * 0.4;
-          freeArmTargetRotX = targetRotX + dip;
-          freeArmTargetRotZ = targetRotZ;
-        } else if (t < 2.2) {
-          const localLerp = (t - 1.5) / 0.7;
-          const ease = localLerp * localLerp * (3 - 2 * localLerp);
-          freeArmTargetRotX = THREE.MathUtils.lerp(targetRotX, freeArmTargetRotX, ease);
-          freeArmTargetRotZ = THREE.MathUtils.lerp(
-            targetRotZ,
-            this.currentWeaponHand === "left" ? baseRArmZ : baseLArmZ,
-            ease
-          );
-        }
-      } else if (this.heldItem) {
-        this.heldItem._reloadStartTime = null;
-      }
-
-      const headYaw = this.targetHeadYaw || 0;
-      this.upperBodyGroup.rotation.y = THREE.MathUtils.lerp(this.upperBodyGroup.rotation.y, headYaw, animLerp * 2.0);
-
-      let weaponSwayZ = 0;
-      let weaponSwayY = 0;
-      if (this.isFirstPerson) {
-        weaponSwayZ = headYaw * -0.4;
-        weaponSwayY = headYaw * 0.3;
-      }
-
-      if (this.currentWeaponHand === "left") {
-        this.leftArmGroup.rotation.x = THREE.MathUtils.lerp(this.leftArmGroup.rotation.x, pointAimAngle + aimBob, 0.2);
-        this.leftArmGroup.rotation.z = THREE.MathUtils.lerp(this.leftArmGroup.rotation.z, weaponArmRotZ + weaponSwayZ, 0.2);
-        this.leftArmGroup.rotation.y = THREE.MathUtils.lerp(this.leftArmGroup.rotation.y, weaponArmRotY + weaponSwayY, 0.4);
-
-        this.rightArmGroup.rotation.x = THREE.MathUtils.lerp(this.rightArmGroup.rotation.x, freeArmTargetRotX, animLerp);
-        this.rightArmGroup.rotation.z = THREE.MathUtils.lerp(this.rightArmGroup.rotation.z, freeArmTargetRotZ, animLerp);
-        this.rightArmGroup.rotation.y = THREE.MathUtils.lerp(this.rightArmGroup.rotation.y, 0, animLerp);
-      } else {
-        this.rightArmGroup.rotation.x = THREE.MathUtils.lerp(this.rightArmGroup.rotation.x, pointAimAngle + aimBob, 0.2);
-        this.rightArmGroup.rotation.z = THREE.MathUtils.lerp(this.rightArmGroup.rotation.z, weaponArmRotZ + weaponSwayZ, 0.2);
-        this.rightArmGroup.rotation.y = THREE.MathUtils.lerp(this.rightArmGroup.rotation.y, weaponArmRotY + weaponSwayY, 0.4);
-
-        this.leftArmGroup.rotation.x = THREE.MathUtils.lerp(this.leftArmGroup.rotation.x, freeArmTargetRotX, animLerp);
-        this.leftArmGroup.rotation.z = THREE.MathUtils.lerp(this.leftArmGroup.rotation.z, freeArmTargetRotZ, animLerp);
-        this.leftArmGroup.rotation.y = THREE.MathUtils.lerp(this.leftArmGroup.rotation.y, 0, animLerp);
-      }
-
-      if (this.heldItemMesh && this.heldItem && this.heldItem.type === "weapon") {
-        const recoil = this.heldItem.gunImpulse ? this.heldItem.gunImpulse * 2 : 0;
-        const reloadZ = this.heldItem.springReloadZ || 0;
-        const initialZ = 2 * pixelScale;
-
-        this.heldItemMesh.position.z = initialZ - reloadZ - recoil;
-        this.heldItemMesh.rotation.x = this.heldItem.isReloading ? -Math.PI / 2 - reloadZ * 3 : -Math.PI / 2;
-      }
-
-      const aimTwist = this.currentWeaponHand === "left" ? 0.2 : -0.2;
-      this.body.rotation.y = THREE.MathUtils.lerp(this.body.rotation.y, aimTwist, animLerp);
-      this.headGroup.rotation.y = THREE.MathUtils.lerp(this.headGroup.rotation.y, aimTwist * 0.5, animLerp * 2.0);
+      this.body.rotation.y = THREE.MathUtils.lerp(this.body.rotation.y, 0, 10 * dt);
+      this.upperBodyGroup.rotation.y = THREE.MathUtils.lerp(this.upperBodyGroup.rotation.y, 0, 10 * dt);
+      this.headGroup.rotation.y = THREE.MathUtils.lerp(this.headGroup.rotation.y, this.targetHeadYaw || 0, 10 * dt);
     } else {
-      this.upperBodyGroup.rotation.y = THREE.MathUtils.lerp(this.upperBodyGroup.rotation.y, 0, animLerp);
-      this.leftArmGroup.rotation.x = THREE.MathUtils.lerp(this.leftArmGroup.rotation.x, baseLArmX, animLerp);
-      this.rightArmGroup.rotation.x = THREE.MathUtils.lerp(this.rightArmGroup.rotation.x, baseRArmX, animLerp);
-      this.leftArmGroup.rotation.z = THREE.MathUtils.lerp(this.leftArmGroup.rotation.z, baseLArmZ, animLerp);
-      this.rightArmGroup.rotation.z = THREE.MathUtils.lerp(this.rightArmGroup.rotation.z, baseRArmZ, animLerp);
+      let baseRArmX = 0;
+      let baseLArmX = 0;
+      let baseRLegX = 0;
+      let baseLLegX = 0;
+      let baseRArmZ = 0;
+      let baseLArmZ = 0;
 
-      const resetTwist = 0;
-      this.body.rotation.y = THREE.MathUtils.lerp(this.body.rotation.y, resetTwist, animLerp);
-      this.headGroup.rotation.y = THREE.MathUtils.lerp(this.headGroup.rotation.y, resetTwist + (this.targetHeadYaw || 0), animLerp * 2.0);
-      this.leftArmGroup.rotation.y = THREE.MathUtils.lerp(this.leftArmGroup.rotation.y, resetTwist, animLerp);
-      this.rightArmGroup.rotation.y = THREE.MathUtils.lerp(this.rightArmGroup.rotation.y, resetTwist, animLerp);
+      if (isMoving) {
+        const speed = isCrouching ? 5 : 10;
+        const time = (Date.now() / 1000) * speed;
+        const sinVal = Math.sin(time);
+
+        baseRArmX = sinVal * 0.8;
+        baseLArmX = -sinVal * 0.8;
+        baseRLegX = -sinVal * 0.8;
+        baseLLegX = sinVal * 0.8;
+
+        if (isCrouching) {
+          baseRArmX += 0.2;
+          baseLArmX += 0.2;
+        }
+      } else {
+        const time = Date.now() / 1000;
+        baseRArmZ = Math.sin(time) * 0.05 + 0.05;
+        baseLArmZ = -Math.sin(time) * 0.05 - 0.05;
+
+        if (isCrouching) {
+          baseRArmX = 0.2;
+          baseLArmX = 0.2;
+        }
+      }
+
+      const animLerp = 0.2;
+      this.rightLegGroup.rotation.x = THREE.MathUtils.lerp(this.rightLegGroup.rotation.x, baseRLegX, animLerp);
+      this.leftLegGroup.rotation.x = THREE.MathUtils.lerp(this.leftLegGroup.rotation.x, baseLLegX, animLerp);
+
+      if (this.attackWeight > 0.01) {
+        const blend = this.attackWeight;
+        const punchRotX = -swing * 2.5 - 0.2;
+        const recoilRotX = swing * 0.5 + 0.5;
+        const targetTwist = swing * 0.4;
+
+        const finalLArmX = THREE.MathUtils.lerp(baseLArmX, punchRotX, blend);
+        const finalRArmX = THREE.MathUtils.lerp(baseRArmX, recoilRotX, blend);
+        const finalTwist = THREE.MathUtils.lerp(0, targetTwist, blend);
+
+        this.leftArmGroup.rotation.x = finalLArmX;
+        this.rightArmGroup.rotation.x = finalRArmX;
+        this.body.rotation.y = 0;
+        this.upperBodyGroup.rotation.y = finalTwist;
+        this.headGroup.rotation.y = this.targetHeadYaw || 0;
+        this.leftArmGroup.rotation.y = 0;
+        this.rightArmGroup.rotation.y = 0;
+      } else if (this.isHoldingWeapon) {
+        const currentPitch = this.targetHeadPitch || 0;
+        const pointAimAngle = -Math.PI / 2 - currentPitch;
+        const aimBob = isMoving ? Math.sin((Date.now() / 100) * 0.5) * 0.05 : Math.sin(Date.now() / 500) * 0.02;
+
+        let freeArmTargetRotX = this.currentWeaponHand === "left" ? baseRArmX : baseLArmX;
+        let freeArmTargetRotZ = this.currentWeaponHand === "left" ? baseRArmZ : baseLArmZ;
+        let weaponArmRotZ = 0;
+        let weaponArmRotY = 0;
+
+        if (this.isFirstPerson) {
+          const pitchOffset = currentPitch * 0.3;
+          if (this.currentWeaponHand === "left") {
+            weaponArmRotZ = -0.1 - pitchOffset * 0.5;
+            weaponArmRotY = 0.15 + pitchOffset * 0.5;
+          } else {
+            weaponArmRotZ = 0.1 + pitchOffset * 0.5;
+            weaponArmRotY = -0.15 - pitchOffset * 0.5;
+          }
+        }
+
+        if (this.heldItem && this.heldItem.isReloading) {
+          if (!this.heldItem._reloadStartTime) {
+            this.heldItem._reloadStartTime = Date.now();
+          }
+
+          const t = (Date.now() - this.heldItem._reloadStartTime) / 700;
+          const targetRotX = -Math.PI / 2;
+          const targetRotZ = this.currentWeaponHand === "left" ? -0.8 : 0.8;
+
+          if (t < 1.0) {
+            const localLerp = t / 1.0;
+            const ease = localLerp * localLerp * (3 - 2 * localLerp);
+            freeArmTargetRotX = THREE.MathUtils.lerp(freeArmTargetRotX, targetRotX, ease);
+            freeArmTargetRotZ = THREE.MathUtils.lerp(freeArmTargetRotZ, targetRotZ, ease);
+          } else if (t < 1.5) {
+            const dipLerp = (t - 1.0) / 0.5;
+            const dip = Math.sin(dipLerp * Math.PI) * 0.4;
+            freeArmTargetRotX = targetRotX + dip;
+            freeArmTargetRotZ = targetRotZ;
+          } else if (t < 2.2) {
+            const localLerp = (t - 1.5) / 0.7;
+            const ease = localLerp * localLerp * (3 - 2 * localLerp);
+            freeArmTargetRotX = THREE.MathUtils.lerp(targetRotX, freeArmTargetRotX, ease);
+            freeArmTargetRotZ = THREE.MathUtils.lerp(
+              targetRotZ,
+              this.currentWeaponHand === "left" ? baseRArmZ : baseLArmZ,
+              ease
+            );
+          }
+        } else if (this.heldItem) {
+          this.heldItem._reloadStartTime = null;
+        }
+
+        const headYaw = this.targetHeadYaw || 0;
+        this.upperBodyGroup.rotation.y = THREE.MathUtils.lerp(this.upperBodyGroup.rotation.y, headYaw, animLerp * 2.0);
+
+        let weaponSwayZ = 0;
+        let weaponSwayY = 0;
+        if (this.isFirstPerson) {
+          weaponSwayZ = headYaw * -0.4;
+          weaponSwayY = headYaw * 0.3;
+        }
+
+        if (this.currentWeaponHand === "left") {
+          this.leftArmGroup.rotation.x = THREE.MathUtils.lerp(this.leftArmGroup.rotation.x, pointAimAngle + aimBob, 0.2);
+          this.leftArmGroup.rotation.z = THREE.MathUtils.lerp(this.leftArmGroup.rotation.z, weaponArmRotZ + weaponSwayZ, 0.2);
+          this.leftArmGroup.rotation.y = THREE.MathUtils.lerp(this.leftArmGroup.rotation.y, weaponArmRotY + weaponSwayY, 0.4);
+
+          this.rightArmGroup.rotation.x = THREE.MathUtils.lerp(this.rightArmGroup.rotation.x, freeArmTargetRotX, animLerp);
+          this.rightArmGroup.rotation.z = THREE.MathUtils.lerp(this.rightArmGroup.rotation.z, freeArmTargetRotZ, animLerp);
+          this.rightArmGroup.rotation.y = THREE.MathUtils.lerp(this.rightArmGroup.rotation.y, 0, animLerp);
+        } else {
+          this.rightArmGroup.rotation.x = THREE.MathUtils.lerp(this.rightArmGroup.rotation.x, pointAimAngle + aimBob, 0.2);
+          this.rightArmGroup.rotation.z = THREE.MathUtils.lerp(this.rightArmGroup.rotation.z, weaponArmRotZ + weaponSwayZ, 0.2);
+          this.rightArmGroup.rotation.y = THREE.MathUtils.lerp(this.rightArmGroup.rotation.y, weaponArmRotY + weaponSwayY, 0.4);
+
+          this.leftArmGroup.rotation.x = THREE.MathUtils.lerp(this.leftArmGroup.rotation.x, freeArmTargetRotX, animLerp);
+          this.leftArmGroup.rotation.z = THREE.MathUtils.lerp(this.leftArmGroup.rotation.z, freeArmTargetRotZ, animLerp);
+          this.leftArmGroup.rotation.y = THREE.MathUtils.lerp(this.leftArmGroup.rotation.y, 0, animLerp);
+        }
+
+        if (this.heldItemMesh && this.heldItem && this.heldItem.type === "weapon") {
+          const recoil = this.heldItem.gunImpulse ? this.heldItem.gunImpulse * 2 : 0;
+          const reloadZ = this.heldItem.springReloadZ || 0;
+          const initialZ = 2 * pixelScale;
+
+          this.heldItemMesh.position.z = initialZ - reloadZ - recoil;
+          this.heldItemMesh.rotation.x = this.heldItem.isReloading ? -Math.PI / 2 - reloadZ * 3 : -Math.PI / 2;
+        }
+
+        const aimTwist = this.currentWeaponHand === "left" ? 0.2 : -0.2;
+        this.body.rotation.y = THREE.MathUtils.lerp(this.body.rotation.y, aimTwist, animLerp);
+        this.headGroup.rotation.y = THREE.MathUtils.lerp(this.headGroup.rotation.y, aimTwist * 0.5, animLerp * 2.0);
+      } else {
+        this.upperBodyGroup.rotation.y = THREE.MathUtils.lerp(this.upperBodyGroup.rotation.y, 0, animLerp);
+        this.leftArmGroup.rotation.x = THREE.MathUtils.lerp(this.leftArmGroup.rotation.x, baseLArmX, animLerp);
+        this.rightArmGroup.rotation.x = THREE.MathUtils.lerp(this.rightArmGroup.rotation.x, baseRArmX, animLerp);
+        this.leftArmGroup.rotation.z = THREE.MathUtils.lerp(this.leftArmGroup.rotation.z, baseLArmZ, animLerp);
+        this.rightArmGroup.rotation.z = THREE.MathUtils.lerp(this.rightArmGroup.rotation.z, baseRArmZ, animLerp);
+
+        const resetTwist = 0;
+        this.body.rotation.y = THREE.MathUtils.lerp(this.body.rotation.y, resetTwist, animLerp);
+        this.headGroup.rotation.y = THREE.MathUtils.lerp(this.headGroup.rotation.y, resetTwist + (this.targetHeadYaw || 0), animLerp * 2.0);
+        this.leftArmGroup.rotation.y = THREE.MathUtils.lerp(this.leftArmGroup.rotation.y, resetTwist, animLerp);
+        this.rightArmGroup.rotation.y = THREE.MathUtils.lerp(this.rightArmGroup.rotation.y, resetTwist, animLerp);
+      }
     }
 
     if (!isGrounded) {
@@ -621,38 +662,40 @@ export class PolygonModelSkin implements ICharacterModel {
       this.airTime = 0;
     }
 
-    const jumpAnim = this.jumpAnimationType || "flip";
-    const fallAnim = this.fallAnimationType || "none";
-    let shouldFlip = false;
+    if (!isSuperman) {
+      const jumpAnim = this.jumpAnimationType || "flip";
+      const fallAnim = this.fallAnimationType || "none";
+      let shouldFlip = false;
 
-    if (jumpAnim === "flip" && !isGrounded) {
-      shouldFlip = true;
-    }
+      if (jumpAnim === "flip" && !isGrounded) {
+        shouldFlip = true;
+      }
 
-    if (fallAnim === "flip" && !isGrounded && this.airTime > 0.5) {
-      shouldFlip = true;
-    }
+      if (fallAnim === "flip" && !isGrounded && this.airTime > 0.5) {
+        shouldFlip = true;
+      }
 
-    if (shouldFlip) {
-      const jumpLerp = 0.15;
+      if (shouldFlip) {
+        const jumpLerp = 0.15;
 
-      this.rightArmGroup.rotation.z = THREE.MathUtils.lerp(this.rightArmGroup.rotation.z, 0, jumpLerp);
-      this.leftArmGroup.rotation.z = THREE.MathUtils.lerp(this.leftArmGroup.rotation.z, 0, jumpLerp);
-      this.rightArmGroup.rotation.x = THREE.MathUtils.lerp(this.rightArmGroup.rotation.x, -0.5, jumpLerp);
-      this.leftArmGroup.rotation.x = THREE.MathUtils.lerp(this.leftArmGroup.rotation.x, -0.5, jumpLerp);
-      this.rightLegGroup.rotation.x = THREE.MathUtils.lerp(this.rightLegGroup.rotation.x, 0.5, jumpLerp);
-      this.leftLegGroup.rotation.x = THREE.MathUtils.lerp(this.leftLegGroup.rotation.x, 0.5, jumpLerp);
+        this.rightArmGroup.rotation.z = THREE.MathUtils.lerp(this.rightArmGroup.rotation.z, 0, jumpLerp);
+        this.leftArmGroup.rotation.z = THREE.MathUtils.lerp(this.leftArmGroup.rotation.z, 0, jumpLerp);
+        this.rightArmGroup.rotation.x = THREE.MathUtils.lerp(this.rightArmGroup.rotation.x, -0.5, jumpLerp);
+        this.leftArmGroup.rotation.x = THREE.MathUtils.lerp(this.leftArmGroup.rotation.x, -0.5, jumpLerp);
+        this.rightLegGroup.rotation.x = THREE.MathUtils.lerp(this.rightLegGroup.rotation.x, 0.5, jumpLerp);
+        this.leftLegGroup.rotation.x = THREE.MathUtils.lerp(this.leftLegGroup.rotation.x, 0.5, jumpLerp);
 
-      this.pivotGroup.rotation.x -= 10 * dt;
-    } else {
-      const currentRot = this.pivotGroup.rotation.x;
-      if (Math.abs(currentRot) > 0.001) {
-        const twoPI = Math.PI * 2;
-        const targetRot = Math.round(currentRot / twoPI) * twoPI;
-        this.pivotGroup.rotation.x = THREE.MathUtils.lerp(currentRot, targetRot, 15 * dt);
+        this.pivotGroup.rotation.x -= 10 * dt;
+      } else {
+        const currentRot = this.pivotGroup.rotation.x;
+        if (Math.abs(currentRot) > 0.001) {
+          const twoPI = Math.PI * 2;
+          const targetRot = Math.round(currentRot / twoPI) * twoPI;
+          this.pivotGroup.rotation.x = THREE.MathUtils.lerp(currentRot, targetRot, 15 * dt);
 
-        if (Math.abs(this.pivotGroup.rotation.x - targetRot) < 0.01) {
-          this.pivotGroup.rotation.x = 0;
+          if (Math.abs(this.pivotGroup.rotation.x - targetRot) < 0.01) {
+            this.pivotGroup.rotation.x = 0;
+          }
         }
       }
     }

@@ -10,6 +10,7 @@ import { WEAPONS_CONFIG } from "../items/WeaponSettings";
 import { MapShapeEditor } from "./MapShapeEditor";
 import { AdvancedWeaponConfigPanel } from "./AdvancedWeaponConfigPanel";
 import { getActiveFarmingGroups } from "./GameHUD";
+import { JetpackItem } from "../items/JetpackItem";
 
 export class ConstructionMenu {
     constructor(inventoryManager, gameInstance) {
@@ -70,6 +71,9 @@ export class ConstructionMenu {
         WEAPONS_CONFIG.forEach(cfg => {
             this.libraryItems.push(new GunItem(cfg));
         });
+
+        // Add Consumables to Library
+        this.libraryItems.push(new JetpackItem());
     }
 
     generateLogicLibrary() {
@@ -355,11 +359,13 @@ export class ConstructionMenu {
         };
 
         // Create Sections
-        const sectionConstruction = createCollapsibleSection("Construcción", item => item.type !== "weapon");
+        const sectionConstruction = createCollapsibleSection("Construcción", item => item.type !== "weapon" && item.type !== "consumable" && item.type !== "collectible");
         const sectionWeapons = createCollapsibleSection("Armas", item => item.type === "weapon");
+        const sectionConsumables = createCollapsibleSection("Consumibles", item => item.type === "consumable");
 
         this.libraryLeftCol.appendChild(sectionConstruction);
         this.libraryLeftCol.appendChild(sectionWeapons);
+        this.libraryLeftCol.appendChild(sectionConsumables);
 
         // Right: Customizer Panel
         this.libraryPanel = document.createElement("div");
@@ -2682,6 +2688,122 @@ export class ConstructionMenu {
 
         this.panelEditor.appendChild(weaponControlsContainer);
 
+        // --- NEW: Consumable Controls ---
+        const consumableControlsContainer = document.createElement("div");
+        consumableControlsContainer.style.cssText = `
+            width: 100%;
+            display: none;
+            flex-direction: column;
+            gap: 14px;
+            border-top: 1px solid #444;
+            padding-top: 10px;
+        `;
+
+        const createConsumableInputMix = (labelText, min, max, step, initialVal, onChange) => {
+            const row = document.createElement("div");
+            row.style.cssText = "display: flex; flex-direction: column; gap: 6px; text-align: left;";
+
+            const label = document.createElement("span");
+            label.textContent = labelText;
+            label.style.cssText = "font-size: 13px; color: #ccc;";
+            row.appendChild(label);
+
+            const flexContainer = document.createElement("div");
+            flexContainer.style.cssText = "display: flex; align-items: center; gap: 10px;";
+
+            const slider = document.createElement("input");
+            slider.type = "range";
+            slider.min = String(min);
+            slider.max = String(max);
+            slider.step = String(step);
+            slider.value = String(initialVal);
+            slider.style.cssText = "flex: 1; cursor: pointer;";
+
+            const numBox = document.createElement("input");
+            numBox.type = "number";
+            numBox.min = String(min);
+            numBox.max = String(max);
+            numBox.step = String(step);
+            numBox.value = String(initialVal);
+            numBox.style.cssText = "width: 70px; background: #333; color: white; border: 1px solid #555; border-radius: 4px; padding: 4px 6px; font-size: 13px; text-align: center;";
+
+            slider.addEventListener("input", (e) => {
+                const val = parseFloat(e.target.value);
+                numBox.value = String(val);
+                onChange(val);
+            });
+
+            numBox.addEventListener("input", (e) => {
+                let val = parseFloat(e.target.value);
+                if (isNaN(val)) return;
+
+                if (val < min) val = min;
+                if (val > max) val = max;
+
+                slider.value = String(val);
+                numBox.value = String(val);
+                onChange(val);
+            });
+
+            flexContainer.appendChild(slider);
+            flexContainer.appendChild(numBox);
+            row.appendChild(flexContainer);
+
+            return { row, slider, numBox };
+        };
+
+        const airLimitMix = createConsumableInputMix("Uso en el Aire (segundos consecutivos):", 1, 30, 0.5, 5, (val) => {
+            if (this.currentDraftItem) this.currentDraftItem.airLimit = val;
+        });
+        this.airLimitSlider = airLimitMix.slider;
+        this.airLimitNumBox = airLimitMix.numBox;
+
+        const consumableUseMix = createConsumableInputMix("Uso Consumible (segundos totales):", 5, 300, 1, 30, (val) => {
+            if (this.currentDraftItem) {
+                this.currentDraftItem.consumableUse = val;
+                this.currentDraftItem.maxConsumableUse = val;
+            }
+        });
+        this.consumableUseSlider = consumableUseMix.slider;
+        this.consumableUseNumBox = consumableUseMix.numBox;
+
+        const thrustMix = createConsumableInputMix("Fuerza de Impulso:", 5, 50, 0.5, 25, (val) => {
+            if (this.currentDraftItem) this.currentDraftItem.thrust = val;
+        });
+        this.thrustSlider = thrustMix.slider;
+        this.thrustNumBox = thrustMix.numBox;
+
+        const vfxRow = document.createElement("div");
+        vfxRow.style.cssText = "display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 13px; text-align: left;";
+        const vfxLabel = document.createElement("span");
+        vfxLabel.textContent = "Efecto VFX:";
+        vfxLabel.style.color = "#ccc";
+
+        const vfxSelect = document.createElement("select");
+        vfxSelect.style.cssText = "padding: 6px; background: #333; color: white; border: 1px solid #555; border-radius: 4px; font-size: 12px; cursor: pointer; flex: 1;";
+        const vfxOptions = ["Humo y Fuego", "Sólo Humo", "Sólo Fuego", "Chispas", "Ninguno"];
+        vfxOptions.forEach(opt => {
+            const el = document.createElement("option");
+            el.value = opt;
+            el.textContent = opt;
+            vfxSelect.appendChild(el);
+        });
+        vfxSelect.addEventListener("change", (e) => {
+            if (this.currentDraftItem) this.currentDraftItem.particleVFX = e.target.value;
+        });
+        this.vfxSelect = vfxSelect;
+
+        vfxRow.appendChild(vfxLabel);
+        vfxRow.appendChild(vfxSelect);
+
+        consumableControlsContainer.appendChild(airLimitMix.row);
+        consumableControlsContainer.appendChild(consumableUseMix.row);
+        consumableControlsContainer.appendChild(thrustMix.row);
+        consumableControlsContainer.appendChild(vfxRow);
+
+        this.panelEditor.appendChild(consumableControlsContainer);
+        this.editorConsumableControlsContainer = consumableControlsContainer;
+
         // --- NEW: Logic Controls ---
         const logicControlsContainer = document.createElement("div");
         logicControlsContainer.style.cssText = `
@@ -2700,6 +2822,7 @@ export class ConstructionMenu {
         this.editorTextureContainer = textureContainer;
         this.editorDimContainer = dimContainer;
         this.editorWeaponControlsContainer = weaponControlsContainer;
+        this.editorConsumableControlsContainer = consumableControlsContainer;
 
         const dragHint = document.createElement("div");
         dragHint.textContent = "Arrastra la imagen superior a tu inventario";
@@ -2732,6 +2855,7 @@ export class ConstructionMenu {
             this.editorTextureContainer.style.display = "none";
             this.editorDimContainer.style.display = "none";
             this.editorWeaponControlsContainer.style.display = "flex";
+            this.editorConsumableControlsContainer.style.display = "none";
 
             this.damageInput.value = baseItem.damage !== undefined ? baseItem.damage : 10;
             this.cooldownInput.value = baseItem.cooldown !== undefined ? baseItem.cooldown : 0.5;
@@ -2763,12 +2887,36 @@ export class ConstructionMenu {
 
             this.playerImpulseBackInput.checked = baseItem.hasPlayerImpulseBack !== undefined ? baseItem.hasPlayerImpulseBack : false;
             this.playerImpulseBackForceInput.value = baseItem.playerImpulseBackForce !== undefined ? baseItem.playerImpulseBackForce : 5.0;
+        } else if (baseItem.type === "consumable") {
+            if (this.advancedConfigBtn) this.advancedConfigBtn.style.display = "none";
+            this.editorConstructionControls.style.display = "none";
+            this.editorTextureContainer.style.display = "none";
+            this.editorDimContainer.style.display = "none";
+            this.editorWeaponControlsContainer.style.display = "none";
+            this.editorConsumableControlsContainer.style.display = "flex";
+
+            const airLim = baseItem.airLimit !== undefined ? baseItem.airLimit : 5;
+            const consUse = baseItem.consumableUse !== undefined ? baseItem.consumableUse : 30;
+            const thr = baseItem.thrust !== undefined ? baseItem.thrust : 25;
+            const vfx = baseItem.particleVFX !== undefined ? baseItem.particleVFX : "Humo y Fuego";
+
+            this.airLimitSlider.value = String(airLim);
+            this.airLimitNumBox.value = String(airLim);
+
+            this.consumableUseSlider.value = String(consUse);
+            this.consumableUseNumBox.value = String(consUse);
+
+            this.thrustSlider.value = String(thr);
+            this.thrustNumBox.value = String(thr);
+
+            this.vfxSelect.value = vfx;
         } else {
             if (this.advancedConfigBtn) this.advancedConfigBtn.style.display = "none";
             this.editorConstructionControls.style.display = "flex";
             this.editorTextureContainer.style.display = "flex";
             this.editorDimContainer.style.display = "flex";
             this.editorWeaponControlsContainer.style.display = "none";
+            this.editorConsumableControlsContainer.style.display = "none";
 
             // Reset color picker
             const hex = baseItem.color !== undefined ? "#" + new THREE.Color(baseItem.color).getHexString() : "#ffffff";
@@ -2798,7 +2946,7 @@ export class ConstructionMenu {
     }
 
     createDraft(id, name, type, color, scale, texturePath = null, baseItem = null) {
-        if (type === "weapon" && baseItem && baseItem.clone) {
+        if ((type === "weapon" || type === "consumable") && baseItem && baseItem.clone) {
             this.currentDraftItem = baseItem.clone();
         } else {
             this.currentDraftItem = new MapObjectItem(id, name, type, "", color, scale, texturePath);

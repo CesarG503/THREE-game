@@ -282,7 +282,7 @@ export function animate(this: any) {
 			const sendAttacking = isAttacking || this._netAttackLatch;
 
 			const currentItem = this.inventoryManager ? this.inventoryManager.getCurrentItem() : null;
-			const equippedWeapon = (currentItem && currentItem.type === "weapon") ? currentItem.id : null;
+			const equippedWeapon = (currentItem && (currentItem.type === "weapon" || currentItem.id === "jetpack" || currentItem.id.startsWith("jetpack"))) ? currentItem.id : null;
 			const equippedHand = (currentItem && currentItem.equippedHand) ? currentItem.equippedHand : "right";
 
 			const playerState = {

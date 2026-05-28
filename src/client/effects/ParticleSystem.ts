@@ -304,6 +304,120 @@ export class ParticleSystem {
     this._addSystem(system);
   }
 
+  spawnJetpackEffect(position: any, normal: any = new THREE.Vector3(0, -1, 0), vfxType: string = "Humo y Fuego") {
+    if (vfxType === "Ninguno") return;
+
+    const showSmoke = vfxType === "Humo y Fuego" || vfxType === "Sólo Humo";
+    const showFire = vfxType === "Humo y Fuego" || vfxType === "Sólo Fuego";
+    const showSparks = vfxType === "Chispas";
+
+    if (showFire) {
+      const system = new QParticleSystem({
+        duration: 0.1,
+        looping: false,
+        startLife: new IntervalValue(0.1, 0.3),
+        startSpeed: new IntervalValue(4, 8),
+        startSize: new IntervalValue(0.15, 0.3),
+        startColor: new ColorRange(new Vector4(1, 0.8, 0.1, 1), new Vector4(1, 0.1, 0, 0.2)),
+        worldSpace: true,
+        emissionOverTime: new ConstantValue(0),
+        emissionBursts: [
+          {
+            time: 0,
+            count: new ConstantValue(4),
+            cycle: 1,
+            interval: 0.01,
+            probability: 1
+          }
+        ],
+        shape: new ConeEmitter({
+          radius: 0.05,
+          angle: 0.2,
+          thickness: 1,
+          arc: Math.PI * 2
+        }),
+        material: this.impactMaterial,
+        renderMode: RenderMode.BillBoard
+      });
+      const quaternion = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), normal);
+      system.emitter.quaternion.copy(quaternion);
+      system.addBehavior(new SizeOverLife(new PiecewiseBezier([[new Bezier(1, 0.5, 0.2, 0), 0]])));
+      system.emitter.position.copy(position);
+      this._addSystem(system);
+    }
+
+    if (showSmoke) {
+      const system = new QParticleSystem({
+        duration: 0.2,
+        looping: false,
+        startLife: new IntervalValue(0.3, 0.6),
+        startSpeed: new IntervalValue(2, 5),
+        startSize: new IntervalValue(0.15, 0.4),
+        startColor: new ColorRange(new Vector4(0.6, 0.6, 0.6, 0.6), new Vector4(0.3, 0.3, 0.3, 0)),
+        worldSpace: true,
+        emissionOverTime: new ConstantValue(0),
+        emissionBursts: [
+          {
+            time: 0,
+            count: new ConstantValue(3),
+            cycle: 1,
+            interval: 0.01,
+            probability: 1
+          }
+        ],
+        shape: new ConeEmitter({
+          radius: 0.1,
+          angle: 0.3,
+          thickness: 1,
+          arc: Math.PI * 2
+        }),
+        material: this.jumpMaterial,
+        renderMode: RenderMode.BillBoard
+      });
+      const quaternion = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), normal);
+      system.emitter.quaternion.copy(quaternion);
+      system.addBehavior(new SizeOverLife(new PiecewiseBezier([[new Bezier(0.5, 1, 1.2, 1.5), 0]])));
+      system.emitter.position.copy(position);
+      this._addSystem(system);
+    }
+
+    if (showSparks) {
+      const system = new QParticleSystem({
+        duration: 0.1,
+        looping: false,
+        startLife: new IntervalValue(0.15, 0.45),
+        startSpeed: new IntervalValue(6, 12),
+        startSize: new IntervalValue(0.02, 0.08),
+        startColor: new ColorRange(new Vector4(1, 0.9, 0.5, 1), new Vector4(1, 0.5, 0.1, 0)),
+        worldSpace: true,
+        emissionOverTime: new ConstantValue(0),
+        emissionBursts: [
+          {
+            time: 0,
+            count: new ConstantValue(6),
+            cycle: 1,
+            interval: 0.01,
+            probability: 1
+          }
+        ],
+        shape: new ConeEmitter({
+          radius: 0.02,
+          angle: 0.4,
+          thickness: 1,
+          arc: Math.PI * 2
+        }),
+        material: this.impactMaterial,
+        renderMode: RenderMode.StretchedBillBoard,
+        speedFactor: 0.03
+      });
+      const quaternion = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), normal);
+      system.emitter.quaternion.copy(quaternion);
+      system.addBehavior(new SizeOverLife(new PiecewiseBezier([[new Bezier(1, 0.6, 0.2, 0), 0]])));
+      system.emitter.position.copy(position);
+      this._addSystem(system);
+    }
+  }
+
   update(dt: any) {
     this.batchRenderer.update(dt);
   }

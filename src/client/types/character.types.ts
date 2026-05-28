@@ -9,7 +9,7 @@ export interface ICharacterModel {
     setRotation(rot: number): void;
     getPosition(): Vector3;
     setHeldItem(item: any): void;
-    update(dt: number, isMoving: boolean, isCrouching?: boolean, isAttacking?: boolean, isGrounded?: boolean, verticalVelocity?: number): void;
+    update(dt: number, isMoving: boolean, isCrouching?: boolean, isAttacking?: boolean, isGrounded?: boolean, verticalVelocity?: number, isSuperman?: boolean): void;
 
     // Métodos opcionales específicos
     switchAnimation?: (name: string) => void;

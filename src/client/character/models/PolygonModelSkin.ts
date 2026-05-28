@@ -472,6 +472,13 @@ export class PolygonModelSkin implements ICharacterModel {
     const targetHeadRotX = targetBodyRotX - (this.targetHeadPitch || 0);
     this.headGroup.rotation.x = THREE.MathUtils.lerp(this.headGroup.rotation.x, targetHeadRotX, lerpSpeed * 2.0);
 
+    if (this.backItemMesh) {
+      const targetBackY = (1.3 - 6 * pixelScale) - crouchOffset;
+      this.backItemMesh.position.y = THREE.MathUtils.lerp(this.backItemMesh.position.y, targetBackY, lerpSpeed);
+      const targetBackRotX = -this.body.rotation.x;
+      this.backItemMesh.rotation.x = THREE.MathUtils.lerp(this.backItemMesh.rotation.x, targetBackRotX, lerpSpeed);
+    }
+
     if (isSuperman) {
       const targetPivotRotX = Math.PI / 2.2;
       this.pivotGroup.rotation.x = THREE.MathUtils.lerp(this.pivotGroup.rotation.x, targetPivotRotX, 10 * dt);

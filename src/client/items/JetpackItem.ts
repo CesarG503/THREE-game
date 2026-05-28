@@ -18,6 +18,10 @@ export class JetpackItem extends Item {
   equipSlot: string;
   modelPath: string;
   modelScale: number;
+  limitHeightEnabled: boolean;
+  maxFlightHeight: number;
+  cooldownEnabled: boolean;
+  cooldownTime: number;
 
   model: THREE.Object3D | null;
   equipGroup: THREE.Group;
@@ -37,6 +41,10 @@ export class JetpackItem extends Item {
     this.maxConsumableUse = config.maxConsumableUse !== undefined ? config.maxConsumableUse : 30;
     this.thrust = config.thrust !== undefined ? config.thrust : 25.0;
     this.particleVFX = config.particleVFX || "Humo y Fuego";
+    this.limitHeightEnabled = config.limitHeightEnabled !== undefined ? config.limitHeightEnabled : true;
+    this.maxFlightHeight = config.maxFlightHeight !== undefined ? config.maxFlightHeight : 20.0;
+    this.cooldownEnabled = config.cooldownEnabled !== undefined ? config.cooldownEnabled : false;
+    this.cooldownTime = config.cooldownTime !== undefined ? config.cooldownTime : 3.0;
     this.equipSlot = "back";
     this.modelPath = "/assets/Jetpack.glb";
     this.modelScale = 1;
@@ -136,7 +144,11 @@ export class JetpackItem extends Item {
       consumableUse: this.consumableUse,
       maxConsumableUse: this.maxConsumableUse,
       thrust: this.thrust,
-      particleVFX: this.particleVFX
+      particleVFX: this.particleVFX,
+      limitHeightEnabled: this.limitHeightEnabled,
+      maxFlightHeight: this.maxFlightHeight,
+      cooldownEnabled: this.cooldownEnabled,
+      cooldownTime: this.cooldownTime
     });
   }
 }

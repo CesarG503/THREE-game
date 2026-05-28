@@ -251,6 +251,9 @@ export function animate(this: any) {
 	// Character Update
 	const remotePlayers = this.networkManager ? this.networkManager.remotePlayers : null;
 	this.character.update(dt, this.inputManager, remotePlayers);
+	if (this.inventoryManager) {
+		this.inventoryManager.updateFuelBars();
+	}
 
 	// Camera Update
 	this.cameraController.update(this.character.getPosition(), this.character.getRotation(), dt);

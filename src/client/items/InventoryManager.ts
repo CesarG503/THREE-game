@@ -149,8 +149,55 @@ export class InventoryManager {
         img.style.width = "70%";
         img.style.height = "70%";
         img.style.objectFit = "contain";
+        img.style.zIndex = "2";
+        img.style.position = "relative";
         img.draggable = false;
         slotEl.appendChild(img);
+
+        if (numberEl) {
+          (numberEl as HTMLElement).style.zIndex = "3";
+        }
+      }
+    });
+
+    this.updateFuelBars();
+  }
+
+  updateFuelBars() {
+    this.uiSlots.forEach((slotEl: Element, index: number) => {
+      const item = this.slots[index];
+      const fuelOverlay = slotEl.querySelector(".fuel-overlay") as HTMLElement;
+
+      if (item && item.type === "consumable" && item.maxConsumableUse !== undefined) {
+        const pct = item.maxConsumableUse > 0 ? Math.max(0, Math.min(1.0, item.consumableUse / item.maxConsumableUse)) : 0;
+        
+        let overlay = fuelOverlay;
+        if (!overlay) {
+          overlay = document.createElement("div");
+          overlay.className = "fuel-overlay";
+          overlay.style.cssText = "position: absolute; bottom: 0; left: 0; height: 100%; z-index: 1; opacity: 0.35; pointer-events: none; transition: width 0.05s linear;";
+          (slotEl as HTMLElement).style.position = "relative";
+          (slotEl as HTMLElement).style.overflow = "hidden";
+          slotEl.insertBefore(overlay, slotEl.firstChild);
+        }
+
+        overlay.style.width = `${pct * 100}%`;
+
+        if (pct <= 0) {
+          const blink = Math.floor(Date.now() / 150) % 2 === 0;
+          overlay.style.backgroundColor = blink ? "#ff3333" : "#d6b600";
+          overlay.style.width = "100%";
+        } else if (pct <= 0.2) {
+          overlay.style.backgroundColor = "#ff3333";
+        } else if (pct <= 0.5) {
+          overlay.style.backgroundColor = "#d6b600";
+        } else {
+          overlay.style.backgroundColor = "#00aa00";
+        }
+      } else {
+        if (fuelOverlay) {
+          fuelOverlay.remove();
+        }
       }
     });
   }

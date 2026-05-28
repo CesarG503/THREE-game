@@ -2703,10 +2703,23 @@ export class ConstructionMenu {
             const row = document.createElement("div");
             row.style.cssText = "display: flex; flex-direction: column; gap: 6px; text-align: left;";
 
+            const header = document.createElement("div");
+            header.style.cssText = "display: flex; align-items: center; gap: 8px; margin-bottom: 2px;";
+
+            let mode = "standard";
+
+            const toggleBtn = document.createElement("button");
+            toggleBtn.innerHTML = "&#9881;"; // Gear character ⚙
+            toggleBtn.style.cssText = "background: none; border: 1px solid #555; color: #aaa; cursor: pointer; padding: 0; font-size: 11px; border-radius: 4px; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; outline: none; transition: all 0.2s ease;";
+            toggleBtn.title = "Alternar entre barra deslizadora y entrada numérica directa";
+
             const label = document.createElement("span");
             label.textContent = labelText;
             label.style.cssText = "font-size: 13px; color: #ccc;";
-            row.appendChild(label);
+
+            header.appendChild(toggleBtn);
+            header.appendChild(label);
+            row.appendChild(header);
 
             const flexContainer = document.createElement("div");
             flexContainer.style.cssText = "display: flex; align-items: center; gap: 10px;";
@@ -2727,20 +2740,42 @@ export class ConstructionMenu {
             numBox.value = String(initialVal);
             numBox.style.cssText = "width: 70px; background: #333; color: white; border: 1px solid #555; border-radius: 4px; padding: 4px 6px; font-size: 13px; text-align: center;";
 
-            slider.addEventListener("input", (e) => {
+            const updateView = () => {
+                if (mode === "standard") {
+                    slider.style.display = "block";
+                    numBox.style.width = "70px";
+                    toggleBtn.style.borderColor = "#555";
+                    toggleBtn.style.color = "#aaa";
+                    toggleBtn.innerHTML = "&#9881;"; // Gear
+                } else {
+                    slider.style.display = "none";
+                    numBox.style.width = "100%"; // Take full width of the row when slider is hidden
+                    toggleBtn.style.borderColor = "#44f";
+                    toggleBtn.style.color = "#0ff";
+                    toggleBtn.innerHTML = "&infin;"; // Infinity (Free text mode)
+                }
+            };
+
+            toggleBtn.addEventListener("click", () => {
+                mode = mode === "standard" ? "free" : "standard";
+                updateView();
+            });
+
+            slider.addEventListener("input", (e: any) => {
                 const val = parseFloat(e.target.value);
                 numBox.value = String(val);
                 onChange(val);
             });
 
-            numBox.addEventListener("input", (e) => {
+            numBox.addEventListener("input", (e: any) => {
                 let val = parseFloat(e.target.value);
                 if (isNaN(val)) return;
 
-                if (val < min) val = min;
-                if (val > max) val = max;
-
-                slider.value = String(val);
+                if (mode === "standard") {
+                    if (val < min) val = min;
+                    if (val > max) val = max;
+                    slider.value = String(val);
+                }
                 numBox.value = String(val);
                 onChange(val);
             });
@@ -2748,6 +2783,8 @@ export class ConstructionMenu {
             flexContainer.appendChild(slider);
             flexContainer.appendChild(numBox);
             row.appendChild(flexContainer);
+
+            updateView();
 
             return { row, slider, numBox };
         };
@@ -2796,10 +2833,118 @@ export class ConstructionMenu {
         vfxRow.appendChild(vfxLabel);
         vfxRow.appendChild(vfxSelect);
 
+        const heightLimitRow = document.createElement("div");
+        heightLimitRow.style.cssText = "display: flex; align-items: center; gap: 10px; font-size: 13px; text-align: left; margin-top: 5px; cursor: pointer; user-select: none;";
+
+        const heightLimitCheck = document.createElement("input");
+        heightLimitCheck.type = "checkbox";
+        heightLimitCheck.checked = true;
+        heightLimitCheck.style.cssText = "width: 16px; height: 16px; cursor: pointer; flex-shrink: 0;";
+        heightLimitCheck.addEventListener("change", (e: any) => {
+            if (this.currentDraftItem) {
+                this.currentDraftItem.limitHeightEnabled = e.target.checked;
+            }
+            heightValueRow.style.display = e.target.checked ? "flex" : "none";
+        });
+        this.heightLimitCheck = heightLimitCheck;
+
+        const heightLimitLabel = document.createElement("span");
+        heightLimitLabel.textContent = "Limitar altura de vuelo";
+        heightLimitLabel.style.color = "#ccc";
+
+        heightLimitRow.appendChild(heightLimitCheck);
+        heightLimitRow.appendChild(heightLimitLabel);
+
+        heightLimitRow.addEventListener("click", (e) => {
+            if (e.target !== heightLimitCheck) {
+                heightLimitCheck.checked = !heightLimitCheck.checked;
+                heightLimitCheck.dispatchEvent(new Event("change"));
+            }
+        });
+
+        const heightValueRow = document.createElement("div");
+        heightValueRow.style.cssText = "display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 13px; text-align: left; margin-left: 26px; margin-top: 2px;";
+        const heightValueLabel = document.createElement("span");
+        heightValueLabel.textContent = "Altura Máxima (metros):";
+        heightValueLabel.style.color = "#aaa";
+        const heightValueInput = document.createElement("input");
+        heightValueInput.type = "number";
+        heightValueInput.min = "1";
+        heightValueInput.max = "500";
+        heightValueInput.step = "1";
+        heightValueInput.value = "20";
+        heightValueInput.style.cssText = "width: 70px; background: #333; color: white; border: 1px solid #555; border-radius: 4px; padding: 4px 6px; font-size: 13px; text-align: center;";
+        heightValueInput.addEventListener("input", (e: any) => {
+            const val = parseFloat(e.target.value);
+            if (!isNaN(val) && this.currentDraftItem) {
+                this.currentDraftItem.maxFlightHeight = val;
+            }
+        });
+        this.heightValueInput = heightValueInput;
+        heightValueRow.appendChild(heightValueLabel);
+        heightValueRow.appendChild(heightValueInput);
+
+        // Cooldown checkbox
+        const jetpackCooldownRow = document.createElement("div");
+        jetpackCooldownRow.style.cssText = "display: flex; align-items: center; gap: 10px; font-size: 13px; text-align: left; margin-top: 5px; cursor: pointer; user-select: none;";
+
+        const cooldownCheck = document.createElement("input");
+        cooldownCheck.type = "checkbox";
+        cooldownCheck.checked = false; // Desactivado por defecto
+        cooldownCheck.style.cssText = "width: 16px; height: 16px; cursor: pointer; flex-shrink: 0;";
+        cooldownCheck.addEventListener("change", (e: any) => {
+            if (this.currentDraftItem) {
+                this.currentDraftItem.cooldownEnabled = e.target.checked;
+            }
+            cooldownValueRow.style.display = e.target.checked ? "flex" : "none";
+        });
+        this.cooldownCheck = cooldownCheck;
+
+        const jetpackCooldownLabel = document.createElement("span");
+        jetpackCooldownLabel.textContent = "Tiempo de recarga";
+        jetpackCooldownLabel.style.color = "#ccc";
+
+        jetpackCooldownRow.appendChild(cooldownCheck);
+        jetpackCooldownRow.appendChild(jetpackCooldownLabel);
+
+        jetpackCooldownRow.addEventListener("click", (e) => {
+            if (e.target !== cooldownCheck) {
+                cooldownCheck.checked = !cooldownCheck.checked;
+                cooldownCheck.dispatchEvent(new Event("change"));
+            }
+        });
+
+        // Cooldown value row
+        const cooldownValueRow = document.createElement("div");
+        cooldownValueRow.style.cssText = "display: none; align-items: center; justify-content: space-between; gap: 10px; font-size: 13px; text-align: left; margin-left: 26px; margin-top: 2px;";
+        const cooldownValueLabel = document.createElement("span");
+        cooldownValueLabel.textContent = "Tiempo de Recarga (segundos):";
+        cooldownValueLabel.style.color = "#aaa";
+        const cooldownValueInput = document.createElement("input");
+        cooldownValueInput.type = "number";
+        cooldownValueInput.min = "0.5";
+        cooldownValueInput.max = "60";
+        cooldownValueInput.step = "0.5";
+        cooldownValueInput.value = "3";
+        cooldownValueInput.style.cssText = "width: 70px; background: #333; color: white; border: 1px solid #555; border-radius: 4px; padding: 4px 6px; font-size: 13px; text-align: center;";
+        cooldownValueInput.addEventListener("input", (e: any) => {
+            const val = parseFloat(e.target.value);
+            if (!isNaN(val) && this.currentDraftItem) {
+                this.currentDraftItem.cooldownTime = val;
+            }
+        });
+        this.cooldownValueInput = cooldownValueInput;
+        cooldownValueRow.appendChild(cooldownValueLabel);
+        cooldownValueRow.appendChild(cooldownValueInput);
+
         consumableControlsContainer.appendChild(airLimitMix.row);
         consumableControlsContainer.appendChild(consumableUseMix.row);
         consumableControlsContainer.appendChild(thrustMix.row);
         consumableControlsContainer.appendChild(vfxRow);
+        consumableControlsContainer.appendChild(heightLimitRow);
+        consumableControlsContainer.appendChild(heightValueRow);
+        consumableControlsContainer.appendChild(jetpackCooldownRow);
+        consumableControlsContainer.appendChild(cooldownValueRow);
 
         this.panelEditor.appendChild(consumableControlsContainer);
         this.editorConsumableControlsContainer = consumableControlsContainer;
@@ -2899,6 +3044,10 @@ export class ConstructionMenu {
             const consUse = baseItem.consumableUse !== undefined ? baseItem.consumableUse : 30;
             const thr = baseItem.thrust !== undefined ? baseItem.thrust : 25;
             const vfx = baseItem.particleVFX !== undefined ? baseItem.particleVFX : "Humo y Fuego";
+            const limHeight = baseItem.limitHeightEnabled !== undefined ? baseItem.limitHeightEnabled : true;
+            const maxHt = baseItem.maxFlightHeight !== undefined ? baseItem.maxFlightHeight : 20.0;
+            const coolEnabled = baseItem.cooldownEnabled !== undefined ? baseItem.cooldownEnabled : false;
+            const coolTime = baseItem.cooldownTime !== undefined ? baseItem.cooldownTime : 3.0;
 
             this.airLimitSlider.value = String(airLim);
             this.airLimitNumBox.value = String(airLim);
@@ -2910,6 +3059,25 @@ export class ConstructionMenu {
             this.thrustNumBox.value = String(thr);
 
             this.vfxSelect.value = vfx;
+            this.heightLimitCheck.checked = limHeight;
+            this.heightValueInput.value = String(maxHt);
+            this.heightValueInput.parentElement.style.display = limHeight ? "flex" : "none";
+
+            this.cooldownCheck.checked = coolEnabled;
+            this.cooldownValueInput.value = String(coolTime);
+            this.cooldownValueInput.parentElement.style.display = coolEnabled ? "flex" : "none";
+
+            if (this.currentDraftItem) {
+                this.currentDraftItem.airLimit = airLim;
+                this.currentDraftItem.consumableUse = consUse;
+                this.currentDraftItem.maxConsumableUse = consUse;
+                this.currentDraftItem.thrust = thr;
+                this.currentDraftItem.particleVFX = vfx;
+                this.currentDraftItem.limitHeightEnabled = limHeight;
+                this.currentDraftItem.maxFlightHeight = maxHt;
+                this.currentDraftItem.cooldownEnabled = coolEnabled;
+                this.currentDraftItem.cooldownTime = coolTime;
+            }
         } else {
             if (this.advancedConfigBtn) this.advancedConfigBtn.style.display = "none";
             this.editorConstructionControls.style.display = "flex";
@@ -2966,7 +3134,7 @@ export class ConstructionMenu {
 
     updateLogicControls(baseItem) {
         this.editorLogicControlsContainer.innerHTML = "";
-        
+
         const logicTypes = ["spawn_point", "movement_controller", "interaction_button", "interactive_collision", "target", "impulse_jump", "impulse_lateral", "farming_zone"];
         if (!logicTypes.includes(baseItem.type) && !baseItem.logicProperties) {
             this.editorLogicControlsContainer.style.display = "none";
@@ -3032,7 +3200,7 @@ export class ConstructionMenu {
         if (!this.currentDraftItem.logicProperties) {
             this.currentDraftItem.logicProperties = {};
         }
-        
+
         if (this.currentDraftItem.logicProperties[key] === undefined) {
             this.currentDraftItem.logicProperties[key] = defaultValue;
         }

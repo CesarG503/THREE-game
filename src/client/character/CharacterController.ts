@@ -51,6 +51,7 @@ export class CharacterController {
   listeners: Record<string, Function[]>;
   equippedItem: any;
   consecutiveAirTime: number;
+  jetpackCooldownTimer: number;
 
   constructor(scene: THREE.Scene, world: RAPIER.World, camera: THREE.Camera, cameraController: any) {
     this.scene = scene;
@@ -118,6 +119,7 @@ export class CharacterController {
     this.listeners = {};
     this.equippedItem = null;
     this.consecutiveAirTime = 0;
+    this.jetpackCooldownTimer = 0;
   }
 
   on(event: string, callback: Function) {
@@ -335,9 +337,29 @@ export class CharacterController {
     const hasJetpack = this.equippedItem && (this.equippedItem.id === "jetpack" || this.equippedItem.id.startsWith("jetpack_"));
     const hasFuel = hasJetpack && this.equippedItem.consumableUse > 0;
     const withinAirLimit = hasJetpack && this.consecutiveAirTime < this.equippedItem.airLimit;
-    const isUsingJetpackCameraDir = hasJetpack && input.keys.jump && input.keys.crouch && hasFuel && withinAirLimit;
-    const isUsingJetpackNormal = hasJetpack && input.keys.jump && !isGrounded && hasFuel && withinAirLimit && !input.keys.crouch;
+
+    // Cooldown logic: if enabled, recharges when on ground and not in flight
+    if (hasJetpack) {
+      if (this.equippedItem.cooldownEnabled) {
+        const isUsingNow = this.consecutiveAirTime > 0;
+        if (!isUsingNow && isGrounded) {
+          const cooldownLimit = this.equippedItem.cooldownTime !== undefined ? this.equippedItem.cooldownTime : 3.0;
+          this.jetpackCooldownTimer = Math.min(cooldownLimit, this.jetpackCooldownTimer + dt);
+        }
+      } else {
+        this.jetpackCooldownTimer = 0;
+      }
+    }
+
+    const cooldownReady = !hasJetpack || !this.equippedItem.cooldownEnabled || this.consecutiveAirTime > 0 || this.jetpackCooldownTimer >= (this.equippedItem.cooldownTime !== undefined ? this.equippedItem.cooldownTime : 3.0);
+
+    const isUsingJetpackCameraDir = hasJetpack && input.keys.jump && input.keys.crouch && hasFuel && withinAirLimit && cooldownReady;
+    const isUsingJetpackNormal = hasJetpack && input.keys.jump && !isGrounded && hasFuel && withinAirLimit && !input.keys.crouch && cooldownReady;
     let isUsingJetpack = isUsingJetpackCameraDir || isUsingJetpackNormal;
+
+    if (isUsingJetpack) {
+      this.jetpackCooldownTimer = 0;
+    }
 
     const isSuperman = isUsingJetpack && input.keys.crouch;
     const visualCrouch = input.keys.crouch && !isSuperman;
@@ -347,6 +369,15 @@ export class CharacterController {
     this.polygonModelSkin.update(dt, hasInput, visualCrouch, input.keys.attack, isGrounded, this.verticalVelocity, isSuperman);
 
     if (this.particleSystem) this.particleSystem.update(dt);
+
+    if (hasJetpack) {
+      const currentAirTimeLeft = Math.max(0, this.equippedItem.airLimit - this.consecutiveAirTime);
+      this.emit("jumpChanged", {
+        current: currentAirTimeLeft,
+        max: this.equippedItem.airLimit,
+        type: "jetpack"
+      });
+    }
 
     if (this.isClimbing) {
       this.verticalVelocity = 0;
@@ -390,7 +421,21 @@ export class CharacterController {
       const flyDir = new THREE.Vector3();
       this.camera.getWorldDirection(flyDir);
 
-      const velocity = flyDir.clone().multiplyScalar(this.equippedItem.thrust);
+      let velocity = flyDir.clone().multiplyScalar(this.equippedItem.thrust);
+
+      let limitActive = false;
+      if (this.equippedItem && this.equippedItem.limitHeightEnabled) {
+        const curY = this.getPosition().y;
+        const maxLimit = this.equippedItem.maxFlightHeight !== undefined ? this.equippedItem.maxFlightHeight : 20.0;
+        if (curY >= maxLimit) {
+          limitActive = true;
+        }
+      }
+
+      if (limitActive && velocity.y > 0) {
+        velocity.y = 0;
+      }
+
       desiredTranslation.copy(velocity.multiplyScalar(dt));
       this.verticalVelocity = velocity.y;
 
@@ -440,10 +485,23 @@ export class CharacterController {
         isUsingJetpack = true;
         this.consecutiveAirTime += dt;
 
-        this.verticalVelocity += (this.equippedItem.thrust - 35) * dt;
+        let limitActive = false;
+        if (this.equippedItem && this.equippedItem.limitHeightEnabled) {
+          const curY = this.getPosition().y;
+          const maxLimit = this.equippedItem.maxFlightHeight !== undefined ? this.equippedItem.maxFlightHeight : 20.0;
+          if (curY >= maxLimit) {
+            limitActive = true;
+          }
+        }
 
-        if (this.verticalVelocity > this.equippedItem.thrust) {
-          this.verticalVelocity = this.equippedItem.thrust;
+        if (limitActive) {
+          this.verticalVelocity = Math.min(this.verticalVelocity, 0);
+        } else {
+          this.verticalVelocity += (this.equippedItem.thrust - 35) * dt;
+
+          if (this.verticalVelocity > this.equippedItem.thrust) {
+            this.verticalVelocity = this.equippedItem.thrust;
+          }
         }
 
         this.equippedItem.consumeFuel(dt);
@@ -745,6 +803,14 @@ export class CharacterController {
 
     if (this.polygonModelSkin) {
       this.polygonModelSkin.setHeldItem(item);
+    }
+
+    const hasJetpack = item && (item.id === "jetpack" || item.id.startsWith("jetpack_"));
+    if (hasJetpack) {
+      const cooldownLimit = item.cooldownTime !== undefined ? item.cooldownTime : 3.0;
+      this.jetpackCooldownTimer = cooldownLimit; // Start fully charged!
+    } else {
+      this.emit("jumpChanged", { current: this.maxMultiJumps, max: this.maxMultiJumps, type: "reset" });
     }
   }
 

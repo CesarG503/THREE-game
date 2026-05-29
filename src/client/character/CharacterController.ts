@@ -202,6 +202,50 @@ export class CharacterController {
   update(dt: number, input: InputManager, remotePlayers: any[]) {
     if (!this.rigidBody) return;
 
+    const isGrounded = this.characterController ? this.characterController.computedGrounded() : false;
+
+    const hasJetpack = this.equippedItem && (this.equippedItem.id === "jetpack" || this.equippedItem.id.startsWith("jetpack_"));
+    const hasFuel = hasJetpack && this.equippedItem.consumableUse > 0;
+    const withinAirLimit = hasJetpack && this.consecutiveAirTime < this.equippedItem.airLimit;
+
+    // Cooldown logic: if enabled, recharges when on ground and not in flight
+    if (hasJetpack) {
+      if (this.equippedItem.cooldownEnabled) {
+        const isUsingNow = this.consecutiveAirTime > 0;
+        if (!isUsingNow && isGrounded) {
+          const cooldownLimit = this.equippedItem.cooldownTime !== undefined ? this.equippedItem.cooldownTime : 3.0;
+          this.jetpackCooldownTimer = Math.min(cooldownLimit, this.jetpackCooldownTimer + dt);
+        }
+      } else {
+        this.jetpackCooldownTimer = 0;
+      }
+    }
+
+    const cooldownReady = !hasJetpack || !this.equippedItem.cooldownEnabled || this.consecutiveAirTime > 0 || this.jetpackCooldownTimer >= (this.equippedItem.cooldownTime !== undefined ? this.equippedItem.cooldownTime : 3.0);
+
+    const pointerFollow = hasJetpack && (this.equippedItem.pointerFollowEnabled !== false);
+    const shiftFlight = hasJetpack && !!this.equippedItem.shiftFlightEnabled;
+    const isUsingJetpackShiftFlight = hasJetpack && shiftFlight && input.keys.crouch && hasFuel && withinAirLimit && cooldownReady;
+    const isUsingJetpackCameraDir = hasJetpack && !isUsingJetpackShiftFlight && input.keys.jump && input.keys.crouch && hasFuel && withinAirLimit && cooldownReady && pointerFollow;
+    const isUsingJetpackNormal = hasJetpack && input.keys.jump && !isGrounded && hasFuel && withinAirLimit && cooldownReady && (!input.keys.crouch || !pointerFollow);
+    let isUsingJetpack = isUsingJetpackCameraDir || isUsingJetpackNormal || isUsingJetpackShiftFlight;
+
+    if (isUsingJetpack) {
+      this.jetpackCooldownTimer = 0;
+    }
+
+    if (hasJetpack && input.keys.crouch) {
+      console.log("[Jetpack Debug] crouch is pressed! shiftFlightEnabled:", this.equippedItem.shiftFlightEnabled, "hasFuel:", hasFuel, "withinAirLimit:", withinAirLimit, "cooldownReady:", cooldownReady, "isUsingJetpackShiftFlight:", isUsingJetpackShiftFlight);
+    }
+
+    if (this.characterController) {
+      if (isUsingJetpack || this.isFlying) {
+        this.characterController.enableSnapToGround(0.0);
+      } else {
+        this.characterController.enableSnapToGround(0.5);
+      }
+    }
+
     if (this.noClip) {
       const speed = this.speed * 2;
       const moveDir = new THREE.Vector3();
@@ -298,6 +342,11 @@ export class CharacterController {
       } else {
         this.headPitch = 0;
         this.headYaw = 0;
+        if (isUsingJetpack || this.isFlying) {
+          const camDir = new THREE.Vector3();
+          this.camera.getWorldDirection(camDir);
+          this.headPitch = Math.asin(camDir.y);
+        }
         const targetRotation = Math.atan2(desiredTranslation.x, desiredTranslation.z) + Math.PI;
         let rotDiff = targetRotation - this.currentRotation;
         while (rotDiff > Math.PI) rotDiff -= Math.PI * 2;
@@ -329,45 +378,21 @@ export class CharacterController {
       } else {
         this.headPitch = 0;
         this.headYaw = 0;
-      }
-    }
-
-    const isGrounded = this.characterController.computedGrounded();
-
-    const hasJetpack = this.equippedItem && (this.equippedItem.id === "jetpack" || this.equippedItem.id.startsWith("jetpack_"));
-    const hasFuel = hasJetpack && this.equippedItem.consumableUse > 0;
-    const withinAirLimit = hasJetpack && this.consecutiveAirTime < this.equippedItem.airLimit;
-
-    // Cooldown logic: if enabled, recharges when on ground and not in flight
-    if (hasJetpack) {
-      if (this.equippedItem.cooldownEnabled) {
-        const isUsingNow = this.consecutiveAirTime > 0;
-        if (!isUsingNow && isGrounded) {
-          const cooldownLimit = this.equippedItem.cooldownTime !== undefined ? this.equippedItem.cooldownTime : 3.0;
-          this.jetpackCooldownTimer = Math.min(cooldownLimit, this.jetpackCooldownTimer + dt);
+        if (isUsingJetpack || this.isFlying) {
+          const camDir = new THREE.Vector3();
+          this.camera.getWorldDirection(camDir);
+          this.headPitch = Math.asin(camDir.y);
         }
-      } else {
-        this.jetpackCooldownTimer = 0;
       }
     }
 
-    const cooldownReady = !hasJetpack || !this.equippedItem.cooldownEnabled || this.consecutiveAirTime > 0 || this.jetpackCooldownTimer >= (this.equippedItem.cooldownTime !== undefined ? this.equippedItem.cooldownTime : 3.0);
-
-    const pointerFollow = hasJetpack && (this.equippedItem.pointerFollowEnabled !== false);
-    const isUsingJetpackCameraDir = hasJetpack && input.keys.jump && input.keys.crouch && hasFuel && withinAirLimit && cooldownReady && pointerFollow;
-    const isUsingJetpackNormal = hasJetpack && input.keys.jump && !isGrounded && hasFuel && withinAirLimit && cooldownReady && (!input.keys.crouch || !pointerFollow);
-    let isUsingJetpack = isUsingJetpackCameraDir || isUsingJetpackNormal;
-
-    if (isUsingJetpack) {
-      this.jetpackCooldownTimer = 0;
-    }
-
-    const isSuperman = isUsingJetpackCameraDir;
+    const isSuperman = isUsingJetpackCameraDir || isUsingJetpackShiftFlight;
+    const noPitchTilt = !!isUsingJetpackCameraDir;
     const visualCrouch = input.keys.crouch && !isSuperman;
 
     this.glbModel.update(dt, hasInput);
     this.polygonModel.update(dt, hasInput);
-    this.polygonModelSkin.update(dt, hasInput, visualCrouch, input.keys.attack, isGrounded, this.verticalVelocity, isSuperman);
+    this.polygonModelSkin.update(dt, hasInput, visualCrouch, input.keys.attack, isGrounded, this.verticalVelocity, isSuperman, noPitchTilt);
 
     if (this.particleSystem) this.particleSystem.update(dt);
 
@@ -415,14 +440,18 @@ export class CharacterController {
         this.isClimbing = false;
         this.verticalVelocity = 5;
       }
-    } else if (isUsingJetpackCameraDir) {
+    } else if (isUsingJetpackCameraDir || isUsingJetpackShiftFlight) {
       isUsingJetpack = true;
       this.consecutiveAirTime += dt;
 
       const flyDir = new THREE.Vector3();
       this.camera.getWorldDirection(flyDir);
+      if (isUsingJetpackCameraDir && this.cameraController) {
+        flyDir.copy(this.cameraController.getForwardDirection());
+      }
+      flyDir.normalize();
 
-      let velocity = flyDir.clone().multiplyScalar(this.equippedItem.thrust);
+      const velocity = flyDir.clone().multiplyScalar(this.equippedItem.thrust);
 
       let limitActive = false;
       if (this.equippedItem && this.equippedItem.limitHeightEnabled) {
@@ -437,8 +466,8 @@ export class CharacterController {
         velocity.y = 0;
       }
 
-      desiredTranslation.copy(velocity.multiplyScalar(dt));
       this.verticalVelocity = velocity.y;
+      desiredTranslation.copy(velocity).multiplyScalar(dt);
 
       const targetRotation = Math.atan2(flyDir.x, flyDir.z) + Math.PI;
       let rotDiff = targetRotation - this.currentRotation;

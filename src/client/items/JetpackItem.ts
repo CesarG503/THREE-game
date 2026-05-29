@@ -23,6 +23,7 @@ export class JetpackItem extends Item {
   cooldownEnabled: boolean;
   cooldownTime: number;
   pointerFollowEnabled: boolean;
+  shiftFlightEnabled: boolean;
 
   model: THREE.Object3D | null;
   equipGroup: THREE.Group;
@@ -47,6 +48,7 @@ export class JetpackItem extends Item {
     this.cooldownEnabled = config.cooldownEnabled !== undefined ? config.cooldownEnabled : false;
     this.cooldownTime = config.cooldownTime !== undefined ? config.cooldownTime : 3.0;
     this.pointerFollowEnabled = config.pointerFollowEnabled !== undefined ? config.pointerFollowEnabled : true;
+    this.shiftFlightEnabled = config.shiftFlightEnabled !== undefined ? config.shiftFlightEnabled : false;
     this.equipSlot = "back";
     this.modelPath = "/assets/Jetpack.glb";
     this.modelScale = 1;
@@ -151,7 +153,8 @@ export class JetpackItem extends Item {
       maxFlightHeight: this.maxFlightHeight,
       cooldownEnabled: this.cooldownEnabled,
       cooldownTime: this.cooldownTime,
-      pointerFollowEnabled: this.pointerFollowEnabled
+      pointerFollowEnabled: this.pointerFollowEnabled,
+      shiftFlightEnabled: this.shiftFlightEnabled
     });
   }
 }

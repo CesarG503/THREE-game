@@ -385,7 +385,7 @@ export class PolygonModelSkin implements ICharacterModel {
     }
   }
 
-  update(dt: number, isMoving: boolean, isCrouching = false, isAttacking = false, isGrounded = true, verticalVelocity = 0, isSuperman = false) {
+  update(dt: number, isMoving: boolean, isCrouching = false, isAttacking = false, isGrounded = true, verticalVelocity = 0, isSuperman = false, noPitchTilt = false) {
     this.isSuperman = isSuperman;
     if (!this.model || !this.isVisible) return;
     if (
@@ -480,11 +480,11 @@ export class PolygonModelSkin implements ICharacterModel {
     }
 
     if (isSuperman) {
-      const targetPivotRotX = Math.PI / 2.2;
+      const currentPitch = this.targetHeadPitch || 0;
+      const targetPivotRotX = noPitchTilt ? Math.PI / 2.2 : (Math.PI / 2.2 - currentPitch);
       this.pivotGroup.rotation.x = THREE.MathUtils.lerp(this.pivotGroup.rotation.x, targetPivotRotX, 10 * dt);
 
-      const currentPitch = this.targetHeadPitch || 0;
-      const targetHeadRotX = -Math.PI / 2 - currentPitch;
+      const targetHeadRotX = -Math.PI / 2;
       this.headGroup.rotation.x = THREE.MathUtils.lerp(this.headGroup.rotation.x, targetHeadRotX, 10 * dt);
 
       const armFlyRotX = -Math.PI + 0.2;

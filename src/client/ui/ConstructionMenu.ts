@@ -2953,7 +2953,7 @@ export class ConstructionMenu {
         this.pointerFollowCheck = pointerFollowCheck;
 
         const jetpackPointerFollowLabel = document.createElement("span");
-        jetpackPointerFollowLabel.textContent = "Seguimiento del puntero al volar";
+        jetpackPointerFollowLabel.textContent = "Seguimiento del punto al volar estricto";
         jetpackPointerFollowLabel.style.color = "#ccc";
 
         jetpackPointerFollowRow.appendChild(pointerFollowCheck);
@@ -2966,6 +2966,35 @@ export class ConstructionMenu {
             }
         });
 
+        // Shift flight checkbox
+        const jetpackShiftFlightRow = document.createElement("div");
+        jetpackShiftFlightRow.style.cssText = "display: flex; align-items: center; gap: 10px; font-size: 13px; text-align: left; margin-top: 5px; cursor: pointer; user-select: none;";
+
+        const shiftFlightCheck = document.createElement("input");
+        shiftFlightCheck.type = "checkbox";
+        shiftFlightCheck.checked = false; // Desactivado por defecto
+        shiftFlightCheck.style.cssText = "width: 16px; height: 16px; cursor: pointer; flex-shrink: 0;";
+        shiftFlightCheck.addEventListener("change", (e: any) => {
+            if (this.currentDraftItem) {
+                this.currentDraftItem.shiftFlightEnabled = e.target.checked;
+            }
+        });
+        this.shiftFlightCheck = shiftFlightCheck;
+
+        const jetpackShiftFlightLabel = document.createElement("span");
+        jetpackShiftFlightLabel.textContent = "Seguimiento del punto al volar libre";
+        jetpackShiftFlightLabel.style.color = "#ccc";
+
+        jetpackShiftFlightRow.appendChild(shiftFlightCheck);
+        jetpackShiftFlightRow.appendChild(jetpackShiftFlightLabel);
+
+        jetpackShiftFlightRow.addEventListener("click", (e) => {
+            if (e.target !== shiftFlightCheck) {
+                shiftFlightCheck.checked = !shiftFlightCheck.checked;
+                shiftFlightCheck.dispatchEvent(new Event("change"));
+            }
+        });
+
         consumableControlsContainer.appendChild(airLimitMix.row);
         consumableControlsContainer.appendChild(consumableUseMix.row);
         consumableControlsContainer.appendChild(thrustMix.row);
@@ -2975,6 +3004,7 @@ export class ConstructionMenu {
         consumableControlsContainer.appendChild(jetpackCooldownRow);
         consumableControlsContainer.appendChild(cooldownValueRow);
         consumableControlsContainer.appendChild(jetpackPointerFollowRow);
+        consumableControlsContainer.appendChild(jetpackShiftFlightRow);
 
         this.panelEditor.appendChild(consumableControlsContainer);
         this.editorConsumableControlsContainer = consumableControlsContainer;
@@ -3079,6 +3109,7 @@ export class ConstructionMenu {
             const coolEnabled = baseItem.cooldownEnabled !== undefined ? baseItem.cooldownEnabled : false;
             const coolTime = baseItem.cooldownTime !== undefined ? baseItem.cooldownTime : 3.0;
             const pointerFollow = baseItem.pointerFollowEnabled !== undefined ? baseItem.pointerFollowEnabled : true;
+            const shiftFlight = baseItem.shiftFlightEnabled !== undefined ? baseItem.shiftFlightEnabled : false;
 
             this.airLimitSlider.value = String(airLim);
             this.airLimitNumBox.value = String(airLim);
@@ -3102,6 +3133,10 @@ export class ConstructionMenu {
                 this.pointerFollowCheck.checked = pointerFollow;
             }
 
+            if (this.shiftFlightCheck) {
+                this.shiftFlightCheck.checked = shiftFlight;
+            }
+
             if (this.currentDraftItem) {
                 this.currentDraftItem.airLimit = airLim;
                 this.currentDraftItem.consumableUse = consUse;
@@ -3113,6 +3148,7 @@ export class ConstructionMenu {
                 this.currentDraftItem.cooldownEnabled = coolEnabled;
                 this.currentDraftItem.cooldownTime = coolTime;
                 this.currentDraftItem.pointerFollowEnabled = pointerFollow;
+                this.currentDraftItem.shiftFlightEnabled = shiftFlight;
             }
         } else {
             if (this.advancedConfigBtn) this.advancedConfigBtn.style.display = "none";

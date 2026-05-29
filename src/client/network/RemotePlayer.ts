@@ -299,6 +299,10 @@ export class RemotePlayer {
         this.polygonModel.update(dt, hasInput);
         const isUsingJetpack = this.state.equippedWeapon && (this.state.equippedWeapon === "jetpack" || this.state.equippedWeapon.startsWith("jetpack"));
         const isSuperman = this.state.isSuperman !== undefined ? !!this.state.isSuperman : !!(isUsingJetpack && this.state.isCrouching && !this.state.isGrounded);
+        const noPitchTilt = !!(isUsingJetpack && 
+                               this.currentWeaponInstance && 
+                               this.currentWeaponInstance.pointerFollowEnabled && 
+                               !this.currentWeaponInstance.shiftFlightEnabled);
         const visualCrouch = !!(this.state.isCrouching && !isSuperman);
 
         this.polygonModelSkin.update(
@@ -308,7 +312,8 @@ export class RemotePlayer {
             (effectivelyAttacking || false),
             (this.state.isGrounded !== undefined ? this.state.isGrounded : true),
             this.state.verticalVelocity || 0,
-            isSuperman
+            isSuperman,
+            noPitchTilt
         );
         if (this.currentWeaponInstance && typeof this.currentWeaponInstance.updateAnim === "function") {
             this.currentWeaponInstance.updateAnim(dt, 0);

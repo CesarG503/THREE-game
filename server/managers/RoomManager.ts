@@ -1,5 +1,5 @@
 import { WebSocket } from "ws"
-import type { ExtendedWebSocket, OutgoingMessage, PlayerData, Vector3 } from "../types.js"
+import type { ExtendedWebSocket, GroundItemRecord, OutgoingMessage, PlayerData, Vector3 } from "../types.js"
 import { logger } from "../utils/Logger.js"
 
 /**
@@ -13,6 +13,8 @@ import { logger } from "../utils/Logger.js"
 export class RoomManager {
   private rooms       = new Map<string, Map<string, PlayerData>>()
   private roomSockets = new Map<string, Map<string, ExtendedWebSocket>>()
+  private roomGroundItems = new Map<string, Map<string, GroundItemRecord>>()
+  private roomGroundItemUids = new Map<string, Set<string>>()
 
   // ── Getters (lazy-init) ────────────────────────────────────────────────
 
@@ -24,6 +26,16 @@ export class RoomManager {
   private getOrCreateSockets(roomId: string): Map<string, ExtendedWebSocket> {
     if (!this.roomSockets.has(roomId)) this.roomSockets.set(roomId, new Map())
     return this.roomSockets.get(roomId)!
+  }
+
+  private getOrCreateGroundItems(roomId: string): Map<string, GroundItemRecord> {
+    if (!this.roomGroundItems.has(roomId)) this.roomGroundItems.set(roomId, new Map())
+    return this.roomGroundItems.get(roomId)!
+  }
+
+  private getOrCreateGroundItemUids(roomId: string): Set<string> {
+    if (!this.roomGroundItemUids.has(roomId)) this.roomGroundItemUids.set(roomId, new Set())
+    return this.roomGroundItemUids.get(roomId)!
   }
 
   getPlayer(roomId: string, playerId: string): PlayerData | undefined {
@@ -40,6 +52,38 @@ export class RoomManager {
 
   getRoomSize(roomId: string): number {
     return this.rooms.get(roomId)?.size ?? 0
+  }
+
+  getGroundItems(roomId: string): GroundItemRecord[] {
+    return Array.from(this.roomGroundItems.get(roomId)?.values() ?? [])
+  }
+
+  getGroundItem(roomId: string, dropId: string): GroundItemRecord | undefined {
+    return this.roomGroundItems.get(roomId)?.get(dropId)
+  }
+
+  addGroundItem(roomId: string, item: GroundItemRecord): boolean {
+    const drops = this.getOrCreateGroundItems(roomId)
+    const itemUids = this.getOrCreateGroundItemUids(roomId)
+
+    if (drops.has(item.dropId)) return false
+    if (item.itemUid && itemUids.has(item.itemUid)) return false
+
+    drops.set(item.dropId, item)
+    if (item.itemUid) itemUids.add(item.itemUid)
+    return true
+  }
+
+  removeGroundItem(roomId: string, dropId: string): boolean {
+    const drops = this.roomGroundItems.get(roomId)
+    if (!drops) return false
+
+    const item = drops.get(dropId)
+    if (!item) return false
+
+    drops.delete(dropId)
+    if (item.itemUid) this.roomGroundItemUids.get(roomId)?.delete(item.itemUid)
+    return true
   }
 
   // ── Join / Leave ───────────────────────────────────────────────────────
@@ -87,6 +131,8 @@ export class RoomManager {
     if (room?.size === 0) {
       this.rooms.delete(roomId)
       this.roomSockets.delete(roomId)
+      this.roomGroundItems.delete(roomId)
+      this.roomGroundItemUids.delete(roomId)
       logger.info(`Room:${roomId}`, "Room closed (empty)")
       return true
     }

@@ -29,6 +29,7 @@ export function handleJoinRoom(
 
   // Snapshot existing players BEFORE adding the new one
   const existingPlayers = room.getRoomPlayers(roomId)
+  const groundItems = room.getGroundItems(roomId)
 
   room.addPlayer(roomId, playerId, playerName, position, ws)
 
@@ -46,6 +47,11 @@ export function handleJoinRoom(
       targetId: playerId,
     })
     if (sent) logger.info(`Room:${roomId}`, `Map sync requested from ${firstPeerId} for ${playerId}`)
+  }
+
+  if (groundItems.length > 0) {
+    room.send(ws, { type: "groundItemsSync", items: groundItems })
+    logger.info(`Room:${roomId}`, `Ground item sync sent to ${playerId} (${groundItems.length})`)
   }
 
   // 4. Notify everyone else

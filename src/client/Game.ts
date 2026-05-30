@@ -36,6 +36,7 @@ import { setupEditorUI, saveMap, loadMap, useCurrentItem, _loadSingleMapObject, 
 import { regenerateObjectPhysics, updateObjectPhysics } from "./core/GamePhysics";
 import { GameHUD } from "./ui/GameHUD";
 import { ObjectInspector } from "./ui/ObjectInspector";
+import { createItemFromNetworkData, serializeItemForNetwork } from "./items/ItemNetworkSerializer";
 
 export class Game {
 	sceneManager: any;
@@ -63,6 +64,7 @@ export class Game {
 	objectInspector: any;
 	inventoryManager: any;
 	itemDropManager: any;
+	pendingItemPickups: Map<string, any>;
 	fuegoCount: number;
 	farmingZoneCounts: { [groupId: string]: number };
 	environmentConfig: any;
@@ -216,6 +218,7 @@ export class Game {
 		this.farmingZones = [];
 		this.projectiles = [];
 		this.fxBlasterSystem = new BlasterSystem(this.sceneManager.scene);
+		this.pendingItemPickups = new Map();
 		this._netAttackLatch = false;
 		this.isFKeyDown = false;
 		this.fKeyHeldTime = 0;
@@ -305,51 +308,66 @@ export class Game {
 			this.handleRemoteShoot(startPos, direction, type, speed, damage, drop, rebote, hasImpactEffect, hasTracer, hasTrajectoryLine, customTracerVFX, customImpactVFX, tracerDestroyOnCollision, tracerStayForever, tracerCollisionVFX);
 		};
 
+		this.networkManager.onGroundItemsSync = (items: any[]) => {
+			if (!this.itemDropManager) return;
+			console.log(`[Items] Sincronizando ${items.length} items del suelo.`);
+			this.itemDropManager.syncGroundItems(items);
+		};
+
 		this.networkManager.onPlayerAction = (playerId: any, actionType: any, data: any) => {
 			if (actionType === "dropItem") {
-				let newItem: any;
-				if (data.itemData.itemClass === "GunItem" || data.itemData.type === "weapon" || data.itemData.id === "gun" || data.itemData.modelPath) {
-					newItem = new GunItem(data.itemData);
-				} else if (data.itemData.itemClass === "FuegoItem" || data.itemData.id === "fuego") {
-					newItem = new FuegoItem();
-				} else if (data.itemData.itemClass === "PelotaItem" || data.itemData.id === "pelota") {
-					newItem = new PelotaItem();
-				} else if (data.itemData.itemClass === "MapObjectItem") {
-					newItem = new MapObjectItem(data.itemData.id, data.itemData.name, data.itemData.type, data.itemData.iconPath, data.itemData.color, data.itemData.scale, data.itemData.texturePath);
-				} else if (data.itemData.itemClass === "ImpulseItem" || data.itemData.type === "impulse") {
-					newItem = new ImpulseItem(data.itemData.id, data.itemData.name, data.itemData.iconPath, data.itemData.type, data.itemData.strength);
-				} else if (data.itemData.itemClass === "TurretItem" || data.itemData.id === "turret") {
-					newItem = new TurretItem(data.itemData.id || "turret", data.itemData.name || "Turret", data.itemData.iconPath || "");
-				} else {
-					newItem = new Item(data.itemData.id, data.itemData.name, data.itemData.iconPath);
-				}
-
-				const restoreProperties = (target: any, source: any) => {
-					for (const key in source) {
-						if (target[key] && typeof target[key] === "object" && !Array.isArray(target[key])) {
-							if (target[key].isVector3) {
-								target[key].set(source[key].x || 0, source[key].y || 0, source[key].z || 0);
-							} else if (target[key].isEuler) {
-								const rx = source[key].x !== undefined ? source[key].x : (source[key]._x || 0);
-								const ry = source[key].y !== undefined ? source[key].y : (source[key]._y || 0);
-								const rz = source[key].z !== undefined ? source[key].z : (source[key]._z || 0);
-								target[key].set(rx, ry, rz);
-							} else {
-								restoreProperties(target[key], source[key]);
-							}
-						} else {
-							target[key] = source[key];
-						}
-					}
-				};
-
-				restoreProperties(newItem, data.itemData);
+				const newItem = createItemFromNetworkData(data.itemData);
 
 				const pos = new THREE.Vector3(data.position.x, data.position.y, data.position.z);
 				const dir = new THREE.Vector3(data.direction.x, data.direction.y, data.direction.z);
 				this.itemDropManager.dropItem(newItem, pos, dir, data.dropId, { torque: data.torque });
 			} else if (actionType === "pickupItem") {
-				this.itemDropManager.removeItemByDropId(data.dropId);
+				const pickedBy = data.pickedBy || playerId;
+				if (pickedBy === this.networkManager.playerId) {
+					const pending = this.pendingItemPickups.get(data.dropId);
+					this.pendingItemPickups.delete(data.dropId);
+					const picked = pending?.item || createItemFromNetworkData(data.itemData);
+
+					if (picked.id === "fuego") {
+						const valueAdded = picked.value || 1;
+						const gId = picked.groupId || "Grupo 1";
+
+						this.fuegoCount += valueAdded;
+						if (!this.farmingZoneCounts) this.farmingZoneCounts = {};
+						if (this.farmingZoneCounts[gId] === undefined) this.farmingZoneCounts[gId] = 0;
+						this.farmingZoneCounts[gId] += valueAdded;
+
+						const counterEl = document.getElementById("fuego-count");
+						if (counterEl) counterEl.textContent = this.fuegoCount.toString();
+
+						if (this.hud && this.hud.updateFarmingCounters) {
+							this.hud.updateFarmingCounters(this);
+						}
+					} else {
+						const added = this.inventoryManager.addItem(picked);
+						if (!added) {
+							const charPos = this.character.getPosition();
+							const camDir = new THREE.Vector3();
+							this.sceneManager.camera.getWorldDirection(camDir);
+							const droppedBack = this.itemDropManager.dropItem(picked, charPos, camDir);
+
+							if (droppedBack && this.networkManager && this.networkManager.isConnected) {
+								this.networkManager.sendPlayerAction("dropItem", {
+									dropId: droppedBack.dropId,
+									itemData: serializeItemForNetwork(picked),
+									position: { x: charPos.x, y: charPos.y, z: charPos.z },
+									direction: { x: camDir.x, y: camDir.y, z: camDir.z },
+									torque: droppedBack.torque
+								});
+							}
+						}
+					}
+				} else {
+					this.itemDropManager.removeItemByDropId(data.dropId);
+					this.pendingItemPickups.delete(data.dropId);
+				}
+			} else if (actionType === "pickupDenied") {
+				this.pendingItemPickups.delete(data.dropId);
 			} else if (actionType === "spawn-effect") {
 				if (this.character && this.character.particleSystem && data) {
 					const pos = new THREE.Vector3(data.pos.x, data.pos.y, data.pos.z);

@@ -28,6 +28,7 @@ export class NetworkManager {
     onMapSyncData: any;
     onPlayerShoot: any;
     onPlayerAction: any;
+    onGroundItemsSync: any;
 
     constructor(scene: any, world: any, roomId: any, onConnected?: any) {
         this.scene = scene;
@@ -60,6 +61,7 @@ export class NetworkManager {
 
         this.onPlayerShoot = null;
         this.onPlayerAction = null;
+        this.onGroundItemsSync = null;
     }
 
     connect(serverUrl: string) {
@@ -239,8 +241,17 @@ export class NetworkManager {
                 break;
 
             case "playerAction":
-                if (this.onPlayerAction && message.playerId !== this.playerId) {
+                if (
+                    this.onPlayerAction &&
+                    (message.playerId !== this.playerId || message.actionType === "pickupItem" || message.actionType === "pickupDenied")
+                ) {
                     this.onPlayerAction(message.playerId, message.actionType, message.data);
+                }
+                break;
+
+            case "groundItemsSync":
+                if (this.onGroundItemsSync) {
+                    this.onGroundItemsSync(message.items || []);
                 }
                 break;
         }

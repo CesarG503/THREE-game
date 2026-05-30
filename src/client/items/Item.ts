@@ -1,7 +1,9 @@
 import type { Object3D } from "three";
 import type { ItemContext, ItemLike } from "../types";
+import { createItemUid } from "./ItemInstance";
 
 export class Item implements ItemLike {
+  uid: string;
   id: string;
   name: string;
   iconPath: string;
@@ -10,6 +12,7 @@ export class Item implements ItemLike {
   value: number;
 
   constructor(id: string, name: string, iconPath: string) {
+    this.uid = createItemUid();
     this.id = id;
     this.name = name;
     this.iconPath = iconPath;

@@ -1,4 +1,5 @@
 import type { ItemLike } from "../types";
+import { ensureItemUid, getItemUid } from "./ItemInstance";
 
 export class InventoryManager {
   uiSlots: NodeListOf<Element>;
@@ -61,6 +62,16 @@ export class InventoryManager {
 
   setItem(index: number, item: ItemLike | null) {
     if (index >= 0 && index < this.slots.length) {
+      ensureItemUid(item);
+      const uid = getItemUid(item);
+      if (uid) {
+        for (let i = 0; i < this.slots.length; i++) {
+          if (i !== index && this.slots[i]?.uid === uid) {
+            this.slots[i] = null;
+          }
+        }
+      }
+
       this.slots[index] = item;
       this.updateUI();
 
@@ -71,11 +82,11 @@ export class InventoryManager {
   }
 
   addItem(item: ItemLike) {
-    for (let i = 0; i < this.slots.length; i++) {
-      if (this.slots[i] && this.slots[i].id === item.id && this.slots[i].count < this.slots[i].maxStack) {
-        console.log("Item apilado (logica placeholder)");
-        return true;
-      }
+    ensureItemUid(item);
+
+    if (this.slots.some((slot) => slot?.uid === item.uid)) {
+      console.warn("Item duplicado ignorado en inventario:", item.name, item.uid);
+      return false;
     }
 
     for (let i = 0; i < this.slots.length; i++) {

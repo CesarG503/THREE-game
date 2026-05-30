@@ -461,10 +461,18 @@ export function animate(this: any) {
 
 		if (this.character) {
 			const charPos = this.character.getPosition();
-			const collectedFuego = this.itemDropManager.checkAutoPickup(charPos, 1.5, "fuego");
+			const collectedFuego = this.itemDropManager.checkAutoPickupDetailed(charPos, 1.5, "fuego");
 
 			if (collectedFuego.length > 0) {
-				collectedFuego.forEach((item: any) => {
+				collectedFuego.forEach((pickup: any) => {
+					const item = pickup.item;
+
+					if (this.networkManager && this.networkManager.isConnected) {
+						this.pendingItemPickups.set(pickup.dropId, { item });
+						this.networkManager.sendPlayerAction("pickupItem", { dropId: pickup.dropId });
+						return;
+					}
+
 					const valueAdded = item.value || 1;
 					const gId = item.groupId || "Grupo 1";
 

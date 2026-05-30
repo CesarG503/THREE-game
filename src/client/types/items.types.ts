@@ -37,11 +37,18 @@ export interface ItemContext {
 }
 
 export interface ItemLike {
+	uid: string;
 	id: string;
 	name: string;
 	iconPath: string;
 	count: number;
 	maxStack: number;
+	type?: string;
+	value?: number;
+	groupId?: string;
+	itemTexture?: string;
+	consumableUse?: number;
+	maxConsumableUse?: number;
 	use: (context: ItemContext) => boolean;
 	getDisplayMesh: () => Object3D | null;
 }

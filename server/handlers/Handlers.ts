@@ -97,11 +97,70 @@ export function registerHandlers(router: MessageRouter): void {
   })
 
   router.register<PlayerActionMessage>("playerAction", ({ roomId, playerId, room }, msg) => {
+    const data = msg.data as any
+
+    if (msg.actionType === "dropItem" && data?.dropId && data?.itemData && data?.position && data?.direction) {
+      const stored = room.addGroundItem(roomId, {
+        dropId: data.dropId,
+        itemUid: data.itemData.uid,
+        itemData: data.itemData,
+        position: data.position,
+        direction: data.direction,
+        torque: data.torque,
+        ownerId: playerId,
+        createdAt: Date.now(),
+      })
+
+      if (!stored) {
+        logger.warn(`Room:${roomId}`, `Duplicate drop ignored: ${data.dropId}`)
+        return
+      }
+
+      room.broadcast(roomId, {
+        type:       "playerAction",
+        playerId,
+        actionType: msg.actionType,
+        data:       data,
+      }, playerId)
+      return
+    }
+
+    if (msg.actionType === "pickupItem" && data?.dropId) {
+      const groundItem = room.getGroundItem(roomId, data.dropId)
+      if (!groundItem) {
+        logger.warn(`Room:${roomId}`, `Pickup denied for missing drop: ${data.dropId}`)
+        room.sendToPlayer(roomId, playerId, {
+          type:       "playerAction",
+          playerId,
+          actionType: "pickupDenied",
+          data:       { dropId: data.dropId },
+        })
+        return
+      }
+
+      const removed = room.removeGroundItem(roomId, data.dropId)
+      if (!removed) {
+        return
+      }
+
+      room.broadcast(roomId, {
+        type:       "playerAction",
+        playerId,
+        actionType: msg.actionType,
+        data:       {
+          dropId: data.dropId,
+          pickedBy: playerId,
+          itemData: groundItem.itemData,
+        },
+      }, null)
+      return
+    }
+
     room.broadcast(roomId, {
       type:       "playerAction",
       playerId,
       actionType: msg.actionType,
-      data:       msg.data,
+      data:       data,
     }, playerId)
   })
 

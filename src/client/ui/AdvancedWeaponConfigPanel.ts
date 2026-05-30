@@ -4,6 +4,7 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
+import { serializeItemForNetwork } from "../items/ItemNetworkSerializer";
 
 export class AdvancedWeaponConfigPanel {
     constructor(game, constructionMenu = null) {
@@ -592,15 +593,12 @@ export class AdvancedWeaponConfigPanel {
                 pos.y += 1.5;
 
                 const dropped = this.game.itemDropManager.dropItem(newWeapon, pos, dir);
+                if (!dropped) return;
 
                 if (this.game.networkManager && this.game.networkManager.isConnected) {
-                    let itemData = Object.assign({}, newWeapon);
-                    itemData.itemClass = newWeapon.constructor.name;
-                    delete itemData.model; delete itemData.equipGroup; delete itemData.transformGroup; delete itemData.mixer; delete itemData.actionShoot; delete itemData.actionReload; delete itemData.blasterSystem; delete itemData.originalConfig;
-
                     this.game.networkManager.sendPlayerAction("dropItem", {
                         dropId: dropped.dropId,
-                        itemData: itemData,
+                        itemData: serializeItemForNetwork(newWeapon),
                         position: { x: pos.x, y: pos.y, z: pos.z },
                         direction: { x: dir.x, y: dir.y, z: dir.z },
                         torque: dropped.torque

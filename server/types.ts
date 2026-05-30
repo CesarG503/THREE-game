@@ -7,6 +7,17 @@ export interface Vector3 {
   z: number
 }
 
+export interface GroundItemRecord {
+  dropId: string
+  itemUid?: string
+  itemData: Record<string, unknown>
+  position: Vector3
+  direction: Vector3
+  torque?: Vector3
+  ownerId?: string
+  createdAt: number
+}
+
 // ── Player State ──────────────────────────────────
 export interface PlayerState {
   modelType: "skin" | "glb"
@@ -97,6 +108,11 @@ export interface PlayerActionMessage extends BaseMessage {
   data: unknown
 }
 
+export interface GroundItemsSyncMessage extends BaseMessage {
+  type: "groundItemsSync"
+  items: GroundItemRecord[]
+}
+
 export interface EditorPlaceMessage extends BaseMessage {
   type: "editorPlace"
   playerId?: string
@@ -183,6 +199,7 @@ export interface RequestMapSyncMessage extends BaseMessage {
 export type OutgoingMessage =
   | WelcomeMessage
   | GameStateMessage
+  | GroundItemsSyncMessage
   | PlayerJoinedMessage
   | PlayerLeftMessage
   | RequestMapSyncMessage

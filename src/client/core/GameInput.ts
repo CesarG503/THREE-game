@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { GunItem } from "../items/GunItem";
+import { serializeItemForNetwork } from "../items/ItemNetworkSerializer";
 import type { Game } from "../Game";
 
 export function setupGameInput(this: Game) {
@@ -49,15 +50,15 @@ export function setupGameInput(this: Game) {
 				this.sceneManager.camera.getWorldDirection(camDir);
 
 				const dropped = this.itemDropManager.dropItem(item, charPos, camDir);
+				if (!dropped) {
+					this.inventoryManager.addItem(item);
+					return;
+				}
 
 				if (this.networkManager && this.networkManager.isConnected) {
-					const itemData = Object.assign({}, item);
-					itemData.itemClass = item.constructor.name;
-					delete itemData.model; delete itemData.equipGroup; delete itemData.transformGroup; delete itemData.mixer; delete itemData.actionShoot; delete itemData.actionReload; delete itemData.blasterSystem; delete itemData.originalConfig;
-
 					this.networkManager.sendPlayerAction("dropItem", {
 						dropId: dropped.dropId,
-						itemData: itemData,
+						itemData: serializeItemForNetwork(item),
 						position: { x: charPos.x, y: charPos.y, z: charPos.z },
 						direction: { x: camDir.x, y: camDir.y, z: camDir.z },
 						torque: dropped.torque
@@ -92,7 +93,9 @@ export function setupGameInput(this: Game) {
 				const picked = pickupResult.item;
 
 				if (this.networkManager && this.networkManager.isConnected) {
+					this.pendingItemPickups.set(pickupResult.dropId, { item: picked });
 					this.networkManager.sendPlayerAction("pickupItem", { dropId: pickupResult.dropId });
+					return;
 				}
 
 				if (picked.id === "fuego") {
@@ -123,14 +126,10 @@ export function setupGameInput(this: Game) {
 						this.sceneManager.camera.getWorldDirection(camDir);
 						const droppedBack = this.itemDropManager.dropItem(picked, charPos, camDir);
 
-						if (this.networkManager && this.networkManager.isConnected) {
-							const itemData = Object.assign({}, picked);
-							itemData.itemClass = picked.constructor.name;
-							delete itemData.model; delete itemData.equipGroup; delete itemData.transformGroup; delete itemData.mixer; delete itemData.actionShoot; delete itemData.actionReload; delete itemData.blasterSystem; delete itemData.originalConfig;
-
+						if (droppedBack && this.networkManager && this.networkManager.isConnected) {
 							this.networkManager.sendPlayerAction("dropItem", {
 								dropId: droppedBack.dropId,
-								itemData: itemData,
+								itemData: serializeItemForNetwork(picked),
 								position: { x: charPos.x, y: charPos.y, z: charPos.z },
 								direction: { x: camDir.x, y: camDir.y, z: camDir.z },
 								torque: droppedBack.torque

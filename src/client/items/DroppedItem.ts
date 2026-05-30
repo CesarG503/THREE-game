@@ -14,6 +14,7 @@ export class DroppedItem {
   timeOffset: number;
   dropId: string;
   torque: { x: number; y: number; z: number } | null;
+  networkManaged: boolean;
 
   constructor(scene: THREE.Scene, world: any, item: ItemLike, position: { x: number; y: number; z: number }) {
     this.scene = scene;
@@ -57,6 +58,7 @@ export class DroppedItem {
     this.timeOffset = Math.random() * 100;
     this.dropId = "";
     this.torque = null;
+    this.networkManaged = false;
   }
 
   update(dt: number, time: number) {

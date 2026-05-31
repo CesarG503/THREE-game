@@ -156,6 +156,23 @@ export function registerHandlers(router: MessageRouter): void {
       return
     }
 
+    if (msg.actionType === "groundItemState" && Array.isArray(data?.updates)) {
+      const acceptedUpdates = data.updates.filter((update: any) => {
+        if (!update?.dropId || !update.position) return false
+        return room.updateGroundItemState(roomId, update.dropId, update, playerId)
+      })
+
+      if (acceptedUpdates.length === 0) return
+
+      room.broadcast(roomId, {
+        type:       "playerAction",
+        playerId,
+        actionType: msg.actionType,
+        data:       { updates: acceptedUpdates },
+      }, playerId)
+      return
+    }
+
     room.broadcast(roomId, {
       type:       "playerAction",
       playerId,

@@ -320,7 +320,10 @@ export class Game {
 
 				const pos = new THREE.Vector3(data.position.x, data.position.y, data.position.z);
 				const dir = new THREE.Vector3(data.direction.x, data.direction.y, data.direction.z);
-				this.itemDropManager.dropItem(newItem, pos, dir, data.dropId, { torque: data.torque });
+				const dropped = this.itemDropManager.dropItem(newItem, pos, dir, data.dropId, { torque: data.torque });
+				if (dropped && data.state) {
+					dropped.applyNetworkState(data.state, playerId);
+				}
 			} else if (actionType === "pickupItem") {
 				const pickedBy = data.pickedBy || playerId;
 				if (pickedBy === this.networkManager.playerId) {
@@ -368,6 +371,10 @@ export class Game {
 				}
 			} else if (actionType === "pickupDenied") {
 				this.pendingItemPickups.delete(data.dropId);
+			} else if (actionType === "groundItemState") {
+				if (this.itemDropManager && Array.isArray(data?.updates)) {
+					this.itemDropManager.applyNetworkPhysicsStates(data.updates, playerId);
+				}
 			} else if (actionType === "spawn-effect") {
 				if (this.character && this.character.particleSystem && data) {
 					const pos = new THREE.Vector3(data.pos.x, data.pos.y, data.pos.z);

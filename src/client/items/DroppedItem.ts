@@ -15,6 +15,8 @@ export class DroppedItem {
   dropId: string;
   torque: { x: number; y: number; z: number } | null;
   networkManaged: boolean;
+  lastRemoteStateAt: number;
+  lastRemoteAuthorityId: string | null;
 
   constructor(scene: THREE.Scene, world: any, item: ItemLike, position: { x: number; y: number; z: number }) {
     this.scene = scene;
@@ -59,6 +61,67 @@ export class DroppedItem {
     this.dropId = "";
     this.torque = null;
     this.networkManaged = false;
+    this.lastRemoteStateAt = 0;
+    this.lastRemoteAuthorityId = null;
+  }
+
+  getPhysicsState(timestamp = Date.now()) {
+    const pos = this.rigidBody.translation();
+    const rot = this.rigidBody.rotation();
+    const linvel = this.rigidBody.linvel();
+    const angvel = this.rigidBody.angvel();
+
+    return {
+      dropId: this.dropId,
+      position: { x: pos.x, y: pos.y, z: pos.z },
+      rotation: { x: rot.x, y: rot.y, z: rot.z, w: rot.w },
+      linvel: { x: linvel.x, y: linvel.y, z: linvel.z },
+      angvel: { x: angvel.x, y: angvel.y, z: angvel.z },
+      timestamp,
+    };
+  }
+
+  applyNetworkState(state: any, authorityId: string | null = null) {
+    if (!state || this.isCollected) return;
+
+    if (state.position) {
+      this.rigidBody.setTranslation(
+        { x: state.position.x || 0, y: state.position.y || 0, z: state.position.z || 0 },
+        true
+      );
+    }
+
+    if (state.rotation) {
+      this.rigidBody.setRotation(
+        {
+          x: state.rotation.x || 0,
+          y: state.rotation.y || 0,
+          z: state.rotation.z || 0,
+          w: state.rotation.w !== undefined ? state.rotation.w : 1,
+        },
+        true
+      );
+    }
+
+    if (state.linvel) {
+      this.rigidBody.setLinvel(
+        { x: state.linvel.x || 0, y: state.linvel.y || 0, z: state.linvel.z || 0 },
+        true
+      );
+    }
+
+    if (state.angvel) {
+      this.rigidBody.setAngvel(
+        { x: state.angvel.x || 0, y: state.angvel.y || 0, z: state.angvel.z || 0 },
+        true
+      );
+    }
+
+    const pos = this.rigidBody.translation();
+    this.mesh.position.set(pos.x, pos.y, pos.z);
+    this.lastRemoteStateAt = Date.now();
+    this.lastRemoteAuthorityId = authorityId;
+    this.networkManaged = true;
   }
 
   update(dt: number, time: number) {

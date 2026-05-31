@@ -10,6 +10,8 @@ export class ItemDropManager {
   droppedItems: DroppedItem[];
   private dropIds: Set<string>;
   private groundItemUids: Set<string>;
+  private lastPhysicsSyncTime: number;
+  private lastSentPhysicsStates: Map<string, any>;
 
   constructor(scene: THREE.Scene, world: unknown) {
     this.scene = scene;
@@ -17,6 +19,8 @@ export class ItemDropManager {
     this.droppedItems = [];
     this.dropIds = new Set();
     this.groundItemUids = new Set();
+    this.lastPhysicsSyncTime = 0;
+    this.lastSentPhysicsStates = new Map();
   }
 
   private generateDropId() {
@@ -36,6 +40,7 @@ export class ItemDropManager {
   private unregisterDrop(dropped: DroppedItem) {
     this.dropIds.delete(dropped.dropId);
     this.groundItemUids.delete(dropped.item.uid);
+    this.lastSentPhysicsStates.delete(dropped.dropId);
 
     const index = this.droppedItems.indexOf(dropped);
     if (index > -1) {
@@ -150,6 +155,23 @@ export class ItemDropManager {
     return false;
   }
 
+  getDropById(dropId: string) {
+    return this.droppedItems.find((d: DroppedItem) => d.dropId === dropId) || null;
+  }
+
+  applyNetworkPhysicsState(update: any, authorityId: string | null = null) {
+    const dropped = this.getDropById(update?.dropId);
+    if (!dropped) return false;
+    dropped.applyNetworkState(update, authorityId);
+    this.lastSentPhysicsStates.set(dropped.dropId, dropped.getPhysicsState(update.timestamp || Date.now()));
+    return true;
+  }
+
+  applyNetworkPhysicsStates(updates: any[], authorityId: string | null = null) {
+    if (!Array.isArray(updates)) return;
+    updates.forEach((update) => this.applyNetworkPhysicsState(update, authorityId));
+  }
+
   getNearestItem(position: { x: number; y: number; z: number }, range = 3.0) {
     let nearest: DroppedItem | null = null;
     let minDistSq = range * range;
@@ -208,8 +230,58 @@ export class ItemDropManager {
 
       const pos = record.position || { x: 0, y: 1, z: 0 };
       const direction = record.direction || { x: 0, y: 1, z: 0 };
-      this.dropItem(item, pos, direction, record.dropId, { torque: record.torque, networkManaged: true } as any);
+      const dropped = this.dropItem(item, pos, direction, record.dropId, { torque: record.torque, networkManaged: true } as any);
+      if (dropped && record.state) {
+        dropped.applyNetworkState(record.state, record.ownerId || null);
+      }
     });
+  }
+
+  collectPhysicsStateUpdates(localPlayerPosition: { x: number; y: number; z: number } | null, nowMs = Date.now()) {
+    if (nowMs - this.lastPhysicsSyncTime < 100) return [];
+    this.lastPhysicsSyncTime = nowMs;
+
+    const updates: any[] = [];
+    const localPos = localPlayerPosition
+      ? new THREE.Vector3(localPlayerPosition.x, localPlayerPosition.y, localPlayerPosition.z)
+      : null;
+
+    for (const dropped of this.droppedItems) {
+      if (dropped.isCollected) continue;
+
+      const state = dropped.getPhysicsState(nowMs);
+      const linSpeedSq =
+        state.linvel.x * state.linvel.x +
+        state.linvel.y * state.linvel.y +
+        state.linvel.z * state.linvel.z;
+
+      const itemPos = new THREE.Vector3(state.position.x, state.position.y, state.position.z);
+      const nearLocalPlayer = localPos ? itemPos.distanceToSquared(localPos) <= 9.0 : false;
+      const recentlyCorrected = nowMs - dropped.lastRemoteStateAt < 250;
+
+      if (dropped.networkManaged && !nearLocalPlayer) continue;
+      if (dropped.networkManaged && recentlyCorrected && linSpeedSq < 0.04) continue;
+
+      const previous = this.lastSentPhysicsStates.get(dropped.dropId);
+      const movedSq = previous
+        ? (state.position.x - previous.position.x) ** 2 +
+          (state.position.y - previous.position.y) ** 2 +
+          (state.position.z - previous.position.z) ** 2
+        : Infinity;
+
+      const velocityChangedSq = previous
+        ? (state.linvel.x - previous.linvel.x) ** 2 +
+          (state.linvel.y - previous.linvel.y) ** 2 +
+          (state.linvel.z - previous.linvel.z) ** 2
+        : Infinity;
+
+      if (movedSq > 0.0004 || velocityChangedSq > 0.0025 || linSpeedSq > 0.01) {
+        updates.push(state);
+        this.lastSentPhysicsStates.set(dropped.dropId, state);
+      }
+    }
+
+    return updates;
   }
 
   update(dt: number, time: number) {

@@ -14,8 +14,10 @@ export interface GroundItemRecord {
   position: Vector3
   direction: Vector3
   torque?: Vector3
+  state?: Record<string, unknown>
   ownerId?: string
   createdAt: number
+  updatedAt?: number
 }
 
 // ── Player State ──────────────────────────────────

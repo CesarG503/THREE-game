@@ -86,6 +86,20 @@ export class RoomManager {
     return true
   }
 
+  updateGroundItemState(roomId: string, dropId: string, state: Record<string, unknown>, ownerId: string): boolean {
+    const item = this.roomGroundItems.get(roomId)?.get(dropId)
+    if (!item) return false
+
+    item.state = state
+    item.ownerId = ownerId
+    item.updatedAt = Date.now()
+
+    const position = state.position as Vector3 | undefined
+    if (position) item.position = position
+
+    return true
+  }
+
   // ── Join / Leave ───────────────────────────────────────────────────────
 
   addPlayer(

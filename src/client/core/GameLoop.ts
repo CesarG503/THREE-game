@@ -461,6 +461,13 @@ export function animate(this: any) {
 
 		if (this.character) {
 			const charPos = this.character.getPosition();
+			if (this.networkManager && this.networkManager.isConnected) {
+				const itemPhysicsUpdates = this.itemDropManager.collectPhysicsStateUpdates(charPos, Date.now());
+				if (itemPhysicsUpdates.length > 0) {
+					this.networkManager.sendPlayerAction("groundItemState", { updates: itemPhysicsUpdates });
+				}
+			}
+
 			const collectedFuego = this.itemDropManager.checkAutoPickupDetailed(charPos, 1.5, "fuego");
 
 			if (collectedFuego.length > 0) {

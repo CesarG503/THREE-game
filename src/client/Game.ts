@@ -201,6 +201,7 @@ export class Game {
 			console.log("Player joined", id);
 			this.updateConnectionStatus(true, id);
 		});
+		this.networkManager.particleSystem = this.character.particleSystem;
 
 		if (this.gameMode === "editor") {
 			this.networkManager.collaborativeMode = true;

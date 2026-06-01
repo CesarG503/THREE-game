@@ -40,6 +40,7 @@ export class RemotePlayer {
     rigidBody: any;
     attackEndTime: number;
     weaponsCache: any;
+    particleSystem: any;
 
     constructor(scene: any, world: any, playerId: any, playerName: any, position: any = new THREE.Vector3(0, 0, 0)) {
         this.scene = scene;
@@ -299,7 +300,7 @@ export class RemotePlayer {
         this.polygonModel.update(dt, hasInput);
         const isUsingJetpack = this.state.equippedWeapon && (this.state.equippedWeapon === "jetpack" || this.state.equippedWeapon.startsWith("jetpack"));
         const isSuperman = this.state.isSuperman !== undefined ? !!this.state.isSuperman : !!(isUsingJetpack && this.state.isCrouching && !this.state.isGrounded);
-        const noPitchTilt = !!(isUsingJetpack && 
+        const noPitchTilt = this.state.noPitchTilt !== undefined ? !!this.state.noPitchTilt : !!(isUsingJetpack && 
                                this.currentWeaponInstance && 
                                this.currentWeaponInstance.pointerFollowEnabled && 
                                !this.currentWeaponInstance.shiftFlightEnabled);
@@ -317,6 +318,25 @@ export class RemotePlayer {
         );
         if (this.currentWeaponInstance && typeof this.currentWeaponInstance.updateAnim === "function") {
             this.currentWeaponInstance.updateAnim(dt, 0);
+        }
+
+        const effectivelyUsingJetpack = this.state.isUsingJetpack !== undefined ? !!this.state.isUsingJetpack : isUsingJetpack;
+
+        if (effectivelyUsingJetpack && this.particleSystem && this.polygonModelSkin && this.polygonModelSkin.backItemMesh) {
+            const jetpackMesh = this.polygonModelSkin.backItemMesh;
+            const leftNozzleWorld = new THREE.Vector3();
+            const rightNozzleWorld = new THREE.Vector3();
+            const leftOffset = new THREE.Vector3(-0.15, 0.1, 0.5);
+            const rightOffset = new THREE.Vector3(0.15, 0.1, 0.5);
+
+            jetpackMesh.updateMatrixWorld(true);
+            jetpackMesh.localToWorld(leftNozzleWorld.copy(leftOffset));
+            jetpackMesh.localToWorld(rightNozzleWorld.copy(rightOffset));
+
+            const normal = new THREE.Vector3(0, -1, 0);
+            const particleVFX = (this.currentWeaponInstance && this.currentWeaponInstance.particleVFX) || "Humo y Fuego";
+            this.particleSystem.spawnJetpackEffect(leftNozzleWorld, normal, particleVFX);
+            this.particleSystem.spawnJetpackEffect(rightNozzleWorld, normal, particleVFX);
         }
     }
 

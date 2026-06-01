@@ -52,6 +52,10 @@ export class CharacterController {
   equippedItem: any;
   consecutiveAirTime: number;
   jetpackCooldownTimer: number;
+  isSuperman: boolean;
+  noPitchTilt: boolean;
+  isUsingJetpack: boolean;
+
 
   constructor(scene: THREE.Scene, world: RAPIER.World, camera: THREE.Camera, cameraController: any) {
     this.scene = scene;
@@ -120,6 +124,9 @@ export class CharacterController {
     this.equippedItem = null;
     this.consecutiveAirTime = 0;
     this.jetpackCooldownTimer = 0;
+    this.isSuperman = false;
+    this.noPitchTilt = false;
+    this.isUsingJetpack = false;
   }
 
   on(event: string, callback: Function) {
@@ -201,6 +208,10 @@ export class CharacterController {
 
   update(dt: number, input: InputManager, remotePlayers: any[]) {
     if (!this.rigidBody) return;
+
+    this.isSuperman = false;
+    this.noPitchTilt = false;
+    this.isUsingJetpack = false;
 
     const isGrounded = this.characterController ? this.characterController.computedGrounded() : false;
 
@@ -663,6 +674,10 @@ export class CharacterController {
     newPos.z += correctedMovement.z;
 
     this.rigidBody.setNextKinematicTranslation(newPos);
+
+    this.isSuperman = isSuperman;
+    this.noPitchTilt = noPitchTilt;
+    this.isUsingJetpack = isUsingJetpack;
 
     this.updateModelVisuals();
   }

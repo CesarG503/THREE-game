@@ -421,4 +421,10 @@ export class ParticleSystem {
   update(dt: any) {
     this.batchRenderer.update(dt);
   }
+
+  dispose() {
+    if (this.batchRenderer) {
+      this.scene.remove(this.batchRenderer);
+    }
+  }
 }

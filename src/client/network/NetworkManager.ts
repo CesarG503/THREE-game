@@ -29,6 +29,7 @@ export class NetworkManager {
     onPlayerShoot: any;
     onPlayerAction: any;
     onGroundItemsSync: any;
+    particleSystem: any;
 
     constructor(scene: any, world: any, roomId: any, onConnected?: any) {
         this.scene = scene;
@@ -267,6 +268,9 @@ export class NetworkManager {
         );
 
         const remotePlayer = new RemotePlayer(this.scene, this.world, playerId, playerName, spawnPosition);
+        if (this.particleSystem) {
+            remotePlayer.particleSystem = this.particleSystem;
+        }
         if (rotation !== undefined) {
             remotePlayer.setRotation(rotation);
         }

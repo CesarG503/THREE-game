@@ -302,7 +302,9 @@ export function animate(this: any) {
 				playerCollision: this.character.playerCollision || "push",
 				headPitch: this.character.headPitch || 0,
 				headYaw: this.character.headYaw || 0,
-				isSuperman: this.character.polygonModelSkin ? this.character.polygonModelSkin.isSuperman : false
+				isSuperman: this.character.isSuperman !== undefined ? this.character.isSuperman : (this.character.polygonModelSkin ? this.character.polygonModelSkin.isSuperman : false),
+				noPitchTilt: this.character.noPitchTilt !== undefined ? this.character.noPitchTilt : false,
+				isUsingJetpack: this.character.isUsingJetpack !== undefined ? this.character.isUsingJetpack : false
 			};
 
 			const updateSent = this.networkManager.sendPlayerUpdate(

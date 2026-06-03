@@ -101,11 +101,14 @@ export function createItemFromNetworkData(data: any): ItemLike {
   const itemData = data || {};
   let item: any;
 
-  if (itemData.itemClass === "GunItem" || itemData.type === "weapon" || itemData.id === "gun" || itemData.modelPath) {
+  // 1. Check exact item class name matches first to avoid property collisions (e.g. modelPath)
+  if (itemData.itemClass === "JetpackItem") {
+    item = new JetpackItem(itemData);
+  } else if (itemData.itemClass === "GunItem") {
     item = new GunItem(itemData);
-  } else if (itemData.itemClass === "FuegoItem" || itemData.id === "fuego") {
+  } else if (itemData.itemClass === "FuegoItem") {
     item = new FuegoItem(itemData.groupId || "Grupo 1", itemData.itemTexture || itemData.iconPath || "/assets/textures/fuego.png");
-  } else if (itemData.itemClass === "PelotaItem" || itemData.id === "pelota") {
+  } else if (itemData.itemClass === "PelotaItem") {
     item = new PelotaItem(
       itemData.id || "pelota",
       itemData.name || "Pelota",
@@ -125,12 +128,32 @@ export function createItemFromNetworkData(data: any): ItemLike {
       itemData.scale,
       itemData.texturePath
     );
-  } else if (itemData.itemClass === "ImpulseItem" || itemData.type === "impulse") {
+  } else if (itemData.itemClass === "ImpulseItem") {
     item = new ImpulseItem(itemData.id, itemData.name, itemData.iconPath, itemData.type, itemData.strength);
-  } else if (itemData.itemClass === "TurretItem" || itemData.id === "turret") {
+  } else if (itemData.itemClass === "TurretItem") {
     item = new TurretItem(itemData.id || "turret", itemData.name || "Turret", itemData.iconPath || "");
-  } else if (itemData.itemClass === "JetpackItem" || itemData.type === "consumable") {
+  }
+  // 2. Fallbacks for missing itemClass / general data
+  else if (itemData.type === "consumable") {
     item = new JetpackItem(itemData);
+  } else if (itemData.type === "weapon" || itemData.id === "gun" || (itemData.modelPath && !itemData.type)) {
+    item = new GunItem(itemData);
+  } else if (itemData.id === "fuego" || itemData.itemClass === "FuegoItem") {
+    item = new FuegoItem(itemData.groupId || "Grupo 1", itemData.itemTexture || itemData.iconPath || "/assets/textures/fuego.png");
+  } else if (itemData.id === "pelota" || itemData.itemClass === "PelotaItem") {
+    item = new PelotaItem(
+      itemData.id || "pelota",
+      itemData.name || "Pelota",
+      itemData.iconPath || "/assets/textures/pelota.png",
+      itemData.damage,
+      itemData.fireRate,
+      itemData.bulletSpeed,
+      itemData.bulletDrop
+    );
+  } else if (itemData.type === "impulse" || itemData.itemClass === "ImpulseItem") {
+    item = new ImpulseItem(itemData.id, itemData.name, itemData.iconPath, itemData.type, itemData.strength);
+  } else if (itemData.id === "turret" || itemData.itemClass === "TurretItem") {
+    item = new TurretItem(itemData.id || "turret", itemData.name || "Turret", itemData.iconPath || "");
   } else {
     item = new Item(itemData.id || "item", itemData.name || "Item", itemData.iconPath || "");
   }

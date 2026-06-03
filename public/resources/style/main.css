@@ -480,6 +480,7 @@ input:checked+.toggle-slider:before {
     z-index: 100;
     box-sizing: border-box;
     touch-action: none;
+    pointer-events: auto;
 }
 
 .inventory-slot {

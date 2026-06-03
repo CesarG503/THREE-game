@@ -196,6 +196,8 @@ export class GameHUD {
             if (el.parentElement !== this.container) {
                 this.container.appendChild(el);
             }
+            // Ensure interactive events are allowed on the inventory despite game-hud-layer's pointer-events: none
+            el.style.pointerEvents = 'auto';
             // Prevent stretching
             el.style.width = 'max-content';
             el.style.height = 'max-content';

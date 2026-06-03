@@ -8,6 +8,11 @@ export interface UIPositionObject {
     transform?: string;
 }
 
+export interface HUDAnchor {
+    parentId?: string | null;
+    pos?: UIPositionObject;
+}
+
 export type UIPresetPosition = 
     | 'top-left' | 'top-center' | 'top-right' 
     | 'middle-left' | 'center' | 'middle-right' 
@@ -44,6 +49,7 @@ export interface HUDConfig {
     inventorySlotPositions?: Record<number, { left: string; top: string }>;
 
     layerOrder?: string[];
+    hudAnchors?: Record<string, HUDAnchor>;
 }
 
 export interface FloatingTextItem {

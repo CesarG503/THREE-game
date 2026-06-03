@@ -1,5 +1,9 @@
 // @ts-nocheck
 
+import {
+    applyResponsivePosition
+} from './HUDResponsiveUtils'
+
 export class HUDLayoutSystem {
     constructor(container) {
         this.container = container;
@@ -8,6 +12,7 @@ export class HUDLayoutSystem {
         this.activeDrag = null;
         this.isEditMode = false;
         this.onSelectionChange = null; // Callback
+        this.onDragEnd = null;
 
         this.grid = null;
 
@@ -20,10 +25,15 @@ export class HUDLayoutSystem {
         this.onMouseMove = this.onMouseMove.bind(this);
         this.onMouseUp = this.onMouseUp.bind(this);
         this.onContainerMouseDown = this.onContainerMouseDown.bind(this);
+        this.refreshLayout = this.refreshLayout.bind(this);
     }
 
     setSelectionCallback(cb) {
         this.onSelectionChange = cb;
+    }
+
+    setDragEndCallback(cb) {
+        this.onDragEnd = cb;
     }
 
     enableEditMode(showGrid = true) {
@@ -32,6 +42,8 @@ export class HUDLayoutSystem {
 
         // Add marquee listener to container
         this.container.addEventListener('mousedown', this.onContainerMouseDown);
+        window.addEventListener('resize', this.refreshLayout);
+        window.visualViewport?.addEventListener('resize', this.refreshLayout);
 
         if (showGrid) {
             if (!this.grid) {
@@ -52,6 +64,8 @@ export class HUDLayoutSystem {
         this.isEditMode = false;
         this.container.style.pointerEvents = 'none';
         this.container.removeEventListener('mousedown', this.onContainerMouseDown);
+        window.removeEventListener('resize', this.refreshLayout);
+        window.visualViewport?.removeEventListener('resize', this.refreshLayout);
 
         if (this.grid) {
             this.grid.style.display = 'none';
@@ -104,6 +118,12 @@ export class HUDLayoutSystem {
 
     // --- Element Reg ---
 
+    clearElements() {
+        this.elements.clear();
+        this.selection.clear();
+        if (this.onSelectionChange) this.onSelectionChange([]);
+    }
+
     registerElement(element, id, initialPos, onMoveCallback) {
         element.style.position = 'absolute';
         element.style.pointerEvents = 'auto';
@@ -111,20 +131,28 @@ export class HUDLayoutSystem {
 
         this.elements.set(id, {
             el: element,
+            config: initialPos,
             onMove: onMoveCallback
         });
 
         this.makeDraggable(element, id);
+        this.scheduleRefresh();
     }
 
     applyPosition(el, pos) {
         if (!pos) return;
-        if (pos.top) el.style.top = pos.top;
-        if (pos.left) el.style.left = pos.left;
-        if (pos.bottom) el.style.bottom = pos.bottom;
-        if (pos.right) el.style.right = pos.right;
-        if (pos.transform) el.style.transform = pos.transform;
-        else el.style.transform = 'none';
+        applyResponsivePosition(el, pos);
+        this.scheduleRefresh();
+    }
+
+    scheduleRefresh() {
+        cancelAnimationFrame(this.refreshFrame);
+        this.refreshFrame = requestAnimationFrame(this.refreshLayout);
+    }
+
+    refreshLayout() {
+        // No automatic repositioning here: editor preview must preserve exactly
+        // what the user placed. Stacking is handled by layer order / z-index.
     }
 
     // --- Interaction ---
@@ -215,14 +243,15 @@ export class HUDLayoutSystem {
                     let newLeft = startOff.offsetX + dx;
                     let newTop = startOff.offsetY + dy;
 
-                    // Clamp (Simple: Clamp inside container)
                     const w = meta.el.offsetWidth;
                     const h = meta.el.offsetHeight;
+                    const maxLeft = Math.max(0, containerRect.width - w);
+                    const maxTop = Math.max(0, containerRect.height - h);
 
                     if (newLeft < 0) newLeft = 0;
                     if (newTop < 0) newTop = 0;
-                    if (newLeft + w > containerRect.width) newLeft = containerRect.width - w;
-                    if (newTop + h > containerRect.height) newTop = containerRect.height - h;
+                    if (newLeft > maxLeft) newLeft = maxLeft;
+                    if (newTop > maxTop) newTop = maxTop;
 
                     meta.el.style.left = newLeft + 'px';
                     meta.el.style.top = newTop + 'px';
@@ -233,7 +262,9 @@ export class HUDLayoutSystem {
                     // Callback
                     const leftPct = (newLeft / containerRect.width) * 100;
                     const topPct = (newTop / containerRect.height) * 100;
-                    if (meta.onMove) meta.onMove({ left: leftPct.toFixed(2) + '%', top: topPct.toFixed(2) + '%' });
+                    const nextPos = { left: leftPct.toFixed(2) + '%', top: topPct.toFixed(2) + '%' };
+                    meta.config = nextPos;
+                    if (meta.onMove) meta.onMove(nextPos);
                 }
             });
 
@@ -256,6 +287,8 @@ export class HUDLayoutSystem {
     }
 
     onMouseUp(e) {
+        const endedDragIds = this.activeDrag ? Array.from(this.selection) : null;
+
         if (this.activeDrag) {
             this.activeDrag = null;
         }
@@ -292,5 +325,9 @@ export class HUDLayoutSystem {
         this.elements.forEach((meta) => {
             meta.el.style.cursor = 'grab';
         });
+
+        if (endedDragIds && this.onDragEnd) {
+            this.onDragEnd(endedDragIds);
+        }
     }
 }

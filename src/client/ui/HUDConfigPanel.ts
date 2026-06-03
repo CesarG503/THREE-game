@@ -3,6 +3,18 @@
 import { animate, stagger } from 'animejs'
 import { HUDLayoutSystem } from './modules/HUDLayoutSystem'
 import { getActiveFarmingGroups } from './GameHUD'
+import {
+    clamp,
+    fitLength,
+    getViewportMetrics,
+    keepElementInsideContainer,
+    positionFromContainerRect,
+    positionFromRect,
+    rectsTouchOrOverlap,
+    resolveAnchoredPosition,
+    scaleHUDValue,
+    scalePixelPosition
+} from './modules/HUDResponsiveUtils'
 
 export class HUDConfigPanel {
     constructor(game, manager, onClose) {
@@ -16,6 +28,7 @@ export class HUDConfigPanel {
         this.layoutSystem = null;
         this.uiInputs = {}; // Store references to inputs for live updates
         this.isMinimized = false; // State for minimization
+        this.viewportResizeTimer = null;
     }
 
     open(profile) {
@@ -103,6 +116,13 @@ export class HUDConfigPanel {
         this.layoutSystem.setSelectionCallback((selectedIds) => {
             this.onSelectionChange(selectedIds);
         });
+        this.layoutSystem.setDragEndCallback((draggedIds) => {
+            if (draggedIds.includes('inventory') && draggedIds.length === 1) {
+                this.applyPreviewAnchors();
+            } else {
+                this.syncHudAnchorsFromPreview();
+            }
+        });
 
         this.previewContainer = previewArea;
 
@@ -110,7 +130,7 @@ export class HUDConfigPanel {
         const configWindow = document.createElement('div');
         configWindow.className = 'hud-config-window';
         configWindow.style.cssText = `
-            position: absolute; right: 30px; top: 30px; width: 500px; height: 600px;
+            position: absolute; right: 12px; top: 12px; width: min(500px, calc(100vw - 24px)); height: min(600px, calc(100dvh - 24px));
             background: rgba(30, 30, 30, 0.95);
             border: 1px solid #555; border-radius: 8px;
             box-shadow: 0 10px 40px rgba(0,0,0,0.8);
@@ -174,6 +194,13 @@ export class HUDConfigPanel {
 
         this.container.appendChild(configWindow);
         document.body.appendChild(this.container);
+
+        this.onViewportResize = () => {
+            window.clearTimeout(this.viewportResizeTimer);
+            this.viewportResizeTimer = window.setTimeout(() => this.updatePreview(), 80);
+        };
+        window.addEventListener('resize', this.onViewportResize);
+        window.visualViewport?.addEventListener('resize', this.onViewportResize);
 
         // Initial Render
         this.renderSidebar();
@@ -846,6 +873,7 @@ export class HUDConfigPanel {
 
         this.contentWrapper.innerHTML = '';
         this.contentWrapper.style.zIndex = '10';
+        this.layoutSystem.clearElements();
 
         const activeGroups = getActiveFarmingGroups(this.game);
         const layerOrder = [...(this.tempSettings.layerOrder || ['health', 'jump', 'inventory'])];
@@ -875,16 +903,164 @@ export class HUDConfigPanel {
         if (children.length > 0) {
             animate(children, {
                 opacity: [0, 1],
-                translateY: [20, 0],
                 delay: stagger(100),
-                duration: 500,
+                duration: 250,
                 easing: 'easeOutQuad'
             });
         }
+
+        this.applyPreviewLayerOrder(layerOrder);
+        this.applyPreviewAnchors();
+        this.keepPreviewHUDInsideViewport();
+        this.layoutSystem.scheduleRefresh();
+    }
+
+    applyPreviewLayerOrder(layerOrder) {
+        const topBase = 100;
+        layerOrder.forEach((id, index) => {
+            const el = this.contentWrapper.querySelector(`[data-hud-id="${CSS.escape(id)}"]`);
+            if (!el) return;
+            el.style.zIndex = `${topBase + layerOrder.length - index}`;
+        });
+    }
+
+    getHudPosKey(id) {
+        if (id === 'health') return 'healthPos';
+        if (id === 'jump') return 'jumpPos';
+        if (id === 'inventory') return 'inventoryPos';
+        if (id.startsWith('fz_')) return `pos_fz_${id.substring(3)}`;
+        return `${id}Pos`;
+    }
+
+    getHudElement(id) {
+        if (!this.contentWrapper) return null;
+        return this.contentWrapper.querySelector(`[data-hud-id="${CSS.escape(id)}"]`);
+    }
+
+    getRenderedHudIds() {
+        if (!this.contentWrapper) return [];
+        return Array.from(this.contentWrapper.querySelectorAll('[data-hud-id]'))
+            .map(el => el.dataset.hudId)
+            .filter(id => id && id !== 'inventory');
+    }
+
+    getResolvedLayerOrder() {
+        const layerOrder = [...(this.tempSettings.layerOrder || ['health', 'jump', 'inventory'])];
+        this.getRenderedHudIds().forEach(id => {
+            if (!layerOrder.includes(id)) layerOrder.push(id);
+        });
+        if (!layerOrder.includes('inventory')) layerOrder.push('inventory');
+        return layerOrder;
+    }
+
+    isAboveInventory(id) {
+        const layerOrder = this.getResolvedLayerOrder();
+        const itemIndex = layerOrder.indexOf(id);
+        const inventoryIndex = layerOrder.indexOf('inventory');
+        return itemIndex !== -1 && inventoryIndex !== -1 && itemIndex < inventoryIndex;
+    }
+
+    setHudGlobalPosition(id, pos) {
+        const key = this.getHudPosKey(id);
+        this.tempSettings[key] = pos;
+    }
+
+    keepPreviewElementInsideViewport(id) {
+        const el = this.getHudElement(id);
+        if (!el) return false;
+
+        const moved = keepElementInsideContainer(el, this.previewContainer);
+        if (moved) {
+            this.setHudGlobalPosition(
+                id,
+                positionFromContainerRect(el.getBoundingClientRect(), this.previewContainer.getBoundingClientRect())
+            );
+        }
+        return moved;
+    }
+
+    keepPreviewHUDInsideViewport() {
+        const movedInventory = this.keepPreviewElementInsideViewport('inventory');
+        if (movedInventory) this.applyPreviewAnchors();
+
+        this.getRenderedHudIds().forEach(id => {
+            this.keepPreviewElementInsideViewport(id);
+        });
+    }
+
+    syncHudAnchorsFromPreview() {
+        if (!this.contentWrapper) return;
+
+        this.keepPreviewHUDInsideViewport();
+
+        const inventoryEl = this.getHudElement('inventory');
+        const containerRect = this.previewContainer.getBoundingClientRect();
+        if (!this.tempSettings.hudAnchors) this.tempSettings.hudAnchors = {};
+        const renderedIds = this.getRenderedHudIds();
+
+        Object.keys(this.tempSettings.hudAnchors).forEach(id => {
+            if (!renderedIds.includes(id)) delete this.tempSettings.hudAnchors[id];
+        });
+
+        renderedIds.forEach(id => {
+            const el = this.getHudElement(id);
+            if (!el) return;
+
+            const childRect = el.getBoundingClientRect();
+            const globalPos = positionFromContainerRect(childRect, containerRect);
+            this.setHudGlobalPosition(id, globalPos);
+
+            if (!inventoryEl || !this.tempSettings.showInventory || !this.isAboveInventory(id)) {
+                delete this.tempSettings.hudAnchors[id];
+                return;
+            }
+
+            const inventoryRect = inventoryEl.getBoundingClientRect();
+            if (rectsTouchOrOverlap(childRect, inventoryRect)) {
+                this.tempSettings.hudAnchors[id] = {
+                    parentId: 'inventory',
+                    pos: positionFromRect(childRect, inventoryRect)
+                };
+            } else {
+                delete this.tempSettings.hudAnchors[id];
+            }
+        });
+
+        if (Object.keys(this.tempSettings.hudAnchors).length === 0) {
+            delete this.tempSettings.hudAnchors;
+        }
+
+        this.applyPreviewAnchors();
+    }
+
+    applyPreviewAnchors() {
+        if (!this.contentWrapper) return;
+
+        const inventoryEl = this.getHudElement('inventory');
+        const anchors = this.tempSettings.hudAnchors || {};
+        if (!inventoryEl || !this.tempSettings.showInventory) return;
+
+        Object.entries(anchors).forEach(([id, anchor]) => {
+            if (!anchor || anchor.parentId !== 'inventory' || !anchor.pos || !this.isAboveInventory(id)) return;
+
+            const el = this.getHudElement(id);
+            if (!el) return;
+
+            const resolved = resolveAnchoredPosition(this.previewContainer, inventoryEl, anchor.pos);
+            if (!resolved) return;
+
+            el.dataset.hudParent = 'inventory';
+            el.style.left = resolved.left;
+            el.style.top = resolved.top;
+            el.style.bottom = 'auto';
+            el.style.right = 'auto';
+            el.style.transform = 'none';
+        });
     }
 
     renderPreviewHealth() {
         const el = document.createElement('div');
+        el.dataset.hudId = 'health';
         el.style.cssText = `display: flex; gap: 5px;`;
 
         // Handle Orientation
@@ -897,8 +1073,8 @@ export class HUDConfigPanel {
         }
 
         if (this.tempSettings.healthStyle === 'bar') {
-            const w = this.tempSettings.healthWidth || 300;
-            const h = this.tempSettings.healthHeight || 20;
+            const w = fitLength(this.tempSettings.healthWidth || 300, this.previewContainer, 'x', 24);
+            const h = fitLength(this.tempSettings.healthHeight || 20, this.previewContainer, 'y', 5);
 
             // Bar Calculation
             // For vertical, we might swap w/h concept or just respect w/h as raw pixels
@@ -908,19 +1084,22 @@ export class HUDConfigPanel {
 
             const isVert = this.tempSettings.healthOrientation === 'vertical';
             const fillDir = isVert ? 'to top' : '90deg';
+            const fontSize = clamp(Math.round(Math.min(w, h) / 1.5), 8, 24);
 
             el.innerHTML = `
                 <div style="width: ${w}px; height: ${h}px; background: rgba(0,0,0,0.7); border: 2px solid #333; border-radius: ${Math.min(w, h) / 2}px; position:relative; overflow:hidden;">
                     <div style="width: 100%; height: 100%; background: linear-gradient(${fillDir}, #ff3333, #ff6666); clip-path: inset(${isVert ? '20% 0 0 0' : '0 20% 0 0'});"></div>
                     ${this.tempSettings.healthShowText ?
-                    `<div style="position:absolute; top:0; left:0; width:100%; height:100%; display:flex; align-items:center; justify-content:center; color:white; font-size:${Math.min(w, h) / 1.5}px; font-weight:bold; text-shadow:1px 1px 1px black;">80 / 100</div>`
+                    `<div style="position:absolute; top:0; left:0; width:100%; height:100%; display:flex; align-items:center; justify-content:center; color:white; font-size:${fontSize}px; font-weight:bold; text-shadow:1px 1px 1px black;">80 / 100</div>`
                     : ''}
                 </div>
             `;
         } else if (this.tempSettings.healthStyle === 'hearts') {
-            el.innerHTML = `<span style="font-size:24px; color:#ff3333;">❤❤❤❤</span><span style="font-size:24px; color:#555;">♡</span>`;
+            const fontSize = scaleHUDValue(24, this.previewContainer, 16, 24);
+            el.innerHTML = `<span style="font-size:${fontSize}px; color:#ff3333;">❤❤❤❤</span><span style="font-size:${fontSize}px; color:#555;">♡</span>`;
         } else {
-            el.innerHTML = `<span style="font-size:40px; font-weight:900; color:#ff3333; -webkit-text-stroke:1px white;">80</span>`;
+            const fontSize = scaleHUDValue(40, this.previewContainer, 22, 40);
+            el.innerHTML = `<span style="font-size:${fontSize}px; font-weight:900; color:#ff3333; -webkit-text-stroke:1px white;">80</span>`;
         }
 
         this.contentWrapper.appendChild(el);
@@ -937,24 +1116,27 @@ export class HUDConfigPanel {
 
     renderPreviewJump() {
         const el = document.createElement('div');
+        el.dataset.hudId = 'jump';
         el.style.cssText = `display: flex; align-items: center;`;
 
         if (this.tempSettings.jumpStyle === 'bar') {
-            const w = this.tempSettings.jumpWidth || 200;
-            const h = this.tempSettings.jumpHeight || 8;
+            const w = fitLength(this.tempSettings.jumpWidth || 200, this.previewContainer, 'x', 20);
+            const h = fitLength(this.tempSettings.jumpHeight || 8, this.previewContainer, 'y', 5);
             const isVert = this.tempSettings.jumpOrientation === 'vertical';
             const fillDir = isVert ? 'to top' : '90deg';
+            const fontSize = clamp(Math.round(Math.min(w, h) / 1.5), 8, 18);
 
             el.innerHTML = `
-                <div style="width: ${w}px; height: ${h}px; background: rgba(0,0,0,0.7); border: 2px solid #333; border-radius: ${Math.min(w, h) / 2}px; position:relative; overflow:hidden;">
+                <div style="width: ${w}px; height: ${h}px; background: rgba(0,0,0,0.7); border-radius: ${Math.min(w, h) / 2}px; position:relative; overflow:hidden;">
                     <div style="width: 100%; height: 100%; background: linear-gradient(${fillDir}, #00cfff, #0077ff); clip-path: inset(${isVert ? '30% 0 0 0' : '0 30% 0 0'});"></div>
                     ${this.tempSettings.jumpShowText ?
-                    `<div style="position:absolute; top:0; left:0; width:100%; height:100%; display:flex; align-items:center; justify-content:center; color:white; font-size:${Math.min(w, h) / 1.5}px; font-weight:bold; text-shadow:1px 1px 1px black;">80%</div>`
+                    `<div style="position:absolute; top:0; left:0; width:100%; height:100%; display:flex; align-items:center; justify-content:center; color:white; font-size:${fontSize}px; font-weight:bold; text-shadow:1px 1px 1px black;">80%</div>`
                     : ''}
                 </div>
             `;
         } else if (this.tempSettings.jumpStyle === 'circle') {
-            el.innerHTML = `<div style="width:50px; height:50px; border:3px solid #00cfff; border-radius:50%; position:relative;">
+            const size = scaleHUDValue(50, this.previewContainer, 34, 50);
+            el.innerHTML = `<div style="width:${size}px; height:${size}px; border:3px solid #00cfff; border-radius:50%; position:relative;">
                 <div style="position:absolute; bottom:0; left:0; width:100%; height:60%; background:#00cfff; border-radius:0 0 50% 50%;"></div>
             </div>`;
         }
@@ -972,6 +1154,7 @@ export class HUDConfigPanel {
 
     renderPreviewInventory() {
         const el = document.createElement('div');
+        el.dataset.hudId = 'inventory';
         el.className = "inventory-container-preview";
 
         const padding = this.tempSettings.inventoryPadding !== undefined ? this.tempSettings.inventoryPadding : 10;
@@ -979,16 +1162,29 @@ export class HUDConfigPanel {
         let height = this.tempSettings.inventoryContainerHeight;
         const isFree = this.tempSettings.inventoryFreeLayout;
         const slots = this.tempSettings.inventorySlots || 9;
-        const size = this.tempSettings.inventorySlotSize || 50;
+        const metrics = getViewportMetrics(this.previewContainer);
+        const scaledPadding = scaleHUDValue(padding, this.previewContainer, 4, 24);
+        let size = scaleHUDValue(this.tempSettings.inventorySlotSize || 50, this.previewContainer, 28, 100);
+        const availableWidth = Math.max(80, metrics.width - metrics.edge * 2);
+        const availableHeight = Math.max(80, metrics.height - metrics.edge * 2);
 
-        const autoWidth = slots * size + Math.max(0, slots - 1) * padding + padding * 2;
-        const autoHeight = size + padding * 2;
-        let cssWidth = width ? `${width}px` : `${autoWidth}px`;
-        let cssHeight = height ? `${height}px` : `${autoHeight}px`;
+        if (!isFree) {
+            const fittedSlot = Math.floor((availableWidth - scaledPadding * 2 - Math.max(0, slots - 1) * scaledPadding) / slots);
+            size = clamp(size, 24, Math.max(24, fittedSlot));
+        }
+
+        const scaledWidth = Math.min(scaleHUDValue(width || 300, this.previewContainer, 60), availableWidth);
+        const scaledHeight = Math.min(scaleHUDValue(height || 100, this.previewContainer, 50), availableHeight);
+        const autoWidth = Math.min(slots * size + Math.max(0, slots - 1) * scaledPadding + scaledPadding * 2, availableWidth);
+        const autoHeight = size + scaledPadding * 2;
+        let cssWidth = width ? `${scaledWidth}px` : `${autoWidth}px`;
+        let cssHeight = height
+            ? `${Math.min(Math.max(scaledHeight, autoHeight), availableHeight)}px`
+            : `${Math.min(autoHeight, availableHeight)}px`;
 
         el.style.cssText = `
             background: rgba(0, 0, 0, 0.5);
-            padding: ${padding}px;
+            padding: ${scaledPadding}px;
             border-radius: 12px;
             border: 1px solid rgba(255, 255, 255, 0.1);
             width: ${cssWidth};
@@ -1001,13 +1197,13 @@ export class HUDConfigPanel {
             el.style.display = 'block';
             if (!width) width = 300;
             if (!height) height = 100;
-            el.style.width = width + 'px';
-            el.style.height = height + 'px';
+            el.style.width = scaledWidth + 'px';
+            el.style.height = scaledHeight + 'px';
         } else {
             el.style.display = 'grid';
             el.style.gridTemplateColumns = `repeat(auto-fit, minmax(${size}px, ${size}px))`;
             el.style.gridAutoRows = `${size}px`;
-            el.style.gap = `${padding}px`;
+            el.style.gap = `${scaledPadding}px`;
 
             const align = this.tempSettings.inventorySlotAlignment || 'center';
             const alignMap = {
@@ -1056,17 +1252,18 @@ export class HUDConfigPanel {
                 slot.style.position = 'absolute';
                 let pos = this.tempSettings.inventorySlotPositions[i];
                 if (!pos) {
-                    const cols = Math.max(1, Math.floor(((width || 300) - padding * 2) / (size + padding)));
+                    const cols = Math.max(1, Math.floor((scaledWidth - scaledPadding * 2) / (size + scaledPadding)));
                     const row = Math.floor(i / cols);
                     const col = i % cols;
                     pos = {
-                        left: (padding + col * (size + padding)) + 'px',
-                        top: (padding + row * (size + padding)) + 'px'
+                        left: (padding + col * ((this.tempSettings.inventorySlotSize || 50) + padding)) + 'px',
+                        top: (padding + row * ((this.tempSettings.inventorySlotSize || 50) + padding)) + 'px'
                     };
                     this.tempSettings.inventorySlotPositions[i] = pos;
                 }
-                slot.style.left = pos.left;
-                slot.style.top = pos.top;
+                const scaledPos = scalePixelPosition(pos, metrics.scale);
+                slot.style.left = scaledPos.left;
+                slot.style.top = scaledPos.top;
                 this.makeSlotDraggable(slot, el, i);
             } else {
                 slot.style.position = 'relative';
@@ -1099,6 +1296,7 @@ export class HUDConfigPanel {
             const parentRect = container.getBoundingClientRect();
             const offsetX = startX - rect.left;
             const offsetY = startY - rect.top;
+            const scale = getViewportMetrics(this.previewContainer).scale || 1;
 
             const onMouseMove = (ev) => {
                 const x = ev.clientX - parentRect.left - offsetX;
@@ -1111,8 +1309,8 @@ export class HUDConfigPanel {
                 slot.style.left = clampedX + 'px';
                 slot.style.top = clampedY + 'px';
                 this.tempSettings.inventorySlotPositions[index] = {
-                    left: clampedX + 'px',
-                    top: clampedY + 'px'
+                    left: Math.round(clampedX / scale) + 'px',
+                    top: Math.round(clampedY / scale) + 'px'
                 };
             };
 
@@ -1146,6 +1344,7 @@ export class HUDConfigPanel {
 
             const startX = e.clientX;
             const startY = e.clientY;
+            const scale = getViewportMetrics(this.previewContainer).scale || 1;
 
             let startW, startH;
             if (prefix === 'inventoryContainer') {
@@ -1161,22 +1360,26 @@ export class HUDConfigPanel {
                 const dy = ev.clientY - startY;
 
                 if (prefix === 'inventoryContainer') {
-                    let newW = startW + dx;
-                    let newH = startH + dy;
+                    let newW = startW + dx / scale;
+                    let newH = startH + dy / scale;
                     if (newW < 50) newW = 50;
                     if (newH < 50) newH = 50;
 
                     this.tempSettings.inventoryContainerWidth = newW;
                     this.tempSettings.inventoryContainerHeight = newH;
 
-                    el.style.width = newW + 'px';
-                    el.style.height = newH + 'px';
+                    el.style.width = fitLength(newW, this.previewContainer, 'x', 50) + 'px';
+                    el.style.height = fitLength(newH, this.previewContainer, 'y', 50) + 'px';
 
                     if (this.uiInputs['inventoryContainerWidth']) this.uiInputs['inventoryContainerWidth'].value = Math.round(newW);
                     if (this.uiInputs['inventoryContainerHeight']) this.uiInputs['inventoryContainerHeight'].value = Math.round(newH);
+
+                    if (this.keepPreviewElementInsideViewport('inventory')) {
+                        this.applyPreviewAnchors();
+                    }
                 } else {
-                    let newW = startW + dx;
-                    let newH = startH + dy;
+                    let newW = startW + dx / scale;
+                    let newH = startH + dy / scale;
                     if (newW < 5) newW = 5;
                     if (newH < 5) newH = 5;
 
@@ -1188,16 +1391,22 @@ export class HUDConfigPanel {
 
                     const inner = el.firstElementChild;
                     if (inner) {
-                        inner.style.width = newW + 'px';
-                        inner.style.height = newH + 'px';
-                        inner.style.borderRadius = (Math.min(newW, newH) / 2) + 'px';
+                        const visualW = fitLength(newW, this.previewContainer, 'x', 5);
+                        const visualH = fitLength(newH, this.previewContainer, 'y', 5);
+                        inner.style.width = visualW + 'px';
+                        inner.style.height = visualH + 'px';
+                        inner.style.borderRadius = (Math.min(visualW, visualH) / 2) + 'px';
                     }
+
+                    this.keepPreviewElementInsideViewport(prefix);
                 }
             };
 
             const onMouseUp = () => {
                 document.removeEventListener('mousemove', onMouseMove);
                 document.removeEventListener('mouseup', onMouseUp);
+                this.keepPreviewHUDInsideViewport();
+                this.syncHudAnchorsFromPreview();
                 this.updatePreview();
             };
 
@@ -1209,6 +1418,8 @@ export class HUDConfigPanel {
     // --- Save / Close ---
 
     save() {
+        this.syncHudAnchorsFromPreview();
+
         // Apply settings to profile
         this.profile.hudSettings = this.tempSettings;
 
@@ -1221,6 +1432,11 @@ export class HUDConfigPanel {
     }
 
     close() {
+        if (this.onViewportResize) {
+            window.removeEventListener('resize', this.onViewportResize);
+            window.visualViewport?.removeEventListener('resize', this.onViewportResize);
+        }
+
         if (this.container) {
             animate(this.container, {
                 opacity: [1, 0],
@@ -1297,19 +1513,25 @@ export class HUDConfigPanel {
     renderPreviewFarmingCounter(groupId) {
         const activeGroups = getActiveFarmingGroups(this.game);
         const group = activeGroups.find(g => g.groupId === groupId) || { itemTexture: "/assets/textures/fuego.png", itemValue: 1 };
+        const metrics = getViewportMetrics(this.previewContainer);
+        const fontSize = scaleHUDValue(20, this.previewContainer, 14, 20);
+        const iconSize = scaleHUDValue(24, this.previewContainer, 18, 24);
+        const padY = scaleHUDValue(8, this.previewContainer, 5, 8);
+        const padX = scaleHUDValue(16, this.previewContainer, 9, 16);
 
         const el = document.createElement('div');
         el.id = `fz-counter-preview-${groupId}`;
+        el.dataset.hudId = `fz_${groupId}`;
         el.style.cssText = `
             display: flex; gap: 8px; align-items: center;
             background: rgba(30, 30, 30, 0.65);
             backdrop-filter: blur(10px);
             border: 1px solid rgba(255, 255, 255, 0.1);
             border-radius: 12px;
-            padding: 8px 16px;
+            padding: ${padY}px ${padX}px;
             color: #ff4500;
             font-family: sans-serif;
-            font-size: 20px;
+            font-size: ${fontSize}px;
             font-weight: bold;
             pointer-events: auto;
             user-select: none;
@@ -1317,7 +1539,7 @@ export class HUDConfigPanel {
         `;
 
         el.innerHTML = `
-            <img src="${group.itemTexture}" style="width: 24px; height: 24px; object-fit: contain;">
+            <img src="${group.itemTexture}" style="width: ${iconSize}px; height: ${iconSize}px; object-fit: contain;">
             <span>42</span>
         `;
 
@@ -1328,7 +1550,7 @@ export class HUDConfigPanel {
         if (!initialPos) {
             // Stagger default position to prevent overlapping
             const idx = activeGroups.findIndex(g => g.groupId === groupId);
-            const topOffset = 20 + (idx >= 0 ? idx : 0) * 55;
+            const topOffset = metrics.edge + (idx >= 0 ? idx : 0) * scaleHUDValue(55, this.previewContainer, 36, 55);
             initialPos = { top: `${topOffset}px`, left: "50%", transform: "translateX(-50%)" };
             this.tempSettings[posKey] = initialPos;
         }

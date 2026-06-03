@@ -468,7 +468,7 @@ input:checked+.toggle-slider:before {
 /* Inventory System Styles */
 #inventory-container {
     position: fixed;
-    bottom: 20px;
+    bottom: max(20px, env(safe-area-inset-bottom));
     left: 50%;
     transform: translateX(-50%);
     display: flex;
@@ -478,6 +478,8 @@ input:checked+.toggle-slider:before {
     border-radius: 12px;
     border: 1px solid rgba(255, 255, 255, 0.1);
     z-index: 100;
+    box-sizing: border-box;
+    touch-action: none;
 }
 
 .inventory-slot {
@@ -491,6 +493,8 @@ input:checked+.toggle-slider:before {
     justify-content: center;
     align-items: center;
     transition: all 0.2s ease;
+    box-sizing: border-box;
+    flex: 0 0 auto;
 }
 
 .inventory-slot.active {

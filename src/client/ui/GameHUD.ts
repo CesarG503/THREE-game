@@ -1,5 +1,15 @@
 import { animate } from 'animejs'
 import type { HUDConfig, UIPosition, UIPositionObject } from '../types'
+import {
+    applyResponsivePosition,
+    clamp,
+    fitLength,
+    getViewportMetrics,
+    keepElementInsideContainer,
+    resolveAnchoredPosition,
+    scaleHUDValue,
+    scalePixelPosition
+} from './modules/HUDResponsiveUtils'
 
 export class GameHUD {
     container: HTMLElement;
@@ -8,6 +18,10 @@ export class GameHUD {
     jumpElement: HTMLElement | null;
     inventoryElement: HTMLElement | null;
     settings: HUDConfig;
+    resizeTimer: number | null;
+    lastHealth: { current: number; max: number } | null;
+    lastJump: { current: number; max: number } | null;
+    onViewportChange: () => void;
 
     constructor() {
         this.container = document.createElement('div')
@@ -25,6 +39,21 @@ export class GameHUD {
         this.inventoryElement = null
 
         this.settings = {}
+        this.resizeTimer = null
+        this.lastHealth = null
+        this.lastJump = null
+
+        this.onViewportChange = () => {
+            if (this.resizeTimer !== null) window.clearTimeout(this.resizeTimer)
+            this.resizeTimer = window.setTimeout(() => {
+                this.resizeTimer = null
+                if (this.settings) this.createHUD(this.settings)
+            }, 80)
+        }
+
+        window.addEventListener('resize', this.onViewportChange)
+        window.visualViewport?.addEventListener('resize', this.onViewportChange)
+        window.visualViewport?.addEventListener('scroll', this.onViewportChange)
     }
 
     createHUD(settings: HUDConfig) {
@@ -59,6 +88,14 @@ export class GameHUD {
             else if (id === 'jump' && this.settings.showJump) this.createJump(this.settings);
             else if (id === 'inventory' && this.settings.showInventory) this.createInventory(this.settings);
         }
+
+        this.applyHUDAnchors()
+        this.keepHUDInsideViewport()
+        this.applyHUDAnchors()
+        this.keepHUDInsideViewport()
+        if (this.lastHealth) this.updateHealth(this.lastHealth.current, this.lastHealth.max)
+        if (this.lastJump) this.updateJump(this.lastJump.current, this.lastJump.max)
+        this.applyLayerOrder()
     }
 
     createHealth(s: HUDConfig) {
@@ -76,23 +113,26 @@ export class GameHUD {
         }
 
         if (s.healthStyle === 'bar') {
-            const w = s.healthWidth || 300;
-            const h = s.healthHeight || 20;
+            const w = fitLength(s.healthWidth || 300, this.container, 'x', 24);
+            const h = fitLength(s.healthHeight || 20, this.container, 'y', 5);
             const isVert = s.healthOrientation === 'vertical';
             const fillDir = isVert ? 'to top' : '90deg';
+            const fontSize = clamp(Math.round(Math.min(w, h) / 1.5), 8, 24);
 
             el.innerHTML = `
                 <div style="width: ${w}px; height: ${h}px; background: rgba(0,0,0,0.7); border: 2px solid #333; border-radius: ${Math.min(w, h) / 2}px; position:relative; overflow:hidden;">
                     <div id="health-bar-fill" style="width: 100%; height: 100%; background: linear-gradient(${fillDir}, #ff3333, #ff6666); transform-origin: ${isVert ? 'bottom' : 'left'};"></div>
                     ${s.healthShowText ?
-                    `<div id="health-text" style="position:absolute; top:0; left:0; width:100%; height:100%; display:flex; align-items:center; justify-content:center; color:white; font-size:${Math.min(w, h) / 1.5}px; font-weight:bold; text-shadow:1px 1px 1px black;">100 / 100</div>`
+                    `<div id="health-text" style="position:absolute; top:0; left:0; width:100%; height:100%; display:flex; align-items:center; justify-content:center; color:white; font-size:${fontSize}px; font-weight:bold; text-shadow:1px 1px 1px black;">100 / 100</div>`
                     : ''}
                 </div>
             `;
         } else if (s.healthStyle === 'hearts') {
-            el.innerHTML = `<span style="font-size:24px; color:#ff3333;">❤❤❤❤</span><span style="font-size:24px; color:#555;">♡</span>`;
+            const fontSize = scaleHUDValue(24, this.container, 16, 24);
+            el.innerHTML = `<span style="font-size:${fontSize}px; color:#ff3333;">❤❤❤❤</span><span style="font-size:${fontSize}px; color:#555;">♡</span>`;
         } else {
-            el.innerHTML = `<span id="health-text-simple" style="font-size:40px; font-weight:900; color:#ff3333; -webkit-text-stroke:1px white;">100</span>`;
+            const fontSize = scaleHUDValue(40, this.container, 22, 40);
+            el.innerHTML = `<span id="health-text-simple" style="font-size:${fontSize}px; font-weight:900; color:#ff3333; -webkit-text-stroke:1px white;">100</span>`;
         }
 
         this.applyPosition(el, s.healthPos);
@@ -113,24 +153,30 @@ export class GameHUD {
         }
 
         if (s.jumpStyle === 'bar') {
-            const w = s.jumpWidth || 200;
-            const h = s.jumpHeight || 8;
+            const w = fitLength(s.jumpWidth || 200, this.container, 'x', 20);
+            const h = fitLength(s.jumpHeight || 8, this.container, 'y', 5);
             const isVert = s.jumpOrientation === 'vertical';
             const fillDir = isVert ? 'to top' : '90deg';
+            const fontSize = clamp(Math.round(Math.min(w, h) / 1.5), 8, 18);
 
             el.innerHTML = `
                 <div style="width: ${w}px; height: ${h}px; background: rgba(0,0,0,0.7); border-radius: ${Math.min(w, h) / 2}px; overflow:hidden; position:relative;">
                     <div id="jump-bar-fill" style="width: 100%; height: 100%; background: linear-gradient(${fillDir}, #33ccff, #3388ff); transform-origin: ${isVert ? 'bottom' : 'left'};"></div>
                      ${s.jumpShowText ?
-                    `<div id="jump-text" style="position:absolute; top:0; left:0; width:100%; height:100%; display:flex; align-items:center; justify-content:center; color:white; font-size:${Math.min(w, h) / 1.5}px; font-weight:bold; text-shadow:1px 1px 1px black;">1</div>`
+                    `<div id="jump-text" style="position:absolute; top:0; left:0; width:100%; height:100%; display:flex; align-items:center; justify-content:center; color:white; font-size:${fontSize}px; font-weight:bold; text-shadow:1px 1px 1px black;">1</div>`
                     : ''}
                 </div>
             `;
         } else {
+            const size = scaleHUDValue(50, this.container, 34, 50);
+            const center = size / 2;
+            const radius = Math.max(10, Math.round(size * 0.4));
+            const stroke = Math.max(3, Math.round(size * 0.1));
+            const dash = 2 * Math.PI * radius;
             el.innerHTML = `
-               <svg width="50" height="50" style="transform: rotate(-90deg)">
-                   <circle cx="25" cy="25" r="20" stroke="rgba(0,0,0,0.5)" stroke-width="5" fill="transparent"/>
-                   <circle id="jump-circle-fill" cx="25" cy="25" r="20" stroke="#33ccff" stroke-width="5" fill="transparent" stroke-dasharray="125.6" stroke-dashoffset="125.6"/>
+               <svg width="${size}" height="${size}" data-radius="${radius}" style="transform: rotate(-90deg)">
+                   <circle cx="${center}" cy="${center}" r="${radius}" stroke="rgba(0,0,0,0.5)" stroke-width="${stroke}" fill="transparent"/>
+                   <circle id="jump-circle-fill" cx="${center}" cy="${center}" r="${radius}" stroke="#33ccff" stroke-width="${stroke}" fill="transparent" stroke-dasharray="${dash}" stroke-dashoffset="${dash}"/>
                </svg>
             `;
         }
@@ -147,6 +193,9 @@ export class GameHUD {
         if (el) {
             // Ensure it's visible (GameHUD manages visibility now based on settings)
             el.style.display = 'flex';
+            if (el.parentElement !== this.container) {
+                this.container.appendChild(el);
+            }
             // Prevent stretching
             el.style.width = 'max-content';
             el.style.height = 'max-content';
@@ -156,24 +205,38 @@ export class GameHUD {
 
             // Apply Container Style
             const padding = s.inventoryPadding !== undefined ? s.inventoryPadding : 10;
-            const width = s.inventoryContainerWidth || 300;
-            const height = s.inventoryContainerHeight || 100;
+            const baseWidth = s.inventoryContainerWidth || 300;
+            const baseHeight = s.inventoryContainerHeight || 100;
             const isFree = s.inventoryFreeLayout;
             const targetCount = s.inventorySlots || 9;
-            const slotSize = s.inventorySlotSize || 50;
-            const autoWidth = targetCount * slotSize + Math.max(0, targetCount - 1) * padding + padding * 2;
-            const autoHeight = slotSize + padding * 2;
+            const metrics = getViewportMetrics(this.container);
+            const scaledPadding = scaleHUDValue(padding, this.container, 4, 24);
+            let slotSize = scaleHUDValue(s.inventorySlotSize || 50, this.container, 28, 100);
+            const availableWidth = Math.max(80, metrics.width - metrics.edge * 2);
+            const availableHeight = Math.max(80, metrics.height - metrics.edge * 2);
+
+            if (!isFree) {
+                const fittedSlot = Math.floor((availableWidth - scaledPadding * 2 - Math.max(0, targetCount - 1) * scaledPadding) / targetCount);
+                slotSize = clamp(slotSize, 24, Math.max(24, fittedSlot));
+            }
+
+            const width = Math.min(scaleHUDValue(baseWidth, this.container, 60), availableWidth);
+            const height = Math.min(scaleHUDValue(baseHeight, this.container, 50), availableHeight);
+            const scaledAutoWidth = targetCount * slotSize + Math.max(0, targetCount - 1) * scaledPadding + scaledPadding * 2;
+            const scaledAutoHeight = slotSize + scaledPadding * 2;
 
             // Allow container configuration
             // If user has set specific width/height in config, use it. Otherwise use max-content or similar?
             // If free layout is ON, we definitely need dimensions.
             if (s.inventoryContainerWidth) el.style.width = `${width}px`;
-            else el.style.width = isFree ? `${width}px` : `${autoWidth}px`;
+            else el.style.width = isFree ? `${width}px` : `${Math.min(scaledAutoWidth, availableWidth)}px`;
 
-            if (s.inventoryContainerHeight) el.style.height = `${height}px`;
-            else el.style.height = isFree ? `${height}px` : `${autoHeight}px`;
+            const finalHeight = s.inventoryContainerHeight
+                ? Math.min(Math.max(height, scaledAutoHeight), availableHeight)
+                : Math.min(isFree ? height : scaledAutoHeight, availableHeight);
+            el.style.height = `${finalHeight}px`;
 
-            el.style.padding = `${padding}px`;
+            el.style.padding = `${scaledPadding}px`;
             el.style.boxSizing = 'border-box'; // Ensure padding doesn't expand width if set
 
             // Layout Mode
@@ -183,7 +246,7 @@ export class GameHUD {
             } else {
                 el.style.position = 'fixed';
                 el.style.display = 'grid';
-                el.style.gap = `${padding}px`;
+                el.style.gap = `${scaledPadding}px`;
                 el.style.gridTemplateColumns = `repeat(auto-fit, minmax(${slotSize}px, ${slotSize}px))`;
                 el.style.gridAutoRows = `${slotSize}px`;
 
@@ -236,8 +299,8 @@ export class GameHUD {
                     if (isFree) {
                         slot.style.position = 'absolute';
                         const pos = (s.inventorySlotPositions && s.inventorySlotPositions[index])
-                            ? s.inventorySlotPositions[index]
-                            : { left: `${padding + (index * (slotSize + padding))}px`, top: `${padding}px` }; // Fallback simple internal layout
+                            ? scalePixelPosition(s.inventorySlotPositions[index], metrics.scale)
+                            : { left: `${scaledPadding + (index * (slotSize + scaledPadding))}px`, top: `${scaledPadding}px` }; // Fallback simple internal layout
 
                         slot.style.left = pos.left;
                         slot.style.top = pos.top;
@@ -259,6 +322,7 @@ export class GameHUD {
     }
 
     updateHealth(current: number, max: number) {
+        this.lastHealth = { current, max };
         if (!this.healthElement) return;
 
         // Ensure valid numbers
@@ -304,6 +368,7 @@ export class GameHUD {
     }
 
     updateJump(current: number, max: number) {
+        this.lastJump = { current, max };
         if (!this.jumpElement) return;
 
         // Ensure valid numbers
@@ -334,7 +399,9 @@ export class GameHUD {
             // Circle
             const circle = this.jumpElement.querySelector<HTMLElement>('#jump-circle-fill');
             if (circle) {
-                const circumference = 2 * Math.PI * 20; // r=20
+                const svg = circle.closest('svg');
+                const radius = parseFloat(svg?.getAttribute('data-radius') || '20');
+                const circumference = 2 * Math.PI * radius;
                 const offset = circumference - ((current / max) * circumference);
 
                 // API v4: animate(targets, parameters)
@@ -352,14 +419,7 @@ export class GameHUD {
         
         // Handle position object
         if (typeof pos === 'object' && pos !== null) {
-            const p = pos as UIPositionObject;
-            if (p.top) { el.style.top = p.top; el.style.bottom = 'auto'; }
-            if (p.left) { el.style.left = p.left; el.style.right = 'auto'; }
-            if (p.bottom) { el.style.bottom = p.bottom; el.style.top = 'auto'; }
-            if (p.right) { el.style.right = p.right; el.style.left = 'auto'; }
-
-            if (p.transform) el.style.transform = p.transform;
-            else el.style.transform = 'none';
+            applyResponsivePosition(el, pos as UIPositionObject);
         }
         
         // Handle predefined strings
@@ -401,6 +461,104 @@ export class GameHUD {
             default: // Default Top Center
                 el.style.top = margin; el.style.left = "50%"; el.style.transform = "translateX(-50%)";
                 break;
+        }
+    }
+
+    getHudElement(id: string) {
+        if (id === 'health') return this.healthElement;
+        if (id === 'jump') return this.jumpElement;
+        if (id === 'inventory') return this.inventoryElement;
+        if (id.startsWith('fz_')) return document.getElementById(`fz-counter-${id.substring(3)}`);
+        return null;
+    }
+
+    getRenderedHudIds() {
+        const ids: string[] = [];
+        if (this.healthElement) ids.push('health');
+        if (this.jumpElement) ids.push('jump');
+        Array.from(this.container.querySelectorAll<HTMLElement>('[id^="fz-counter-"]')).forEach(el => {
+            ids.push(`fz_${el.id.substring('fz-counter-'.length)}`);
+        });
+        return ids;
+    }
+
+    getResolvedLayerOrder() {
+        const layerOrder = [...(this.settings.layerOrder || ['health', 'jump', 'inventory'])];
+        this.getRenderedHudIds().forEach(id => {
+            if (!layerOrder.includes(id)) layerOrder.push(id);
+        });
+        if (!layerOrder.includes('inventory')) layerOrder.push('inventory');
+        return layerOrder;
+    }
+
+    isAboveInventory(id: string) {
+        const layerOrder = this.getResolvedLayerOrder();
+        const itemIndex = layerOrder.indexOf(id);
+        const inventoryIndex = layerOrder.indexOf('inventory');
+        return itemIndex !== -1 && inventoryIndex !== -1 && itemIndex < inventoryIndex;
+    }
+
+    applyHUDAnchors() {
+        const anchors = this.settings.hudAnchors || {};
+        if (!this.inventoryElement || !this.settings.showInventory) return;
+
+        this.getRenderedHudIds().forEach(id => {
+            const anchor = anchors[id];
+            const el = this.getHudElement(id);
+            if (!el) return;
+
+            if (!anchor || anchor.parentId !== 'inventory' || !anchor.pos || !this.isAboveInventory(id)) {
+                delete el.dataset.hudParent;
+                return;
+            }
+
+            const resolved = resolveAnchoredPosition(this.container, this.inventoryElement, anchor.pos);
+            if (!resolved) return;
+
+            el.dataset.hudParent = 'inventory';
+            el.style.left = resolved.left;
+            el.style.top = resolved.top;
+            el.style.bottom = 'auto';
+            el.style.right = 'auto';
+            el.style.transform = 'none';
+        });
+    }
+
+    keepHUDInsideViewport() {
+        const inventory = this.getHudElement('inventory');
+        if (inventory) keepElementInsideContainer(inventory, this.container);
+
+        this.getRenderedHudIds().forEach(id => {
+            const el = this.getHudElement(id);
+            if (el) keepElementInsideContainer(el, this.container);
+        });
+    }
+
+    applyLayerOrder() {
+        const elementById = new Map<string, HTMLElement | null>([
+            ['health', this.healthElement],
+            ['jump', this.jumpElement],
+            ['inventory', this.inventoryElement]
+        ]);
+
+        Array.from(this.container.querySelectorAll<HTMLElement>('[id^="fz-counter-"]')).forEach(el => {
+            elementById.set(`fz_${el.id.substring('fz-counter-'.length)}`, el);
+        });
+
+        const layerOrder = [...(this.settings.layerOrder || ['health', 'jump', 'inventory'])];
+        elementById.forEach((_, id) => {
+            if (!layerOrder.includes(id)) layerOrder.push(id);
+        });
+
+        const topBase = 100;
+        layerOrder.forEach((id, index) => {
+            const el = elementById.get(id);
+            if (!el) return;
+            el.style.zIndex = `${topBase + layerOrder.length - index}`;
+        });
+
+        if (this.timerElement) {
+            this.timerElement.style.zIndex = `${topBase + layerOrder.length + 1}`;
         }
     }
 
@@ -451,32 +609,38 @@ export class GameHUD {
     // --- STYLES ---
 
     applyNeonStyle(el: HTMLElement) {
+        const fontSize = scaleHUDValue(40, this.container, 24, 40)
+        const padY = scaleHUDValue(10, this.container, 6, 10)
+        const padX = scaleHUDValue(30, this.container, 14, 30)
         el.style.fontFamily = "'Courier New', monospace"
-        el.style.fontSize = "40px"
+        el.style.fontSize = `${fontSize}px`
         el.style.fontWeight = "bold"
         el.style.color = "#0ff"
         el.style.textShadow = "0 0 10px #0ff, 0 0 20px #0ff"
         el.style.background = "rgba(0, 0, 0, 0.6)"
-        el.style.padding = "10px 30px"
+        el.style.padding = `${padY}px ${padX}px`
         el.style.borderRadius = "8px"
         el.style.border = "2px solid #0ff"
         el.style.boxShadow = "0 0 15px rgba(0, 255, 255, 0.3)"
     }
 
     applyMinimalStyle(el: HTMLElement) {
+        const fontSize = scaleHUDValue(48, this.container, 28, 48)
         el.style.fontFamily = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
-        el.style.fontSize = "48px"
+        el.style.fontSize = `${fontSize}px`
         el.style.fontWeight = "300"
         el.style.color = "#ffffff"
         el.style.textShadow = "0 2px 4px rgba(0,0,0,0.5)"
     }
 
     applySportsStyle(el: HTMLElement) {
+        const fontSize = scaleHUDValue(36, this.container, 22, 36)
+        const padX = scaleHUDValue(40, this.container, 16, 40)
         el.style.fontFamily = "Impact, sans-serif"
-        el.style.fontSize = "36px"
+        el.style.fontSize = `${fontSize}px`
         el.style.color = "#FFD700" // Gold
         el.style.background = "linear-gradient(180deg, #333, #111)"
-        el.style.padding = "5px 40px"
+        el.style.padding = `5px ${padX}px`
         el.style.borderRadius = "4px"
         el.style.border = "2px solid #555"
         el.style.borderBottom = "4px solid #333"
@@ -509,6 +673,11 @@ export class GameHUD {
         const settings = this.settings || {};
         const profile = game.playerConfigManager?.getCurrentProfile?.() || {};
         const hudSettings = profile.hudSettings || settings;
+        const metrics = getViewportMetrics(this.container);
+        const counterFont = scaleHUDValue(20, this.container, 14, 20);
+        const counterIcon = scaleHUDValue(24, this.container, 18, 24);
+        const counterPadY = scaleHUDValue(8, this.container, 5, 8);
+        const counterPadX = scaleHUDValue(16, this.container, 9, 16);
 
         activeGroups.forEach((group, idx) => {
             const gId = group.groupId;
@@ -549,6 +718,9 @@ export class GameHUD {
                 this.container.appendChild(el);
             }
 
+            el.style.padding = `${counterPadY}px ${counterPadX}px`;
+            el.style.fontSize = `${counterFont}px`;
+
             // Update texture/icon and text if changed
             const imgEl = el.querySelector("img");
             const spanEl = el.querySelector("span");
@@ -558,7 +730,7 @@ export class GameHUD {
 
             if (!imgEl || !spanEl || !currentTex.includes(expectedTex)) {
                 el.innerHTML = `
-                    <img src="${expectedTex}" style="width: 24px; height: 24px; object-fit: contain;">
+                    <img src="${expectedTex}" style="width: ${counterIcon}px; height: ${counterIcon}px; object-fit: contain;">
                     <span>${count}</span>
                 `;
             } else {
@@ -581,14 +753,17 @@ export class GameHUD {
                 this.applyPosition(el, customPos);
             } else {
                 // Default position staggered vertically
-                const topOffset = 20 + idx * 55;
-                el.style.top = `${topOffset}px`;
+                el.style.top = `${metrics.edge + idx * scaleHUDValue(55, this.container, 36, 55)}px`;
                 el.style.left = "50%";
                 el.style.bottom = "auto";
                 el.style.right = "auto";
                 el.style.transform = "translateX(-50%)";
             }
         });
+
+        this.applyHUDAnchors();
+        this.keepHUDInsideViewport();
+        this.applyLayerOrder();
     }
 }
 

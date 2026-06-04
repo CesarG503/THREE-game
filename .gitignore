@@ -4,3 +4,7 @@ docs/
 promt.agent/skills/threejs-skills/
 promt
 dist
+.agents
+.codex
+graphify-out
+.graphifyignore

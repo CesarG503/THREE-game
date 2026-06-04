@@ -113,16 +113,18 @@ export class GameHUD {
         }
 
         if (s.healthStyle === 'bar') {
-            const w = fitLength(s.healthWidth || 300, this.container, 'x', 24);
-            const h = fitLength(s.healthHeight || 20, this.container, 'y', 5);
+            const w = fitLength(s.healthWidth || 300, this.container, 'x', 2);
+            const h = fitLength(s.healthHeight || 20, this.container, 'y', 1);
             const isVert = s.healthOrientation === 'vertical';
             const fillDir = isVert ? 'to top' : '90deg';
-            const fontSize = clamp(Math.round(Math.min(w, h) / 1.5), 8, 24);
+            const border = h <= 4 || w <= 10 ? 0 : clamp(Math.floor(Math.min(w, h) / 8), 1, 2);
+            const showText = s.healthShowText && w >= 44 && h >= 10;
+            const fontSize = clamp(Math.round(Math.min(w, h) / 1.5), 6, 24);
 
             el.innerHTML = `
-                <div style="width: ${w}px; height: ${h}px; background: rgba(0,0,0,0.7); border: 2px solid #333; border-radius: ${Math.min(w, h) / 2}px; position:relative; overflow:hidden;">
+                <div style="width: ${w}px; height: ${h}px; background: rgba(0,0,0,0.7); border: ${border}px solid #333; border-radius: ${Math.min(w, h) / 2}px; position:relative; overflow:hidden; box-sizing:border-box;">
                     <div id="health-bar-fill" style="width: 100%; height: 100%; background: linear-gradient(${fillDir}, #ff3333, #ff6666); transform-origin: ${isVert ? 'bottom' : 'left'};"></div>
-                    ${s.healthShowText ?
+                    ${showText ?
                     `<div id="health-text" style="position:absolute; top:0; left:0; width:100%; height:100%; display:flex; align-items:center; justify-content:center; color:white; font-size:${fontSize}px; font-weight:bold; text-shadow:1px 1px 1px black;">100 / 100</div>`
                     : ''}
                 </div>
@@ -153,16 +155,17 @@ export class GameHUD {
         }
 
         if (s.jumpStyle === 'bar') {
-            const w = fitLength(s.jumpWidth || 200, this.container, 'x', 20);
-            const h = fitLength(s.jumpHeight || 8, this.container, 'y', 5);
+            const w = fitLength(s.jumpWidth || 200, this.container, 'x', 2);
+            const h = fitLength(s.jumpHeight || 8, this.container, 'y', 1);
             const isVert = s.jumpOrientation === 'vertical';
             const fillDir = isVert ? 'to top' : '90deg';
-            const fontSize = clamp(Math.round(Math.min(w, h) / 1.5), 8, 18);
+            const showText = s.jumpShowText && w >= 32 && h >= 8;
+            const fontSize = clamp(Math.round(Math.min(w, h) / 1.5), 6, 18);
 
             el.innerHTML = `
-                <div style="width: ${w}px; height: ${h}px; background: rgba(0,0,0,0.7); border-radius: ${Math.min(w, h) / 2}px; overflow:hidden; position:relative;">
+                <div style="width: ${w}px; height: ${h}px; background: rgba(0,0,0,0.7); border-radius: ${Math.min(w, h) / 2}px; overflow:hidden; position:relative; box-sizing:border-box;">
                     <div id="jump-bar-fill" style="width: 100%; height: 100%; background: linear-gradient(${fillDir}, #33ccff, #3388ff); transform-origin: ${isVert ? 'bottom' : 'left'};"></div>
-                     ${s.jumpShowText ?
+                     ${showText ?
                     `<div id="jump-text" style="position:absolute; top:0; left:0; width:100%; height:100%; display:flex; align-items:center; justify-content:center; color:white; font-size:${fontSize}px; font-weight:bold; text-shadow:1px 1px 1px black;">1</div>`
                     : ''}
                 </div>

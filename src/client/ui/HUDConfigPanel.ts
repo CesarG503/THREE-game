@@ -1073,8 +1073,8 @@ export class HUDConfigPanel {
         }
 
         if (this.tempSettings.healthStyle === 'bar') {
-            const w = fitLength(this.tempSettings.healthWidth || 300, this.previewContainer, 'x', 24);
-            const h = fitLength(this.tempSettings.healthHeight || 20, this.previewContainer, 'y', 5);
+            const w = fitLength(this.tempSettings.healthWidth || 300, this.previewContainer, 'x', 2);
+            const h = fitLength(this.tempSettings.healthHeight || 20, this.previewContainer, 'y', 1);
 
             // Bar Calculation
             // For vertical, we might swap w/h concept or just respect w/h as raw pixels
@@ -1084,12 +1084,14 @@ export class HUDConfigPanel {
 
             const isVert = this.tempSettings.healthOrientation === 'vertical';
             const fillDir = isVert ? 'to top' : '90deg';
-            const fontSize = clamp(Math.round(Math.min(w, h) / 1.5), 8, 24);
+            const border = h <= 4 || w <= 10 ? 0 : clamp(Math.floor(Math.min(w, h) / 8), 1, 2);
+            const showText = this.tempSettings.healthShowText && w >= 44 && h >= 10;
+            const fontSize = clamp(Math.round(Math.min(w, h) / 1.5), 6, 24);
 
             el.innerHTML = `
-                <div style="width: ${w}px; height: ${h}px; background: rgba(0,0,0,0.7); border: 2px solid #333; border-radius: ${Math.min(w, h) / 2}px; position:relative; overflow:hidden;">
+                <div style="width: ${w}px; height: ${h}px; background: rgba(0,0,0,0.7); border: ${border}px solid #333; border-radius: ${Math.min(w, h) / 2}px; position:relative; overflow:hidden; box-sizing:border-box;">
                     <div style="width: 100%; height: 100%; background: linear-gradient(${fillDir}, #ff3333, #ff6666); clip-path: inset(${isVert ? '20% 0 0 0' : '0 20% 0 0'});"></div>
-                    ${this.tempSettings.healthShowText ?
+                    ${showText ?
                     `<div style="position:absolute; top:0; left:0; width:100%; height:100%; display:flex; align-items:center; justify-content:center; color:white; font-size:${fontSize}px; font-weight:bold; text-shadow:1px 1px 1px black;">80 / 100</div>`
                     : ''}
                 </div>
@@ -1120,16 +1122,17 @@ export class HUDConfigPanel {
         el.style.cssText = `display: flex; align-items: center;`;
 
         if (this.tempSettings.jumpStyle === 'bar') {
-            const w = fitLength(this.tempSettings.jumpWidth || 200, this.previewContainer, 'x', 20);
-            const h = fitLength(this.tempSettings.jumpHeight || 8, this.previewContainer, 'y', 5);
+            const w = fitLength(this.tempSettings.jumpWidth || 200, this.previewContainer, 'x', 2);
+            const h = fitLength(this.tempSettings.jumpHeight || 8, this.previewContainer, 'y', 1);
             const isVert = this.tempSettings.jumpOrientation === 'vertical';
             const fillDir = isVert ? 'to top' : '90deg';
-            const fontSize = clamp(Math.round(Math.min(w, h) / 1.5), 8, 18);
+            const showText = this.tempSettings.jumpShowText && w >= 32 && h >= 8;
+            const fontSize = clamp(Math.round(Math.min(w, h) / 1.5), 6, 18);
 
             el.innerHTML = `
-                <div style="width: ${w}px; height: ${h}px; background: rgba(0,0,0,0.7); border-radius: ${Math.min(w, h) / 2}px; position:relative; overflow:hidden;">
+                <div style="width: ${w}px; height: ${h}px; background: rgba(0,0,0,0.7); border-radius: ${Math.min(w, h) / 2}px; position:relative; overflow:hidden; box-sizing:border-box;">
                     <div style="width: 100%; height: 100%; background: linear-gradient(${fillDir}, #00cfff, #0077ff); clip-path: inset(${isVert ? '30% 0 0 0' : '0 30% 0 0'});"></div>
-                    ${this.tempSettings.jumpShowText ?
+                    ${showText ?
                     `<div style="position:absolute; top:0; left:0; width:100%; height:100%; display:flex; align-items:center; justify-content:center; color:white; font-size:${fontSize}px; font-weight:bold; text-shadow:1px 1px 1px black;">80%</div>`
                     : ''}
                 </div>
@@ -1391,8 +1394,8 @@ export class HUDConfigPanel {
 
                     const inner = el.firstElementChild;
                     if (inner) {
-                        const visualW = fitLength(newW, this.previewContainer, 'x', 5);
-                        const visualH = fitLength(newH, this.previewContainer, 'y', 5);
+                        const visualW = fitLength(newW, this.previewContainer, 'x', 2);
+                        const visualH = fitLength(newH, this.previewContainer, 'y', 1);
                         inner.style.width = visualW + 'px';
                         inner.style.height = visualH + 'px';
                         inner.style.borderRadius = (Math.min(visualW, visualH) / 2) + 'px';

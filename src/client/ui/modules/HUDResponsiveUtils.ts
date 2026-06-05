@@ -54,6 +54,109 @@ export function applyResponsivePosition(el, pos) {
     }
 }
 
+export function hasViewportConstraint(constraint) {
+    if (!constraint) return false;
+    return (constraint.horizontal && constraint.horizontal !== "free") ||
+        (constraint.vertical && constraint.vertical !== "free");
+}
+
+export function resolveViewportConstraintPosition(container, el, constraint) {
+    if (!container || !el || !hasViewportConstraint(constraint)) return null;
+
+    const containerRect = container.getBoundingClientRect();
+    const elRect = el.getBoundingClientRect();
+    const result = {};
+
+    if (constraint.horizontal && constraint.horizontal !== "free") {
+        const guideX = constraint.horizontal === "center"
+            ? containerRect.width / 2
+            : constraint.horizontal === "right"
+                ? containerRect.width
+                : 0;
+        const elementOffset = constraint.horizontal === "center"
+            ? elRect.width / 2
+            : constraint.horizontal === "right"
+                ? elRect.width
+                : 0;
+        result.left = `${Math.round(guideX + (Number(constraint.offsetX) || 0) - elementOffset)}px`;
+    }
+
+    if (constraint.vertical && constraint.vertical !== "free") {
+        const guideY = constraint.vertical === "center"
+            ? containerRect.height / 2
+            : constraint.vertical === "bottom"
+                ? containerRect.height
+                : 0;
+        const elementOffset = constraint.vertical === "center"
+            ? elRect.height / 2
+            : constraint.vertical === "bottom"
+                ? elRect.height
+                : 0;
+        result.top = `${Math.round(guideY + (Number(constraint.offsetY) || 0) - elementOffset)}px`;
+    }
+
+    return result;
+}
+
+export function applyViewportConstraint(el, container, constraint) {
+    const resolved = resolveViewportConstraintPosition(container, el, constraint);
+    if (!resolved) return false;
+
+    if (resolved.left !== undefined) {
+        el.style.left = resolved.left;
+        el.style.right = "auto";
+    }
+    if (resolved.top !== undefined) {
+        el.style.top = resolved.top;
+        el.style.bottom = "auto";
+    }
+    if (resolved.left !== undefined || resolved.top !== undefined) {
+        el.style.transform = "none";
+    }
+    return true;
+}
+
+export function deriveViewportConstraintOffsets(container, el, constraint) {
+    if (!container || !el || !constraint) return { offsetX: 0, offsetY: 0 };
+
+    const containerRect = container.getBoundingClientRect();
+    const elRect = el.getBoundingClientRect();
+    const next = {
+        offsetX: Number(constraint.offsetX) || 0,
+        offsetY: Number(constraint.offsetY) || 0
+    };
+
+    if (constraint.horizontal && constraint.horizontal !== "free") {
+        const guideX = constraint.horizontal === "center"
+            ? containerRect.width / 2
+            : constraint.horizontal === "right"
+                ? containerRect.width
+                : 0;
+        const elementX = constraint.horizontal === "center"
+            ? elRect.left - containerRect.left + elRect.width / 2
+            : constraint.horizontal === "right"
+                ? elRect.right - containerRect.left
+                : elRect.left - containerRect.left;
+        next.offsetX = Math.round(elementX - guideX);
+    }
+
+    if (constraint.vertical && constraint.vertical !== "free") {
+        const guideY = constraint.vertical === "center"
+            ? containerRect.height / 2
+            : constraint.vertical === "bottom"
+                ? containerRect.height
+                : 0;
+        const elementY = constraint.vertical === "center"
+            ? elRect.top - containerRect.top + elRect.height / 2
+            : constraint.vertical === "bottom"
+                ? elRect.bottom - containerRect.top
+                : elRect.top - containerRect.top;
+        next.offsetY = Math.round(elementY - guideY);
+    }
+
+    return next;
+}
+
 export function scalePixelPosition(pos, scale) {
     if (!pos) return pos;
 

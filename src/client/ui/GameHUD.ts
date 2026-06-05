@@ -2,9 +2,11 @@ import { animate } from 'animejs'
 import type { HUDConfig, UIPosition, UIPositionObject } from '../types'
 import {
     applyResponsivePosition,
+    applyViewportConstraint,
     clamp,
     fitLength,
     getViewportMetrics,
+    hasViewportConstraint,
     keepElementInsideContainer,
     resolveAnchoredPosition,
     scaleHUDValue,
@@ -89,8 +91,10 @@ export class GameHUD {
             else if (id === 'inventory' && this.settings.showInventory) this.createInventory(this.settings);
         }
 
+        this.applyHUDConstraints()
         this.applyHUDAnchors()
         this.keepHUDInsideViewport()
+        this.applyHUDConstraints()
         this.applyHUDAnchors()
         this.keepHUDInsideViewport()
         if (this.lastHealth) this.updateHealth(this.lastHealth.current, this.lastHealth.max)
@@ -503,6 +507,22 @@ export class GameHUD {
         return itemIndex !== -1 && inventoryIndex !== -1 && itemIndex < inventoryIndex;
     }
 
+    applyHUDConstraints(ids?: string[]) {
+        const constraints = this.settings.hudConstraints || {};
+        const targetIds = ids || Object.keys(constraints);
+
+        targetIds.forEach(id => {
+            const constraint = constraints[id];
+            if (!hasViewportConstraint(constraint)) return;
+
+            const el = this.getHudElement(id);
+            if (!el) return;
+
+            applyViewportConstraint(el, this.container, constraint);
+            el.dataset.hudConstraint = 'viewport';
+        });
+    }
+
     applyHUDAnchors() {
         const anchors = this.settings.hudAnchors || {};
         if (!this.inventoryElement || !this.settings.showInventory) return;
@@ -512,7 +532,11 @@ export class GameHUD {
             const el = this.getHudElement(id);
             if (!el) return;
 
-            if (!anchor || anchor.parentId !== 'inventory' || !anchor.pos || !this.isAboveInventory(id)) {
+            if (hasViewportConstraint(this.settings.hudConstraints?.[id]) ||
+                !anchor ||
+                anchor.parentId !== 'inventory' ||
+                !anchor.pos ||
+                !this.isAboveInventory(id)) {
                 delete el.dataset.hudParent;
                 return;
             }
@@ -766,8 +790,10 @@ export class GameHUD {
             }
         });
 
+        this.applyHUDConstraints();
         this.applyHUDAnchors();
         this.keepHUDInsideViewport();
+        this.applyHUDConstraints();
         this.applyLayerOrder();
     }
 }

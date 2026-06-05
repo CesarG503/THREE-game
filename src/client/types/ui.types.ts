@@ -13,6 +13,13 @@ export interface HUDAnchor {
     pos?: UIPositionObject;
 }
 
+export interface HUDViewportConstraint {
+    horizontal?: 'free' | 'left' | 'center' | 'right';
+    vertical?: 'free' | 'top' | 'center' | 'bottom';
+    offsetX?: number;
+    offsetY?: number;
+}
+
 export type UIPresetPosition = 
     | 'top-left' | 'top-center' | 'top-right' 
     | 'middle-left' | 'center' | 'middle-right' 
@@ -50,6 +57,7 @@ export interface HUDConfig {
 
     layerOrder?: string[];
     hudAnchors?: Record<string, HUDAnchor>;
+    hudConstraints?: Record<string, HUDViewportConstraint>;
 }
 
 export interface FloatingTextItem {

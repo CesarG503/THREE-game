@@ -4,9 +4,12 @@ import { animate, stagger } from 'animejs'
 import { HUDLayoutSystem } from './modules/HUDLayoutSystem'
 import { getActiveFarmingGroups } from './GameHUD'
 import {
+    applyViewportConstraint,
     clamp,
+    deriveViewportConstraintOffsets,
     fitLength,
     getViewportMetrics,
+    hasViewportConstraint,
     keepElementInsideContainer,
     positionFromContainerRect,
     positionFromRect,
@@ -29,12 +32,15 @@ export class HUDConfigPanel {
         this.uiInputs = {}; // Store references to inputs for live updates
         this.isMinimized = false; // State for minimization
         this.viewportResizeTimer = null;
+        this.selectedPropertyTab = 'style';
+        this.constraintGuideLayer = null;
     }
 
     open(profile) {
         this.profile = profile;
         this.tempSettings = JSON.parse(JSON.stringify(profile.hudSettings || {}));
         this.selectedId = 'health'; // Default selection
+        this.selectedPropertyTab = 'style';
         this.contentWrapper = null;
         this.uiInputs = {};
 
@@ -69,6 +75,7 @@ export class HUDConfigPanel {
         if (this.tempSettings.inventoryFreeLayout === undefined) this.tempSettings.inventoryFreeLayout = false;
         if (!this.tempSettings.inventorySlotPositions) this.tempSettings.inventorySlotPositions = [];
         if (!this.tempSettings.inventorySlotAlignment) this.tempSettings.inventorySlotAlignment = 'center';
+        if (!this.tempSettings.hudConstraints) this.tempSettings.hudConstraints = {};
 
         this.createUI();
 
@@ -117,14 +124,27 @@ export class HUDConfigPanel {
             this.onSelectionChange(selectedIds);
         });
         this.layoutSystem.setDragEndCallback((draggedIds) => {
+            this.syncConstraintOffsetsFromPreview(draggedIds);
             if (draggedIds.includes('inventory') && draggedIds.length === 1) {
                 this.applyPreviewAnchors();
             } else {
                 this.syncHudAnchorsFromPreview();
             }
+            this.applyPreviewConstraints();
+            this.applyPreviewAnchors();
+            this.updateConstraintGuides();
         });
 
         this.previewContainer = previewArea;
+        this.constraintGuideLayer = document.createElement('div');
+        this.constraintGuideLayer.className = 'hud-constraint-guides';
+        this.constraintGuideLayer.style.cssText = `
+            position: absolute; inset: 0;
+            pointer-events: none;
+            z-index: 6;
+            overflow: hidden;
+        `;
+        previewArea.appendChild(this.constraintGuideLayer);
 
         // 2. Floating Config Window (Resized and Layout Changed)
         const configWindow = document.createElement('div');
@@ -376,16 +396,255 @@ export class HUDConfigPanel {
         }
 
         const type = this.selectedId;
+        this.renderPropertyTabs(this.propertyPanel);
+
+        const body = document.createElement('div');
+        this.propertyPanel.appendChild(body);
+
+        if (this.selectedPropertyTab === 'constraints') {
+            this.renderConstraintProperties(body, type);
+            this.updateConstraintGuides();
+            return;
+        }
+
         if (type.startsWith("fz_")) {
             const gId = type.substring(3);
-            this.renderFarmingZoneGroupProperties(this.propertyPanel, gId);
+            this.renderFarmingZoneGroupProperties(body, gId);
             return;
         }
 
         const title = type === 'health' ? "Salud (Vida)" : (type === 'jump' ? "Salto (Carga)" : "Inventario");
 
         // Re-use logic from createSection but adapt to just render one
-        this.createSection(this.propertyPanel, title, type);
+        this.createSection(body, title, type);
+    }
+
+    renderPropertyTabs(parent) {
+        const tabs = document.createElement('div');
+        tabs.style.cssText = "display:flex; gap:6px; margin-bottom:14px; border-bottom:1px solid #3f3f3f; padding-bottom:8px;";
+
+        const makeTab = (id, label) => {
+            const btn = document.createElement('button');
+            const active = this.selectedPropertyTab === id;
+            btn.textContent = label;
+            btn.style.cssText = `
+                border: 1px solid ${active ? '#4CAF50' : '#555'};
+                background: ${active ? 'rgba(76, 175, 80, 0.22)' : '#2f2f2f'};
+                color: ${active ? '#fff' : '#bbb'};
+                border-radius: 4px;
+                padding: 7px 10px;
+                font-size: 12px;
+                cursor: pointer;
+            `;
+            btn.onclick = () => {
+                this.selectedPropertyTab = id;
+                this.renderProperties();
+                this.updateConstraintGuides();
+            };
+            return btn;
+        };
+
+        tabs.appendChild(makeTab('style', 'Opciones'));
+        tabs.appendChild(makeTab('constraints', 'Constraints'));
+        parent.appendChild(tabs);
+    }
+
+    getSelectedConstraintIds() {
+        const selected = this.layoutSystem ? Array.from(this.layoutSystem.selection) : [];
+        if (selected.length > 0) return selected;
+        return this.selectedId ? [this.selectedId] : [];
+    }
+
+    getConstraint(id) {
+        if (!this.tempSettings.hudConstraints) this.tempSettings.hudConstraints = {};
+        if (!this.tempSettings.hudConstraints[id]) {
+            this.tempSettings.hudConstraints[id] = {
+                horizontal: 'free',
+                vertical: 'free',
+                offsetX: 0,
+                offsetY: 0
+            };
+        }
+        return this.tempSettings.hudConstraints[id];
+    }
+
+    cleanupConstraints() {
+        const constraints = this.tempSettings.hudConstraints;
+        if (!constraints) return;
+
+        Object.keys(constraints).forEach(id => {
+            const c = constraints[id];
+            if (!hasViewportConstraint(c)) {
+                delete constraints[id];
+            }
+        });
+
+        if (Object.keys(constraints).length === 0) {
+            delete this.tempSettings.hudConstraints;
+        }
+    }
+
+    setConstraintForIds(ids, patch, options = {}) {
+        ids.forEach(id => {
+            const current = { ...this.getConstraint(id), ...patch };
+            const el = this.getHudElement(id);
+            if (el && !options.zeroOffsets) {
+                const offsets = deriveViewportConstraintOffsets(this.previewContainer, el, current);
+                current.offsetX = offsets.offsetX;
+                current.offsetY = offsets.offsetY;
+            }
+            if (options.zeroOffsets) {
+                if (patch.horizontal && patch.horizontal !== 'free') current.offsetX = 0;
+                if (patch.vertical && patch.vertical !== 'free') current.offsetY = 0;
+            }
+            this.getConstraint(id);
+            this.tempSettings.hudConstraints[id] = current;
+        });
+        this.applyPreviewConstraints(ids);
+        this.syncHudAnchorsFromPreview();
+        this.updateConstraintGuides();
+    }
+
+    renderConstraintProperties(parent, type) {
+        const sec = document.createElement('div');
+        sec.style.marginBottom = "20px";
+
+        const title = document.createElement('h3');
+        title.textContent = "Constraint Widget";
+        title.style.cssText = "color: #ddd; border-bottom: 1px solid #444; padding-bottom: 5px; margin-bottom: 10px; font-size:14px;";
+        sec.appendChild(title);
+
+        const ids = this.getSelectedConstraintIds();
+        const primary = ids[0] || type;
+        const constraint = this.getConstraint(primary);
+
+        const rowStyle = "margin-bottom: 10px;";
+        const labelStyle = "color:#aaa; font-size:12px; margin-bottom:5px;";
+        const selectStyle = "width:100%; background:#333; color:white; border:1px solid #555; padding:5px;";
+
+        const axisRow = document.createElement('div');
+        axisRow.style.cssText = "display:grid; grid-template-columns:1fr 1fr; gap:10px;";
+
+        const xWrap = document.createElement('div');
+        xWrap.style.cssText = rowStyle;
+        const xLabel = document.createElement('div');
+        xLabel.textContent = "Eje X";
+        xLabel.style.cssText = labelStyle;
+        const xSelect = document.createElement('select');
+        xSelect.style.cssText = selectStyle;
+        [
+            ['free', 'Libre'],
+            ['left', 'Izquierda'],
+            ['center', 'Centro'],
+            ['right', 'Derecha']
+        ].forEach(([value, text]) => {
+            const opt = document.createElement('option');
+            opt.value = value;
+            opt.textContent = text;
+            if ((constraint.horizontal || 'free') === value) opt.selected = true;
+            xSelect.appendChild(opt);
+        });
+        xSelect.onchange = (e) => this.setConstraintForIds(ids, { horizontal: e.target.value });
+        xWrap.appendChild(xLabel);
+        xWrap.appendChild(xSelect);
+
+        const yWrap = document.createElement('div');
+        yWrap.style.cssText = rowStyle;
+        const yLabel = document.createElement('div');
+        yLabel.textContent = "Eje Y";
+        yLabel.style.cssText = labelStyle;
+        const ySelect = document.createElement('select');
+        ySelect.style.cssText = selectStyle;
+        [
+            ['free', 'Libre'],
+            ['top', 'Arriba'],
+            ['center', 'Centro'],
+            ['bottom', 'Abajo']
+        ].forEach(([value, text]) => {
+            const opt = document.createElement('option');
+            opt.value = value;
+            opt.textContent = text;
+            if ((constraint.vertical || 'free') === value) opt.selected = true;
+            ySelect.appendChild(opt);
+        });
+        ySelect.onchange = (e) => this.setConstraintForIds(ids, { vertical: e.target.value });
+        yWrap.appendChild(yLabel);
+        yWrap.appendChild(ySelect);
+
+        axisRow.appendChild(xWrap);
+        axisRow.appendChild(yWrap);
+        sec.appendChild(axisRow);
+
+        const offsetRow = document.createElement('div');
+        offsetRow.style.cssText = "display:grid; grid-template-columns:1fr 1fr; gap:10px;";
+
+        const makeOffsetInput = (key, label) => {
+            const wrap = document.createElement('div');
+            wrap.style.cssText = rowStyle;
+            const l = document.createElement('div');
+            l.textContent = label;
+            l.style.cssText = labelStyle;
+            const input = document.createElement('input');
+            input.type = "number";
+            input.value = Math.round(Number(constraint[key]) || 0);
+            input.style.cssText = "width:100%; background:#333; color:white; border:1px solid #555; padding:5px; box-sizing:border-box;";
+            input.onchange = (e) => {
+                const value = parseInt(e.target.value) || 0;
+                ids.forEach(id => {
+                    const c = this.getConstraint(id);
+                    c[key] = value;
+                });
+                this.applyPreviewConstraints(ids);
+                this.updateConstraintGuides();
+            };
+            wrap.appendChild(l);
+            wrap.appendChild(input);
+            return wrap;
+        };
+
+        offsetRow.appendChild(makeOffsetInput('offsetX', 'Offset X'));
+        offsetRow.appendChild(makeOffsetInput('offsetY', 'Offset Y'));
+        sec.appendChild(offsetRow);
+
+        const buttonGrid = document.createElement('div');
+        buttonGrid.style.cssText = "display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:12px;";
+
+        const makeButton = (label, onClick) => {
+            const btn = document.createElement('button');
+            btn.textContent = label;
+            btn.style.cssText = "padding:8px; background:#353535; color:#eee; border:1px solid #555; border-radius:4px; cursor:pointer; font-size:12px;";
+            btn.onclick = onClick;
+            return btn;
+        };
+
+        buttonGrid.appendChild(makeButton('Centro X', () => {
+            this.setConstraintForIds(ids, { horizontal: 'center' }, { zeroOffsets: true });
+            this.renderProperties();
+        }));
+        buttonGrid.appendChild(makeButton('Centro Y', () => {
+            this.setConstraintForIds(ids, { vertical: 'center' }, { zeroOffsets: true });
+            this.renderProperties();
+        }));
+        buttonGrid.appendChild(makeButton('Centro Total', () => {
+            this.setConstraintForIds(ids, { horizontal: 'center', vertical: 'center' }, { zeroOffsets: true });
+            this.renderProperties();
+        }));
+        buttonGrid.appendChild(makeButton('Liberar', () => {
+            ids.forEach(id => {
+                const c = this.getConstraint(id);
+                c.horizontal = 'free';
+                c.vertical = 'free';
+                c.offsetX = 0;
+                c.offsetY = 0;
+            });
+            this.cleanupConstraints();
+            this.syncHudAnchorsFromPreview();
+            this.updateConstraintGuides();
+            this.renderProperties();
+        }));
+
+        sec.appendChild(buttonGrid);
+        parent.appendChild(sec);
     }
 
 
@@ -910,8 +1169,10 @@ export class HUDConfigPanel {
         }
 
         this.applyPreviewLayerOrder(layerOrder);
+        this.applyPreviewConstraints();
         this.applyPreviewAnchors();
         this.keepPreviewHUDInsideViewport();
+        this.updateConstraintGuides();
         this.layoutSystem.scheduleRefresh();
     }
 
@@ -965,6 +1226,146 @@ export class HUDConfigPanel {
         this.tempSettings[key] = pos;
     }
 
+    applyPreviewConstraints(ids = null) {
+        const constraints = this.tempSettings.hudConstraints || {};
+        const targetIds = ids || Object.keys(constraints);
+
+        targetIds.forEach(id => {
+            const constraint = constraints[id];
+            if (!hasViewportConstraint(constraint)) return;
+
+            const el = this.getHudElement(id);
+            if (!el) return;
+
+            applyViewportConstraint(el, this.previewContainer, constraint);
+            el.dataset.hudConstraint = 'viewport';
+        });
+    }
+
+    syncConstraintOffsetsFromPreview(ids = null) {
+        const constraints = this.tempSettings.hudConstraints || {};
+        const targetIds = ids || Object.keys(constraints);
+
+        targetIds.forEach(id => {
+            const constraint = constraints[id];
+            const el = this.getHudElement(id);
+            if (!el || !hasViewportConstraint(constraint)) return;
+
+            const offsets = deriveViewportConstraintOffsets(this.previewContainer, el, constraint);
+            constraint.offsetX = offsets.offsetX;
+            constraint.offsetY = offsets.offsetY;
+        });
+    }
+
+    updateConstraintGuides() {
+        if (!this.constraintGuideLayer || !this.previewContainer) return;
+
+        this.constraintGuideLayer.innerHTML = '';
+
+        const selectedIds = this.getSelectedConstraintIds();
+        const constraints = this.tempSettings.hudConstraints || {};
+        const selectedWithConstraints = selectedIds.filter(id => hasViewportConstraint(constraints[id]));
+        const showBaseGuides = this.selectedPropertyTab === 'constraints' || selectedWithConstraints.length > 0;
+        if (!showBaseGuides) return;
+
+        const rect = this.previewContainer.getBoundingClientRect();
+        const addLine = (x1, y1, x2, y2, color = 'rgba(76, 175, 80, 0.78)', width = 1) => {
+            const line = document.createElement('div');
+            const isHorizontal = Math.abs(y1 - y2) < 1;
+            if (isHorizontal) {
+                line.style.cssText = `
+                    position:absolute;
+                    left:${Math.min(x1, x2)}px;
+                    top:${y1}px;
+                    width:${Math.abs(x2 - x1)}px;
+                    height:0;
+                    border-top:${width}px dashed ${color};
+                `;
+            } else {
+                line.style.cssText = `
+                    position:absolute;
+                    left:${x1}px;
+                    top:${Math.min(y1, y2)}px;
+                    width:0;
+                    height:${Math.abs(y2 - y1)}px;
+                    border-left:${width}px dashed ${color};
+                `;
+            }
+            this.constraintGuideLayer.appendChild(line);
+        };
+
+        const addGuideLabel = (text, x, y) => {
+            const label = document.createElement('div');
+            label.textContent = text;
+            label.style.cssText = `
+                position:absolute;
+                left:${x}px;
+                top:${y}px;
+                transform:translate(-50%, -50%);
+                color:rgba(255,255,255,0.82);
+                background:rgba(30,30,30,0.78);
+                border:1px solid rgba(76,175,80,0.45);
+                border-radius:4px;
+                padding:2px 6px;
+                font-size:10px;
+                font-family:sans-serif;
+                white-space:nowrap;
+            `;
+            this.constraintGuideLayer.appendChild(label);
+        };
+
+        const cx = rect.width / 2;
+        const cy = rect.height / 2;
+        addLine(cx, 0, cx, rect.height, 'rgba(255,255,255,0.22)');
+        addLine(0, cy, rect.width, cy, 'rgba(255,255,255,0.22)');
+        addGuideLabel('X Centro', cx, 16);
+        addGuideLabel('Y Centro', 42, cy);
+
+        selectedWithConstraints.forEach(id => {
+            const el = this.getHudElement(id);
+            const constraint = constraints[id];
+            if (!el || !constraint) return;
+
+            const elRect = el.getBoundingClientRect();
+            const local = {
+                left: elRect.left - rect.left,
+                right: elRect.right - rect.left,
+                top: elRect.top - rect.top,
+                bottom: elRect.bottom - rect.top,
+                centerX: elRect.left - rect.left + elRect.width / 2,
+                centerY: elRect.top - rect.top + elRect.height / 2
+            };
+
+            if (constraint.horizontal && constraint.horizontal !== 'free') {
+                const guideX = constraint.horizontal === 'center'
+                    ? cx
+                    : constraint.horizontal === 'right'
+                        ? rect.width
+                        : 0;
+                const elementX = constraint.horizontal === 'center'
+                    ? local.centerX
+                    : constraint.horizontal === 'right'
+                        ? local.right
+                        : local.left;
+                addLine(elementX, local.centerY, guideX, local.centerY);
+            }
+
+            if (constraint.vertical && constraint.vertical !== 'free') {
+                const guideY = constraint.vertical === 'center'
+                    ? cy
+                    : constraint.vertical === 'bottom'
+                        ? rect.height
+                        : 0;
+                const elementY = constraint.vertical === 'center'
+                    ? local.centerY
+                    : constraint.vertical === 'bottom'
+                        ? local.bottom
+                        : local.top;
+                addLine(local.centerX, elementY, local.centerX, guideY);
+            }
+        });
+    }
+
     keepPreviewElementInsideViewport(id) {
         const el = this.getHudElement(id);
         if (!el) return false;
@@ -1010,7 +1411,10 @@ export class HUDConfigPanel {
             const globalPos = positionFromContainerRect(childRect, containerRect);
             this.setHudGlobalPosition(id, globalPos);
 
-            if (!inventoryEl || !this.tempSettings.showInventory || !this.isAboveInventory(id)) {
+            if (hasViewportConstraint(this.tempSettings.hudConstraints?.[id]) ||
+                !inventoryEl ||
+                !this.tempSettings.showInventory ||
+                !this.isAboveInventory(id)) {
                 delete this.tempSettings.hudAnchors[id];
                 return;
             }
@@ -1041,7 +1445,11 @@ export class HUDConfigPanel {
         if (!inventoryEl || !this.tempSettings.showInventory) return;
 
         Object.entries(anchors).forEach(([id, anchor]) => {
-            if (!anchor || anchor.parentId !== 'inventory' || !anchor.pos || !this.isAboveInventory(id)) return;
+            if (hasViewportConstraint(this.tempSettings.hudConstraints?.[id]) ||
+                !anchor ||
+                anchor.parentId !== 'inventory' ||
+                !anchor.pos ||
+                !this.isAboveInventory(id)) return;
 
             const el = this.getHudElement(id);
             if (!el) return;
@@ -1380,6 +1788,8 @@ export class HUDConfigPanel {
                     if (this.keepPreviewElementInsideViewport('inventory')) {
                         this.applyPreviewAnchors();
                     }
+                    this.applyPreviewConstraints(['inventory']);
+                    this.updateConstraintGuides();
                 } else {
                     let newW = startW + dx / scale;
                     let newH = startH + dy / scale;
@@ -1402,6 +1812,8 @@ export class HUDConfigPanel {
                     }
 
                     this.keepPreviewElementInsideViewport(prefix);
+                    this.applyPreviewConstraints([prefix]);
+                    this.updateConstraintGuides();
                 }
             };
 
@@ -1409,6 +1821,8 @@ export class HUDConfigPanel {
                 document.removeEventListener('mousemove', onMouseMove);
                 document.removeEventListener('mouseup', onMouseUp);
                 this.keepPreviewHUDInsideViewport();
+                this.applyPreviewConstraints();
+                this.syncConstraintOffsetsFromPreview();
                 this.syncHudAnchorsFromPreview();
                 this.updatePreview();
             };
@@ -1421,6 +1835,8 @@ export class HUDConfigPanel {
     // --- Save / Close ---
 
     save() {
+        this.syncConstraintOffsetsFromPreview();
+        this.cleanupConstraints();
         this.syncHudAnchorsFromPreview();
 
         // Apply settings to profile

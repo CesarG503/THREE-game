@@ -34,6 +34,8 @@ export class HUDConfigPanel {
         this.viewportResizeTimer = null;
         this.selectedPropertyTab = 'style';
         this.constraintGuideLayer = null;
+        this.previewBackdropEnabled = false;
+        this.previewBackdropButton = null;
     }
 
     open(profile) {
@@ -41,6 +43,8 @@ export class HUDConfigPanel {
         this.tempSettings = JSON.parse(JSON.stringify(profile.hudSettings || {}));
         this.selectedId = 'health'; // Default selection
         this.selectedPropertyTab = 'style';
+        this.previewBackdropEnabled = false;
+        this.previewBackdropButton = null;
         this.contentWrapper = null;
         this.uiInputs = {};
 
@@ -176,6 +180,17 @@ export class HUDConfigPanel {
 
         const controls = document.createElement('div');
         controls.style.display = 'flex'; controls.style.alignItems = 'center';
+
+        const eyeBtn = document.createElement('button');
+        eyeBtn.innerHTML = "👁";
+        eyeBtn.title = "Mostrar fondo blanco";
+        eyeBtn.style.cssText = "background:none; border:none; color:#aaa; font-size: 16px; cursor: pointer; margin-right: 10px; font-weight: bold; vertical-align: middle; width:24px; height:24px; line-height:20px; display:flex; align-items:center; justify-content:center; border-radius:4px;";
+        eyeBtn.onclick = (e) => {
+            e.stopPropagation();
+            this.togglePreviewBackdrop();
+        };
+        this.previewBackdropButton = eyeBtn;
+        controls.appendChild(eyeBtn);
         controls.appendChild(minBtn);
 
         const closeBtn = document.createElement('button');
@@ -226,6 +241,7 @@ export class HUDConfigPanel {
         this.renderSidebar();
         this.renderProperties();
         this.updatePreview();
+        this.applyPreviewBackdrop();
     }
 
     // --- Split View Logic ---
@@ -1123,6 +1139,37 @@ export class HUDConfigPanel {
         return sel;
     }
 
+    togglePreviewBackdrop() {
+        this.previewBackdropEnabled = !this.previewBackdropEnabled;
+        this.applyPreviewBackdrop();
+        this.updateConstraintGuides();
+    }
+
+    applyPreviewBackdrop() {
+        if (!this.previewContainer) return;
+
+        this.previewContainer.style.background = this.previewBackdropEnabled
+            ? '#ffffff'
+            : 'transparent';
+
+        if (this.container) {
+            this.container.style.background = this.previewBackdropEnabled
+                ? 'rgba(0,0,0,0.05)'
+                : 'rgba(0,0,0,0.5)';
+        }
+
+        this.layoutSystem?.setGridTheme?.(this.previewBackdropEnabled ? 'light' : 'dark');
+
+        if (this.previewBackdropButton) {
+            this.previewBackdropButton.style.color = this.previewBackdropEnabled ? '#111' : '#aaa';
+            this.previewBackdropButton.style.background = this.previewBackdropEnabled ? '#fff' : 'none';
+            this.previewBackdropButton.style.border = this.previewBackdropEnabled ? '1px solid #4CAF50' : 'none';
+            this.previewBackdropButton.title = this.previewBackdropEnabled
+                ? 'Ocultar fondo blanco'
+                : 'Mostrar fondo blanco';
+        }
+    }
+
     updatePreview() {
         if (!this.contentWrapper) {
             this.contentWrapper = document.createElement('div');
@@ -1316,8 +1363,11 @@ export class HUDConfigPanel {
 
         const cx = rect.width / 2;
         const cy = rect.height / 2;
-        addLine(cx, 0, cx, rect.height, 'rgba(255,255,255,0.22)');
-        addLine(0, cy, rect.width, cy, 'rgba(255,255,255,0.22)');
+        const centerGuideColor = this.previewBackdropEnabled
+            ? 'rgba(0,0,0,0.32)'
+            : 'rgba(255,255,255,0.22)';
+        addLine(cx, 0, cx, rect.height, centerGuideColor);
+        addLine(0, cy, rect.width, cy, centerGuideColor);
         addGuideLabel('X Centro', cx, 16);
         addGuideLabel('Y Centro', 42, cy);
 

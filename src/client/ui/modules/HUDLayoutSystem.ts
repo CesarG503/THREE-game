@@ -15,6 +15,7 @@ export class HUDLayoutSystem {
         this.onDragEnd = null;
 
         this.grid = null;
+        this.gridTheme = 'dark';
 
         // Marquee State
         this.isMarqueeSelecting = false;
@@ -57,6 +58,20 @@ export class HUDLayoutSystem {
                 this.container.appendChild(this.grid);
             }
             this.grid.style.display = 'block';
+            this.setGridTheme(this.gridTheme);
+        }
+    }
+
+    setGridTheme(theme = 'dark') {
+        this.gridTheme = theme;
+        if (!this.grid) return;
+
+        if (theme === 'light') {
+            this.grid.style.opacity = '0.32';
+            this.grid.style.backgroundImage = 'linear-gradient(rgba(0,0,0,0.38) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,0.38) 1px, transparent 1px)';
+        } else {
+            this.grid.style.opacity = '0.1';
+            this.grid.style.backgroundImage = 'linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)';
         }
     }
 

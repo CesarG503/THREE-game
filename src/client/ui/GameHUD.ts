@@ -501,10 +501,22 @@ export class GameHUD {
     }
 
     isAboveInventory(id: string) {
+        return this.isAboveParent(id, 'inventory');
+    }
+
+    isAboveParent(childId: string, parentId: string) {
+        const child = this.getHudElement(childId);
+        const parent = this.getHudElement(parentId);
+        if (!child || !parent) return false;
+
+        const childZ = parseInt(child.style.zIndex || getComputedStyle(child).zIndex || '0', 10) || 0;
+        const parentZ = parseInt(parent.style.zIndex || getComputedStyle(parent).zIndex || '0', 10) || 0;
+        if (childZ !== parentZ) return childZ > parentZ;
+
         const layerOrder = this.getResolvedLayerOrder();
-        const itemIndex = layerOrder.indexOf(id);
-        const inventoryIndex = layerOrder.indexOf('inventory');
-        return itemIndex !== -1 && inventoryIndex !== -1 && itemIndex < inventoryIndex;
+        const childIndex = layerOrder.indexOf(childId);
+        const parentIndex = layerOrder.indexOf(parentId);
+        return childIndex !== -1 && parentIndex !== -1 && childIndex < parentIndex;
     }
 
     applyHUDConstraints(ids?: string[]) {
@@ -525,26 +537,28 @@ export class GameHUD {
 
     applyHUDAnchors() {
         const anchors = this.settings.hudAnchors || {};
-        if (!this.inventoryElement || !this.settings.showInventory) return;
 
-        this.getRenderedHudIds().forEach(id => {
+        Object.keys(anchors).forEach(id => {
             const anchor = anchors[id];
             const el = this.getHudElement(id);
             if (!el) return;
 
             if (hasViewportConstraint(this.settings.hudConstraints?.[id]) ||
                 !anchor ||
-                anchor.parentId !== 'inventory' ||
+                !anchor.parentId ||
                 !anchor.pos ||
-                !this.isAboveInventory(id)) {
+                !this.isAboveParent(id, anchor.parentId)) {
                 delete el.dataset.hudParent;
                 return;
             }
 
-            const resolved = resolveAnchoredPosition(this.container, this.inventoryElement, anchor.pos);
+            const parentEl = this.getHudElement(anchor.parentId);
+            if (!parentEl) return;
+
+            const resolved = resolveAnchoredPosition(this.container, parentEl, anchor.pos);
             if (!resolved) return;
 
-            el.dataset.hudParent = 'inventory';
+            el.dataset.hudParent = anchor.parentId;
             el.style.left = resolved.left;
             el.style.top = resolved.top;
             el.style.bottom = 'auto';

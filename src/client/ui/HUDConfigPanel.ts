@@ -127,15 +127,20 @@ export class HUDConfigPanel {
         this.layoutSystem.setSelectionCallback((selectedIds) => {
             this.onSelectionChange(selectedIds);
         });
+        this.layoutSystem.setDragGroupResolver((selectedIds) => this.getAnchorDescendants(selectedIds));
+        this.layoutSystem.setDragMoveCallback((draggedIds) => {
+            this.syncConstraintOffsetsFromPreview(draggedIds);
+            this.syncHudAnchorsFromPreview();
+            this.updateConstraintPanelReadouts();
+            this.updateConstraintGuides();
+        });
         this.layoutSystem.setDragEndCallback((draggedIds) => {
             this.syncConstraintOffsetsFromPreview(draggedIds);
-            if (draggedIds.includes('inventory') && draggedIds.length === 1) {
-                this.applyPreviewAnchors();
-            } else {
-                this.syncHudAnchorsFromPreview();
-            }
+            this.syncHudAnchorsFromPreview();
             this.applyPreviewConstraints();
             this.applyPreviewAnchors();
+            this.syncHudAnchorsFromPreview();
+            this.updateConstraintPanelReadouts();
             this.updateConstraintGuides();
         });
 
@@ -517,8 +522,131 @@ export class HUDConfigPanel {
             this.tempSettings.hudConstraints[id] = current;
         });
         this.applyPreviewConstraints(ids);
+        this.applyPreviewAnchors();
         this.syncHudAnchorsFromPreview();
         this.updateConstraintGuides();
+    }
+
+    getConstraintLineMetrics(id, constraint) {
+        const el = this.getHudElement(id);
+        if (!el || !this.previewContainer) return null;
+
+        const containerRect = this.previewContainer.getBoundingClientRect();
+        const elRect = el.getBoundingClientRect();
+        const metrics = {};
+
+        if (constraint.horizontal && constraint.horizontal !== 'free') {
+            const line = constraint.horizontal === 'center'
+                ? containerRect.width / 2
+                : constraint.horizontal === 'right'
+                    ? containerRect.width
+                    : 0;
+            const point = constraint.horizontal === 'center'
+                ? elRect.left - containerRect.left + elRect.width / 2
+                : constraint.horizontal === 'right'
+                    ? elRect.right - containerRect.left
+                    : elRect.left - containerRect.left;
+            metrics.x = {
+                line: Math.round(line),
+                point: Math.round(point),
+                relative: Math.round(point - line)
+            };
+        }
+
+        if (constraint.vertical && constraint.vertical !== 'free') {
+            const line = constraint.vertical === 'center'
+                ? containerRect.height / 2
+                : constraint.vertical === 'bottom'
+                    ? containerRect.height
+                    : 0;
+            const point = constraint.vertical === 'center'
+                ? elRect.top - containerRect.top + elRect.height / 2
+                : constraint.vertical === 'bottom'
+                    ? elRect.bottom - containerRect.top
+                    : elRect.top - containerRect.top;
+            metrics.y = {
+                line: Math.round(line),
+                point: Math.round(point),
+                relative: Math.round(point - line)
+            };
+        }
+
+        return metrics;
+    }
+
+    getAnchorChildren(parentId) {
+        const anchors = this.tempSettings.hudAnchors || {};
+        return Object.entries(anchors)
+            .filter(([, anchor]) => anchor?.parentId === parentId)
+            .map(([id]) => id);
+    }
+
+    getAnchorDescendants(parentIds) {
+        const result = new Set();
+        const visit = (parentId) => {
+            this.getAnchorChildren(parentId).forEach(childId => {
+                if (result.has(childId)) return;
+                result.add(childId);
+                visit(childId);
+            });
+        };
+
+        parentIds.forEach(visit);
+        return Array.from(result);
+    }
+
+    applyConstraintOffsetInput(ids, key, value) {
+        ids.forEach(id => {
+            const c = this.getConstraint(id);
+            c[key] = value;
+        });
+        this.applyPreviewConstraints(ids);
+        this.applyPreviewAnchors();
+        this.syncHudAnchorsFromPreview();
+        this.updateConstraintGuides();
+        this.updateConstraintPanelReadouts();
+    }
+
+    updateConstraintPanelReadouts() {
+        if (this.selectedPropertyTab !== 'constraints' || !this.propertyPanel) return;
+
+        const ids = this.getSelectedConstraintIds();
+        const primary = ids[0] || this.selectedId;
+        if (!primary) return;
+
+        const constraint = this.getConstraint(primary);
+        const metrics = this.getConstraintLineMetrics(primary, constraint);
+        const childIds = this.getAnchorChildren(primary);
+
+        const updateAxis = (axis, offsetKey) => {
+            const data = metrics?.[axis];
+            const info = this.propertyPanel.querySelector(`[data-constraint-info="${axis}"]`);
+            const input = this.propertyPanel.querySelector(`[data-constraint-relative="${axis}"]`);
+            const offsetInput = this.propertyPanel.querySelector(`[data-constraint-offset="${offsetKey}"]`);
+
+            if (info) {
+                info.textContent = data
+                    ? `${axis.toUpperCase()}: punto ${data.point}px / línea ${data.line}px`
+                    : `${axis.toUpperCase()}: eje libre`;
+            }
+            if (input && document.activeElement !== input) {
+                input.disabled = !data;
+                input.value = data ? data.relative : 0;
+            }
+            if (offsetInput && document.activeElement !== offsetInput) {
+                offsetInput.value = Math.round(Number(constraint[offsetKey]) || 0);
+            }
+        };
+
+        updateAxis('x', 'offsetX');
+        updateAxis('y', 'offsetY');
+
+        const childInfo = this.propertyPanel.querySelector('[data-constraint-children]');
+        if (childInfo) {
+            childInfo.textContent = childIds.length > 0
+                ? `Hijos relativos: ${childIds.join(', ')}`
+                : "Hijos relativos: ninguno";
+        }
     }
 
     renderConstraintProperties(parent, type) {
@@ -533,6 +661,8 @@ export class HUDConfigPanel {
         const ids = this.getSelectedConstraintIds();
         const primary = ids[0] || type;
         const constraint = this.getConstraint(primary);
+        const metrics = this.getConstraintLineMetrics(primary, constraint);
+        const childIds = this.getAnchorChildren(primary);
 
         const rowStyle = "margin-bottom: 10px;";
         const labelStyle = "color:#aaa; font-size:12px; margin-bottom:5px;";
@@ -603,16 +733,14 @@ export class HUDConfigPanel {
             const input = document.createElement('input');
             input.type = "number";
             input.value = Math.round(Number(constraint[key]) || 0);
+            input.dataset.constraintOffset = key;
             input.style.cssText = "width:100%; background:#333; color:white; border:1px solid #555; padding:5px; box-sizing:border-box;";
-            input.onchange = (e) => {
+            const handleInput = (e) => {
                 const value = parseInt(e.target.value) || 0;
-                ids.forEach(id => {
-                    const c = this.getConstraint(id);
-                    c[key] = value;
-                });
-                this.applyPreviewConstraints(ids);
-                this.updateConstraintGuides();
+                this.applyConstraintOffsetInput(ids, key, value);
             };
+            input.oninput = handleInput;
+            input.onchange = handleInput;
             wrap.appendChild(l);
             wrap.appendChild(input);
             return wrap;
@@ -621,6 +749,55 @@ export class HUDConfigPanel {
         offsetRow.appendChild(makeOffsetInput('offsetX', 'Offset X'));
         offsetRow.appendChild(makeOffsetInput('offsetY', 'Offset Y'));
         sec.appendChild(offsetRow);
+
+        const lineSection = document.createElement('div');
+        lineSection.style.cssText = "margin-top:12px; padding:10px; background:rgba(255,255,255,0.04); border:1px solid #444; border-radius:4px;";
+        const lineTitle = document.createElement('div');
+        lineTitle.textContent = "Posición respecto a línea";
+        lineTitle.style.cssText = "color:#ddd; font-size:12px; font-weight:bold; margin-bottom:8px;";
+        lineSection.appendChild(lineTitle);
+
+        const makeRelativeInput = (axis, offsetKey, label) => {
+            const data = metrics?.[axis];
+            const wrap = document.createElement('div');
+            wrap.style.cssText = "display:grid; grid-template-columns:1fr 72px; gap:8px; align-items:end; margin-bottom:8px;";
+
+            const info = document.createElement('div');
+            info.style.cssText = "color:#aaa; font-size:11px; line-height:1.35;";
+            info.dataset.constraintInfo = axis;
+            info.textContent = data
+                ? `${label}: punto ${data.point}px / línea ${data.line}px`
+                : `${label}: eje libre`;
+
+            const input = document.createElement('input');
+            input.type = "number";
+            input.disabled = !data;
+            input.value = data ? data.relative : 0;
+            input.dataset.constraintRelative = axis;
+            input.style.cssText = "width:100%; background:#333; color:white; border:1px solid #555; padding:5px; box-sizing:border-box;";
+            const handleInput = (e) => {
+                const value = parseInt(e.target.value) || 0;
+                this.applyConstraintOffsetInput(ids, offsetKey, value);
+            };
+            input.oninput = handleInput;
+            input.onchange = handleInput;
+
+            wrap.appendChild(info);
+            wrap.appendChild(input);
+            return wrap;
+        };
+
+        lineSection.appendChild(makeRelativeInput('x', 'offsetX', 'X'));
+        lineSection.appendChild(makeRelativeInput('y', 'offsetY', 'Y'));
+
+        const childInfo = document.createElement('div');
+        childInfo.style.cssText = "color:#8fbf8f; font-size:11px; margin-top:4px; line-height:1.35;";
+        childInfo.dataset.constraintChildren = 'true';
+        childInfo.textContent = childIds.length > 0
+            ? `Hijos relativos: ${childIds.join(', ')}`
+            : "Hijos relativos: ninguno";
+        lineSection.appendChild(childInfo);
+        sec.appendChild(lineSection);
 
         const buttonGrid = document.createElement('div');
         buttonGrid.style.cssText = "display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:12px;";
@@ -1252,6 +1429,13 @@ export class HUDConfigPanel {
             .filter(id => id && id !== 'inventory');
     }
 
+    getAllRenderedHudIds() {
+        if (!this.contentWrapper) return [];
+        return Array.from(this.contentWrapper.querySelectorAll('[data-hud-id]'))
+            .map(el => el.dataset.hudId)
+            .filter(Boolean);
+    }
+
     getResolvedLayerOrder() {
         const layerOrder = [...(this.tempSettings.layerOrder || ['health', 'jump', 'inventory'])];
         this.getRenderedHudIds().forEach(id => {
@@ -1262,10 +1446,22 @@ export class HUDConfigPanel {
     }
 
     isAboveInventory(id) {
+        return this.isAboveParent(id, 'inventory');
+    }
+
+    isAboveParent(childId, parentId) {
+        const child = this.getHudElement(childId);
+        const parent = this.getHudElement(parentId);
+        if (!child || !parent) return false;
+
+        const childZ = parseInt(child.style.zIndex || getComputedStyle(child).zIndex || '0', 10) || 0;
+        const parentZ = parseInt(parent.style.zIndex || getComputedStyle(parent).zIndex || '0', 10) || 0;
+        if (childZ !== parentZ) return childZ > parentZ;
+
         const layerOrder = this.getResolvedLayerOrder();
-        const itemIndex = layerOrder.indexOf(id);
-        const inventoryIndex = layerOrder.indexOf('inventory');
-        return itemIndex !== -1 && inventoryIndex !== -1 && itemIndex < inventoryIndex;
+        const childIndex = layerOrder.indexOf(childId);
+        const parentIndex = layerOrder.indexOf(parentId);
+        return childIndex !== -1 && parentIndex !== -1 && childIndex < parentIndex;
     }
 
     setHudGlobalPosition(id, pos) {
@@ -1444,10 +1640,9 @@ export class HUDConfigPanel {
 
         this.keepPreviewHUDInsideViewport();
 
-        const inventoryEl = this.getHudElement('inventory');
         const containerRect = this.previewContainer.getBoundingClientRect();
         if (!this.tempSettings.hudAnchors) this.tempSettings.hudAnchors = {};
-        const renderedIds = this.getRenderedHudIds();
+        const renderedIds = this.getAllRenderedHudIds();
 
         Object.keys(this.tempSettings.hudAnchors).forEach(id => {
             if (!renderedIds.includes(id)) delete this.tempSettings.hudAnchors[id];
@@ -1461,22 +1656,22 @@ export class HUDConfigPanel {
             const globalPos = positionFromContainerRect(childRect, containerRect);
             this.setHudGlobalPosition(id, globalPos);
 
-            if (hasViewportConstraint(this.tempSettings.hudConstraints?.[id]) ||
-                !inventoryEl ||
-                !this.tempSettings.showInventory ||
-                !this.isAboveInventory(id)) {
+            if (hasViewportConstraint(this.tempSettings.hudConstraints?.[id])) {
                 delete this.tempSettings.hudAnchors[id];
+                delete el.dataset.hudParent;
                 return;
             }
 
-            const inventoryRect = inventoryEl.getBoundingClientRect();
-            if (rectsTouchOrOverlap(childRect, inventoryRect)) {
+            const parentId = this.findAnchorParentForElement(id, childRect, renderedIds);
+            if (parentId) {
+                const parentRect = this.getHudElement(parentId).getBoundingClientRect();
                 this.tempSettings.hudAnchors[id] = {
-                    parentId: 'inventory',
-                    pos: positionFromRect(childRect, inventoryRect)
+                    parentId,
+                    pos: positionFromRect(childRect, parentRect)
                 };
             } else {
                 delete this.tempSettings.hudAnchors[id];
+                delete el.dataset.hudParent;
             }
         });
 
@@ -1487,27 +1682,55 @@ export class HUDConfigPanel {
         this.applyPreviewAnchors();
     }
 
+    findAnchorParentForElement(childId, childRect, renderedIds) {
+        let best = null;
+        let bestZ = Number.NEGATIVE_INFINITY;
+
+        renderedIds.forEach(parentId => {
+            if (parentId === childId) return;
+            const parent = this.getHudElement(parentId);
+            if (!parent || !this.isAboveParent(childId, parentId)) return;
+
+            const parentRect = parent.getBoundingClientRect();
+            if (!rectsTouchOrOverlap(childRect, parentRect)) return;
+
+            const parentZ = parseInt(parent.style.zIndex || getComputedStyle(parent).zIndex || '0', 10) || 0;
+            if (parentZ > bestZ) {
+                best = parentId;
+                bestZ = parentZ;
+            }
+        });
+
+        return best;
+    }
+
     applyPreviewAnchors() {
         if (!this.contentWrapper) return;
 
-        const inventoryEl = this.getHudElement('inventory');
         const anchors = this.tempSettings.hudAnchors || {};
-        if (!inventoryEl || !this.tempSettings.showInventory) return;
+        const anchorIds = new Set(Object.keys(anchors));
+        this.getAllRenderedHudIds().forEach(id => {
+            if (anchorIds.has(id)) return;
+            const el = this.getHudElement(id);
+            if (el) delete el.dataset.hudParent;
+        });
 
         Object.entries(anchors).forEach(([id, anchor]) => {
             if (hasViewportConstraint(this.tempSettings.hudConstraints?.[id]) ||
                 !anchor ||
-                anchor.parentId !== 'inventory' ||
+                !anchor.parentId ||
                 !anchor.pos ||
-                !this.isAboveInventory(id)) return;
+                !this.isAboveParent(id, anchor.parentId)) return;
 
             const el = this.getHudElement(id);
+            const parentEl = this.getHudElement(anchor.parentId);
             if (!el) return;
+            if (!parentEl) return;
 
-            const resolved = resolveAnchoredPosition(this.previewContainer, inventoryEl, anchor.pos);
+            const resolved = resolveAnchoredPosition(this.previewContainer, parentEl, anchor.pos);
             if (!resolved) return;
 
-            el.dataset.hudParent = 'inventory';
+            el.dataset.hudParent = anchor.parentId;
             el.style.left = resolved.left;
             el.style.top = resolved.top;
             el.style.bottom = 'auto';

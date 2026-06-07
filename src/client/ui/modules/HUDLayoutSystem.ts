@@ -13,6 +13,8 @@ export class HUDLayoutSystem {
         this.isEditMode = false;
         this.onSelectionChange = null; // Callback
         this.onDragEnd = null;
+        this.onDragMove = null;
+        this.dragGroupResolver = null;
 
         this.grid = null;
         this.gridTheme = 'dark';
@@ -35,6 +37,14 @@ export class HUDLayoutSystem {
 
     setDragEndCallback(cb) {
         this.onDragEnd = cb;
+    }
+
+    setDragMoveCallback(cb) {
+        this.onDragMove = cb;
+    }
+
+    setDragGroupResolver(cb) {
+        this.dragGroupResolver = cb;
     }
 
     enableEditMode(showGrid = true) {
@@ -201,8 +211,11 @@ export class HUDLayoutSystem {
             // Store initial offsets for ALL selected items
             this.dragOffsets = new Map();
             const containerRect = this.container.getBoundingClientRect();
+            const selectedIds = Array.from(this.selection);
+            const extraIds = this.dragGroupResolver ? this.dragGroupResolver(selectedIds) : [];
+            this.activeDragIds = Array.from(new Set([...selectedIds, ...(extraIds || [])]));
 
-            this.selection.forEach(selId => {
+            this.activeDragIds.forEach(selId => {
                 const meta = this.elements.get(selId);
                 if (meta) {
                     const elRect = meta.el.getBoundingClientRect();
@@ -249,8 +262,8 @@ export class HUDLayoutSystem {
             const dy = e.clientY - this.activeDrag.startY;
             const containerRect = this.container.getBoundingClientRect();
 
-            // Move ALL selected elements
-            this.selection.forEach(selId => {
+            // Move selected elements plus any dependent children supplied by the editor.
+            this.activeDragIds.forEach(selId => {
                 const meta = this.elements.get(selId);
                 const startOff = this.dragOffsets.get(selId);
 
@@ -283,6 +296,8 @@ export class HUDLayoutSystem {
                 }
             });
 
+            if (this.onDragMove) this.onDragMove(this.activeDragIds || Array.from(this.selection));
+
         } else if (this.isMarqueeSelecting) {
             // MARQUEE SELECTION
             e.preventDefault();
@@ -302,10 +317,11 @@ export class HUDLayoutSystem {
     }
 
     onMouseUp(e) {
-        const endedDragIds = this.activeDrag ? Array.from(this.selection) : null;
+        const endedDragIds = this.activeDrag ? (this.activeDragIds || Array.from(this.selection)) : null;
 
         if (this.activeDrag) {
             this.activeDrag = null;
+            this.activeDragIds = null;
         }
 
         if (this.isMarqueeSelecting) {

@@ -20,8 +20,8 @@ export class PlayerConfigManager {
                     showHealth: true,
                     healthStyle: 'bar',
                     healthPos: {
-                        left: '36.72%',
-                        top: '96.89%'
+                        left: '33.63%',
+                        top: '96.99%'
                     },
                     healthShowText: false,
                     healthOrientation: 'horizontal',
@@ -30,18 +30,18 @@ export class PlayerConfigManager {
                     showJump: true,
                     jumpStyle: 'bar',
                     jumpPos: {
-                        left: '36.78%',
-                        top: '95.75%'
+                        left: '33.69%',
+                        top: '95.88%'
                     },
                     jumpShowText: false,
                     jumpOrientation: 'horizontal',
-                    jumpWidth: 283,
-                    jumpHeight: 6,
+                    jumpWidth: 277,
+                    jumpHeight: 5,
                     showInventory: true,
                     inventorySlots: 9,
                     inventoryPos: {
-                        left: '35.98%',
-                        top: '89.51%'
+                        left: '31.50%',
+                        top: '88.17%'
                     },
                     inventorySlotSize: 50,
                     inventoryPadding: 10,
@@ -53,8 +53,32 @@ export class PlayerConfigManager {
                         'jump',
                         'inventory'
                     ],
-                    inventoryContainerWidth: 553,
-                    inventoryContainerHeight: 93
+                    inventoryContainerWidth: 592,
+                    inventoryContainerHeight: 94,
+                    hudAnchors: {
+                        jump: {
+                            parentId: 'inventory',
+                            pos: {
+                                left: '5.912%',
+                                top: '73.620%'
+                            }
+                        },
+                        health: {
+                            parentId: 'inventory',
+                            pos: {
+                                left: '5.743%',
+                                top: '84.259%'
+                            }
+                        }
+                    },
+                    hudConstraints: {
+                        inventory: {
+                            horizontal: 'center',
+                            vertical: 'free',
+                            offsetX: 0,
+                            offsetY: 0
+                        }
+                    }
                 }
             },
             {
@@ -75,8 +99,8 @@ export class PlayerConfigManager {
                     showHealth: true,
                     healthStyle: 'bar',
                     healthPos: {
-                        left: '36.72%',
-                        top: '96.89%'
+                        left: '33.63%',
+                        top: '96.99%'
                     },
                     healthShowText: false,
                     healthOrientation: 'horizontal',
@@ -85,18 +109,18 @@ export class PlayerConfigManager {
                     showJump: true,
                     jumpStyle: 'bar',
                     jumpPos: {
-                        left: '36.78%',
-                        top: '95.75%'
+                        left: '33.69%',
+                        top: '95.88%'
                     },
                     jumpShowText: false,
                     jumpOrientation: 'horizontal',
-                    jumpWidth: 283,
-                    jumpHeight: 6,
+                    jumpWidth: 277,
+                    jumpHeight: 5,
                     showInventory: true,
                     inventorySlots: 9,
                     inventoryPos: {
-                        left: '35.98%',
-                        top: '89.51%'
+                        left: '31.50%',
+                        top: '88.17%'
                     },
                     inventorySlotSize: 50,
                     inventoryPadding: 10,
@@ -108,8 +132,32 @@ export class PlayerConfigManager {
                         'jump',
                         'inventory'
                     ],
-                    inventoryContainerWidth: 553,
-                    inventoryContainerHeight: 93
+                    inventoryContainerWidth: 592,
+                    inventoryContainerHeight: 94,
+                    hudAnchors: {
+                        jump: {
+                            parentId: 'inventory',
+                            pos: {
+                                left: '5.912%',
+                                top: '73.620%'
+                            }
+                        },
+                        health: {
+                            parentId: 'inventory',
+                            pos: {
+                                left: '5.743%',
+                                top: '84.259%'
+                            }
+                        }
+                    },
+                    hudConstraints: {
+                        inventory: {
+                            horizontal: 'center',
+                            vertical: 'free',
+                            offsetX: 0,
+                            offsetY: 0
+                        }
+                    }
                 }
             }
         ];
@@ -155,8 +203,8 @@ export class PlayerConfigManager {
                 showHealth: true,
                 healthStyle: 'bar',
                 healthPos: {
-                    left: '36.72%',
-                    top: '96.89%'
+                    left: '33.63%',
+                    top: '96.99%'
                 },
                 healthShowText: false,
                 healthOrientation: 'horizontal',
@@ -165,18 +213,18 @@ export class PlayerConfigManager {
                 showJump: true,
                 jumpStyle: 'bar',
                 jumpPos: {
-                    left: '36.78%',
-                    top: '95.75%'
+                    left: '33.69%',
+                    top: '95.88%'
                 },
                 jumpShowText: false,
                 jumpOrientation: 'horizontal',
-                jumpWidth: 283,
-                jumpHeight: 6,
+                jumpWidth: 277,
+                jumpHeight: 5,
                 showInventory: true,
                 inventorySlots: 9,
                 inventoryPos: {
-                    left: '35.98%',
-                    top: '89.51%'
+                    left: '31.50%',
+                    top: '88.17%'
                 },
                 inventorySlotSize: 50,
                 inventoryPadding: 10,
@@ -188,8 +236,32 @@ export class PlayerConfigManager {
                     'jump',
                     'inventory'
                 ],
-                inventoryContainerWidth: 553,
-                inventoryContainerHeight: 93
+                inventoryContainerWidth: 592,
+                inventoryContainerHeight: 94,
+                hudAnchors: {
+                    jump: {
+                        parentId: 'inventory',
+                        pos: {
+                            left: '5.912%',
+                            top: '73.620%'
+                        }
+                    },
+                    health: {
+                        parentId: 'inventory',
+                        pos: {
+                            left: '5.743%',
+                            top: '84.259%'
+                        }
+                    }
+                },
+                hudConstraints: {
+                    inventory: {
+                        horizontal: 'center',
+                        vertical: 'free',
+                        offsetX: 0,
+                        offsetY: 0
+                    }
+                }
             }
         };
         this.profiles.push(newProfile);

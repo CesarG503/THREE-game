@@ -68,10 +68,12 @@ export function renderLobby(router: Router): () => void {
 	accountRow.style.cssText = "display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; color: #cbd5e1; font-size: 14px;";
 
 	const accountName = document.createElement("span");
-	accountName.textContent = account ? `Cuenta: ${account.user.displayName || account.user.username}` : "";
+	accountName.textContent = account
+		? `Cuenta: ${account.user.displayName || account.user.username}`
+		: "Invitado: puedes jugar sin cuenta";
 
 	const logoutBtn = document.createElement("button");
-	logoutBtn.textContent = "Salir";
+	logoutBtn.textContent = account ? "Salir" : "Entrar";
 	logoutBtn.style.cssText = `
 		background: transparent;
 		color: #fca5a5;
@@ -82,8 +84,12 @@ export function renderLobby(router: Router): () => void {
 		font-size: 14px;
 	`;
 	logoutBtn.onclick = () => {
-		clearStoredAuth();
-		window.location.reload();
+		if (account) {
+			clearStoredAuth();
+			window.location.reload();
+			return;
+		}
+		router.navigate("editor");
 	};
 
 	accountRow.appendChild(accountName);

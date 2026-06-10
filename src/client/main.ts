@@ -6,7 +6,6 @@ import type { GameMode } from "./types";
 
 const router = new Router();
 let game: Game | null = null;
-let isAuthenticated = Boolean(getStoredAuth());
 let cleanupAuth: (() => void) | null = null;
 let cleanupLobby: (() => void) | null = null;
 
@@ -22,24 +21,39 @@ const startGame = () => {
 const generateRoomId = () => Math.random().toString(36).substring(2, 7).toUpperCase();
 
 const handleRoute = (mode: GameMode) => {
-	if (!isAuthenticated) {
-		if (!cleanupAuth) {
-			cleanupAuth = renderAuthScreen(() => {
-				isAuthenticated = true;
-				if (cleanupAuth) {
-					cleanupAuth();
-					cleanupAuth = null;
-				}
-				handleRoute(router.getMode());
-			});
-		}
-		return;
+	if (cleanupAuth && mode !== "editor") {
+		cleanupAuth();
+		cleanupAuth = null;
 	}
 
 	if (mode === "lobby") {
 		if (!cleanupLobby) cleanupLobby = renderLobby(router);
 		return;
 	}
+
+	if (mode === "editor" && !getStoredAuth()) {
+		if (!cleanupAuth) {
+			cleanupAuth = renderAuthScreen(() => {
+				if (cleanupAuth) {
+					cleanupAuth();
+					cleanupAuth = null;
+				}
+				handleRoute(router.getMode());
+			}, {
+				subtitle: "Necesitas una cuenta para crear y guardar mapas. Puedes jugar sin cuenta.",
+				cancelText: "Jugar sin cuenta",
+				onCancel: () => {
+					if (cleanupAuth) {
+						cleanupAuth();
+						cleanupAuth = null;
+					}
+					router.navigate("play");
+				},
+			});
+		}
+		return;
+	}
+
 	if (!router.getRoomId()) {
 		router.navigate(mode, generateRoomId());
 		return;

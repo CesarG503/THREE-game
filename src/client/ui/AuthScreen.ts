@@ -35,7 +35,16 @@ export function clearStoredAuth() {
 	localStorage.removeItem(STORAGE_KEY);
 }
 
-export function renderAuthScreen(onAuthenticated: (auth: StoredAuthSession) => void): () => void {
+export interface AuthScreenOptions {
+	subtitle?: string;
+	cancelText?: string;
+	onCancel?: () => void;
+}
+
+export function renderAuthScreen(
+	onAuthenticated: (auth: StoredAuthSession) => void,
+	options: AuthScreenOptions = {},
+): () => void {
 	let mode: "login" | "register" = "login";
 
 	const container = document.createElement("div");
@@ -103,9 +112,9 @@ export function renderAuthScreen(onAuthenticated: (auth: StoredAuthSession) => v
 	const updateMode = () => {
 		const isRegister = mode === "register";
 		title.textContent = isRegister ? "Crear cuenta" : "Entrar a Veta";
-		subtitle.textContent = isRegister
+		subtitle.textContent = options.subtitle || (isRegister
 			? "Registro preliminar para empezar a guardar datos del juego."
-			: "Usa tu cuenta de prueba para continuar.";
+			: "Usa tu cuenta de prueba para continuar.");
 		username.style.display = isRegister ? "block" : "none";
 		username.required = isRegister;
 		email.type = isRegister ? "email" : "text";
@@ -152,6 +161,23 @@ export function renderAuthScreen(onAuthenticated: (auth: StoredAuthSession) => v
 	panel.appendChild(status);
 	panel.appendChild(submit);
 	panel.appendChild(toggle);
+
+	if (options.onCancel) {
+		const cancel = document.createElement("button");
+		cancel.type = "button";
+		cancel.textContent = options.cancelText || "Volver";
+		cancel.style.cssText = `
+			background: transparent;
+			color: #cbd5e1;
+			border: none;
+			padding: 8px 12px;
+			cursor: pointer;
+			font-size: 14px;
+		`;
+		cancel.onclick = options.onCancel;
+		panel.appendChild(cancel);
+	}
+
 	container.appendChild(panel);
 	document.body.appendChild(container);
 	updateMode();

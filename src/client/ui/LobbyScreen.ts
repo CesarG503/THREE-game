@@ -1,4 +1,5 @@
 import { Router } from "../routing/Router";
+import { clearStoredAuth, getStoredAuth } from "./AuthScreen";
 
 const HIDDEN_IDS = [
 	"loading",
@@ -46,7 +47,7 @@ export function renderLobby(router: Router): () => void {
 		padding: 40px;
 		background: rgba(10, 12, 16, 0.85);
 		border: 1px solid #2f3947;
-		border-radius: 16px;
+		border-radius: 8px;
 		box-shadow: 0 20px 60px rgba(0,0,0,0.45);
 		backdrop-filter: blur(6px);
 		display: flex;
@@ -61,6 +62,32 @@ export function renderLobby(router: Router): () => void {
 	const subtitle = document.createElement("div");
 	subtitle.textContent = "Elige un modo para comenzar";
 	subtitle.style.cssText = "color: #9ca3af; font-size: 16px;";
+
+	const account = getStoredAuth();
+	const accountRow = document.createElement("div");
+	accountRow.style.cssText = "display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; color: #cbd5e1; font-size: 14px;";
+
+	const accountName = document.createElement("span");
+	accountName.textContent = account ? `Cuenta: ${account.user.displayName || account.user.username}` : "";
+
+	const logoutBtn = document.createElement("button");
+	logoutBtn.textContent = "Salir";
+	logoutBtn.style.cssText = `
+		background: transparent;
+		color: #fca5a5;
+		border: 1px solid #475569;
+		padding: 8px 12px;
+		border-radius: 8px;
+		cursor: pointer;
+		font-size: 14px;
+	`;
+	logoutBtn.onclick = () => {
+		clearStoredAuth();
+		window.location.reload();
+	};
+
+	accountRow.appendChild(accountName);
+	accountRow.appendChild(logoutBtn);
 
 	const buttonRow = document.createElement("div");
 	buttonRow.style.cssText = "display: flex; gap: 12px; flex-wrap: wrap;";
@@ -80,6 +107,7 @@ export function renderLobby(router: Router): () => void {
 
 	panel.appendChild(title);
 	panel.appendChild(subtitle);
+	panel.appendChild(accountRow);
 	panel.appendChild(buttonRow);
 	container.appendChild(panel);
 	document.body.appendChild(container);
@@ -104,7 +132,7 @@ function baseButtonStyles(accent: string) {
 		color: white;
 		border: none;
 		padding: 12px 20px;
-		border-radius: 10px;
+		border-radius: 8px;
 		cursor: pointer;
 		font-size: 16px;
 		font-weight: 700;

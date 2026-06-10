@@ -1,6 +1,9 @@
+import "dotenv/config"
+
 // WebSocket Server – Multiplayer Game
 // Run with: node dist/index.js  (or: tsx src/index.ts)
 
+import { createServer } from "node:http"
 import { WebSocketServer } from "ws"
 import type { ExtendedWebSocket, IncomingMessage } from "./types.js"
 import { RoomManager }    from "./managers/RoomManager.js"
@@ -9,6 +12,9 @@ import { registerHandlers } from "./handlers/Handlers.js"
 import { handleJoinRoom } from "./handlers/Joinroom.js"
 import { buildContext }   from "./middleware/Session.js"
 import { logger }         from "./utils/Logger.js"
+import { connectRedis, disconnectRedis } from "./cache/redis.js"
+import { prisma } from "./db/prisma.js"
+import { handleHttpRequest } from "./http/ApiServer.js"
 
 // ── Bootstrap ──────────────────────────────────────────────────────────────
 
@@ -20,13 +26,19 @@ const router = new MessageRouter()
 registerHandlers(router)
 
 logger.info("Server", `Registered handlers: ${router.registeredTypes().join(", ")}`)
+void connectRedis()
 
-// ── WebSocket Server ───────────────────────────────────────────────────────
+// ── HTTP + WebSocket Server ────────────────────────────────────────────────
 
-const wss = new WebSocketServer({ port: PORT })
+const httpServer = createServer((req, res) => {
+  void handleHttpRequest(req, res)
+})
 
-wss.on("listening", () => {
+const wss = new WebSocketServer({ server: httpServer })
+
+httpServer.on("listening", () => {
   logger.info("Server", `WebSocket server running on ws://localhost:${PORT}`)
+  logger.info("Server", `HTTP API running on http://localhost:${PORT}/api`)
 })
 
 wss.on("connection", (ws: ExtendedWebSocket) => {
@@ -79,3 +91,17 @@ if (process.env.LOG_STATS === "true") {
     logger.debug("Stats", "Server stats", roomManager.stats())
   }, 30_000)
 }
+
+httpServer.listen(PORT)
+
+async function shutdown(signal: string): Promise<void> {
+  logger.info("Server", `Received ${signal}; shutting down`)
+  wss.close()
+  httpServer.close()
+  await disconnectRedis()
+  await prisma.$disconnect()
+  process.exit(0)
+}
+
+process.on("SIGINT", () => void shutdown("SIGINT"))
+process.on("SIGTERM", () => void shutdown("SIGTERM"))

@@ -1,0 +1,102 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum MatchStatus {
+  WAITING
+  RUNNING
+  FINISHED
+  CANCELLED
+}
+
+model User {
+  id           String        @id @default(cuid())
+  email        String        @unique
+  username     String        @unique
+  passwordHash String
+  displayName  String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  sessions     UserSession[]
+  maps         GameMap[]
+  matches      MatchPlayer[]
+}
+
+model UserSession {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model GameMap {
+  id               String           @id @default(cuid())
+  slug             String           @unique
+  name             String
+  description      String?
+  ownerId          String?
+  currentVersionId String?
+  isPublished      Boolean          @default(false)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  owner            User?            @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  versions         GameMapVersion[]
+  matches          Match[]
+
+  @@index([ownerId])
+}
+
+model GameMapVersion {
+  id        String   @id @default(cuid())
+  mapId     String
+  version   Int
+  data      Json
+  notes     String?
+  createdAt DateTime @default(now())
+  map       GameMap  @relation(fields: [mapId], references: [id], onDelete: Cascade)
+
+  @@unique([mapId, version])
+  @@index([mapId])
+}
+
+model Match {
+  id        String        @id @default(cuid())
+  roomId    String
+  mapId     String?
+  status    MatchStatus   @default(WAITING)
+  startedAt DateTime      @default(now())
+  endedAt   DateTime?
+  summary   Json?
+  map       GameMap?      @relation(fields: [mapId], references: [id], onDelete: SetNull)
+  players   MatchPlayer[]
+
+  @@index([roomId])
+  @@index([mapId])
+  @@index([status])
+}
+
+model MatchPlayer {
+  id        String   @id @default(cuid())
+  matchId   String
+  userId    String?
+  playerId  String
+  playerName String
+  joinedAt  DateTime @default(now())
+  leftAt    DateTime?
+  stats     Json?
+  match     Match    @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([matchId])
+  @@index([userId])
+  @@unique([matchId, playerId])
+}

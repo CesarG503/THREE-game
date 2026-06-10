@@ -6,15 +6,35 @@ import type { GameMode } from "./types";
 
 const router = new Router();
 let game: Game | null = null;
+let activeGameKey: string | null = null;
 let cleanupAuth: (() => void) | null = null;
 let cleanupLobby: (() => void) | null = null;
 
-const startGame = () => {
-	if (game) return;
+const cleanupLobbyScreen = () => {
 	if (cleanupLobby) {
 		cleanupLobby();
 		cleanupLobby = null;
 	}
+	document.getElementById("lobby-screen")?.remove();
+};
+
+const getGameKey = () => `${router.getMode()}:${router.getRoomId() || ""}`;
+
+const stopGame = () => {
+	if (game) {
+		game.dispose();
+		game = null;
+	}
+	activeGameKey = null;
+};
+
+const startGame = () => {
+	cleanupLobbyScreen();
+	const nextGameKey = getGameKey();
+	if (game && activeGameKey === nextGameKey) return;
+
+	stopGame();
+	activeGameKey = nextGameKey;
 	game = new Game(router);
 };
 
@@ -27,11 +47,15 @@ const handleRoute = (mode: GameMode) => {
 	}
 
 	if (mode === "lobby") {
+		stopGame();
 		if (!cleanupLobby) cleanupLobby = renderLobby(router);
 		return;
 	}
 
+	cleanupLobbyScreen();
+
 	if (mode === "editor" && !getStoredAuth()) {
+		stopGame();
 		if (!cleanupAuth) {
 			cleanupAuth = renderAuthScreen(() => {
 				if (cleanupAuth) {

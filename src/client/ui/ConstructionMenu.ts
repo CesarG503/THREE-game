@@ -11,6 +11,7 @@ import { MapShapeEditor } from "./MapShapeEditor";
 import { AdvancedWeaponConfigPanel } from "./AdvancedWeaponConfigPanel";
 import { getActiveFarmingGroups } from "./GameHUD";
 import { JetpackItem } from "../items/JetpackItem";
+import { savePlatformMapForRoom } from "../platform/mapRuntime";
 
 export class ConstructionMenu {
     constructor(inventoryManager, gameInstance) {
@@ -1334,7 +1335,45 @@ export class ConstructionMenu {
             }
         };
 
+        const platformStatus = document.createElement("div");
+        platformStatus.style.cssText = "min-height: 18px; color: #aaa; font-size: 13px;";
+        platformStatus.textContent = this.game.roomId
+            ? `Mapa activo: ${this.game.roomId}`
+            : "Abre un mapa desde Biblioteca para guardarlo en la plataforma.";
+
+        const platformSaveBtn = document.createElement("button");
+        platformSaveBtn.textContent = "Guardar en Plataforma";
+        platformSaveBtn.style.cssText = baseBtnStyle + "background:#7c3aed;";
+        platformSaveBtn.onmouseover = () => platformSaveBtn.style.background = "#8b5cf6";
+        platformSaveBtn.onmouseout = () => platformSaveBtn.style.background = "#7c3aed";
+        platformSaveBtn.onclick = async () => {
+            if (!this.game.saveMap) {
+                platformStatus.style.color = "#f87171";
+                platformStatus.textContent = "Error: Funcion saveMap no encontrada.";
+                return;
+            }
+
+            platformSaveBtn.disabled = true;
+            platformStatus.style.color = "#fbbf24";
+            platformStatus.textContent = "Guardando version...";
+
+            try {
+                const mapData = this.game.saveMap();
+                const saved = await savePlatformMapForRoom(this.game.roomId, mapData);
+                this.game.activePlatformMap = saved;
+                platformStatus.style.color = "#86efac";
+                platformStatus.textContent = `Guardado v${saved.version} · ${saved.objectCount} objetos`;
+            } catch (err) {
+                platformStatus.style.color = "#f87171";
+                platformStatus.textContent = err instanceof Error ? err.message : "No se pudo guardar en plataforma.";
+            } finally {
+                platformSaveBtn.disabled = false;
+            }
+        };
+
         btnContainer.appendChild(saveBtn);
+        btnContainer.appendChild(platformSaveBtn);
+        btnContainer.appendChild(platformStatus);
 
         saveSection.appendChild(saveTitle);
         saveSection.appendChild(saveInfo);

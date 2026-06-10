@@ -21,9 +21,11 @@ export class GameHUD {
     inventoryElement: HTMLElement | null;
     settings: HUDConfig;
     resizeTimer: number | null;
+    layoutFrameId: number | null;
     lastHealth: { current: number; max: number } | null;
     lastJump: { current: number; max: number } | null;
     onViewportChange: () => void;
+    isDestroyed: boolean;
 
     constructor() {
         this.container = document.createElement('div')
@@ -42,14 +44,17 @@ export class GameHUD {
 
         this.settings = {}
         this.resizeTimer = null
+        this.layoutFrameId = null
         this.lastHealth = null
         this.lastJump = null
+        this.isDestroyed = false
 
         this.onViewportChange = () => {
+            if (this.isDestroyed) return
             if (this.resizeTimer !== null) window.clearTimeout(this.resizeTimer)
             this.resizeTimer = window.setTimeout(() => {
                 this.resizeTimer = null
-                if (this.settings) this.createHUD(this.settings)
+                if (!this.isDestroyed && this.settings) this.createHUD(this.settings)
             }, 80)
         }
 
@@ -59,7 +64,9 @@ export class GameHUD {
     }
 
     createHUD(settings: HUDConfig) {
+        if (this.isDestroyed) return
         this.settings = settings || {};
+        const sharedInventory = document.getElementById('inventory-container')
 
         // Clear existing (except timer)
         if (this.healthElement) this.healthElement.remove();
@@ -72,6 +79,10 @@ export class GameHUD {
             if (!this.settings.showInventory) {
                 this.inventoryElement.style.display = 'none';
             }
+        }
+
+        if (!this.settings.showInventory && sharedInventory) {
+            sharedInventory.style.display = 'none'
         }
 
         const layerOrder = this.settings.layerOrder || ['health', 'jump', 'inventory'];
@@ -100,6 +111,24 @@ export class GameHUD {
         if (this.lastHealth) this.updateHealth(this.lastHealth.current, this.lastHealth.max)
         if (this.lastJump) this.updateJump(this.lastJump.current, this.lastJump.max)
         this.applyLayerOrder()
+        this.scheduleLayoutStabilization()
+    }
+
+    scheduleLayoutStabilization() {
+        if (this.layoutFrameId !== null) {
+            cancelAnimationFrame(this.layoutFrameId)
+            this.layoutFrameId = null
+        }
+
+        this.layoutFrameId = requestAnimationFrame(() => {
+            this.layoutFrameId = null
+            if (this.isDestroyed) return
+
+            this.applyHUDConstraints()
+            this.applyHUDAnchors()
+            this.keepHUDInsideViewport()
+            this.applyLayerOrder()
+        })
     }
 
     createHealth(s: HUDConfig) {
@@ -647,6 +676,43 @@ export class GameHUD {
         if (this.timerElement) {
             this.timerElement.style.display = 'none'
         }
+    }
+
+    destroy() {
+        if (this.isDestroyed) return
+        this.isDestroyed = true
+
+        if (this.resizeTimer !== null) {
+            window.clearTimeout(this.resizeTimer)
+            this.resizeTimer = null
+        }
+
+        if (this.layoutFrameId !== null) {
+            cancelAnimationFrame(this.layoutFrameId)
+            this.layoutFrameId = null
+        }
+
+        window.removeEventListener('resize', this.onViewportChange)
+        window.visualViewport?.removeEventListener('resize', this.onViewportChange)
+        window.visualViewport?.removeEventListener('scroll', this.onViewportChange)
+
+        const inventory = document.getElementById('inventory-container')
+        if (inventory) {
+            document.body.appendChild(inventory)
+            inventory.style.display = 'none'
+            inventory.style.visibility = 'visible'
+            inventory.style.opacity = '1'
+        }
+
+        this.healthElement?.remove()
+        this.jumpElement?.remove()
+        this.timerElement?.remove()
+        this.container.remove()
+
+        this.healthElement = null
+        this.jumpElement = null
+        this.timerElement = null
+        this.inventoryElement = null
     }
 
     // --- STYLES ---

@@ -1,8 +1,9 @@
 import type { IncomingMessage as HttpIncomingMessage, ServerResponse } from "node:http"
-import { AuthError, loginUser, registerUser, type AuthInput } from "../services/AuthService.js"
+import { AuthError, getUserBySessionToken, loginUser, registerUser, requireUserBySessionToken, type AuthInput } from "../services/AuthService.js"
+import { createMap, deleteMap, getMap, listMaps, updateMap, type MapWriteInput } from "../services/MapService.js"
 import { logger } from "../utils/Logger.js"
 
-const MAX_BODY_BYTES = 1024 * 32
+const MAX_BODY_BYTES = 1024 * 1024 * 2
 
 export async function handleHttpRequest(
   req: HttpIncomingMessage,
@@ -37,7 +38,63 @@ export async function handleHttpRequest(
     })
   }
 
+  if (req.method === "GET" && url.pathname === "/api/maps") {
+    return withApiError(res, async () => {
+      const user = await getOptionalRequestUser(req)
+      const result = await listMaps(url.searchParams.get("scope"), user?.id ?? null)
+      sendJson(res, 200, { maps: result })
+    })
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/maps") {
+    return withJsonBody(req, res, async (body) => {
+      const user = await getRequiredRequestUser(req)
+      const result = await createMap(body as MapWriteInput, user.id)
+      sendJson(res, 201, result)
+    })
+  }
+
+  const mapMatch = /^\/api\/maps\/([^/]+)$/.exec(url.pathname)
+  if (mapMatch) {
+    const identifier = decodeURIComponent(mapMatch[1] ?? "")
+
+    if (req.method === "GET") {
+      return withApiError(res, async () => {
+        const user = await getOptionalRequestUser(req)
+        const result = await getMap(identifier, user?.id ?? null)
+        sendJson(res, 200, result)
+      })
+    }
+
+    if (req.method === "PUT") {
+      return withJsonBody(req, res, async (body) => {
+        const user = await getRequiredRequestUser(req)
+        const result = await updateMap(identifier, body as MapWriteInput, user.id)
+        sendJson(res, 200, result)
+      })
+    }
+
+    if (req.method === "DELETE") {
+      return withApiError(res, async () => {
+        const user = await getRequiredRequestUser(req)
+        const result = await deleteMap(identifier, user.id)
+        sendJson(res, 200, result)
+      })
+    }
+  }
+
   sendJson(res, 404, { error: "Not found" })
+}
+
+async function withApiError(
+  res: ServerResponse,
+  handler: () => Promise<void>,
+): Promise<void> {
+  try {
+    await handler()
+  } catch (err) {
+    handleApiError(res, err)
+  }
 }
 
 async function withJsonBody(
@@ -90,6 +147,12 @@ function handleApiError(res: ServerResponse, err: unknown): void {
     return
   }
 
+  if (isDatabaseConnectionError(err)) {
+    logger.error("HTTP", "Database connection unavailable", err)
+    sendJson(res, 503, { error: "Base de datos no disponible" })
+    return
+  }
+
   logger.error("HTTP", "Unhandled API error", err)
   sendJson(res, 500, { error: "Error interno del servidor" })
 }
@@ -103,6 +166,32 @@ function setCorsHeaders(req: HttpIncomingMessage, res: ServerResponse): void {
   const origin = req.headers.origin
   res.setHeader("Access-Control-Allow-Origin", typeof origin === "string" ? origin : "*")
   res.setHeader("Vary", "Origin")
-  res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS")
+  res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS")
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization")
+}
+
+async function getOptionalRequestUser(req: HttpIncomingMessage) {
+  const token = getBearerToken(req)
+  if (!token) return null
+  return getUserBySessionToken(token)
+}
+
+async function getRequiredRequestUser(req: HttpIncomingMessage) {
+  const token = getBearerToken(req)
+  if (!token) throw new AuthError(401, "Sesion requerida")
+  return requireUserBySessionToken(token)
+}
+
+function getBearerToken(req: HttpIncomingMessage) {
+  const header = req.headers.authorization
+  if (typeof header !== "string") return null
+  const match = /^Bearer\s+(.+)$/i.exec(header)
+  return match?.[1]?.trim() || null
+}
+
+function isDatabaseConnectionError(err: unknown) {
+  if (!err || typeof err !== "object") return false
+  const code = "code" in err ? String(err.code) : ""
+  const message = err instanceof Error ? err.message : ""
+  return code === "ECONNREFUSED" || message.includes("ECONNREFUSED")
 }

@@ -9,6 +9,7 @@ export class SceneManager {
   dirLight: THREE.DirectionalLight;
   stars: THREE.Points | null;
   currentRenderDistance: number | undefined;
+  private boundResize: () => void;
 
   constructor(containerId: any) {
     this.container = document.getElementById(containerId);
@@ -29,7 +30,8 @@ export class SceneManager {
     this.initLights();
     this.initFloor();
 
-    window.addEventListener("resize", this.onWindowResize.bind(this));
+    this.boundResize = this.onWindowResize.bind(this);
+    window.addEventListener("resize", this.boundResize);
   }
 
   initLights() {
@@ -138,5 +140,23 @@ export class SceneManager {
 
   update() {
     this.renderer.render(this.scene, this.camera);
+  }
+
+  dispose() {
+    window.removeEventListener("resize", this.boundResize);
+
+    this.scene.traverse((object: any) => {
+      if (object.geometry) object.geometry.dispose();
+      if (object.material) {
+        if (Array.isArray(object.material)) {
+          object.material.forEach((material: any) => material.dispose());
+        } else {
+          object.material.dispose();
+        }
+      }
+    });
+
+    this.renderer.dispose();
+    this.renderer.domElement.remove();
   }
 }

@@ -37,6 +37,7 @@ import { regenerateObjectPhysics, updateObjectPhysics } from "./core/GamePhysics
 import { GameHUD } from "./ui/GameHUD";
 import { ObjectInspector } from "./ui/ObjectInspector";
 import { createItemFromNetworkData, serializeItemForNetwork } from "./items/ItemNetworkSerializer";
+import { getMapData, loadPlatformMapForRoom, type PlatformMap } from "./platform/mapRuntime";
 
 export class Game {
 	sceneManager: any;
@@ -89,6 +90,10 @@ export class Game {
 	_isApplyingRemoteEdit: boolean;
 	GunItemClass: any;
 	PelotaItemClass: any;
+	activePlatformMap: PlatformMap | null;
+	_routeMapLoadStarted: boolean;
+	isDisposed: boolean;
+	animationFrameId: number | null;
 
 	animate: any;
 	setupDebugRender: any;
@@ -120,9 +125,12 @@ export class Game {
 
 	constructor(router?: Router) {
 		this.router = router || new Router();
+		this.isDisposed = false;
+		this.animationFrameId = null;
 		this.bindModuleMethods();
 
 		RAPIER.init().then(() => {
+			if (this.isDisposed) return;
 			console.log("Rapier Physics Initialized");
 			this.initGame();
 		});
@@ -159,6 +167,7 @@ export class Game {
 	}
 
 	initGame() {
+		if (this.isDisposed) return;
 		this.sceneManager = new SceneManager("game-container");
 		this.inputManager = new InputManager();
 		this.clock = new THREE.Clock();
@@ -226,6 +235,8 @@ export class Game {
 		this.isMovingFarmingZone = false;
 		this.moveGhost = null;
 		this.npc = null;
+		this.activePlatformMap = null;
+		this._routeMapLoadStarted = false;
 
 		this.networkManager.onChatMessage = (playerId: any, playerName: any, msg: any) => {
 			this.chatManager.addChatMessage(playerId, playerName, msg);
@@ -406,6 +417,7 @@ export class Game {
 
 		this.setupSettingsPanel();
 		this.setupMultiplayerUI();
+		this.prepareInventoryContainer();
 
 		const profile = this.playerConfigManager.getCurrentProfile();
 		if (profile) {
@@ -468,12 +480,16 @@ export class Game {
 			this.inventoryManager.addItem(floor);
 			this.inventoryManager.addItem(ramp);
 			this.inventoryManager.addItem(tall);
+			this.ensureEditorInventoryVisible();
 
 			this.setupEditorUI();
 
 			// @ts-ignore legacy UI module from public/js
 			import("./ui/ConstructionMenu").then((module: any) => {
+				if (this.isDisposed) return;
 				this.constructionMenu = new module.ConstructionMenu(this.inventoryManager, this);
+				this.ensureEditorInventoryVisible();
+				void this.loadInitialPlatformMap();
 			});
 
 			this.objectInspector = new ObjectInspector(this);
@@ -541,6 +557,10 @@ export class Game {
 
 		this.setupGameInput();
 
+		if (this.gameMode !== "editor") {
+			void this.loadInitialPlatformMap();
+		}
+
 		this.debugEnabled = false;
 		this.setupDebugRender();
 
@@ -548,7 +568,7 @@ export class Game {
 		this.PelotaItemClass = PelotaItem;
 
 		this.animate = this.animate.bind(this);
-		requestAnimationFrame(this.animate);
+		this.animationFrameId = requestAnimationFrame(this.animate);
 
 		document.addEventListener("mousedown", (e) => {
 			if (e.target !== this.sceneManager.renderer.domElement) return;
@@ -653,6 +673,135 @@ export class Game {
 
 		document.addEventListener("contextmenu", (e) => e.preventDefault(), false);
 
+	}
+
+	prepareInventoryContainer() {
+		let inventoryContainer = document.getElementById("inventory-container");
+		if (!inventoryContainer) {
+			inventoryContainer = document.createElement("div");
+			inventoryContainer.id = "inventory-container";
+			document.body.appendChild(inventoryContainer);
+		}
+
+		if (inventoryContainer.querySelectorAll(".inventory-slot").length !== 9) {
+			inventoryContainer.replaceChildren();
+			for (let index = 0; index < 9; index += 1) {
+				const slot = document.createElement("div");
+				slot.className = `inventory-slot${index === 0 ? " active" : ""}`;
+				const number = document.createElement("span");
+				number.className = "slot-number";
+				number.textContent = String(index + 1);
+				slot.appendChild(number);
+				inventoryContainer.appendChild(slot);
+			}
+		}
+
+		inventoryContainer.style.visibility = "visible";
+		inventoryContainer.style.opacity = "1";
+		inventoryContainer.style.pointerEvents = "auto";
+	}
+
+	showInventoryContainer(inventoryContainer = document.getElementById("inventory-container")) {
+		if (!inventoryContainer) return;
+
+		inventoryContainer.style.visibility = "visible";
+		inventoryContainer.style.opacity = "1";
+		inventoryContainer.style.pointerEvents = "auto";
+
+		const computedDisplay = getComputedStyle(inventoryContainer).display;
+		if (computedDisplay === "none" || inventoryContainer.style.display === "none") {
+			inventoryContainer.style.display = "flex";
+		}
+	}
+
+	ensureEditorInventoryVisible() {
+		if (this.gameMode !== "editor") return;
+
+		const profile = this.playerConfigManager?.getCurrentProfile?.();
+		if (profile?.hudSettings) {
+			profile.hudSettings.showInventory = true;
+			this.hud.createHUD(profile.hudSettings);
+		}
+
+		this.showInventoryContainer();
+		this.inventoryManager?.updateUI?.();
+	}
+
+	dispose() {
+		if (this.isDisposed) return;
+		this.isDisposed = true;
+
+		if (this.animationFrameId !== null) {
+			cancelAnimationFrame(this.animationFrameId);
+			this.animationFrameId = null;
+		}
+
+		if (this.networkManager) {
+			this.networkManager.disconnect();
+			this.networkManager.remotePlayers?.forEach((player: any) => player.dispose?.());
+			this.networkManager.remotePlayers?.clear?.();
+		}
+
+		if (this.scopeController?.destroy) {
+			this.scopeController.destroy();
+		}
+
+		this.projectiles?.forEach((projectile: any) => projectile.destroy?.());
+		this.itemDropManager?.droppedItems?.forEach((item: any) => item.dispose?.());
+		this.fxBlasterSystem?.Destroy?.();
+		this.character?.dispose?.();
+		this.hud?.destroy?.();
+
+		if (document.pointerLockElement) {
+			document.exitPointerLock?.();
+		}
+
+		[
+			"multiplayer-panel",
+			"chat-container",
+			"construction-menu",
+			"object-inspector",
+			"game-hud-layer",
+			"aerial-grid-status",
+			"placement-logic-toolbar",
+			"game-timer-display",
+		].forEach((id) => document.getElementById(id)?.remove());
+
+		document.querySelectorAll("[id^='fz-counter-']").forEach((element) => element.remove());
+		const inventoryContainer = document.getElementById("inventory-container");
+		if (inventoryContainer) {
+			inventoryContainer.style.display = "none";
+		}
+
+		if (this.sceneManager?.dispose) {
+			this.sceneManager.dispose();
+		} else {
+			document.getElementById("game-container")?.replaceChildren();
+		}
+
+		this.world = null;
+		this.eventQueue = null;
+		console.log(`[Game] Experiencia cerrada: ${this.gameMode} / ${this.roomId}`);
+	}
+
+	async loadInitialPlatformMap() {
+		if (this.isDisposed) return;
+		if (!this.roomId || this._routeMapLoadStarted) return;
+		this._routeMapLoadStarted = true;
+
+		const map = await loadPlatformMapForRoom(this.roomId);
+		if (this.isDisposed) return;
+		const data = getMapData(map);
+		if (!map || !data) return;
+
+		this.activePlatformMap = map;
+		this.loadMap(data);
+		if (this.constructionMenu?.refreshLogicList) {
+			this.constructionMenu.refreshLogicList();
+		}
+
+		window.dispatchEvent(new CustomEvent("platformMapLoaded", { detail: map }));
+		console.log(`[Maps] Loaded saved map: ${map.name} (${map.slug})`);
 	}
 
 	setupSettingsPanel() {

@@ -30,6 +30,7 @@ export class NetworkManager {
     onPlayerAction: any;
     onGroundItemsSync: any;
     particleSystem: any;
+    reconnectEnabled: boolean;
 
     constructor(scene: any, world: any, roomId: any, onConnected?: any) {
         this.scene = scene;
@@ -63,10 +64,12 @@ export class NetworkManager {
         this.onPlayerShoot = null;
         this.onPlayerAction = null;
         this.onGroundItemsSync = null;
+        this.reconnectEnabled = false;
     }
 
     connect(serverUrl: string) {
         this.serverUrl = serverUrl;
+        this.reconnectEnabled = true;
 
         try {
             this.socket = new WebSocket(serverUrl);
@@ -101,7 +104,7 @@ export class NetworkManager {
                 this.remotePlayers.clear();
 
                 setTimeout(() => {
-                    if (this.serverUrl) {
+                    if (this.reconnectEnabled && this.serverUrl) {
                         console.log("[Network] Attempting to reconnect...");
                         this.connect(this.serverUrl);
                     }
@@ -336,12 +339,16 @@ export class NetworkManager {
     }
 
     disconnect() {
+        this.reconnectEnabled = false;
         if (this.socket) {
             this.socket.close();
             this.socket = null;
         }
         this.isConnected = false;
         this.serverUrl = null;
+        this.playerId = null;
+        this.remotePlayers.forEach((player) => player.dispose());
+        this.remotePlayers.clear();
     }
 
     sendChatMessage(text: string) {

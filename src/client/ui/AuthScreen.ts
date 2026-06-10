@@ -1,39 +1,7 @@
-export interface StoredAuthSession {
-	user: {
-		id: string;
-		email: string;
-		username: string;
-		displayName?: string | null;
-		createdAt: string;
-	};
-	session: {
-		token: string;
-		expiresAt: string;
-	};
-}
-
-const STORAGE_KEY = "veta.auth";
-
-export function getStoredAuth(): StoredAuthSession | null {
-	const raw = localStorage.getItem(STORAGE_KEY);
-	if (!raw) return null;
-
-	try {
-		const auth = JSON.parse(raw) as StoredAuthSession;
-		if (!auth.session?.token || new Date(auth.session.expiresAt).getTime() <= Date.now()) {
-			clearStoredAuth();
-			return null;
-		}
-		return auth;
-	} catch {
-		clearStoredAuth();
-		return null;
-	}
-}
-
-export function clearStoredAuth() {
-	localStorage.removeItem(STORAGE_KEY);
-}
+import { setStoredAuth, type StoredAuthSession } from "../platform/auth";
+import { submitAuth } from "../platform/api";
+import { injectPlatformStyles } from "./platform/styles";
+export { clearStoredAuth, getStoredAuth } from "../platform/auth";
 
 export interface AuthScreenOptions {
 	subtitle?: string;
@@ -41,11 +9,32 @@ export interface AuthScreenOptions {
 	onCancel?: () => void;
 }
 
+const HIDDEN_GAME_IDS = [
+	"loading",
+	"crosshair",
+	"inventory-container",
+	"settings-panel",
+	"overlay",
+	"fuego-counter",
+	"interaction-prompt",
+	"button-interaction-prompt",
+	"move-prompt-container",
+];
+
 export function renderAuthScreen(
 	onAuthenticated: (auth: StoredAuthSession) => void,
 	options: AuthScreenOptions = {},
 ): () => void {
+	injectPlatformStyles();
 	let mode: "login" | "register" = "login";
+	const hiddenStates = new Map<string, string | null>();
+
+	HIDDEN_GAME_IDS.forEach((id) => {
+		const el = document.getElementById(id);
+		if (!el) return;
+		hiddenStates.set(id, el.style.display || "");
+		el.style.display = "none";
+	});
 
 	const container = document.createElement("div");
 	container.id = "auth-screen";
@@ -54,9 +43,12 @@ export function renderAuthScreen(
 		inset: 0;
 		display: grid;
 		place-items: center;
-		background: linear-gradient(135deg, #111827 0%, #0f172a 48%, #111111 100%);
+		background:
+			radial-gradient(circle at 74% 18%, rgba(139, 92, 246, 0.24), transparent 32%),
+			radial-gradient(circle at 18% 86%, rgba(8, 217, 255, 0.16), transparent 30%),
+			#05070d;
 		color: #f8fafc;
-		font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+		font-family: var(--vp-font);
 		z-index: 4000;
 		padding: 24px;
 	`;
@@ -68,10 +60,11 @@ export function renderAuthScreen(
 		flex-direction: column;
 		gap: 14px;
 		padding: 28px;
-		background: rgba(12, 17, 25, 0.92);
-		border: 1px solid #334155;
-		border-radius: 8px;
+		background: rgba(17, 19, 27, 0.94);
+		border: 1px solid rgba(255, 255, 255, 0.12);
+		border-radius: var(--vp-radius);
 		box-shadow: 0 24px 70px rgba(0,0,0,0.38);
+		backdrop-filter: blur(14px);
 	`;
 
 	const title = document.createElement("h1");
@@ -111,7 +104,7 @@ export function renderAuthScreen(
 
 	const updateMode = () => {
 		const isRegister = mode === "register";
-		title.textContent = isRegister ? "Crear cuenta" : "Entrar a Veta";
+		title.textContent = isRegister ? "Crear cuenta VIPERIO" : "Entrar a VIPERIO";
 		subtitle.textContent = options.subtitle || (isRegister
 			? "Registro preliminar para empezar a guardar datos del juego."
 			: "Usa tu cuenta de prueba para continuar.");
@@ -142,8 +135,7 @@ export function renderAuthScreen(
 				username: username.value,
 				password: password.value,
 			});
-			localStorage.setItem(STORAGE_KEY, JSON.stringify(auth));
-			localStorage.setItem("playerName", auth.user.displayName || auth.user.username);
+			setStoredAuth(auth);
 			onAuthenticated(auth);
 		} catch (err) {
 			status.style.color = "#f87171";
@@ -182,7 +174,13 @@ export function renderAuthScreen(
 	document.body.appendChild(container);
 	updateMode();
 
-	return () => container.remove();
+	return () => {
+		container.remove();
+		hiddenStates.forEach((display, id) => {
+			const el = document.getElementById(id);
+			if (el) el.style.display = display ?? "";
+		});
+	};
 }
 
 function createInput(placeholder: string, type: string, name: string) {
@@ -196,8 +194,8 @@ function createInput(placeholder: string, type: string, name: string) {
 		box-sizing: border-box;
 		background: #0f172a;
 		color: #f8fafc;
-		border: 1px solid #334155;
-		border-radius: 8px;
+		border: 1px solid rgba(255, 255, 255, 0.12);
+		border-radius: var(--vp-radius);
 		padding: 12px 14px;
 		font-size: 15px;
 		outline: none;
@@ -205,39 +203,16 @@ function createInput(placeholder: string, type: string, name: string) {
 	return input;
 }
 
-async function submitAuth(
-	mode: "login" | "register",
-	body: { email: string; username: string; password: string },
-): Promise<StoredAuthSession> {
-	const response = await fetch(`${getApiBaseUrl()}/auth/${mode}`, {
-		method: "POST",
-		headers: { "Content-Type": "application/json" },
-		body: JSON.stringify(body),
-	});
-
-	const payload = await response.json().catch(() => null) as { error?: string } | StoredAuthSession | null;
-	if (!response.ok) {
-		throw new Error(payload && "error" in payload && payload.error ? payload.error : "Error de autenticacion");
-	}
-
-	return payload as StoredAuthSession;
-}
-
-function getApiBaseUrl() {
-	const protocol = window.location.protocol === "https:" ? "https:" : "http:";
-	const hostname = window.location.hostname || "localhost";
-	return `${protocol}//${hostname}:8080/api`;
-}
-
 function buttonStyles(color: string) {
 	return `
-		background: ${color};
+		background: ${color === "#2563eb" ? "var(--vp-purple)" : color};
 		color: white;
 		border: none;
 		padding: 12px 16px;
-		border-radius: 8px;
+		border-radius: var(--vp-radius);
 		cursor: pointer;
 		font-size: 16px;
 		font-weight: 700;
+		box-shadow: 0 0 24px rgba(139, 92, 246, 0.32);
 	`;
 }

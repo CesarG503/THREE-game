@@ -159,7 +159,8 @@ function updateMapFarmingZones(game: any, dt: number) {
 }
 
 export function animate(this: any) {
-	requestAnimationFrame(this.animate);
+	if (this.isDisposed) return;
+	this.animationFrameId = requestAnimationFrame(this.animate);
 
 	const dt = this.clock.getDelta();
 

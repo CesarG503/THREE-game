@@ -83,6 +83,34 @@ export async function loginUser(input: AuthInput) {
   return { user, session }
 }
 
+export async function getUserBySessionToken(token: string) {
+  const normalizedToken = normalizeSessionToken(token)
+
+  const session = await prisma.userSession.findFirst({
+    where: {
+      token: normalizedToken,
+      expiresAt: {
+        gt: new Date(),
+      },
+    },
+    select: {
+      user: {
+        select: publicUserSelect,
+      },
+    },
+  })
+
+  return session?.user ?? null
+}
+
+export async function requireUserBySessionToken(token: string) {
+  const user = await getUserBySessionToken(token)
+  if (!user) {
+    throw new AuthError(401, "Sesion invalida o expirada")
+  }
+  return user
+}
+
 async function createSession(userId: string) {
   const token = randomBytes(SESSION_TOKEN_BYTES).toString("hex")
   const days = Number(process.env.AUTH_SESSION_DAYS || 7)
@@ -159,6 +187,13 @@ function normalizeLoginIdentifier(value: unknown): string {
   return value.trim()
 }
 
+function normalizeSessionToken(value: unknown): string {
+  if (typeof value !== "string" || !/^[a-f0-9]{64}$/i.test(value.trim())) {
+    throw new AuthError(401, "Sesion requerida")
+  }
+  return value.trim()
+}
+
 const publicUserSelect = {
   id: true,
   email: true,
@@ -166,4 +201,3 @@ const publicUserSelect = {
   displayName: true,
   createdAt: true,
 } as const
-

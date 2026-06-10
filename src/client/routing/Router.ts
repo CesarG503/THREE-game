@@ -47,6 +47,9 @@ export class Router {
 
   onChange(cb: RouteListener) {
     this.listeners.push(cb);
+    return () => {
+      this.listeners = this.listeners.filter((listener) => listener !== cb);
+    };
   }
 
   notify() {

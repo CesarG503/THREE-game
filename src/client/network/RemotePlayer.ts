@@ -194,6 +194,10 @@ export class RemotePlayer {
             this.setModelType(state.modelType);
         }
 
+        if (state.skinUrl && this.polygonModelSkin && this.polygonModelSkin.setSkinUrl) {
+            this.polygonModelSkin.setSkinUrl(state.skinUrl);
+        }
+
         if (state.playerCollision !== oldPlayerCollision) {
             this.applyCollisionProfile();
         }

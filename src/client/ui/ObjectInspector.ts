@@ -3,6 +3,7 @@
 import * as THREE from "three"
 import { StairsUtils } from "../utils/StairsUtils"
 import { LogicItemsManager } from "./logic_items/LogicItemsManager"
+import { uploadAsset } from "../platform/api"
 
 export class ObjectInspector {
     constructor(gameInstance) {
@@ -296,12 +297,29 @@ export class ObjectInspector {
             fileInput.type = "file"
             fileInput.accept = "image/*"
             fileInput.style.display = "none"
-            fileInput.onchange = (e) => {
+            fileInput.onchange = async (e) => {
                 const file = e.target.files[0]
                 if (file) {
-                    const reader = new FileReader()
-                    reader.onload = (evt) => this.updateTexture(evt.target.result)
-                    reader.readAsDataURL(file)
+                    const originalText = uploadBtn.textContent
+                    uploadBtn.textContent = "Subiendo..."
+                    uploadBtn.disabled = true
+                    try {
+                        const asset = await uploadAsset(file, {
+                            kind: "TEXTURE",
+                            visibility: "UNLISTED",
+                            name: file.name,
+                            metadata: { source: "object-inspector" }
+                        })
+                        this.updateTexture(asset.fileUrl, asset.id)
+                        uploadBtn.textContent = "Textura cargada"
+                    } catch (err) {
+                        console.error("No se pudo subir la textura", err)
+                        alert(err instanceof Error ? err.message : "No se pudo subir la textura")
+                        uploadBtn.textContent = originalText
+                    } finally {
+                        uploadBtn.disabled = false
+                        fileInput.value = ""
+                    }
                 }
             }
             uploadBtn.onclick = () => fileInput.click()
@@ -432,7 +450,7 @@ export class ObjectInspector {
             `
             if (tex.path) t.style.backgroundImage = `url(${tex.path})`
 
-            t.onclick = () => this.updateTexture(tex.path)
+            t.onclick = () => this.updateTexture(tex.path, null)
             container.appendChild(t)
         })
     }
@@ -759,10 +777,11 @@ export class ObjectInspector {
         }
     }
 
-    updateTexture(pathOrDataUrl) {
+    updateTexture(pathOrDataUrl, assetId = null) {
         if (!this.selectedObject) return
 
         this.selectedObject.userData.texturePath = pathOrDataUrl
+        this.selectedObject.userData.textureAssetId = assetId
 
         if (pathOrDataUrl) {
             const loader = new THREE.TextureLoader()

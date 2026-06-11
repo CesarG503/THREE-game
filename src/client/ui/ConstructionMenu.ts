@@ -12,6 +12,7 @@ import { AdvancedWeaponConfigPanel } from "./AdvancedWeaponConfigPanel";
 import { getActiveFarmingGroups } from "./GameHUD";
 import { JetpackItem } from "../items/JetpackItem";
 import { savePlatformMapForRoom } from "../platform/mapRuntime";
+import { uploadAsset } from "../platform/api";
 
 export class ConstructionMenu {
     constructor(inventoryManager, gameInstance) {
@@ -1962,22 +1963,34 @@ export class ConstructionMenu {
         fileInput.type = "file";
         fileInput.accept = "image/*";
         fileInput.style.display = "none";
-        fileInput.addEventListener("change", (e) => {
+        fileInput.addEventListener("change", async (e) => {
             const file = e.target.files[0];
             if (file) {
-                const reader = new FileReader();
-                reader.onload = (evt) => {
-                    const dataUrl = evt.target.result;
-                    this.updateDraftTexture(dataUrl);
-                    // Visual feedback
+                const originalText = uploadBtn.textContent;
+                uploadBtn.textContent = "Subiendo...";
+                uploadBtn.disabled = true;
+                try {
+                    const asset = await uploadAsset(file, {
+                        kind: "TEXTURE",
+                        visibility: "UNLISTED",
+                        name: file.name,
+                        metadata: { source: "construction-menu" }
+                    });
+                    this.updateDraftTexture(asset.fileUrl, asset.id);
                     uploadBtn.textContent = "Textura Cargada";
                     uploadBtn.style.color = "#00FF00";
 
-                    // Reset grid selection
                     const allBtns = this.panelEditor.querySelectorAll(".texture-btn");
                     allBtns.forEach(c => c.style.borderColor = "#555");
-                };
-                reader.readAsDataURL(file);
+                } catch (err) {
+                    console.error("No se pudo subir la textura", err);
+                    alert(err instanceof Error ? err.message : "No se pudo subir la textura");
+                    uploadBtn.textContent = originalText;
+                    uploadBtn.style.color = "white";
+                } finally {
+                    uploadBtn.disabled = false;
+                    fileInput.value = "";
+                }
             }
         });
 
@@ -3228,7 +3241,7 @@ export class ConstructionMenu {
         if ((type === "weapon" || type === "consumable") && baseItem && baseItem.clone) {
             this.currentDraftItem = baseItem.clone();
         } else {
-            this.currentDraftItem = new MapObjectItem(id, name, type, "", color, scale, texturePath);
+            this.currentDraftItem = new MapObjectItem(id, name, type, "", color, scale, texturePath, baseItem?.textureAssetId || null);
             if (baseItem && baseItem.logicProperties) {
                 this.currentDraftItem.logicProperties = JSON.parse(JSON.stringify(baseItem.logicProperties));
             }
@@ -3610,9 +3623,10 @@ export class ConstructionMenu {
         this.currentDraftItem.opacity = opacity;
     }
 
-    updateDraftTexture(texturePath) {
+    updateDraftTexture(texturePath, textureAssetId = null) {
         if (!this.currentDraftItem) return;
         this.currentDraftItem.texturePath = texturePath;
+        this.currentDraftItem.textureAssetId = textureAssetId;
     }
 
     updateDraftScale(axis, value) {

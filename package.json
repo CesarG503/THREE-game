@@ -16,6 +16,7 @@
     "db:studio": "prisma studio"
   },
   "devDependencies": {
+    "@types/busboy": "^1.5.4",
     "@types/node": "24.10.1",
     "@types/react": "19.2.7",
     "@types/react-dom": "19.2.3",
@@ -30,11 +31,13 @@
     "vite": "8.0.10"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1067.0",
     "@dimforge/rapier3d-compat": "0.19.3",
     "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "^7.8.0",
     "@redis/client": "^6.0.0",
     "animejs": "4.3.6",
+    "busboy": "^1.6.0",
     "class-variance-authority": "0.7.1",
     "clsx": "2.1.1",
     "dotenv": "^17.4.2",

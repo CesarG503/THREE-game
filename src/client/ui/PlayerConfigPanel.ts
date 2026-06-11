@@ -1,6 +1,9 @@
 // @ts-nocheck
 
 import { HUDConfigPanel } from './HUDConfigPanel'
+import { uploadAsset } from '../platform/api'
+
+const DEFAULT_POLYGON_SKIN_URL = "https://raw.githubusercontent.com/InventivetalentDev/minecraft-assets/1.19.3/assets/minecraft/textures/entity/player/wide/steve.png"
 
 export class PlayerConfigPanel {
     constructor(game, manager) {
@@ -529,6 +532,79 @@ export class PlayerConfigPanel {
 
         // Appearance / Logic Column
         const extraCol = document.createElement('div');
+
+        const skinHeader = document.createElement('h4');
+        skinHeader.textContent = "Skin Polygon";
+        skinHeader.style.cssText = "color:#aaa; border-bottom:1px solid #444;";
+        extraCol.appendChild(skinHeader);
+
+        const skinBox = document.createElement('div');
+        skinBox.style.cssText = "display:flex; gap:10px; align-items:center; margin-bottom:15px;";
+
+        const skinPreview = document.createElement('div');
+        skinPreview.style.cssText = `
+            width:64px; height:64px; border:1px solid #555; border-radius:4px;
+            background:#111 center/cover no-repeat;
+            image-rendering: pixelated; flex-shrink:0;
+        `;
+        if (profile.skinUrl) skinPreview.style.backgroundImage = `url("${profile.skinUrl}")`;
+
+        const skinActions = document.createElement('div');
+        skinActions.style.cssText = "display:flex; flex-direction:column; gap:6px; flex:1;";
+
+        const skinInput = document.createElement('input');
+        skinInput.type = "file";
+        skinInput.accept = "image/png";
+        skinInput.style.display = "none";
+
+        const skinUploadBtn = document.createElement('button');
+        skinUploadBtn.textContent = "Subir Skin 64x64";
+        skinUploadBtn.style.cssText = "background:#333; color:white; border:1px solid #555; padding:8px; cursor:pointer; border-radius:4px;";
+        skinUploadBtn.onclick = () => skinInput.click();
+
+        const clearSkinBtn = document.createElement('button');
+        clearSkinBtn.textContent = "Usar Skin Base";
+        clearSkinBtn.style.cssText = "background:#222; color:#ddd; border:1px solid #555; padding:6px; cursor:pointer; border-radius:4px;";
+        clearSkinBtn.onclick = () => {
+            this.manager.updateProfile(profile.id, { skinUrl: DEFAULT_POLYGON_SKIN_URL, skinAssetId: null });
+            this.render();
+        };
+
+        skinInput.onchange = async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const originalText = skinUploadBtn.textContent;
+            skinUploadBtn.textContent = "Subiendo...";
+            skinUploadBtn.disabled = true;
+            try {
+                const asset = await uploadAsset(file, {
+                    kind: "CHARACTER_SKIN",
+                    visibility: "UNLISTED",
+                    name: file.name,
+                    metadata: { source: "player-config-panel" }
+                });
+                this.manager.updateProfile(profile.id, {
+                    skinUrl: asset.fileUrl,
+                    skinAssetId: asset.id
+                });
+                this.render();
+            } catch (err) {
+                console.error("No se pudo subir la skin", err);
+                alert(err instanceof Error ? err.message : "No se pudo subir la skin");
+                skinUploadBtn.textContent = originalText;
+            } finally {
+                skinUploadBtn.disabled = false;
+                skinInput.value = "";
+            }
+        };
+
+        skinActions.appendChild(skinUploadBtn);
+        skinActions.appendChild(clearSkinBtn);
+        skinActions.appendChild(skinInput);
+        skinBox.appendChild(skinPreview);
+        skinBox.appendChild(skinActions);
+        extraCol.appendChild(skinBox);
 
         // --- ANIMATIONS SECTION ---
         const animHeader = document.createElement('h4');

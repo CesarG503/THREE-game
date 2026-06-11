@@ -17,6 +17,7 @@ export class MapObjectItem extends Item {
   color: number;
   scale: MapObjectScale;
   texturePath: string | null;
+  textureAssetId: string | null;
   logicProperties: any;
   opacity: number | undefined;
   uuid: string;
@@ -28,13 +29,15 @@ export class MapObjectItem extends Item {
     iconPath: string,
     color: number,
     scale: MapObjectScale = { x: 1, y: 1, z: 1 },
-    texturePath: string | null = null
+    texturePath: string | null = null,
+    textureAssetId: string | null = null
   ) {
     super(id, name, iconPath);
     this.type = type;
     this.color = color;
     this.scale = scale;
     this.texturePath = texturePath;
+    this.textureAssetId = textureAssetId;
     this.logicProperties = null;
 
     this.iconPath = this.generateIcon();
@@ -775,6 +778,7 @@ export class MapObjectItem extends Item {
     object3D.userData.originalScale = { x: this.scale.x, y: this.scale.y, z: this.scale.z };
     object3D.userData.originalRotY = object3D.rotation.y;
     object3D.userData.texturePath = this.texturePath;
+    object3D.userData.textureAssetId = this.textureAssetId;
 
     if (this.logicProperties) {
       object3D.userData.logicProperties = { ...this.logicProperties };

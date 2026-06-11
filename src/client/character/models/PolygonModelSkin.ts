@@ -86,6 +86,7 @@ export class PolygonModelSkin implements ICharacterModel {
 
   initLoader() {
     this.textureLoader = new THREE.TextureLoader();
+    this.textureLoader.setCrossOrigin("anonymous");
   }
 
   createModel() {
@@ -221,6 +222,31 @@ export class PolygonModelSkin implements ICharacterModel {
     this.leftLegGroup.add(lLegOuter);
 
     this.scene.add(this.model);
+  }
+
+  setSkinUrl(url: string) {
+    if (!url || url === this.skinUrl) return;
+    this.skinUrl = url;
+    this.applySkinTexture(url);
+  }
+
+  applySkinTexture(url: string) {
+    if (!this.model) return;
+
+    this.textureLoader.load(url, (texture) => {
+      texture.magFilter = THREE.NearestFilter;
+      texture.minFilter = THREE.NearestFilter;
+      texture.colorSpace = THREE.SRGBColorSpace;
+
+      this.model?.traverse((child: any) => {
+        if (!child.isMesh || !child.material) return;
+        const materials = Array.isArray(child.material) ? child.material : [child.material];
+        materials.forEach((material: any) => {
+          material.map = texture;
+          material.needsUpdate = true;
+        });
+      });
+    });
   }
 
   createBoxGeometryWithUVs(w: number, h: number, d: number, u: number, v: number) {

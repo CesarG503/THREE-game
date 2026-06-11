@@ -22,7 +22,9 @@ export interface GroundItemRecord {
 
 // ── Player State ──────────────────────────────────
 export interface PlayerState {
-  modelType: "skin" | "glb"
+  modelType: "skin" | "glb" | "polygon"
+  skinUrl?: string | null
+  skinAssetId?: string | null
   isMoving: boolean
   isCrouching: boolean
   isAttacking: boolean

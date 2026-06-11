@@ -1,5 +1,8 @@
 import type { IncomingMessage as HttpIncomingMessage, ServerResponse } from "node:http"
+import { Readable } from "node:stream"
+import Busboy from "busboy"
 import { AuthError, getUserBySessionToken, loginUser, registerUser, requireUserBySessionToken, type AuthInput } from "../services/AuthService.js"
+import { createAsset, getAsset, getAssetObject, listAssets, type UploadedAssetFile } from "../services/AssetService.js"
 import { createMap, deleteMap, getMap, listMaps, updateMap, type MapWriteInput } from "../services/MapService.js"
 import { logger } from "../utils/Logger.js"
 
@@ -34,6 +37,49 @@ export async function handleHttpRequest(
   if (req.method === "POST" && url.pathname === "/api/auth/login") {
     return withJsonBody(req, res, async (body) => {
       const result = await loginUser(body as AuthInput)
+      sendJson(res, 200, result)
+    })
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/assets") {
+    return withApiError(res, async () => {
+      const user = await getOptionalRequestUser(req)
+      const result = await listAssets(url.searchParams.get("scope"), user?.id ?? null, url.searchParams.get("kind"))
+      sendJson(res, 200, { assets: result })
+    })
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/assets") {
+    return withMultipartBody(req, res, async ({ fields, file }) => {
+      const user = await getRequiredRequestUser(req)
+      const result = await createAsset({
+        kind: fields.kind,
+        visibility: fields.visibility,
+        name: fields.name,
+        description: fields.description,
+        metadata: fields.metadata,
+        file,
+      }, user.id)
+      sendJson(res, 201, result)
+    })
+  }
+
+  const assetFileMatch = /^\/api\/assets\/([^/]+)\/file$/.exec(url.pathname)
+  if (assetFileMatch && req.method === "GET") {
+    return withApiError(res, async () => {
+      const user = await getOptionalRequestUser(req)
+      const identifier = decodeURIComponent(assetFileMatch[1] ?? "")
+      const result = await getAssetObject(identifier, user?.id ?? null)
+      await sendAssetFile(res, result.asset, result.object)
+    })
+  }
+
+  const assetMatch = /^\/api\/assets\/([^/]+)$/.exec(url.pathname)
+  if (assetMatch && req.method === "GET") {
+    return withApiError(res, async () => {
+      const user = await getOptionalRequestUser(req)
+      const identifier = decodeURIComponent(assetMatch[1] ?? "")
+      const result = await getAsset(identifier, user?.id ?? null)
       sendJson(res, 200, result)
     })
   }
@@ -168,6 +214,130 @@ function setCorsHeaders(req: HttpIncomingMessage, res: ServerResponse): void {
   res.setHeader("Vary", "Origin")
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS")
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization")
+}
+
+async function withMultipartBody(
+  req: HttpIncomingMessage,
+  res: ServerResponse,
+  handler: (body: { fields: Record<string, unknown>; file: UploadedAssetFile }) => Promise<void>,
+): Promise<void> {
+  try {
+    const body = await readMultipartAsset(req)
+    await handler(body)
+  } catch (err) {
+    handleApiError(res, err)
+  }
+}
+
+function readMultipartAsset(req: HttpIncomingMessage): Promise<{ fields: Record<string, unknown>; file: UploadedAssetFile }> {
+  return new Promise((resolve, reject) => {
+    const contentType = req.headers["content-type"]
+    if (!contentType || !contentType.includes("multipart/form-data")) {
+      reject(new AuthError(415, "Se requiere multipart/form-data"))
+      return
+    }
+
+    const maxFileSize = Number(process.env.ASSET_MAX_UPLOAD_BYTES || 50 * 1024 * 1024)
+    const fields: Record<string, unknown> = {}
+    let uploadedFile: UploadedAssetFile | null = null
+    let rejected = false
+
+    const busboy = Busboy({
+      headers: req.headers,
+      limits: {
+        files: 1,
+        fileSize: Number.isFinite(maxFileSize) && maxFileSize > 0 ? maxFileSize : 50 * 1024 * 1024,
+        fields: 12,
+      },
+    })
+
+    const fail = (err: Error) => {
+      if (rejected) return
+      rejected = true
+      reject(err)
+    }
+
+    busboy.on("field", (name, value) => {
+      if (name === "metadata") {
+        try {
+          fields[name] = value.trim() ? JSON.parse(value) : undefined
+        } catch {
+          fail(new AuthError(400, "Metadata invalida"))
+        }
+        return
+      }
+      fields[name] = value
+    })
+
+    busboy.on("file", (_fieldName, file, info) => {
+      const chunks: Buffer[] = []
+      let fileTooLarge = false
+
+      file.on("data", (chunk: Buffer) => chunks.push(chunk))
+      file.on("limit", () => {
+        fileTooLarge = true
+        fail(new AuthError(413, "Archivo demasiado grande"))
+      })
+      file.on("error", fail)
+      file.on("end", () => {
+        if (fileTooLarge || rejected) return
+        uploadedFile = {
+          filename: info.filename || "asset.bin",
+          mimeType: info.mimeType || "application/octet-stream",
+          buffer: Buffer.concat(chunks),
+        }
+      })
+    })
+
+    busboy.on("error", fail)
+    busboy.on("finish", () => {
+      if (rejected) return
+      if (!uploadedFile) {
+        reject(new AuthError(400, "Archivo requerido"))
+        return
+      }
+      resolve({ fields, file: uploadedFile })
+    })
+
+    req.pipe(busboy)
+  })
+}
+
+async function sendAssetFile(
+  res: ServerResponse,
+  asset: { name: string; mimeType: string; sizeBytes: number },
+  object: { Body?: unknown; ContentLength?: number },
+): Promise<void> {
+  if (!object.Body) throw new AuthError(404, "Archivo no encontrado")
+
+  res.writeHead(200, {
+    "Content-Type": asset.mimeType,
+    "Content-Length": String(object.ContentLength ?? asset.sizeBytes),
+    "Cache-Control": "public, max-age=31536000, immutable",
+    "Content-Disposition": `inline; filename="${sanitizeDownloadName(asset.name)}"`,
+  })
+
+  const body = object.Body
+  if (body instanceof Readable) {
+    body.on("error", (err) => {
+      logger.error("HTTP", "Asset stream failed", err)
+      if (!res.destroyed) res.destroy(err)
+    })
+    body.pipe(res)
+    return
+  }
+
+  if (typeof (body as { transformToByteArray?: unknown }).transformToByteArray === "function") {
+    const bytes = await (body as { transformToByteArray: () => Promise<Uint8Array> }).transformToByteArray()
+    res.end(Buffer.from(bytes))
+    return
+  }
+
+  res.end(Buffer.from(String(body)))
+}
+
+function sanitizeDownloadName(value: string): string {
+  return value.replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/^-+|-+$/g, "") || "asset"
 }
 
 async function getOptionalRequestUser(req: HttpIncomingMessage) {

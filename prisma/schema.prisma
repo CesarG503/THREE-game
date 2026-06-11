@@ -13,6 +13,22 @@ enum MatchStatus {
   CANCELLED
 }
 
+enum AssetKind {
+  MAP_IMAGE
+  TEXTURE
+  CHARACTER_SKIN
+  SOUND
+  MODEL
+  VFX
+  OTHER
+}
+
+enum AssetVisibility {
+  PRIVATE
+  UNLISTED
+  PUBLIC
+}
+
 model User {
   id           String        @id @default(cuid())
   email        String        @unique
@@ -23,6 +39,7 @@ model User {
   updatedAt    DateTime      @updatedAt
   sessions     UserSession[]
   maps         GameMap[]
+  assets       Asset[]
   matches      MatchPlayer[]
 }
 
@@ -45,14 +62,17 @@ model GameMap {
   description      String?
   ownerId          String?
   currentVersionId String?
+  coverAssetId     String?
   isPublished      Boolean          @default(false)
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
   owner            User?            @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  coverAsset       Asset?           @relation("GameMapCover", fields: [coverAssetId], references: [id], onDelete: SetNull)
   versions         GameMapVersion[]
   matches          Match[]
 
   @@index([ownerId])
+  @@index([coverAssetId])
 }
 
 model GameMapVersion {
@@ -85,18 +105,47 @@ model Match {
 }
 
 model MatchPlayer {
-  id        String   @id @default(cuid())
-  matchId   String
-  userId    String?
-  playerId  String
+  id         String    @id @default(cuid())
+  matchId    String
+  userId     String?
+  playerId   String
   playerName String
-  joinedAt  DateTime @default(now())
-  leftAt    DateTime?
-  stats     Json?
-  match     Match    @relation(fields: [matchId], references: [id], onDelete: Cascade)
-  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  joinedAt   DateTime  @default(now())
+  leftAt     DateTime?
+  stats      Json?
+  match      Match     @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  user       User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
 
+  @@unique([matchId, playerId])
   @@index([matchId])
   @@index([userId])
-  @@unique([matchId, playerId])
+}
+
+model Asset {
+  id              String          @id @default(cuid())
+  ownerId         String?
+  kind            AssetKind
+  visibility      AssetVisibility @default(UNLISTED)
+  name            String
+  description     String?
+  mimeType        String
+  sizeBytes       Int
+  width           Int?
+  height          Int?
+  durationMs      Int?
+  storageProvider String          @default("s3")
+  bucket          String
+  objectKey       String          @unique
+  publicUrl       String?
+  checksumSha256  String?
+  metadata        Json?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  owner           User?           @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  mapCovers       GameMap[]       @relation("GameMapCover")
+
+  @@index([ownerId])
+  @@index([kind])
+  @@index([visibility])
+  @@index([createdAt])
 }

@@ -17,6 +17,7 @@ export interface ICharacterModel {
     setFirstPerson?: (isFirstPerson: boolean) => void;
     setJumpAnimationType?: (type: string) => void;
     setFallAnimationType?: (type: string) => void;
+    setSkinUrl?: (url: string) => void;
 }
 
 export interface CharacterStats {

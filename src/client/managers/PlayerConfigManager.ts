@@ -1,3 +1,5 @@
+const DEFAULT_POLYGON_SKIN_URL = "https://raw.githubusercontent.com/InventivetalentDev/minecraft-assets/1.19.3/assets/minecraft/textures/entity/player/wide/steve.png";
+
 export class PlayerConfigManager {
     game: any;
     profiles: any[];
@@ -20,6 +22,8 @@ export class PlayerConfigManager {
                 jumpAnimationType: "none",
                 fallAnimationType: "none",
                 playerCollision: "push",
+                skinUrl: DEFAULT_POLYGON_SKIN_URL,
+                skinAssetId: null,
                 statModes: {},
                 hudSettings: {
                     showHealth: true,
@@ -99,6 +103,8 @@ export class PlayerConfigManager {
                 jumpAnimationType: "none",
                 fallAnimationType: "none",
                 playerCollision: "push",
+                skinUrl: DEFAULT_POLYGON_SKIN_URL,
+                skinAssetId: null,
                 statModes: {},
                 hudSettings: {
                     showHealth: true,
@@ -202,6 +208,8 @@ export class PlayerConfigManager {
             jumpAnimationType: "none",
             fallAnimationType: "none",
             playerCollision: "push",
+            skinUrl: DEFAULT_POLYGON_SKIN_URL,
+            skinAssetId: null,
             statModes: {},
             hudSettings: {
                 showHealth: true,
@@ -384,6 +392,11 @@ export class PlayerConfigManager {
                 this.game.hud.updateJump(jumpsLeft, character.maxMultiJumps);
             }
         }
+
+        const skinUrl = profile.skinUrl || DEFAULT_POLYGON_SKIN_URL;
+        if (character.polygonModelSkin && character.polygonModelSkin.setSkinUrl) {
+            character.polygonModelSkin.setSkinUrl(skinUrl);
+        }
     }
 
     saveData() {
@@ -395,7 +408,13 @@ export class PlayerConfigManager {
 
     loadData(data: any) {
         if (!data) return;
-        if (data.profiles) this.profiles = data.profiles;
+        if (data.profiles) {
+            this.profiles = data.profiles.map((profile: any) => ({
+                skinUrl: DEFAULT_POLYGON_SKIN_URL,
+                skinAssetId: null,
+                ...profile
+            }));
+        }
         if (data.assignments) this.assignments = data.assignments;
         console.log("Player Config Loaded", this.profiles);
     }

@@ -539,7 +539,8 @@ export class Game {
 							"",
 							source.color,
 							source.scale,
-							source.texturePath
+							source.texturePath,
+							source.textureAssetId
 						);
 						if (source.logicProperties) {
 							newItem.logicProperties = { ...source.logicProperties };

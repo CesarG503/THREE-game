@@ -291,6 +291,8 @@ export function animate(this: any) {
 
 			const playerState = {
 				modelType: this.character.currentType || "skin",
+				skinUrl: this.character.polygonModelSkin ? this.character.polygonModelSkin.skinUrl : null,
+				skinAssetId: this.playerConfigManager?.getCurrentProfile?.()?.skinAssetId || null,
 				isMoving: isMoving,
 				isCrouching: isCrouching,
 				isAttacking: sendAttacking,

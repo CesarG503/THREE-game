@@ -1,5 +1,6 @@
-import type { Prisma } from "@prisma/client"
+import { AssetKind, type Prisma } from "@prisma/client"
 import { prisma } from "../db/prisma.js"
+import { assertAssetUsable } from "./AssetService.js"
 import { AuthError } from "./AuthService.js"
 
 export interface MapWriteInput {
@@ -8,6 +9,7 @@ export interface MapWriteInput {
   isPublished?: unknown
   data?: unknown
   notes?: unknown
+  coverAssetId?: unknown
 }
 
 export async function listMaps(scope: string | null, userId: string | null) {
@@ -53,7 +55,12 @@ export async function createMap(input: MapWriteInput, ownerId: string) {
   const isPublished = normalizeBoolean(input.isPublished, false)
   const data = normalizeMapData(input.data)
   const notes = normalizeNotes(input.notes) ?? "Version inicial"
+  const coverAssetId = normalizeCoverAssetId(input.coverAssetId)
   const slug = await createUniqueSlug(name)
+
+  if (coverAssetId) {
+    await assertAssetUsable(coverAssetId, ownerId, AssetKind.MAP_IMAGE)
+  }
 
   const created = await prisma.$transaction(async (tx) => {
     const map = await tx.gameMap.create({
@@ -62,6 +69,7 @@ export async function createMap(input: MapWriteInput, ownerId: string) {
         name,
         description,
         ownerId,
+        coverAssetId,
         isPublished,
       },
     })
@@ -108,9 +116,14 @@ export async function updateMap(identifier: string, input: MapWriteInput, ownerI
   const name = input.name === undefined ? undefined : normalizeName(input.name)
   const description = input.description === undefined ? undefined : normalizeDescription(input.description)
   const isPublished = input.isPublished === undefined ? undefined : normalizeBoolean(input.isPublished, false)
+  const coverAssetId = input.coverAssetId === undefined ? undefined : normalizeCoverAssetId(input.coverAssetId)
   const shouldCreateVersion = input.data !== undefined
   const data = shouldCreateVersion ? normalizeMapData(input.data) : null
   const notes = normalizeNotes(input.notes)
+
+  if (coverAssetId) {
+    await assertAssetUsable(coverAssetId, ownerId, AssetKind.MAP_IMAGE)
+  }
 
   const updated = await prisma.$transaction(async (tx) => {
     let currentVersionId = existing.currentVersionId
@@ -134,6 +147,7 @@ export async function updateMap(identifier: string, input: MapWriteInput, ownerI
         ...(name !== undefined ? { name } : {}),
         ...(description !== undefined ? { description } : {}),
         ...(isPublished !== undefined ? { isPublished } : {}),
+        ...(coverAssetId !== undefined ? { coverAssetId } : {}),
         ...(currentVersionId !== existing.currentVersionId ? { currentVersionId } : {}),
       },
       include: mapInclude,
@@ -172,6 +186,16 @@ const mapInclude = {
       displayName: true,
     },
   },
+  coverAsset: {
+    select: {
+      id: true,
+      kind: true,
+      mimeType: true,
+      width: true,
+      height: true,
+      publicUrl: true,
+    },
+  },
   versions: {
     orderBy: { version: "desc" },
     take: 1,
@@ -205,6 +229,13 @@ function toMapDto(map: MapWithInclude, includeData: boolean) {
     isPublished: map.isPublished,
     ownerId: map.ownerId,
     owner: map.owner,
+    coverAssetId: map.coverAssetId,
+    coverAsset: map.coverAsset
+      ? {
+        ...map.coverAsset,
+        fileUrl: map.coverAsset.publicUrl || `/api/assets/${encodeURIComponent(map.coverAsset.id)}/file`,
+      }
+      : null,
     createdAt: map.createdAt,
     updatedAt: map.updatedAt,
     currentVersionId: map.currentVersionId,
@@ -272,6 +303,14 @@ function normalizeNotes(value: unknown) {
   if (value === undefined || value === null) return null
   if (typeof value !== "string") throw new AuthError(400, "Notas invalidas")
   return value.trim().slice(0, 240) || null
+}
+
+function normalizeCoverAssetId(value: unknown) {
+  if (value === undefined || value === null || value === "") return null
+  if (typeof value !== "string") throw new AuthError(400, "Imagen de mapa invalida")
+  const id = value.trim()
+  if (!id || id.length > 120) throw new AuthError(400, "Imagen de mapa invalida")
+  return id
 }
 
 function normalizeBoolean(value: unknown, fallback: boolean) {

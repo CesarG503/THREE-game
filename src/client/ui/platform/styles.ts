@@ -594,6 +594,141 @@ export function injectPlatformStyles() {
 			font-weight: 800;
 		}
 
+		.vp-profile-header {
+			border: 1px solid var(--vp-border);
+			background: rgba(17, 19, 27, 0.72);
+			border-radius: var(--vp-radius);
+			padding: 18px 20px;
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			gap: 16px;
+			margin-bottom: 26px;
+		}
+
+		.vp-skin-layout {
+			display: grid;
+			grid-template-columns: minmax(300px, 1.05fr) minmax(280px, 0.95fr);
+			gap: 20px;
+			align-items: stretch;
+		}
+
+		.vp-skin-preview-panel,
+		.vp-skin-library-panel {
+			min-height: 410px;
+			display: flex;
+			flex-direction: column;
+			gap: 14px;
+		}
+
+		.vp-skin-stage {
+			position: relative;
+			min-height: 310px;
+			flex: 1;
+			border: 1px solid var(--vp-border);
+			border-radius: var(--vp-radius);
+			background:
+				linear-gradient(180deg, rgba(8, 217, 255, 0.08), rgba(139, 92, 246, 0.08)),
+				radial-gradient(circle at 50% 48%, rgba(8, 217, 255, 0.18), transparent 46%),
+				#0b0e15;
+			overflow: hidden;
+		}
+
+		.vp-skin-stage::after {
+			content: "360";
+			position: absolute;
+			left: 50%;
+			bottom: 14px;
+			transform: translateX(-50%);
+			color: rgba(255, 255, 255, 0.58);
+			font-size: 12px;
+			font-weight: 950;
+			pointer-events: none;
+		}
+
+		.vp-skin-canvas {
+			width: 100%;
+			height: 100%;
+			display: block;
+		}
+
+		.vp-skin-controls {
+			display: grid;
+			grid-template-columns: repeat(4, minmax(0, 1fr));
+			gap: 8px;
+		}
+
+		.vp-skin-controls .vp-icon-btn {
+			min-height: 38px;
+			padding: 0 10px;
+			font-size: 12px;
+		}
+
+		.vp-skin-grid {
+			display: grid;
+			grid-template-columns: repeat(auto-fill, minmax(78px, 1fr));
+			gap: 10px;
+		}
+
+		.vp-skin-tile {
+			position: relative;
+			aspect-ratio: 1;
+			border: 1px solid var(--vp-border);
+			background: rgba(255, 255, 255, 0.045);
+			border-radius: var(--vp-radius);
+			cursor: pointer;
+			overflow: hidden;
+			padding: 8px;
+		}
+
+		.vp-skin-tile:hover,
+		.vp-skin-tile.is-active {
+			border-color: rgba(8, 217, 255, 0.82);
+			box-shadow: 0 0 0 1px rgba(8, 217, 255, 0.26), 0 0 24px rgba(8, 217, 255, 0.14);
+		}
+
+		.vp-skin-tile-preview {
+			display: block;
+			width: 100%;
+			height: 100%;
+			background-color: #111827;
+			background-repeat: no-repeat;
+			background-size: 250% 250%;
+			background-position: 8% 8%;
+			image-rendering: pixelated;
+			border-radius: 6px;
+		}
+
+		.vp-skin-active {
+			position: absolute;
+			right: 6px;
+			bottom: 6px;
+			background: rgba(8, 217, 255, 0.92);
+			color: #041018;
+			border-radius: 6px;
+			padding: 3px 6px;
+			font-size: 11px;
+			font-weight: 950;
+		}
+
+		.vp-skin-empty {
+			min-height: 78px;
+			border: 1px dashed var(--vp-border-strong);
+			border-radius: var(--vp-radius);
+			display: grid;
+			place-items: center;
+			color: var(--vp-muted);
+			font-size: 12px;
+			text-align: center;
+			padding: 10px;
+		}
+
+		.vp-skin-upload-btn {
+			width: 100%;
+			min-height: 48px;
+			margin-top: auto;
+		}
+
 		@media (max-width: 980px) {
 			.vp-shell {
 				grid-template-columns: 76px minmax(0, 1fr);
@@ -627,6 +762,10 @@ export function injectPlatformStyles() {
 			}
 
 			.vp-form {
+				grid-template-columns: 1fr;
+			}
+
+			.vp-skin-layout {
 				grid-template-columns: 1fr;
 			}
 		}
@@ -684,6 +823,15 @@ export function injectPlatformStyles() {
 			.vp-hero {
 				min-height: 320px;
 				padding: 26px;
+			}
+
+			.vp-profile-header {
+				align-items: stretch;
+				flex-direction: column;
+			}
+
+			.vp-skin-controls {
+				grid-template-columns: repeat(2, minmax(0, 1fr));
 			}
 		}
 	`;

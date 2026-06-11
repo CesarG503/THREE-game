@@ -1,8 +1,10 @@
 import "iconify-icon";
+import * as THREE from "three";
 import { Router } from "../routing/Router";
 import { clearStoredAuth, getAuthDisplayName, getStoredAuth, type StoredAuthSession } from "../platform/auth";
 import { createEmptyMapData } from "../platform/mapDefaults";
-import { createMap, deleteMap, listMaps, type PlatformMap } from "../platform/api";
+import { createMap, deleteMap, listAssets, listMaps, uploadAsset, type PlatformAsset, type PlatformMap } from "../platform/api";
+import { DEFAULT_POLYGON_SKIN_URL, getSelectedSkin, setSelectedSkin, type SelectedSkin } from "../platform/skinPreferences";
 import { renderAuthScreen } from "./AuthScreen";
 import { clampText, clear, createButton, createElement, createIcon, formatRelativeDate, prependIcon } from "./platform/dom";
 import { injectPlatformStyles } from "./platform/styles";
@@ -44,10 +46,15 @@ export function renderLobby(router: Router): () => void {
 	let auth: StoredAuthSession | null = getStoredAuth();
 	let publicMaps: PlatformMap[] = [];
 	let myMaps: PlatformMap[] = [];
+	let skinAssets: PlatformAsset[] = [];
+	let selectedSkin: SelectedSkin = getSelectedSkin(auth);
 	let query = "";
 	let loading = true;
+	let skinLoading = false;
 	let status = "";
+	let skinStatus = "";
 	let authCleanup: (() => void) | null = null;
+	let skinPreviewCleanup: (() => void) | null = null;
 	let disposed = false;
 	let unsubscribeRoute: () => void = () => {};
 
@@ -59,6 +66,7 @@ export function renderLobby(router: Router): () => void {
 		if (disposed) return;
 		disposed = true;
 		if (authCleanup) authCleanup();
+		if (skinPreviewCleanup) skinPreviewCleanup();
 		unsubscribeRoute();
 		container.remove();
 		cleanup(hiddenStates);
@@ -66,6 +74,11 @@ export function renderLobby(router: Router): () => void {
 
 	const setStatus = (message: string) => {
 		status = message;
+		render();
+	};
+
+	const setSkinStatus = (message: string) => {
+		skinStatus = message;
 		render();
 	};
 
@@ -93,15 +106,41 @@ export function renderLobby(router: Router): () => void {
 		render();
 	};
 
+	const refreshSkins = async () => {
+		if (!auth) {
+			skinAssets = [];
+			selectedSkin = getSelectedSkin(auth);
+			skinLoading = false;
+			render();
+			return;
+		}
+
+		skinLoading = true;
+		render();
+
+		try {
+			skinAssets = await listAssets("mine", "CHARACTER_SKIN");
+			selectedSkin = getSelectedSkin(auth);
+			skinStatus = "";
+		} catch (err) {
+			skinStatus = err instanceof Error ? err.message : "No se pudo leer tus skins";
+		} finally {
+			skinLoading = false;
+			if (!disposed) render();
+		}
+	};
+
 	const openAuth = () => {
 		if (authCleanup) authCleanup();
 		authCleanup = renderAuthScreen((nextAuth) => {
 			auth = nextAuth;
+			selectedSkin = getSelectedSkin(auth);
 			if (authCleanup) {
 				authCleanup();
 				authCleanup = null;
 			}
 			void refreshMaps();
+			void refreshSkins();
 		}, {
 			subtitle: "Entra para crear, guardar y editar tus mapas.",
 			cancelText: "Volver",
@@ -121,6 +160,42 @@ export function renderLobby(router: Router): () => void {
 	const switchView = (view: LobbyView) => {
 		activeView = view;
 		render();
+		if (view === "profile") void refreshSkins();
+	};
+
+	const activateSkin = (skin: SelectedSkin) => {
+		selectedSkin = skin;
+		setSelectedSkin(auth, skin);
+		setSkinStatus("Skin activa actualizada");
+	};
+
+	const uploadProfileSkin = async (file: File) => {
+		if (!auth) {
+			openAuth();
+			return;
+		}
+
+		skinLoading = true;
+		skinStatus = "Subiendo skin...";
+		render();
+
+		try {
+			const asset = await uploadAsset(file, {
+				kind: "CHARACTER_SKIN",
+				visibility: "UNLISTED",
+				name: file.name,
+				metadata: { source: "lobby-profile" },
+			});
+			const nextSkin = { assetId: asset.id, url: asset.fileUrl, name: asset.name };
+			setSelectedSkin(auth, nextSkin);
+			selectedSkin = nextSkin;
+			skinStatus = "Skin subida y activada";
+			await refreshSkins();
+		} catch (err) {
+			skinStatus = err instanceof Error ? err.message : "No se pudo subir la skin";
+			skinLoading = false;
+			render();
+		}
 	};
 
 	const render = () => {
@@ -128,6 +203,10 @@ export function renderLobby(router: Router): () => void {
 		if (router.getMode() !== "lobby") {
 			disposeLobby();
 			return;
+		}
+		if (skinPreviewCleanup) {
+			skinPreviewCleanup();
+			skinPreviewCleanup = null;
 		}
 		clear(container);
 		container.appendChild(renderSidebar(activeView, switchView, auth));
@@ -147,7 +226,20 @@ export function renderLobby(router: Router): () => void {
 		} else if (activeView === "library") {
 			feed.appendChild(renderLibraryView(myMaps, auth, navigateToMap, handleDeleteMap));
 		} else if (activeView === "profile") {
-			feed.appendChild(renderProfileView(auth, myMaps, openAuth));
+			feed.appendChild(renderProfileView({
+				auth,
+				myMaps,
+				openAuth,
+				skinAssets,
+				selectedSkin,
+				skinLoading,
+				skinStatus,
+				onActivateSkin: activateSkin,
+				onUploadSkin: uploadProfileSkin,
+				registerPreviewCleanup: (cleanup) => {
+					skinPreviewCleanup = cleanup;
+				},
+			}));
 		} else if (activeView === "settings") {
 			feed.appendChild(renderSettingsView());
 		} else {
@@ -374,6 +466,7 @@ export function renderLobby(router: Router): () => void {
 
 	render();
 	void refreshMaps();
+	void refreshSkins();
 
 	unsubscribeRoute = router.onChange((route) => {
 		if (route.mode !== "lobby") disposeLobby();
@@ -548,30 +641,314 @@ function renderLibraryView(
 	return section;
 }
 
-function renderProfileView(
-	auth: StoredAuthSession | null,
-	myMaps: PlatformMap[],
-	openAuth: () => void,
-) {
+interface ProfileViewOptions {
+	auth: StoredAuthSession | null;
+	myMaps: PlatformMap[];
+	openAuth: () => void;
+	skinAssets: PlatformAsset[];
+	selectedSkin: SelectedSkin;
+	skinLoading: boolean;
+	skinStatus: string;
+	onActivateSkin: (skin: SelectedSkin) => void;
+	onUploadSkin: (file: File) => void;
+	registerPreviewCleanup: (cleanup: () => void) => void;
+}
+
+function renderProfileView(options: ProfileViewOptions) {
+	const {
+		auth,
+		myMaps,
+		openAuth,
+		skinAssets,
+		selectedSkin,
+		skinLoading,
+		skinStatus,
+		onActivateSkin,
+		onUploadSkin,
+		registerPreviewCleanup,
+	} = options;
 	const section = createElement("section");
 	section.appendChild(createElement("h1", "vp-section-title", "Mi perfil"));
-	const panel = createElement("div", "vp-panel");
 
 	if (!auth) {
+		const panel = createElement("div", "vp-panel");
 		panel.appendChild(createElement("div", "vp-muted", "Sesion de invitado"));
 		panel.appendChild(prependIcon(createButton("vp-primary-btn vp-icon-btn", "Entrar", openAuth), "mdi:login"));
+		section.appendChild(panel);
+		return section;
 	} else {
-		panel.appendChild(createElement("h2", "vp-map-title", getAuthDisplayName(auth)));
-		panel.appendChild(createElement("div", "vp-muted", auth.user.email));
-		panel.appendChild(createElement("div", "vp-muted", `${myMaps.length} mapas guardados`));
-		panel.appendChild(prependIcon(createButton("vp-danger-btn vp-icon-btn", "Cerrar sesion", () => {
+		const profileHeader = createElement("div", "vp-profile-header");
+		const identity = createElement("div");
+		identity.appendChild(createElement("h2", "vp-map-title", getAuthDisplayName(auth)));
+		identity.appendChild(createElement("div", "vp-muted", auth.user.email));
+		identity.appendChild(createElement("div", "vp-muted", `${myMaps.length} mapas guardados · ${skinAssets.length} skins`));
+		profileHeader.appendChild(identity);
+		profileHeader.appendChild(prependIcon(createButton("vp-danger-btn vp-icon-btn", "Cerrar sesion", () => {
 			clearStoredAuth();
 			window.location.reload();
 		}), "mdi:logout"));
+		section.appendChild(profileHeader);
 	}
 
-	section.appendChild(panel);
+	const skinTitle = createElement("h2", "vp-section-title", "Tus Skins");
+	section.appendChild(skinTitle);
+
+	const skinLayout = createElement("div", "vp-skin-layout");
+	const previewPanel = createElement("article", "vp-panel vp-skin-preview-panel");
+	previewPanel.appendChild(createElement("h3", "vp-panel-title", "Previsualizacion de skin"));
+	const previewStage = createElement("div", "vp-skin-stage");
+	previewPanel.appendChild(previewStage);
+	const controls = createElement("div", "vp-skin-controls");
+	const rotateLeft = prependIcon(createButton("vp-secondary-btn vp-icon-btn", "Girar", () => previewStage.dispatchEvent(new CustomEvent("skin-rotate", { detail: -0.35 }))), "mdi:rotate-left");
+	const rotateRight = prependIcon(createButton("vp-secondary-btn vp-icon-btn", "Girar", () => previewStage.dispatchEvent(new CustomEvent("skin-rotate", { detail: 0.35 }))), "mdi:rotate-right");
+	const zoomIn = prependIcon(createButton("vp-secondary-btn vp-icon-btn", "Zoom", () => previewStage.dispatchEvent(new CustomEvent("skin-zoom", { detail: -0.25 }))), "mdi:magnify-plus");
+	const zoomOut = prependIcon(createButton("vp-secondary-btn vp-icon-btn", "Zoom", () => previewStage.dispatchEvent(new CustomEvent("skin-zoom", { detail: 0.25 }))), "mdi:magnify-minus");
+	controls.appendChild(rotateLeft);
+	controls.appendChild(rotateRight);
+	controls.appendChild(zoomIn);
+	controls.appendChild(zoomOut);
+	previewPanel.appendChild(controls);
+	previewPanel.appendChild(createElement("div", "vp-muted", selectedSkin.name || "Skin activa"));
+
+	const preview = new SkinPreviewController(previewStage, selectedSkin.url);
+	registerPreviewCleanup(() => preview.dispose());
+
+	const libraryPanel = createElement("article", "vp-panel vp-skin-library-panel");
+	libraryPanel.appendChild(createElement("h3", "vp-panel-title", "Biblioteca de skins"));
+	const skinGrid = createElement("div", "vp-skin-grid");
+	skinGrid.appendChild(renderSkinTile({
+		id: null,
+		name: "Skin base",
+		url: DEFAULT_POLYGON_SKIN_URL,
+		active: selectedSkin.assetId === null,
+		onActivate: () => onActivateSkin({ assetId: null, url: DEFAULT_POLYGON_SKIN_URL, name: "Skin base" }),
+	}));
+
+	skinAssets.forEach((asset) => {
+		skinGrid.appendChild(renderSkinTile({
+			id: asset.id,
+			name: asset.name,
+			url: asset.fileUrl,
+			active: selectedSkin.assetId === asset.id,
+			onActivate: () => onActivateSkin({ assetId: asset.id, url: asset.fileUrl, name: asset.name }),
+		}));
+	});
+
+	if (skinLoading) {
+		skinGrid.appendChild(createElement("div", "vp-skin-empty", "Cargando..."));
+	} else if (!skinAssets.length) {
+		skinGrid.appendChild(createElement("div", "vp-skin-empty", "Sube una skin PNG 64x64."));
+	}
+
+	const fileInput = document.createElement("input");
+	fileInput.type = "file";
+	fileInput.accept = "image/png";
+	fileInput.style.display = "none";
+	fileInput.onchange = () => {
+		const file = fileInput.files?.[0];
+		if (!file) return;
+		onUploadSkin(file);
+		fileInput.value = "";
+	};
+
+	const uploadButton = prependIcon(createButton("vp-primary-btn vp-icon-btn vp-skin-upload-btn", skinLoading ? "Subiendo..." : "Subir tu skin", () => fileInput.click()), "mdi:cloud-upload");
+	(uploadButton as HTMLButtonElement).disabled = skinLoading;
+
+	libraryPanel.appendChild(skinGrid);
+	libraryPanel.appendChild(fileInput);
+	libraryPanel.appendChild(uploadButton);
+	if (skinStatus) libraryPanel.appendChild(createElement("div", "vp-toast", skinStatus));
+
+	skinLayout.appendChild(previewPanel);
+	skinLayout.appendChild(libraryPanel);
+	section.appendChild(skinLayout);
 	return section;
+}
+
+function renderSkinTile(input: { id: string | null; name: string; url: string; active: boolean; onActivate: () => void }) {
+	const tile = createElement("button", `vp-skin-tile ${input.active ? "is-active" : ""}`) as HTMLButtonElement;
+	tile.type = "button";
+	tile.title = input.name;
+	tile.onclick = input.onActivate;
+	const preview = createElement("span", "vp-skin-tile-preview");
+	preview.style.backgroundImage = `url("${input.url}")`;
+	tile.appendChild(preview);
+	if (input.active) tile.appendChild(createElement("span", "vp-skin-active", "Activa"));
+	return tile;
+}
+
+class SkinPreviewController {
+	private renderer: THREE.WebGLRenderer;
+	private scene: THREE.Scene;
+	private camera: THREE.PerspectiveCamera;
+	private model: THREE.Group;
+	private animationFrame = 0;
+	private yaw = 0.45;
+	private zoom = 4.1;
+	private disposed = false;
+	private resizeObserver: ResizeObserver;
+	private rotateHandler: EventListener;
+	private zoomHandler: EventListener;
+
+	constructor(private mount: HTMLElement, skinUrl: string) {
+		this.scene = new THREE.Scene();
+		this.camera = new THREE.PerspectiveCamera(36, 1, 0.1, 100);
+		this.camera.position.set(0, 1.25, this.zoom);
+
+		this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+		this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+		this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+		this.renderer.domElement.className = "vp-skin-canvas";
+		this.mount.appendChild(this.renderer.domElement);
+
+		const ambient = new THREE.HemisphereLight(0xffffff, 0x1b2440, 2.1);
+		const key = new THREE.DirectionalLight(0xffffff, 2.4);
+		key.position.set(2.2, 3.4, 4);
+		this.scene.add(ambient, key);
+
+		this.model = this.createModel(skinUrl);
+		this.model.rotation.y = this.yaw;
+		this.scene.add(this.model);
+
+		this.rotateHandler = (event) => {
+			this.yaw += Number((event as CustomEvent<number>).detail || 0);
+			this.model.rotation.y = this.yaw;
+			this.renderFrame();
+		};
+		this.zoomHandler = (event) => {
+			this.zoom = THREE.MathUtils.clamp(this.zoom + Number((event as CustomEvent<number>).detail || 0), 2.7, 5.5);
+			this.camera.position.z = this.zoom;
+			this.renderFrame();
+		};
+		this.mount.addEventListener("skin-rotate", this.rotateHandler);
+		this.mount.addEventListener("skin-zoom", this.zoomHandler);
+
+		this.resizeObserver = new ResizeObserver(() => this.resize());
+		this.resizeObserver.observe(this.mount);
+		this.resize();
+		this.animate();
+	}
+
+	dispose() {
+		if (this.disposed) return;
+		this.disposed = true;
+		cancelAnimationFrame(this.animationFrame);
+		this.resizeObserver.disconnect();
+		this.mount.removeEventListener("skin-rotate", this.rotateHandler);
+		this.mount.removeEventListener("skin-zoom", this.zoomHandler);
+		this.model.traverse((child: any) => {
+			if (child.geometry) child.geometry.dispose();
+			if (child.material) {
+				const materials = Array.isArray(child.material) ? child.material : [child.material];
+				materials.forEach((material: THREE.Material & { map?: THREE.Texture }) => {
+					material.map?.dispose();
+					material.dispose();
+				});
+			}
+		});
+		this.renderer.dispose();
+		this.renderer.domElement.remove();
+	}
+
+	private resize() {
+		const rect = this.mount.getBoundingClientRect();
+		const width = Math.max(180, Math.floor(rect.width));
+		const height = Math.max(260, Math.floor(rect.height));
+		this.camera.aspect = width / height;
+		this.camera.updateProjectionMatrix();
+		this.renderer.setSize(width, height, false);
+		this.renderFrame();
+	}
+
+	private animate = () => {
+		if (this.disposed) return;
+		this.model.rotation.y += 0.003;
+		this.yaw = this.model.rotation.y;
+		this.renderFrame();
+		this.animationFrame = requestAnimationFrame(this.animate);
+	};
+
+	private renderFrame() {
+		this.camera.lookAt(0, 0.95, 0);
+		this.renderer.render(this.scene, this.camera);
+	}
+
+	private createModel(skinUrl: string) {
+		const group = new THREE.Group();
+		group.position.y = -0.1;
+
+		const texture = new THREE.TextureLoader().load(skinUrl);
+		texture.magFilter = THREE.NearestFilter;
+		texture.minFilter = THREE.NearestFilter;
+		texture.colorSpace = THREE.SRGBColorSpace;
+
+		const material = new THREE.MeshStandardMaterial({
+			map: texture,
+			roughness: 0.92,
+			metalness: 0,
+			transparent: true,
+			alphaTest: 0.5,
+			side: THREE.DoubleSide,
+		});
+
+		const pixel = 0.055;
+		const addPart = (name: string, w: number, h: number, d: number, u: number, v: number, x: number, y: number, z: number) => {
+			const mesh = new THREE.Mesh(createSkinBoxGeometry(w, h, d, u, v), material);
+			mesh.name = name;
+			mesh.scale.set(pixel, pixel, pixel);
+			mesh.position.set(x, y, z);
+			group.add(mesh);
+			return mesh;
+		};
+
+		addPart("head", 8, 8, 8, 0, 0, 0, 1.88, 0);
+		addPart("body", 8, 12, 4, 16, 16, 0, 1.32, 0);
+		addPart("rightArm", 4, 12, 4, 40, 16, 0.34, 1.32, 0);
+		addPart("leftArm", 4, 12, 4, 32, 48, -0.34, 1.32, 0);
+		addPart("rightLeg", 4, 12, 4, 0, 16, 0.12, 0.66, 0);
+		addPart("leftLeg", 4, 12, 4, 16, 48, -0.12, 0.66, 0);
+		return group;
+	}
+}
+
+function createSkinBoxGeometry(w: number, h: number, d: number, u: number, v: number) {
+	const geometry = new THREE.BoxGeometry(w, h, d);
+	const width = 64;
+	const height = 64;
+
+	const mapUV = (x: number, y: number, w1: number, h1: number) => {
+		const u1 = x / width;
+		const v1 = 1 - (y + h1) / height;
+		const u2 = (x + w1) / width;
+		const v2 = 1 - y / height;
+		return [
+			new THREE.Vector2(u2, v1),
+			new THREE.Vector2(u2, v2),
+			new THREE.Vector2(u1, v2),
+			new THREE.Vector2(u1, v1),
+		];
+	};
+
+	const order = [
+		mapUV(u, v + d, d, h),
+		mapUV(u + d + w, v + d, d, h),
+		mapUV(u + d, v, w, d),
+		mapUV(u + d + w, v, w, d),
+		mapUV(u + d, v + d, w, h),
+		mapUV(u + d + w + d, v + d, w, h),
+	];
+	const uvAttribute = geometry.attributes.uv;
+
+	for (let i = 0; i < 6; i += 1) {
+		const faceUVs = order[i];
+		uvAttribute.setXY(i * 4 + 0, faceUVs[2].x, faceUVs[2].y);
+		uvAttribute.setXY(i * 4 + 1, faceUVs[1].x, faceUVs[1].y);
+		uvAttribute.setXY(i * 4 + 2, faceUVs[3].x, faceUVs[3].y);
+		uvAttribute.setXY(i * 4 + 3, faceUVs[0].x, faceUVs[0].y);
+	}
+
+	geometry.attributes.uv.needsUpdate = true;
+	return geometry;
 }
 
 function renderSettingsView() {

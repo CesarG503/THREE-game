@@ -1,4 +1,5 @@
-const DEFAULT_POLYGON_SKIN_URL = "https://raw.githubusercontent.com/InventivetalentDev/minecraft-assets/1.19.3/assets/minecraft/textures/entity/player/wide/steve.png";
+import { DEFAULT_POLYGON_SKIN_URL, getSelectedSkin } from "../platform/skinPreferences";
+import { getStoredAuth } from "../platform/auth";
 
 export class PlayerConfigManager {
     game: any;
@@ -393,7 +394,10 @@ export class PlayerConfigManager {
             }
         }
 
-        const skinUrl = profile.skinUrl || DEFAULT_POLYGON_SKIN_URL;
+        const selectedSkin = getSelectedSkin(getStoredAuth());
+        const skinUrl = profile.skinUrl && profile.skinUrl !== DEFAULT_POLYGON_SKIN_URL
+            ? profile.skinUrl
+            : selectedSkin.url;
         if (character.polygonModelSkin && character.polygonModelSkin.setSkinUrl) {
             character.polygonModelSkin.setSkinUrl(skinUrl);
         }

@@ -51,6 +51,7 @@ export class BlasterSystem {
     if (this.particlePool.length > 0) {
       const mesh = this.particlePool.pop();
       mesh.visible = true;
+      mesh.material.opacity = 0.8;
       return mesh;
     }
 
@@ -101,5 +102,30 @@ export class BlasterSystem {
     if (p.Colours && p.Colours.length >= 2) {
       p.mesh.material.color.lerpColors(p.Colours[1], p.Colours[0], lifeRatio);
     }
+  }
+
+  Destroy() {
+    for (const p of this.liveParticles_) {
+      if (p.mesh) p.mesh.visible = false;
+    }
+
+    for (const mesh of this.particlePool) {
+      mesh.visible = false;
+    }
+
+    this.liveParticles_ = [];
+    this.particlePool = [];
+
+    if (this.meshGroup.parent) {
+      this.meshGroup.parent.remove(this.meshGroup);
+    }
+
+    this.meshGroup.traverse((child: any) => {
+      if (child.geometry && child.geometry !== this.geometry) child.geometry.dispose?.();
+      if (child.material && child.material !== this.material) child.material.dispose?.();
+    });
+
+    this.geometry.dispose();
+    this.material.dispose();
   }
 }

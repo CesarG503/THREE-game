@@ -120,7 +120,7 @@ export function handleRemoteShoot(this: any, startPos: any, direction: any, type
 	proj.blasterSystem = blaster;
 	proj.particleSystem = this.character ? this.character.particleSystem : null;
 	proj.initialTracer = tempTracer;
-	proj.isRemoteBlaster = true;
+	proj.isRemoteBlaster = false;
 	proj.tracerDestroyOnCollision = tracerDestroyOnCollision;
 	proj.tracerStayForever = tracerStayForever;
 	proj.tracerCollisionVFX = tracerCollisionVFX;

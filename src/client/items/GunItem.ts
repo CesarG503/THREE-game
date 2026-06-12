@@ -412,15 +412,18 @@ export class GunItem extends Item {
       const tracerSpeed = projType === "bullet" ? speed * 3.0 : speed;
       const tracerLength = THREE.MathUtils.clamp(Math.max(tracerSpeed, 0) * 0.05, 0.5, 10.0);
 
+      const shotBlasterSystem = (context as any).game?.fxBlasterSystem || this.blasterSystem;
+
       if ((projType === "bullet" || this.hasTracer) && context.scene) {
-        if (!this.blasterSystem) {
+        if (!shotBlasterSystem && !(context as any).game?.fxBlasterSystem) {
           this.blasterSystem = new BlasterSystem(context.scene);
         }
       }
 
       let tempTracer = null;
       if (projType === "bullet" && context.scene) {
-        const tracer = this.blasterSystem.CreateParticle();
+        const activeBlasterSystem = (context as any).game?.fxBlasterSystem || this.blasterSystem;
+        const tracer = activeBlasterSystem.CreateParticle();
         tracer.Start.copy(startPos);
 
         tracer.End = trajectoryDir.clone().multiplyScalar(tracerLength).add(startPos);
@@ -454,7 +457,7 @@ export class GunItem extends Item {
       proj.tracerDestroyOnCollision = this.tracerDestroyOnCollision;
       proj.tracerStayForever = this.tracerStayForever;
       proj.tracerCollisionVFX = this.tracerCollisionVFX;
-      proj.blasterSystem = this.blasterSystem;
+      proj.blasterSystem = (context as any).game?.fxBlasterSystem || this.blasterSystem;
       proj.particleSystem = context.particleSystem;
       proj.initialTracer = tempTracer;
       context.registerProjectile(proj);

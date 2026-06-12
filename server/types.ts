@@ -25,6 +25,8 @@ export interface PlayerState {
   modelType: "skin" | "glb" | "polygon"
   skinUrl?: string | null
   skinAssetId?: string | null
+  roleId?: string | null
+  roleVisual?: Record<string, unknown> | null
   isMoving: boolean
   isCrouching: boolean
   isAttacking: boolean

@@ -41,6 +41,7 @@ export class RemotePlayer {
     attackEndTime: number;
     weaponsCache: any;
     particleSystem: any;
+    localRoleId: any;
 
     constructor(scene: any, world: any, playerId: any, playerName: any, position: any = new THREE.Vector3(0, 0, 0)) {
         this.scene = scene;
@@ -83,6 +84,7 @@ export class RemotePlayer {
         this.rigidBody = null;
         this.attackEndTime = 0;
         this.weaponsCache = null;
+        this.localRoleId = null;
 
         this.initPhysics();
         this.createLabel();
@@ -196,6 +198,11 @@ export class RemotePlayer {
 
         if (state.skinUrl && this.polygonModelSkin && this.polygonModelSkin.setSkinUrl) {
             this.polygonModelSkin.setSkinUrl(state.skinUrl);
+        }
+
+        if (this.polygonModelSkin && this.polygonModelSkin.setRoleVisual) {
+            const sameRole = Boolean(this.localRoleId && state.roleId && this.localRoleId === state.roleId);
+            this.polygonModelSkin.setRoleVisual(selectRoleVisualForViewer(state.roleVisual, sameRole));
         }
 
         if (state.playerCollision !== oldPlayerCollision) {
@@ -378,4 +385,14 @@ export class RemotePlayer {
     getCollider() {
         return this.collider;
     }
+}
+
+function selectRoleVisualForViewer(roleVisual: any, sameRole: boolean) {
+    if (!roleVisual || typeof roleVisual !== "object") {
+        return { type: "none" };
+    }
+    if (roleVisual.sameRole || roleVisual.otherRole) {
+        return sameRole ? (roleVisual.sameRole || { type: "none" }) : (roleVisual.otherRole || { type: "none" });
+    }
+    return roleVisual;
 }

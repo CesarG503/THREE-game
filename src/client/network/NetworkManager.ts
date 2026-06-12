@@ -31,6 +31,7 @@ export class NetworkManager {
     onGroundItemsSync: any;
     particleSystem: any;
     reconnectEnabled: boolean;
+    localRoleId: any;
 
     constructor(scene: any, world: any, roomId: any, onConnected?: any) {
         this.scene = scene;
@@ -65,6 +66,7 @@ export class NetworkManager {
         this.onPlayerAction = null;
         this.onGroundItemsSync = null;
         this.reconnectEnabled = false;
+        this.localRoleId = null;
     }
 
     connect(serverUrl: string) {
@@ -271,6 +273,7 @@ export class NetworkManager {
         );
 
         const remotePlayer = new RemotePlayer(this.scene, this.world, playerId, playerName, spawnPosition);
+        remotePlayer.localRoleId = this.localRoleId;
         if (this.particleSystem) {
             remotePlayer.particleSystem = this.particleSystem;
         }
@@ -298,6 +301,7 @@ export class NetworkManager {
         }
 
         if (player) {
+            player.localRoleId = this.localRoleId;
             player.setTargetPosition(position.x, position.y, position.z);
             player.setRotation(rotation);
             if (state) {

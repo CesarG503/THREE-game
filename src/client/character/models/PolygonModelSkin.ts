@@ -36,6 +36,9 @@ export class PolygonModelSkin implements ICharacterModel {
   airTime: number;
   backItemMesh: THREE.Object3D | null;
   isSuperman: boolean;
+  roleVisualGroup: THREE.Group | null;
+  roleOutlineMeshes: THREE.Mesh[];
+  roleVisual: any;
 
   constructor(scene: THREE.Scene, isLocal = true) {
     this.scene = scene;
@@ -43,6 +46,9 @@ export class PolygonModelSkin implements ICharacterModel {
     this.model = null;
     this.isVisible = false;
     this.isSuperman = false;
+    this.roleVisualGroup = null;
+    this.roleOutlineMeshes = [];
+    this.roleVisual = { type: "none", color: "#ffffff", aura: "soft" };
 
     // Body Parts
     this.head = null;
@@ -239,13 +245,129 @@ export class PolygonModelSkin implements ICharacterModel {
       texture.colorSpace = THREE.SRGBColorSpace;
 
       this.model?.traverse((child: any) => {
-        if (!child.isMesh || !child.material) return;
+        if (!child.isMesh || !child.material || child.userData?.isRoleOutline || child.userData?.isRoleVisual) return;
         const materials = Array.isArray(child.material) ? child.material : [child.material];
         materials.forEach((material: any) => {
           material.map = texture;
           material.needsUpdate = true;
         });
       });
+    });
+  }
+
+  setRoleVisual(visual: any) {
+    this.roleVisual = normalizeRoleVisual(visual);
+    if (!this.model) return;
+
+    this.clearRoleVisual();
+
+    if (this.roleVisual.type === "none") return;
+
+    const color = new THREE.Color(this.roleVisual.color);
+    const group = new THREE.Group();
+    group.name = "roleVisual";
+    group.userData.isRoleVisual = true;
+
+    if (this.roleVisual.type === "outline") {
+      this.addRoleOutline(color);
+      return;
+    }
+
+    if (this.roleVisual.type === "color" || this.roleVisual.type === "color_aura") {
+      const bandMaterial = new THREE.MeshBasicMaterial({
+        color,
+        transparent: true,
+        opacity: 0.82,
+        depthWrite: false,
+      });
+      const chestBand = new THREE.Mesh(new THREE.TorusGeometry(0.34, 0.018, 8, 48), bandMaterial);
+      chestBand.position.y = 1.02;
+      chestBand.rotation.x = Math.PI / 2;
+      group.add(chestBand);
+
+      const marker = new THREE.Mesh(new THREE.SphereGeometry(0.055, 12, 12), bandMaterial.clone());
+      marker.position.set(0, 1.95, 0.03);
+      group.add(marker);
+    }
+
+    if (this.roleVisual.type === "aura" || this.roleVisual.type === "color_aura") {
+      const auraMaterial = new THREE.MeshBasicMaterial({
+        color,
+        transparent: true,
+        opacity: this.roleVisual.aura === "ring" ? 0.78 : 0.35,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+      });
+      const aura = new THREE.Mesh(new THREE.TorusGeometry(0.58, this.roleVisual.aura === "ring" ? 0.028 : 0.045, 16, 72), auraMaterial);
+      aura.name = "roleAura";
+      aura.position.y = 0.08;
+      aura.rotation.x = Math.PI / 2;
+      group.add(aura);
+
+      if (this.roleVisual.aura !== "ring") {
+        const halo = new THREE.Mesh(new THREE.TorusGeometry(0.44, 0.015, 12, 60), auraMaterial.clone());
+        halo.name = "roleHalo";
+        halo.position.y = 2.12;
+        halo.rotation.x = Math.PI / 2;
+        group.add(halo);
+      }
+    }
+
+    this.roleVisualGroup = group;
+    group.traverse((child: any) => {
+      child.userData.isRoleVisual = true;
+    });
+    this.model.add(group);
+  }
+
+  clearRoleVisual() {
+    this.roleOutlineMeshes.forEach((outline) => {
+      if (outline.parent) outline.parent.remove(outline);
+      const materials = Array.isArray(outline.material) ? outline.material : [outline.material];
+      materials.forEach((material: any) => material?.dispose?.());
+    });
+    this.roleOutlineMeshes = [];
+
+    if (this.roleVisualGroup && this.model) {
+      this.model.remove(this.roleVisualGroup);
+      this.roleVisualGroup.traverse((child: any) => {
+        if (child.geometry) child.geometry.dispose();
+        if (child.material) {
+          const materials = Array.isArray(child.material) ? child.material : [child.material];
+          materials.forEach((material: any) => material?.dispose?.());
+        }
+      });
+      this.roleVisualGroup = null;
+    }
+  }
+
+  addRoleOutline(color: THREE.Color) {
+    if (!this.model) return;
+
+    const targetMeshes: THREE.Mesh[] = [];
+    this.model.traverse((child: any) => {
+      if (!child.isMesh || !child.geometry || child.userData?.isRoleOutline || child.userData?.isRoleVisual) return;
+      targetMeshes.push(child);
+    });
+
+    targetMeshes.forEach((mesh: any) => {
+      const outlineMaterial = new THREE.MeshBasicMaterial({
+        color,
+        side: THREE.BackSide,
+        transparent: true,
+        opacity: 0.58,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+      });
+      const outline = new THREE.Mesh(mesh.geometry, outlineMaterial);
+      outline.name = "roleOutline";
+      outline.userData.isRoleOutline = true;
+      outline.renderOrder = 2;
+      outline.position.set(0, 0, 0);
+      outline.rotation.set(0, 0, 0);
+      outline.scale.set(1.055, 1.055, 1.055);
+      mesh.add(outline);
+      this.roleOutlineMeshes.push(outline);
     });
   }
 
@@ -414,6 +536,16 @@ export class PolygonModelSkin implements ICharacterModel {
   update(dt: number, isMoving: boolean, isCrouching = false, isAttacking = false, isGrounded = true, verticalVelocity = 0, isSuperman = false, noPitchTilt = false) {
     this.isSuperman = isSuperman;
     if (!this.model || !this.isVisible) return;
+    if (this.roleVisualGroup) {
+      const aura = this.roleVisualGroup.getObjectByName("roleAura");
+      const halo = this.roleVisualGroup.getObjectByName("roleHalo");
+      if (aura) {
+        aura.rotation.z += dt * 1.6;
+        const pulse = this.roleVisual.aura === "pulse" ? 1 + Math.sin(Date.now() / 180) * 0.08 : 1;
+        aura.scale.setScalar(pulse);
+      }
+      if (halo) halo.rotation.z -= dt * 1.2;
+    }
     if (
       !this.headGroup ||
       !this.body ||
@@ -736,4 +868,13 @@ export class PolygonModelSkin implements ICharacterModel {
       }
     }
   }
+}
+
+function normalizeRoleVisual(visual: any) {
+  const value = visual && typeof visual === "object" ? visual : {};
+  return {
+    type: ["none", "color", "aura", "color_aura", "outline"].includes(value.type) ? value.type : "none",
+    color: typeof value.color === "string" ? value.color : "#ffffff",
+    aura: ["soft", "pulse", "ring"].includes(value.aura) ? value.aura : "soft",
+  };
 }

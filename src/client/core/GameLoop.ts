@@ -292,7 +292,9 @@ export function animate(this: any) {
 			const playerState = {
 				modelType: this.character.currentType || "skin",
 				skinUrl: this.character.polygonModelSkin ? this.character.polygonModelSkin.skinUrl : null,
-				skinAssetId: this.playerConfigManager?.getCurrentProfile?.()?.skinAssetId || null,
+				skinAssetId: this.character.activeSkinAssetId || null,
+				roleId: this.character.activeRoleId || null,
+				roleVisual: this.character.roleVisual || null,
 				isMoving: isMoving,
 				isCrouching: isCrouching,
 				isAttacking: sendAttacking,
@@ -309,6 +311,8 @@ export function animate(this: any) {
 				noPitchTilt: this.character.noPitchTilt !== undefined ? this.character.noPitchTilt : false,
 				isUsingJetpack: this.character.isUsingJetpack !== undefined ? this.character.isUsingJetpack : false
 			};
+
+			this.networkManager.localRoleId = playerState.roleId;
 
 			const updateSent = this.networkManager.sendPlayerUpdate(
 				this.character.getPosition(),

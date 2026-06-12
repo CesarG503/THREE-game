@@ -1,6 +1,12 @@
 import { DEFAULT_POLYGON_SKIN_URL, getSelectedSkin } from "../platform/skinPreferences";
 import { getStoredAuth } from "../platform/auth";
 
+const DEFAULT_VISUAL_RULE = {
+    type: "none",
+    color: "#ffffff",
+    aura: "soft"
+};
+
 export class PlayerConfigManager {
     game: any;
     profiles: any[];
@@ -23,8 +29,10 @@ export class PlayerConfigManager {
                 jumpAnimationType: "none",
                 fallAnimationType: "none",
                 playerCollision: "push",
+                skinMode: "player",
                 skinUrl: DEFAULT_POLYGON_SKIN_URL,
                 skinAssetId: null,
+                roleVisual: createRoleVisual(),
                 statModes: {},
                 hudSettings: {
                     showHealth: true,
@@ -104,8 +112,10 @@ export class PlayerConfigManager {
                 jumpAnimationType: "none",
                 fallAnimationType: "none",
                 playerCollision: "push",
+                skinMode: "player",
                 skinUrl: DEFAULT_POLYGON_SKIN_URL,
                 skinAssetId: null,
+                roleVisual: createRoleVisual(),
                 statModes: {},
                 hudSettings: {
                     showHealth: true,
@@ -209,8 +219,13 @@ export class PlayerConfigManager {
             jumpAnimationType: "none",
             fallAnimationType: "none",
             playerCollision: "push",
+            skinMode: "player",
             skinUrl: DEFAULT_POLYGON_SKIN_URL,
             skinAssetId: null,
+            roleVisual: createRoleVisual(undefined, {
+                ...DEFAULT_VISUAL_RULE,
+                color: "#" + Math.floor(Math.random() * 16777215).toString(16).padStart(6, "0")
+            }),
             statModes: {},
             hudSettings: {
                 showHealth: true,
@@ -395,11 +410,18 @@ export class PlayerConfigManager {
         }
 
         const selectedSkin = getSelectedSkin(getStoredAuth());
-        const skinUrl = profile.skinUrl && profile.skinUrl !== DEFAULT_POLYGON_SKIN_URL
-            ? profile.skinUrl
-            : selectedSkin.url;
+        const useRoleSkin = profile.skinMode === "role";
+        const skinUrl = useRoleSkin ? (profile.skinUrl || DEFAULT_POLYGON_SKIN_URL) : selectedSkin.url;
+        character.activeSkinAssetId = useRoleSkin ? (profile.skinAssetId || null) : (selectedSkin.assetId || null);
+        character.activeRoleId = profile.id;
+        character.activeRoleName = profile.name;
         if (character.polygonModelSkin && character.polygonModelSkin.setSkinUrl) {
             character.polygonModelSkin.setSkinUrl(skinUrl);
+        }
+
+        character.roleVisual = normalizeRoleVisual(profile.roleVisual);
+        if (character.polygonModelSkin && character.polygonModelSkin.setRoleVisual) {
+            character.polygonModelSkin.setRoleVisual(character.roleVisual.sameRole);
         }
     }
 
@@ -414,8 +436,10 @@ export class PlayerConfigManager {
         if (!data) return;
         if (data.profiles) {
             this.profiles = data.profiles.map((profile: any) => ({
+                skinMode: "player",
                 skinUrl: DEFAULT_POLYGON_SKIN_URL,
                 skinAssetId: null,
+                roleVisual: createRoleVisual(),
                 ...profile
             }));
         }
@@ -428,4 +452,35 @@ export class PlayerConfigManager {
             this.game.networkManager.sendPlayerConfigUpdate(this.saveData());
         }
     }
+}
+
+function normalizeRoleVisual(value: any) {
+    const visual = value && typeof value === "object" ? value : {};
+    if (visual.sameRole || visual.otherRole) {
+        return {
+            sameRole: normalizeVisualRule(visual.sameRole),
+            otherRole: normalizeVisualRule(visual.otherRole)
+        };
+    }
+    const legacy = normalizeVisualRule(visual);
+    return {
+        sameRole: { ...legacy },
+        otherRole: { ...legacy }
+    };
+}
+
+function normalizeVisualRule(value: any) {
+    const visual = value && typeof value === "object" ? value : {};
+    return {
+        type: ["none", "color", "aura", "color_aura", "outline"].includes(visual.type) ? visual.type : "none",
+        color: typeof visual.color === "string" ? visual.color : "#ffffff",
+        aura: ["soft", "pulse", "ring"].includes(visual.aura) ? visual.aura : "soft"
+    };
+}
+
+function createRoleVisual(sameRole?: any, otherRole?: any) {
+    return {
+        sameRole: normalizeVisualRule(sameRole || DEFAULT_VISUAL_RULE),
+        otherRole: normalizeVisualRule(otherRole || DEFAULT_VISUAL_RULE)
+    };
 }

@@ -11,6 +11,7 @@ export class PlayerConfigPanel {
         this.manager = manager;
         this.container = null;
         this.selectedProfileId = 'default';
+        this.activeRoleVisualTab = 'sameRole';
         this.hudPanel = new HUDConfigPanel(game, manager, () => {
             // Optional callback on close
         });
@@ -538,8 +539,33 @@ export class PlayerConfigPanel {
         skinHeader.style.cssText = "color:#aaa; border-bottom:1px solid #444;";
         extraCol.appendChild(skinHeader);
 
+        const skinModeWrap = document.createElement('div');
+        skinModeWrap.style.cssText = "display:flex; flex-direction:column; gap:5px; margin-bottom:10px;";
+        const skinModeLabel = document.createElement('label');
+        skinModeLabel.textContent = "Skin para este rol";
+        skinModeLabel.style.cssText = "color:#ddd; font-size:13px;";
+        const skinModeSelect = document.createElement('select');
+        skinModeSelect.style.cssText = "background:#333; color:white; padding:7px; border:1px solid #555; border-radius:4px; width:100%;";
+        [
+            { v: "player", t: "Usar skin del jugador" },
+            { v: "role", t: "Colocar una skin para este rol" }
+        ].forEach(opt => {
+            const o = document.createElement('option');
+            o.value = opt.v;
+            o.textContent = opt.t;
+            if ((profile.skinMode || "player") === opt.v) o.selected = true;
+            skinModeSelect.appendChild(o);
+        });
+        skinModeSelect.onchange = (e) => {
+            this.manager.updateProfile(profile.id, { skinMode: e.target.value });
+            this.render();
+        };
+        skinModeWrap.appendChild(skinModeLabel);
+        skinModeWrap.appendChild(skinModeSelect);
+        extraCol.appendChild(skinModeWrap);
+
         const skinBox = document.createElement('div');
-        skinBox.style.cssText = "display:flex; gap:10px; align-items:center; margin-bottom:15px;";
+        skinBox.style.cssText = `display:${(profile.skinMode || "player") === "role" ? "flex" : "none"}; gap:10px; align-items:center; margin-bottom:15px;`;
 
         const skinPreview = document.createElement('div');
         skinPreview.style.cssText = `
@@ -605,6 +631,122 @@ export class PlayerConfigPanel {
         skinBox.appendChild(skinPreview);
         skinBox.appendChild(skinActions);
         extraCol.appendChild(skinBox);
+
+        const roleVisual = normalizeRoleVisualConfig(profile.roleVisual, profile.color);
+        const activeVisualTab = this.activeRoleVisualTab || "sameRole";
+        const visual = roleVisual[activeVisualTab] || roleVisual.sameRole;
+        const updateVisual = (patch) => {
+            const nextRule = normalizeVisualRule({ ...visual, ...patch }, profile.color);
+            this.manager.updateProfile(profile.id, {
+                roleVisual: {
+                    ...roleVisual,
+                    [activeVisualTab]: nextRule
+                }
+            });
+            this.render();
+        };
+
+        const visualHeader = document.createElement('h4');
+        visualHeader.textContent = "Diferenciador de Rol / Equipo";
+        visualHeader.style.cssText = "color:#aaa; border-bottom:1px solid #444; margin-top:18px;";
+        extraCol.appendChild(visualHeader);
+
+        const visualBox = document.createElement('div');
+        visualBox.style.cssText = "display:flex; flex-direction:column; gap:10px; margin-bottom:15px;";
+
+        const visualTabs = document.createElement('div');
+        visualTabs.style.cssText = "display:grid; grid-template-columns:1fr 1fr; gap:6px;";
+        [
+            { id: "sameRole", label: "Mismo rol / equipo" },
+            { id: "otherRole", label: "Otros roles / equipos" }
+        ].forEach(tabInfo => {
+            const tabButton = document.createElement('button');
+            tabButton.type = "button";
+            tabButton.textContent = tabInfo.label;
+            const active = activeVisualTab === tabInfo.id;
+            tabButton.style.cssText = `
+                background:${active ? "#31505f" : "#222"};
+                color:${active ? "#e9fbff" : "#bbb"};
+                border:1px solid ${active ? "#63d9ff" : "#555"};
+                padding:8px 6px; border-radius:4px; cursor:pointer;
+                font-size:12px; font-weight:${active ? "700" : "500"};
+            `;
+            tabButton.onclick = () => {
+                this.activeRoleVisualTab = tabInfo.id;
+                this.render();
+            };
+            visualTabs.appendChild(tabButton);
+        });
+        visualBox.appendChild(visualTabs);
+
+        const visualSelect = document.createElement('select');
+        visualSelect.style.cssText = "background:#333; color:white; padding:7px; border:1px solid #555; border-radius:4px; width:100%;";
+        [
+            { v: "none", t: "Sin diferenciacion" },
+            { v: "color", t: "Marca de color" },
+            { v: "aura", t: "Aura visible" },
+            { v: "color_aura", t: "Color + aura" },
+            { v: "outline", t: "Borde de jugador" }
+        ].forEach(opt => {
+            const o = document.createElement('option');
+            o.value = opt.v;
+            o.textContent = opt.t;
+            if (visual.type === opt.v) o.selected = true;
+            visualSelect.appendChild(o);
+        });
+        visualSelect.onchange = (e) => updateVisual({ type: e.target.value });
+        visualBox.appendChild(visualSelect);
+
+        const colorRow = document.createElement('div');
+        colorRow.style.cssText = "display:grid; grid-template-columns:52px 1fr; gap:8px; align-items:center;";
+
+        const colorPicker = document.createElement('input');
+        colorPicker.type = "color";
+        colorPicker.value = normalizeColorValue(visual.color || profile.color || "#ffffff");
+        colorPicker.title = "Color del diferenciador";
+        colorPicker.style.cssText = "width:52px; height:36px; padding:2px; border:1px solid #555; border-radius:4px; background:#222; cursor:pointer;";
+        colorPicker.onchange = (e) => updateVisual({
+            color: e.target.value,
+            type: visual.type === "none" ? "color" : visual.type
+        });
+
+        const colorLabel = document.createElement('div');
+        colorLabel.textContent = activeVisualTab === "sameRole"
+            ? "Color que vera tu mismo rol/equipo"
+            : "Color que veran otros roles/equipos";
+        colorLabel.style.cssText = "color:#bbb; font-size:12px; line-height:1.35;";
+
+        colorRow.appendChild(colorPicker);
+        colorRow.appendChild(colorLabel);
+        visualBox.appendChild(colorRow);
+
+        const auraSelect = document.createElement('select');
+        auraSelect.style.cssText = `display:${["aura", "color_aura"].includes(visual.type) ? "block" : "none"}; background:#333; color:white; padding:7px; border:1px solid #555; border-radius:4px; width:100%;`;
+        [
+            { v: "soft", t: "Aura suave" },
+            { v: "pulse", t: "Aura pulsante" },
+            { v: "ring", t: "Anillo de equipo" }
+        ].forEach(opt => {
+            const o = document.createElement('option');
+            o.value = opt.v;
+            o.textContent = opt.t;
+            if (visual.aura === opt.v) o.selected = true;
+            auraSelect.appendChild(o);
+        });
+        auraSelect.onchange = (e) => updateVisual({
+            aura: e.target.value,
+            type: visual.type === "none" ? "aura" : visual.type
+        });
+        visualBox.appendChild(auraSelect);
+
+        if (visual.type === "outline") {
+            const outlineHint = document.createElement('div');
+            outlineHint.textContent = "Borde neon sutil en el contorno del jugador Polygon Skin.";
+            outlineHint.style.cssText = "color:#9fdff0; font-size:12px; line-height:1.35; background:#10242c; border:1px solid #235064; border-radius:4px; padding:8px;";
+            visualBox.appendChild(outlineHint);
+        }
+
+        extraCol.appendChild(visualBox);
 
         // --- ANIMATIONS SECTION ---
         const animHeader = document.createElement('h4');
@@ -887,4 +1029,36 @@ export class PlayerConfigPanel {
         render();
         container.appendChild(wrap);
     }
+}
+
+function normalizeRoleVisualConfig(value, fallbackColor = "#ffffff") {
+    const visual = value && typeof value === "object" ? value : {};
+    if (visual.sameRole || visual.otherRole) {
+        return {
+            sameRole: normalizeVisualRule(visual.sameRole, fallbackColor),
+            otherRole: normalizeVisualRule(visual.otherRole, fallbackColor)
+        };
+    }
+
+    const legacy = normalizeVisualRule(visual, fallbackColor);
+    return {
+        sameRole: { ...legacy },
+        otherRole: { ...legacy }
+    };
+}
+
+function normalizeVisualRule(value, fallbackColor = "#ffffff") {
+    const visual = value && typeof value === "object" ? value : {};
+    return {
+        type: ["none", "color", "aura", "color_aura", "outline"].includes(visual.type) ? visual.type : "none",
+        color: normalizeColorValue(visual.color || fallbackColor || "#ffffff"),
+        aura: ["soft", "pulse", "ring"].includes(visual.aura) ? visual.aura : "soft"
+    };
+}
+
+function normalizeColorValue(value) {
+    if (typeof value === "string" && /^#[0-9a-fA-F]{6}$/.test(value)) {
+        return value;
+    }
+    return "#ffffff";
 }

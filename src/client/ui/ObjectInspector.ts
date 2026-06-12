@@ -3,15 +3,17 @@
 import * as THREE from "three"
 import { StairsUtils } from "../utils/StairsUtils"
 import { LogicItemsManager } from "./logic_items/LogicItemsManager"
-import { uploadAsset } from "../platform/api"
+import { listAssets, uploadAsset } from "../platform/api"
 
 export class ObjectInspector {
     constructor(gameInstance) {
         this.game = gameInstance
         this.isVisible = false
         this.selectedObject = null
+        this.customTextureAssets = []
 
         this.setupUI()
+        void this.refreshCustomTextures()
     }
 
     setupUI() {
@@ -288,6 +290,16 @@ export class ObjectInspector {
             this.renderTextures(this.textureGrid)
             section.appendChild(this.textureGrid)
 
+            const uploadedLabel = document.createElement('div')
+            uploadedLabel.textContent = "Texturas subidas"
+            uploadedLabel.style.cssText = "font-size: 11px; color: #999; margin: 6px 0 5px;"
+            section.appendChild(uploadedLabel)
+
+            this.customTextureGrid = document.createElement('div')
+            this.customTextureGrid.style.cssText = `display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; margin-bottom: 10px; min-height: 32px;`
+            this.renderUploadedTextures(this.customTextureGrid)
+            section.appendChild(this.customTextureGrid)
+
             // Upload
             const uploadBtn = document.createElement('button')
             uploadBtn.textContent = "Cargar Textura..."
@@ -311,6 +323,8 @@ export class ObjectInspector {
                             metadata: { source: "object-inspector" }
                         })
                         this.updateTexture(asset.fileUrl, asset.id)
+                        this.customTextureAssets = [asset, ...(this.customTextureAssets || []).filter((item) => item.id !== asset.id)]
+                        this.renderUploadedTextures(this.customTextureGrid)
                         uploadBtn.textContent = "Textura cargada"
                     } catch (err) {
                         console.error("No se pudo subir la textura", err)
@@ -451,6 +465,41 @@ export class ObjectInspector {
             if (tex.path) t.style.backgroundImage = `url(${tex.path})`
 
             t.onclick = () => this.updateTexture(tex.path, null)
+            container.appendChild(t)
+        })
+    }
+
+    async refreshCustomTextures() {
+        try {
+            this.customTextureAssets = await listAssets("mine", "TEXTURE")
+        } catch (err) {
+            this.customTextureAssets = []
+            console.warn("No se pudieron cargar tus texturas", err)
+        }
+        this.renderUploadedTextures(this.customTextureGrid)
+    }
+
+    renderUploadedTextures(container) {
+        if (!container) return
+        container.innerHTML = ""
+        const assets = this.customTextureAssets || []
+        if (!assets.length) {
+            const empty = document.createElement('div')
+            empty.textContent = "Sin texturas subidas."
+            empty.style.cssText = "grid-column: 1 / -1; color: #777; font-size: 11px; padding: 6px 0;"
+            container.appendChild(empty)
+            return
+        }
+
+        assets.forEach(asset => {
+            const t = document.createElement('div')
+            t.title = asset.name
+            t.style.cssText = `
+                aspect-ratio: 1; border: 1px solid #444; cursor: pointer; border-radius: 4px;
+                background-image: url(${asset.fileUrl});
+                background-size: cover; background-position: center; image-rendering: pixelated;
+            `
+            t.onclick = () => this.updateTexture(asset.fileUrl, asset.id)
             container.appendChild(t)
         })
     }

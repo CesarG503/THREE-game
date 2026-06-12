@@ -12,7 +12,7 @@ import { AdvancedWeaponConfigPanel } from "./AdvancedWeaponConfigPanel";
 import { getActiveFarmingGroups } from "./GameHUD";
 import { JetpackItem } from "../items/JetpackItem";
 import { savePlatformMapForRoom } from "../platform/mapRuntime";
-import { uploadAsset } from "../platform/api";
+import { listAssets, uploadAsset } from "../platform/api";
 
 export class ConstructionMenu {
     constructor(inventoryManager, gameInstance) {
@@ -26,6 +26,7 @@ export class ConstructionMenu {
 
         // Data
         this.libraryItems = [];
+        this.customTextureAssets = [];
         this.generateLibrary();
         this.generateLogicLibrary();
 
@@ -36,6 +37,7 @@ export class ConstructionMenu {
         this.advancedWeaponConfigPanel = null;
 
         this.setupUI();
+        void this.refreshCustomTextures();
     }
 
     generateLibrary() {
@@ -1953,7 +1955,24 @@ export class ConstructionMenu {
             };
             textureGrid.appendChild(btn);
         });
+        this.editorTextureGrid = textureGrid;
         textureContainer.appendChild(textureGrid);
+
+        const customTextureTitle = document.createElement("span");
+        customTextureTitle.textContent = "Tus texturas subidas:";
+        customTextureTitle.style.cssText = "font-size: 12px; color: #aaa;";
+        textureContainer.appendChild(customTextureTitle);
+
+        const customTextureGrid = document.createElement("div");
+        customTextureGrid.style.cssText = `
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 5px;
+            min-height: 32px;
+        `;
+        this.customTextureGrid = customTextureGrid;
+        textureContainer.appendChild(customTextureGrid);
+        this.renderCustomTextureButtons();
 
         // Upload Button
         const uploadRow = document.createElement("div");
@@ -1977,6 +1996,8 @@ export class ConstructionMenu {
                         metadata: { source: "construction-menu" }
                     });
                     this.updateDraftTexture(asset.fileUrl, asset.id);
+                    this.customTextureAssets = [asset, ...(this.customTextureAssets || []).filter((item) => item.id !== asset.id)];
+                    this.renderCustomTextureButtons();
                     uploadBtn.textContent = "Textura Cargada";
                     uploadBtn.style.color = "#00FF00";
 
@@ -3546,6 +3567,7 @@ export class ConstructionMenu {
         const textures = [
             { name: "Fuego", val: "/assets/textures/fuego.png" },
             { name: "Pelota", val: "/assets/textures/pelota.png" },
+            ...(this.customTextureAssets || []).map((asset) => ({ name: asset.name, val: asset.fileUrl })),
             { name: "URL / Ruta Personalizada...", val: "__CUSTOM__" }
         ];
 
@@ -3627,6 +3649,55 @@ export class ConstructionMenu {
         if (!this.currentDraftItem) return;
         this.currentDraftItem.texturePath = texturePath;
         this.currentDraftItem.textureAssetId = textureAssetId;
+    }
+
+    async refreshCustomTextures() {
+        try {
+            this.customTextureAssets = await listAssets("mine", "TEXTURE");
+        } catch (err) {
+            this.customTextureAssets = [];
+            console.warn("No se pudieron cargar tus texturas", err);
+        }
+        this.renderCustomTextureButtons();
+    }
+
+    renderCustomTextureButtons() {
+        if (!this.customTextureGrid) return;
+        this.customTextureGrid.innerHTML = "";
+
+        const assets = this.customTextureAssets || [];
+        if (assets.length === 0) {
+            const empty = document.createElement("div");
+            empty.textContent = "Aun no has subido texturas.";
+            empty.style.cssText = "grid-column: 1 / -1; color: #777; font-size: 11px; padding: 6px 0;";
+            this.customTextureGrid.appendChild(empty);
+            return;
+        }
+
+        assets.forEach((asset) => {
+            const btn = document.createElement("div");
+            btn.className = "texture-btn custom-texture-btn";
+            btn.title = asset.name;
+            btn.style.cssText = `
+                width: 100%;
+                aspect-ratio: 1;
+                border: 1px solid #555;
+                border-radius: 4px;
+                cursor: pointer;
+                background-image: url(${asset.fileUrl});
+                background-size: cover;
+                background-position: center;
+                image-rendering: pixelated;
+                position: relative;
+            `;
+            btn.onclick = () => {
+                this.updateDraftTexture(asset.fileUrl, asset.id);
+                const allBtns = this.panelEditor.querySelectorAll(".texture-btn");
+                allBtns.forEach((candidate) => candidate.style.borderColor = "#555");
+                btn.style.borderColor = "#00FF00";
+            };
+            this.customTextureGrid.appendChild(btn);
+        });
     }
 
     updateDraftScale(axis, value) {

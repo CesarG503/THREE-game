@@ -18,6 +18,7 @@ export interface ICharacterModel {
     setJumpAnimationType?: (type: string) => void;
     setFallAnimationType?: (type: string) => void;
     setSkinUrl?: (url: string) => void;
+    setRoleVisual?: (visual: any) => void;
 }
 
 export interface CharacterStats {

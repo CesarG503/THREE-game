@@ -16,6 +16,8 @@ export class ScopeController {
   animation: ScopeAnimation;
   effects: ScopeEffects;
   input: ScopeInput;
+  forcedFirstPersonForScope: boolean;
+  scopeEntryWasFirstPerson: boolean;
 
   constructor(camera: THREE.Camera, game: any) {
     this.camera = camera;
@@ -28,6 +30,8 @@ export class ScopeController {
     this.animation = new ScopeAnimation(this.camera, this.ui);
     this.effects = new ScopeEffects(this.ui);
     this.input = new ScopeInput(this);
+    this.forcedFirstPersonForScope = false;
+    this.scopeEntryWasFirstPerson = false;
   }
 
   canHandleInput() {
@@ -57,6 +61,34 @@ export class ScopeController {
     this.ui.setOverlayVisible(selectedZoom > 1);
   }
 
+  private beginScopedCameraMode() {
+    const cameraController = this.game?.cameraController;
+    if (!cameraController) return;
+
+    this.scopeEntryWasFirstPerson = !!cameraController.isFirstPerson;
+    this.ensureScopedCameraMode();
+    this.forcedFirstPersonForScope = !this.scopeEntryWasFirstPerson;
+  }
+
+  private ensureScopedCameraMode() {
+    const cameraController = this.game?.cameraController;
+    if (!cameraController || cameraController.isFirstPerson) return;
+
+    cameraController.toggleCameraMode();
+  }
+
+  private restorePreviousCameraMode() {
+    if (!this.forcedFirstPersonForScope) return;
+
+    const cameraController = this.game?.cameraController;
+    if (cameraController?.isFirstPerson) {
+      cameraController.toggleCameraMode();
+    }
+
+    this.forcedFirstPersonForScope = false;
+    this.scopeEntryWasFirstPerson = false;
+  }
+
   onShoot() {
     if (!this.isAiming) return;
     const selectedZoom = this.allowedScopes[this.currentScopeIndex] ?? 1;
@@ -72,6 +104,7 @@ export class ScopeController {
 
     if (isAimingCommand && canAim) {
       if (!this.isAiming) {
+        this.beginScopedCameraMode();
         this.isAiming = true;
         this.allowedScopes = ScopeSettings.availableScopes.filter((scope) => scope <= maxScope);
         if (this.allowedScopes.length === 0) this.allowedScopes = [1];
@@ -82,12 +115,15 @@ export class ScopeController {
         this.ui.setZoomText(zoomValue);
         this.animation.animateEnter(this.getTargetFov(zoomValue), zoomValue);
         this.effects.startAmbientEffects();
+      } else {
+        this.ensureScopedCameraMode();
       }
     } else {
       if (this.isAiming) {
         this.isAiming = false;
         this.animation.animateExit();
         this.effects.stopAmbientEffects();
+        this.restorePreviousCameraMode();
       }
 
       if (isAimingCommand && currentWeapon && currentWeapon.type === "weapon" && maxScope <= 1) {
@@ -110,6 +146,7 @@ export class ScopeController {
   }
 
   destroy() {
+    this.restorePreviousCameraMode();
     this.ui.destroy();
     this.animation.destroy();
     this.effects.destroy();

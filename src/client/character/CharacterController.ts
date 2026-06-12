@@ -9,6 +9,9 @@ import type { CharacterStats, JumpConfig, FlightConfig, PlayerCollisionMode, Rem
 
 type LadderObject = THREE.Object3D & { bounds?: THREE.Box3 };
 
+const AIM_BODY_DEADZONE = Math.PI / 8;
+const AIM_BODY_TURN_SPEED = 15.0;
+
 export class CharacterController {
   scene: THREE.Scene;
   world: RAPIER.World;
@@ -143,6 +146,57 @@ export class CharacterController {
     if (this.listeners[event]) {
       this.listeners[event].forEach((cb: Function) => cb(data));
     }
+  }
+
+  normalizeAngle(angle: number) {
+    while (angle > Math.PI) angle -= Math.PI * 2;
+    while (angle < -Math.PI) angle += Math.PI * 2;
+    return angle;
+  }
+
+  isHoldingAimWeapon() {
+    return !!(this.equippedItem && this.equippedItem.type === "weapon");
+  }
+
+  getAimPitch() {
+    if (!this.cameraController) return 0;
+    if (this.cameraController.isFirstPerson) return this.cameraController.fpPitch || 0;
+
+    if (typeof this.cameraController.phi === "number") {
+      const maxPitch = this.cameraController.maxPitch || (Math.PI / 2 - 0.35);
+      return THREE.MathUtils.clamp(-this.cameraController.phi, -maxPitch, maxPitch);
+    }
+
+    const camDir = new THREE.Vector3();
+    this.camera.getWorldDirection(camDir);
+    return Math.asin(THREE.MathUtils.clamp(camDir.y, -1, 1));
+  }
+
+  getAimYaw() {
+    if (!this.cameraController) return this.currentRotation - Math.PI;
+    return this.cameraController.isFirstPerson ? this.cameraController.fpYaw : this.cameraController.theta;
+  }
+
+  updateAimAlignment(dt: number, snapToDeadzone: boolean) {
+    this.headPitch = this.getAimPitch();
+
+    const targetBodyRot = this.getAimYaw() + Math.PI;
+    let angleDiff = this.normalizeAngle(targetBodyRot - this.currentRotation);
+
+    if (Math.abs(angleDiff) > AIM_BODY_DEADZONE) {
+      if (snapToDeadzone) {
+        const correction = Math.sign(angleDiff) * (Math.abs(angleDiff) - AIM_BODY_DEADZONE);
+        this.currentRotation += correction;
+      } else {
+        const correctionTarget = targetBodyRot - Math.sign(angleDiff) * AIM_BODY_DEADZONE;
+        const correctionDiff = this.normalizeAngle(correctionTarget - this.currentRotation);
+        this.currentRotation += correctionDiff * AIM_BODY_TURN_SPEED * dt;
+      }
+
+      angleDiff = this.normalizeAngle(targetBodyRot - this.currentRotation);
+    }
+
+    this.headYaw = angleDiff;
   }
 
   setModelType(type: string) {
@@ -326,6 +380,8 @@ export class CharacterController {
     const desiredTranslation = new THREE.Vector3();
     const hasInput = moveDir.lengthSq() > 0;
 
+    const shouldAimAlign = this.cameraController && (this.cameraController.isFirstPerson || this.isHoldingAimWeapon());
+
     if (hasInput && this.cameraController) {
       const forward = this.cameraController.getForwardDirection();
       const right = this.cameraController.getRightDirection();
@@ -334,22 +390,8 @@ export class CharacterController {
       desiredTranslation.z = forward.z * moveDir.z + right.z * moveDir.x;
       desiredTranslation.normalize().multiplyScalar(this.speed * dt);
 
-      if (this.cameraController.isFirstPerson) {
-        this.headPitch = this.cameraController.fpPitch;
-
-        let targetBodyRot = this.cameraController.fpYaw + Math.PI;
-        let angleDiff = targetBodyRot - this.currentRotation;
-        while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
-        while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
-        const deadzone = Math.PI / 8;
-        if (Math.abs(angleDiff) > deadzone) {
-          const correction = Math.sign(angleDiff) * (Math.abs(angleDiff) - deadzone);
-          this.currentRotation += correction;
-          angleDiff = targetBodyRot - this.currentRotation;
-          while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
-          while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
-        }
-        this.headYaw = angleDiff;
+      if (shouldAimAlign) {
+        this.updateAimAlignment(dt, true);
       } else {
         this.headPitch = 0;
         this.headYaw = 0;
@@ -365,27 +407,8 @@ export class CharacterController {
         this.currentRotation += rotDiff * this.rotationSmoothness;
       }
     } else {
-      if (this.cameraController && this.cameraController.isFirstPerson) {
-        this.headPitch = this.cameraController.fpPitch;
-
-        let targetBodyRot = this.cameraController.fpYaw + Math.PI;
-        let angleDiff = targetBodyRot - this.currentRotation;
-        while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
-        while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
-
-        const deadzone = Math.PI / 8;
-        if (Math.abs(angleDiff) > deadzone) {
-          const correction = targetBodyRot - Math.sign(angleDiff) * deadzone;
-          let diff = correction - this.currentRotation;
-          while (diff > Math.PI) diff -= Math.PI * 2;
-          while (diff < -Math.PI) diff += Math.PI * 2;
-          this.currentRotation += diff * 15.0 * dt;
-
-          angleDiff = targetBodyRot - this.currentRotation;
-          while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
-          while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
-        }
-        this.headYaw = angleDiff;
+      if (shouldAimAlign) {
+        this.updateAimAlignment(dt, false);
       } else {
         this.headPitch = 0;
         this.headYaw = 0;

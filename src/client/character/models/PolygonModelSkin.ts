@@ -725,15 +725,13 @@ export class PolygonModelSkin implements ICharacterModel {
         let weaponArmRotZ = 0;
         let weaponArmRotY = 0;
 
-        if (this.isFirstPerson) {
-          const pitchOffset = currentPitch * 0.3;
-          if (this.currentWeaponHand === "left") {
-            weaponArmRotZ = -0.1 - pitchOffset * 0.5;
-            weaponArmRotY = 0.15 + pitchOffset * 0.5;
-          } else {
-            weaponArmRotZ = 0.1 + pitchOffset * 0.5;
-            weaponArmRotY = -0.15 - pitchOffset * 0.5;
-          }
+        const pitchOffset = currentPitch * 0.3;
+        if (this.currentWeaponHand === "left") {
+          weaponArmRotZ = -0.1 - pitchOffset * 0.5;
+          weaponArmRotY = 0.15 + pitchOffset * 0.5;
+        } else {
+          weaponArmRotZ = 0.1 + pitchOffset * 0.5;
+          weaponArmRotY = -0.15 - pitchOffset * 0.5;
         }
 
         if (this.heldItem && this.heldItem.isReloading) {
@@ -774,10 +772,8 @@ export class PolygonModelSkin implements ICharacterModel {
 
         let weaponSwayZ = 0;
         let weaponSwayY = 0;
-        if (this.isFirstPerson) {
-          weaponSwayZ = headYaw * -0.4;
-          weaponSwayY = headYaw * 0.3;
-        }
+        weaponSwayZ = headYaw * -0.4;
+        weaponSwayY = headYaw * 0.3;
 
         if (this.currentWeaponHand === "left") {
           this.leftArmGroup.rotation.x = THREE.MathUtils.lerp(this.leftArmGroup.rotation.x, pointAimAngle + aimBob, 0.2);

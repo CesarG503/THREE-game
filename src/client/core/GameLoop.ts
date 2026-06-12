@@ -7,6 +7,7 @@ export function setupDebugRender(this: any) {
 		new THREE.LineBasicMaterial({ color: 0xffffff, vertexColors: true })
 	);
 	this.debugMesh.frustumCulled = false;
+	this.debugMesh.userData.ignoreRaycast = true;
 	this.debugMesh.visible = false;
 	this.sceneManager.scene.add(this.debugMesh);
 }
@@ -184,6 +185,9 @@ export function animate(this: any) {
 					if (proj.colliderHandle === handle1 || proj.colliderHandle === handle2) {
 						const hitPos = proj.rigidBody.translation();
 						const otherHandle = proj.colliderHandle === handle1 ? handle2 : handle1;
+						if (proj.ownerColliderHandle !== null && proj.ownerColliderHandle === otherHandle) {
+							continue;
+						}
 
 						let hitPlayer = false;
 

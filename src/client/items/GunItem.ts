@@ -306,6 +306,38 @@ export class GunItem extends Item {
     if (this.model) callback();
   }
 
+  shouldIgnoreAimHit(object: any, context: any) {
+    let obj = object;
+    const character = context?.character;
+    const localModelRoots = [
+      character?.glbModel?.model,
+      character?.polygonModel?.model,
+      character?.polygonModelSkin?.model,
+      (context as any)?.game?.fxBlasterSystem?.meshGroup,
+      this.equipGroup,
+      this.transformGroup,
+      this.model
+    ].filter(Boolean);
+
+    while (obj) {
+      if (
+        localModelRoots.includes(obj) ||
+        obj.userData?.ignoreRaycast ||
+        (obj.userData?.isPlayer && obj.userData?.isLocalPlayer) ||
+        (obj as any).isLine ||
+        obj.type === "AxesHelper" ||
+        obj.userData?.isGizmo ||
+        obj.visible === false
+      ) {
+        return true;
+      }
+
+      obj = obj.parent;
+    }
+
+    return false;
+  }
+
   use(context: ItemContext) {
     if (context && context.isRightClick) return false;
     if (this.isReloading) return false;
@@ -373,24 +405,7 @@ export class GunItem extends Item {
         const intersects = raycaster.intersectObjects(context.scene.children, true);
 
         for (const hit of intersects) {
-          let isIgnored = false;
-          let obj = hit.object;
-
-          while (obj) {
-            if (
-              obj === this.model ||
-              obj === this.equipGroup ||
-              (obj.userData.isPlayer && obj.userData.isLocalPlayer) ||
-              (obj as any).isLine ||
-              obj.userData.ignoreRaycast
-            ) {
-              isIgnored = true;
-              break;
-            }
-            obj = obj.parent;
-          }
-
-          if (isIgnored) continue;
+          if (this.shouldIgnoreAimHit(hit.object, context)) continue;
 
           targetPoint.copy(hit.point);
           hitTarget = true;
@@ -460,6 +475,7 @@ export class GunItem extends Item {
       proj.blasterSystem = (context as any).game?.fxBlasterSystem || this.blasterSystem;
       proj.particleSystem = context.particleSystem;
       proj.initialTracer = tempTracer;
+      proj.ownerColliderHandle = (context as any).character?.collider?.handle ?? null;
       context.registerProjectile(proj);
 
       if (context.networkManager) {

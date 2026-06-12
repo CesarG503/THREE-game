@@ -63,6 +63,7 @@ export class CylinderCollider extends Collider {
       opacity: 0.5
     });
     this.debugMesh = new THREE.Mesh(geometry, material);
+    this.debugMesh.userData.ignoreRaycast = true;
     this.debugMesh.visible = this.showDebug;
     scene.add(this.debugMesh);
   }

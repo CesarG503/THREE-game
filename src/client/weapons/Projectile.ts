@@ -32,6 +32,7 @@ export class Projectile {
   isRemoteBlaster: boolean;
   tracerDestroyOnCollision: boolean;
   tracerStayForever: boolean;
+  ownerColliderHandle: number | null;
 
   constructor(
     scene: THREE.Scene,
@@ -73,6 +74,7 @@ export class Projectile {
     this.isRemoteBlaster = false;
     this.tracerDestroyOnCollision = false;
     this.tracerStayForever = false;
+    this.ownerColliderHandle = null;
     this.lastPosition = origin.clone();
     this.trajectoryPoints = [origin.clone()];
     this.trajectoryLine = null;
@@ -81,6 +83,7 @@ export class Projectile {
       const geo = new THREE.SphereGeometry(0.1, 8, 8);
       const mat = new THREE.MeshBasicMaterial({ color: 0xffff00 });
       this.mesh = new THREE.Mesh(geo, mat);
+      this.mesh.userData.ignoreRaycast = true;
       this.mesh.position.copy(origin);
       this.scene.add(this.mesh);
     }
@@ -127,6 +130,7 @@ export class Projectile {
         this.customTracerAttached = true;
         if (!this.mesh) {
           this.mesh = new THREE.Group();
+          this.mesh.userData.ignoreRaycast = true;
           this.scene.add(this.mesh);
         }
         const vel = this.rigidBody.linvel();

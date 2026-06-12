@@ -15,6 +15,7 @@ export class BlasterSystem {
 
     // Group to hold all tracer meshes
     this.meshGroup = new THREE.Group();
+    this.meshGroup.userData.ignoreRaycast = true;
     this.scene.add(this.meshGroup);
 
     // Shared geometry and material for tracers
@@ -52,10 +53,12 @@ export class BlasterSystem {
       const mesh = this.particlePool.pop();
       mesh.visible = true;
       mesh.material.opacity = 0.8;
+      mesh.userData.ignoreRaycast = true;
       return mesh;
     }
 
     const mesh = new THREE.Mesh(this.geometry, this.material.clone());
+    mesh.userData.ignoreRaycast = true;
     this.meshGroup.add(mesh);
     return mesh;
   }

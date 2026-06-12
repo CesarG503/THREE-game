@@ -407,6 +407,10 @@ export class GunItem extends Item {
       const trajectoryDir = targetPoint.clone().sub(startPos).normalize();
 
       const projType = this.projectileType || "bullet";
+      const speed = this.shotSpeed !== undefined ? this.shotSpeed : 50;
+      const drop = this.bulletDrop !== undefined ? this.bulletDrop : 1.0;
+      const tracerSpeed = projType === "bullet" ? speed * 3.0 : speed;
+      const tracerLength = THREE.MathUtils.clamp(Math.max(tracerSpeed, 0) * 0.05, 0.5, 10.0);
 
       if ((projType === "bullet" || this.hasTracer) && context.scene) {
         if (!this.blasterSystem) {
@@ -419,19 +423,17 @@ export class GunItem extends Item {
         const tracer = this.blasterSystem.CreateParticle();
         tracer.Start.copy(startPos);
 
-        tracer.End = trajectoryDir.clone().multiplyScalar(10.0).add(startPos);
-        tracer.Velocity = trajectoryDir.clone().multiplyScalar(150.0);
+        tracer.End = trajectoryDir.clone().multiplyScalar(tracerLength).add(startPos);
+        tracer.Velocity = trajectoryDir.clone().multiplyScalar(tracerSpeed);
 
         tracer.Colours = [new THREE.Color(0xffff88), new THREE.Color(0xffaa00)];
-        tracer.Length = 10.0;
+        tracer.Length = tracerLength;
         tracer.Life = 0.5;
         tracer.TotalLife = 0.5;
         tracer.Width = 0.05;
         tempTracer = tracer;
       }
 
-      const speed = this.shotSpeed !== undefined ? this.shotSpeed : 50;
-      const drop = this.bulletDrop !== undefined ? this.bulletDrop : 1.0;
       const proj = new Projectile(
         context.scene,
         context.world,

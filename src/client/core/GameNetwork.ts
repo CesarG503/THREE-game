@@ -76,19 +76,24 @@ export function updateConnectionStatus(this: any, connected: boolean, playerId: 
 export function handleRemoteShoot(this: any, startPos: any, direction: any, type: any, speed: any, damage: any, drop: any, rebote: any, hasImpactEffect: any, hasTracer = false, hasTrajectoryLine = false, customTracerVFX = "Ninguno", customImpactVFX = "Ninguno", tracerDestroyOnCollision = false, tracerStayForever = false, tracerCollisionVFX = "Ninguno") {
 	if (!this.sceneManager || !this.world) return;
 
+	const projectileType = type || "bullet";
+	const projectileSpeed = speed !== undefined ? speed : 50;
+	const projectileDrop = drop !== undefined ? drop : 1.0;
+	const tracerSpeed = projectileType === "bullet" ? projectileSpeed * 3.0 : projectileSpeed;
+	const tracerLength = THREE.MathUtils.clamp(Math.max(tracerSpeed, 0) * 0.05, 0.5, 10.0);
 	let tempTracer = null;
 	const blaster = this.fxBlasterSystem;
 
-	if ((type === "bullet" || hasTracer) && this.sceneManager.scene && blaster) {
+	if ((projectileType === "bullet" || hasTracer) && this.sceneManager.scene && blaster) {
 		const tracer = blaster.CreateParticle();
 		tracer.Start.copy(startPos);
 
 		const dirVec = new THREE.Vector3(direction.x, direction.y, direction.z).normalize();
-		tracer.End = dirVec.clone().multiplyScalar(10.0).add(startPos);
-		tracer.Velocity = dirVec.clone().multiplyScalar(150.0);
+		tracer.End = dirVec.clone().multiplyScalar(tracerLength).add(startPos);
+		tracer.Velocity = dirVec.clone().multiplyScalar(tracerSpeed);
 
 		tracer.Colours = [new THREE.Color(0xffff88), new THREE.Color(0xffaa00)];
-		tracer.Length = 10.0;
+		tracer.Length = tracerLength;
 		tracer.Life = 0.5;
 		tracer.TotalLife = 0.5;
 		tracer.Width = 0.05;
@@ -100,10 +105,10 @@ export function handleRemoteShoot(this: any, startPos: any, direction: any, type
 		this.world,
 		new THREE.Vector3(startPos.x, startPos.y, startPos.z),
 		new THREE.Vector3(direction.x, direction.y, direction.z),
-		speed || 50,
+		projectileSpeed,
 		damage || 10,
-		drop || 1.0,
-		type || "bullet",
+		projectileDrop,
+		projectileType,
 		rebote || false,
 		hasImpactEffect || false,
 		customTracerVFX,

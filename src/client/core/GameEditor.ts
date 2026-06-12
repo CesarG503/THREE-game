@@ -33,6 +33,7 @@ export function saveMap(this: any) {
 				rot: { x: obj.rotation.x, y: obj.rotation.y, z: obj.rotation.z },
 				texturePath: obj.userData.texturePath,
 				textureAssetId: obj.userData.textureAssetId,
+				textureSettings: obj.userData.textureSettings,
 				logicProperties: obj.userData.logicProperties,
 				uuid: obj.userData.uuid,
 				invisible: obj.userData.invisible,
@@ -104,7 +105,8 @@ export function loadMap(this: any, jsonData: any) {
 			data.color,
 			data.originalScale,
 			data.texturePath || null,
-			data.textureAssetId || null
+			data.textureAssetId || null,
+			data.textureSettings || null
 		);
 
 		if (data.logicProperties) {
@@ -270,6 +272,7 @@ export function useCurrentItem(this: any, isRightClickOrItem: any = false) {
 					rot: { x: obj.rotation.x, y: obj.rotation.y, z: obj.rotation.z },
 					texturePath: obj.userData.texturePath,
 					textureAssetId: obj.userData.textureAssetId,
+					textureSettings: obj.userData.textureSettings,
 					logicProperties: obj.userData.logicProperties,
 					uuid: obj.userData.uuid,
 					invisible: obj.userData.invisible,
@@ -299,7 +302,8 @@ export function _loadSingleMapObject(this: any, data: any) {
 		data.color,
 		data.originalScale,
 		data.texturePath || null,
-		data.textureAssetId || null
+		data.textureAssetId || null,
+		data.textureSettings || null
 	);
 	if (data.logicProperties) tempItem.logicProperties = data.logicProperties;
 	if (data.opacity !== undefined) tempItem.opacity = data.opacity;
@@ -360,6 +364,7 @@ export function broadcastObjectUpdate(this: any, obj: any) {
 		rot: { x: obj.rotation.x, y: obj.rotation.y, z: obj.rotation.z },
 		texturePath: obj.userData.texturePath,
 		textureAssetId: obj.userData.textureAssetId,
+		textureSettings: obj.userData.textureSettings,
 		logicProperties: obj.userData.logicProperties,
 		uuid: obj.userData.uuid,
 		invisible: obj.userData.invisible,

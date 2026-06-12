@@ -12,6 +12,17 @@ export interface SavedMapData {
 		fallDeath: boolean;
 		fallDeathY: number;
 		skyType?: "day" | "night" | "sunset";
+		groundTexturePath?: string | null;
+		groundTextureAssetId?: string | null;
+		groundTextureSettings?: {
+			fitMode?: "auto" | "stretch";
+			tileSize?: number;
+			repeatX?: number;
+			repeatY?: number;
+			offsetX?: number;
+			offsetY?: number;
+			rotation?: number;
+		};
 	};
 	playerConfig: {
 		roles: unknown[];
@@ -34,6 +45,9 @@ export function createEmptyMapData(): SavedMapData {
 			fallDeath: true,
 			fallDeathY: -20,
 			skyType: "night",
+			groundTexturePath: null,
+			groundTextureAssetId: null,
+			groundTextureSettings: { fitMode: "auto", tileSize: 5, repeatX: 1, repeatY: 1, offsetX: 0, offsetY: 0, rotation: 0 },
 		},
 		playerConfig: {
 			roles: [],
@@ -41,4 +55,3 @@ export function createEmptyMapData(): SavedMapData {
 		},
 	};
 }
-

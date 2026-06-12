@@ -135,5 +135,14 @@ export interface MapObjectConfig {
 	scale: { x: number; y: number; z: number };
 	color?: number;
 	texturePath?: string | null;
+	textureSettings?: {
+		fitMode?: "auto" | "stretch";
+		tileSize?: number;
+		repeatX?: number;
+		repeatY?: number;
+		offsetX?: number;
+		offsetY?: number;
+		rotation?: number;
+	} | null;
 	logicProperties?: Record<string, unknown> | null;
 }

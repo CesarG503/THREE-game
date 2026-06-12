@@ -453,7 +453,10 @@ export class Game {
 			mapSizeZ: 100,
 			invisibleWalls: false,
 			fallDeath: true,
-			fallDeathY: -20
+			fallDeathY: -20,
+			groundTexturePath: null,
+			groundTextureAssetId: null,
+			groundTextureSettings: { fitMode: "auto", tileSize: 5, repeatX: 1, repeatY: 1, offsetX: 0, offsetY: 0, rotation: 0 }
 		};
 		this.invisibleWallMeshes = [];
 		this.invisibleWallBodies = [];
@@ -540,7 +543,8 @@ export class Game {
 							source.color,
 							source.scale,
 							source.texturePath,
-							source.textureAssetId
+							source.textureAssetId,
+							source.textureSettings
 						);
 						if (source.logicProperties) {
 							newItem.logicProperties = { ...source.logicProperties };

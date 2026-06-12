@@ -13,6 +13,7 @@ import { getActiveFarmingGroups } from "./GameHUD";
 import { JetpackItem } from "../items/JetpackItem";
 import { savePlatformMapForRoom } from "../platform/mapRuntime";
 import { listAssets, uploadAsset } from "../platform/api";
+import { getDefaultTextureSettings, normalizeTextureSettings } from "../utils/TextureMapping";
 
 export class ConstructionMenu {
     constructor(inventoryManager, gameInstance) {
@@ -635,7 +636,7 @@ export class ConstructionMenu {
         checkbox.addEventListener("change", (e) => {
             if (this.game && this.game.sceneManager) {
                 this.game.sceneManager.scene.children.forEach(child => {
-                    if (child.name === "mapGrid" || child instanceof THREE.GridHelper) {
+                    if (child.name === "mapGrid") {
                         child.visible = e.target.checked;
                     }
                 });
@@ -2034,6 +2035,67 @@ export class ConstructionMenu {
         uploadRow.appendChild(uploadBtn);
         textureContainer.appendChild(uploadRow);
 
+        const textureSettingsPanel = document.createElement("div");
+        textureSettingsPanel.style.cssText = `
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid #333;
+            border-radius: 6px;
+            padding: 10px;
+        `;
+
+        const textureSettingsTitle = document.createElement("span");
+        textureSettingsTitle.textContent = "Ajuste de textura";
+        textureSettingsTitle.style.cssText = "font-size: 12px; color: #ddd; font-weight: 700;";
+        textureSettingsPanel.appendChild(textureSettingsTitle);
+
+        const modeRow = document.createElement("div");
+        modeRow.style.cssText = "display: flex; align-items: center; justify-content: space-between; gap: 8px;";
+        const modeLabel = document.createElement("span");
+        modeLabel.textContent = "Modo";
+        modeLabel.style.cssText = "font-size: 11px; color: #aaa;";
+        const modeSelect = document.createElement("select");
+        modeSelect.style.cssText = "width: 135px; background:#333; color:white; border:1px solid #555; border-radius:4px; padding:4px;";
+        modeSelect.innerHTML = `
+            <option value="auto">Repetir por tamaño</option>
+            <option value="stretch">Estirar por cara</option>
+        `;
+        modeSelect.onchange = (e) => this.updateDraftTextureSetting("fitMode", e.target.value);
+        this.textureFitModeSelect = modeSelect;
+        modeRow.appendChild(modeLabel);
+        modeRow.appendChild(modeSelect);
+        textureSettingsPanel.appendChild(modeRow);
+
+        const textureSettingsGrid = document.createElement("div");
+        textureSettingsGrid.style.cssText = "display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px;";
+        const makeTextureInput = (key, label, step, min = null) => {
+            const wrap = document.createElement("label");
+            wrap.style.cssText = "display:flex; flex-direction:column; gap:3px; font-size:10px; color:#aaa;";
+            const input = document.createElement("input");
+            input.type = "number";
+            input.step = String(step);
+            if (min !== null) input.min = String(min);
+            input.style.cssText = "width:100%; box-sizing:border-box; background:#222; color:white; border:1px solid #444; border-radius:4px; padding:4px;";
+            input.onchange = (e) => {
+                const value = parseFloat(e.target.value);
+                if (!isNaN(value)) this.updateDraftTextureSetting(key, value);
+            };
+            wrap.textContent = label;
+            wrap.appendChild(input);
+            this[`textureSettingInput_${key}`] = input;
+            return wrap;
+        };
+        textureSettingsGrid.appendChild(makeTextureInput("tileSize", "Tamaño baldosa", 0.25, 0.1));
+        textureSettingsGrid.appendChild(makeTextureInput("repeatX", "Repetir U", 0.25, 0.05));
+        textureSettingsGrid.appendChild(makeTextureInput("repeatY", "Repetir V", 0.25, 0.05));
+        textureSettingsGrid.appendChild(makeTextureInput("rotation", "Rotación", 5));
+        textureSettingsGrid.appendChild(makeTextureInput("offsetX", "Mover U", 0.05));
+        textureSettingsGrid.appendChild(makeTextureInput("offsetY", "Mover V", 0.05));
+        textureSettingsPanel.appendChild(textureSettingsGrid);
+        textureContainer.appendChild(textureSettingsPanel);
+
         this.panelEditor.appendChild(textureContainer);
 
         // 5. Dimension Controls
@@ -3240,8 +3302,17 @@ export class ConstructionMenu {
         // Reset Texture UI
         const allBtns = this.panelEditor.querySelectorAll(".texture-btn");
         allBtns.forEach(c => c.style.borderColor = "#555");
-        // Select None (first one) by default if baseItem has no texture
-        if (allBtns.length > 0) allBtns[0].style.borderColor = "#00FF00";
+        const selectedTexturePath = baseItem.texturePath || null;
+        let matchedTexture = false;
+        allBtns.forEach(btn => {
+            const bg = btn.style.backgroundImage || "";
+            if (selectedTexturePath && bg.includes(selectedTexturePath)) {
+                btn.style.borderColor = "#00FF00";
+                matchedTexture = true;
+            }
+        });
+        if (!matchedTexture && allBtns.length > 0) allBtns[0].style.borderColor = "#00FF00";
+        this.syncTextureSettingsInputs(baseItem.textureSettings);
 
         const uploadBtn = this.panelEditor.querySelector("#texture-upload-btn");
         if (uploadBtn) {
@@ -3262,7 +3333,7 @@ export class ConstructionMenu {
         if ((type === "weapon" || type === "consumable") && baseItem && baseItem.clone) {
             this.currentDraftItem = baseItem.clone();
         } else {
-            this.currentDraftItem = new MapObjectItem(id, name, type, "", color, scale, texturePath, baseItem?.textureAssetId || null);
+            this.currentDraftItem = new MapObjectItem(id, name, type, "", color, scale, texturePath, baseItem?.textureAssetId || null, baseItem?.textureSettings || null);
             if (baseItem && baseItem.logicProperties) {
                 this.currentDraftItem.logicProperties = JSON.parse(JSON.stringify(baseItem.logicProperties));
             }
@@ -3649,6 +3720,30 @@ export class ConstructionMenu {
         if (!this.currentDraftItem) return;
         this.currentDraftItem.texturePath = texturePath;
         this.currentDraftItem.textureAssetId = textureAssetId;
+        if (!this.currentDraftItem.textureSettings) {
+            this.currentDraftItem.textureSettings = getDefaultTextureSettings();
+        }
+    }
+
+    syncTextureSettingsInputs(settings = null) {
+        const normalized = normalizeTextureSettings(settings);
+        if (this.currentDraftItem) {
+            this.currentDraftItem.textureSettings = { ...normalized };
+        }
+        if (this.textureFitModeSelect) this.textureFitModeSelect.value = normalized.fitMode;
+        ["tileSize", "repeatX", "repeatY", "offsetX", "offsetY", "rotation"].forEach((key) => {
+            const input = this[`textureSettingInput_${key}`];
+            if (input) input.value = String(normalized[key]);
+        });
+    }
+
+    updateDraftTextureSetting(key, value) {
+        if (!this.currentDraftItem) return;
+        this.currentDraftItem.textureSettings = normalizeTextureSettings({
+            ...(this.currentDraftItem.textureSettings || {}),
+            [key]: value
+        });
+        this.syncTextureSettingsInputs(this.currentDraftItem.textureSettings);
     }
 
     async refreshCustomTextures() {

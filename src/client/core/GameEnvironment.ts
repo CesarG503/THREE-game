@@ -2,6 +2,7 @@ import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
 import { LevelBuilder } from "../environment/LevelBuilder";
 import { LevelLoader } from "../environment/LevelLoader";
+import { applyMapObjectTexture, normalizeTextureSettings } from "../utils/TextureMapping";
 
 export function buildEnvironment(this: any) {
 	this.levelBuilder = new LevelBuilder(this.sceneManager.scene, this.world);
@@ -40,6 +41,7 @@ export function updateEnvironmentConfig(this: any, config: any) {
 			const child = this.groundGroup.children[0];
 			this.groundGroup.remove(child);
 			if (child.geometry) child.geometry.dispose();
+			if (child.material) child.material.dispose();
 		}
 	}
 
@@ -48,22 +50,36 @@ export function updateEnvironmentConfig(this: any, config: any) {
 		this.groundColliders = [];
 	}
 
-	const groundMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.8 });
+	const groundTextureSettings = normalizeTextureSettings(this.environmentConfig.groundTextureSettings || { tileSize: 5 });
+	const groundTexturePath = this.environmentConfig.groundTexturePath || null;
+	const groundTextureLoader = groundTexturePath ? new THREE.TextureLoader() : null;
+	const applyGroundTexture = (mesh: any, dimensions: any) => {
+		if (!groundTextureLoader || !groundTexturePath) return;
+		groundTextureLoader.load(groundTexturePath, (texture: any) => {
+			applyMapObjectTexture(mesh, texture, dimensions, groundTextureSettings);
+		});
+	};
+	const createGroundMaterial = () => new THREE.MeshStandardMaterial({
+		color: groundTexturePath ? 0xffffff : 0x1a1a1a,
+		roughness: 0.8
+	});
 
 	if (shapeType === "rect") {
 		const geo = new THREE.BoxGeometry(sx, 1, sz);
-		const mesh = new THREE.Mesh(geo, groundMat);
+		const mesh = new THREE.Mesh(geo, createGroundMaterial());
 		mesh.receiveShadow = true;
 		this.groundGroup.add(mesh);
+		applyGroundTexture(mesh, { x: sx, y: 1, z: sz });
 
 		const colDesc = RAPIER.ColliderDesc.cuboid(sx / 2, 0.5, sz / 2);
 		this.groundColliders.push(this.world.createCollider(colDesc, this.groundBody));
 	} else if (shapeType === "circle") {
 		const radius = sx / 2;
 		const geo = new THREE.CylinderGeometry(radius, radius, 1, 64);
-		const mesh = new THREE.Mesh(geo, groundMat);
+		const mesh = new THREE.Mesh(geo, createGroundMaterial());
 		mesh.receiveShadow = true;
 		this.groundGroup.add(mesh);
+		applyGroundTexture(mesh, { x: sx, y: 1, z: sx });
 
 		const colDesc = RAPIER.ColliderDesc.cylinder(0.5, radius);
 		this.groundColliders.push(this.world.createCollider(colDesc, this.groundBody));
@@ -77,10 +93,11 @@ export function updateEnvironmentConfig(this: any, config: any) {
 			const z = gz * cellSize;
 
 			const geo = new THREE.BoxGeometry(cellSize, 1, cellSize);
-			const mesh = new THREE.Mesh(geo, groundMat);
+			const mesh = new THREE.Mesh(geo, createGroundMaterial());
 			mesh.position.set(x, 0, z);
 			mesh.receiveShadow = true;
 			this.groundGroup.add(mesh);
+			applyGroundTexture(mesh, { x: cellSize, y: 1, z: cellSize });
 
 			const colDesc = RAPIER.ColliderDesc.cuboid(cellSize / 2, 0.5, cellSize / 2)
 				.setTranslation(x, 0, z);
@@ -88,7 +105,7 @@ export function updateEnvironmentConfig(this: any, config: any) {
 		});
 	}
 
-	const oldGrids = this.sceneManager.scene.children.filter((c: any) => c.name === "mapGrid" || c instanceof THREE.GridHelper);
+	const oldGrids = this.sceneManager.scene.children.filter((c: any) => c.name === "mapGrid");
 	oldGrids.forEach((child: any) => {
 		this.sceneManager.scene.remove(child);
 		if (child.geometry) child.geometry.dispose();
@@ -96,16 +113,69 @@ export function updateEnvironmentConfig(this: any, config: any) {
 	});
 
 	const cellSize = this.environmentConfig.customCellSize || 10;
-	const gridStep = cellSize / 5;
+	const gridStep = 2;
+	const gridInset = 0.04;
 	const hX = sx / 2;
 	const hZ = sz / 2;
 	const gridVertices: number[] = [];
+	const gridSegments = new Set<string>();
 
-	for (let x = -hX; x <= hX; x += gridStep) {
-		gridVertices.push(x, 0, -hZ, x, 0, hZ);
-	}
-	for (let z = -hZ; z <= hZ; z += gridStep) {
-		gridVertices.push(-hX, 0, z, hX, 0, z);
+	const addGridSegment = (x1: number, z1: number, x2: number, z2: number) => {
+		if (Math.abs(x1 - x2) < 0.001 && Math.abs(z1 - z2) < 0.001) return;
+		const a = `${x1.toFixed(3)},${z1.toFixed(3)}`;
+		const b = `${x2.toFixed(3)},${z2.toFixed(3)}`;
+		const key = a < b ? `${a}|${b}` : `${b}|${a}`;
+		if (gridSegments.has(key)) return;
+		gridSegments.add(key);
+		gridVertices.push(x1, 0, z1, x2, 0, z2);
+	};
+
+	const firstGridLine = (min: number) => Math.ceil((min + gridInset) / gridStep) * gridStep;
+
+	if (shapeType === "circle") {
+		const radius = Math.max(0, sx / 2 - gridInset);
+		for (let x = firstGridLine(-radius); x < radius - gridInset; x += gridStep) {
+			const half = Math.sqrt(Math.max(0, radius * radius - x * x));
+			addGridSegment(x, -half, x, half);
+		}
+		for (let z = firstGridLine(-radius); z < radius - gridInset; z += gridStep) {
+			const half = Math.sqrt(Math.max(0, radius * radius - z * z));
+			addGridSegment(-half, z, half, z);
+		}
+	} else if (shapeType === "custom") {
+		const grid = this.environmentConfig.customGrid || [];
+		const gridSet = new Set(grid);
+
+		grid.forEach((key: any) => {
+			const [gx, gz] = key.split(",").map(Number);
+			const centerX = gx * cellSize;
+			const centerZ = gz * cellSize;
+			const minX = centerX - cellSize / 2;
+			const minZ = centerZ - cellSize / 2;
+			const maxX = centerX + cellSize / 2;
+			const maxZ = centerZ + cellSize / 2;
+
+			for (let x = firstGridLine(minX); x < maxX - gridInset; x += gridStep) {
+				addGridSegment(x, minZ + gridInset, x, maxZ - gridInset);
+			}
+			for (let z = firstGridLine(minZ); z < maxZ - gridInset; z += gridStep) {
+				addGridSegment(minX + gridInset, z, maxX - gridInset, z);
+			}
+
+			if (gridSet.has(`${gx + 1},${gz}`)) addGridSegment(maxX, minZ + gridInset, maxX, maxZ - gridInset);
+			if (gridSet.has(`${gx},${gz + 1}`)) addGridSegment(minX + gridInset, maxZ, maxX - gridInset, maxZ);
+		});
+	} else {
+		const minX = -hX + gridInset;
+		const maxX = hX - gridInset;
+		const minZ = -hZ + gridInset;
+		const maxZ = hZ - gridInset;
+		for (let x = firstGridLine(-hX); x < hX - gridInset; x += gridStep) {
+			addGridSegment(x, minZ, x, maxZ);
+		}
+		for (let z = firstGridLine(-hZ); z < hZ - gridInset; z += gridStep) {
+			addGridSegment(minX, z, maxX, z);
+		}
 	}
 
 	const gridGeo = new THREE.BufferGeometry();
@@ -113,7 +183,7 @@ export function updateEnvironmentConfig(this: any, config: any) {
 	const gridMat = new THREE.LineBasicMaterial({ color: 0x666666, transparent: true, opacity: 0.4 });
 	const grid = new THREE.LineSegments(gridGeo, gridMat);
 	grid.name = "mapGrid";
-	grid.position.y = 0.01;
+	grid.position.y = 0.003;
 
 	const chk = document.getElementById("chk-show-grid") as HTMLInputElement | null;
 	if (chk) {

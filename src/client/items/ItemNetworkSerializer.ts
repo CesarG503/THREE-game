@@ -126,7 +126,9 @@ export function createItemFromNetworkData(data: any): ItemLike {
       itemData.iconPath || "",
       itemData.color,
       itemData.scale,
-      itemData.texturePath
+      itemData.texturePath,
+      itemData.textureAssetId || null,
+      itemData.textureSettings || null
     );
   } else if (itemData.itemClass === "ImpulseItem") {
     item = new ImpulseItem(itemData.id, itemData.name, itemData.iconPath, itemData.type, itemData.strength);

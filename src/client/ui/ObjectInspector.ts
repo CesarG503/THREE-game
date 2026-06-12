@@ -4,6 +4,7 @@ import * as THREE from "three"
 import { StairsUtils } from "../utils/StairsUtils"
 import { LogicItemsManager } from "./logic_items/LogicItemsManager"
 import { listAssets, uploadAsset } from "../platform/api"
+import { applyMapObjectTexture, normalizeTextureSettings } from "../utils/TextureMapping"
 
 export class ObjectInspector {
     constructor(gameInstance) {
@@ -340,6 +341,57 @@ export class ObjectInspector {
 
             section.appendChild(fileInput)
             section.appendChild(uploadBtn)
+
+            const settingsPanel = document.createElement('div')
+            settingsPanel.style.cssText = `
+                display: flex; flex-direction: column; gap: 8px; margin-top: 10px;
+                background: rgba(255,255,255,0.04); border: 1px solid #333;
+                border-radius: 6px; padding: 8px;
+            `
+
+            const modeRow = document.createElement('div')
+            modeRow.style.cssText = `display:flex; align-items:center; justify-content:space-between; gap:8px;`
+            const modeLabel = document.createElement('span')
+            modeLabel.textContent = "Modo"
+            modeLabel.style.cssText = "font-size:11px; color:#aaa;"
+            this.textureFitModeSelect = document.createElement('select')
+            this.textureFitModeSelect.style.cssText = `width: 132px; background:#222; color:white; border:1px solid #444; border-radius:4px; padding:4px; font-size:11px;`
+            this.textureFitModeSelect.innerHTML = `
+                <option value="auto">Repetir por tamaño</option>
+                <option value="stretch">Estirar por cara</option>
+            `
+            this.textureFitModeSelect.onchange = (e) => this.updateTextureSetting("fitMode", e.target.value)
+            modeRow.appendChild(modeLabel)
+            modeRow.appendChild(this.textureFitModeSelect)
+            settingsPanel.appendChild(modeRow)
+
+            const settingsGrid = document.createElement('div')
+            settingsGrid.style.cssText = `display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap:6px;`
+            const makeTextureInput = (key, label, step, min = null) => {
+                const wrap = document.createElement('label')
+                wrap.style.cssText = `display:flex; flex-direction:column; gap:3px; color:#aaa; font-size:10px;`
+                const input = document.createElement('input')
+                input.type = "number"
+                input.step = String(step)
+                if (min !== null) input.min = String(min)
+                input.style.cssText = `width:100%; box-sizing:border-box; background:#222; color:white; border:1px solid #444; border-radius:4px; padding:4px; font-size:11px;`
+                input.onchange = (e) => {
+                    const value = parseFloat(e.target.value)
+                    if (!isNaN(value)) this.updateTextureSetting(key, value)
+                }
+                wrap.textContent = label
+                wrap.appendChild(input)
+                this[`textureSettingInput_${key}`] = input
+                return wrap
+            }
+            settingsGrid.appendChild(makeTextureInput("tileSize", "Baldosa", 0.25, 0.1))
+            settingsGrid.appendChild(makeTextureInput("repeatX", "Repetir U", 0.25, 0.05))
+            settingsGrid.appendChild(makeTextureInput("repeatY", "Repetir V", 0.25, 0.05))
+            settingsGrid.appendChild(makeTextureInput("rotation", "Rotación", 5))
+            settingsGrid.appendChild(makeTextureInput("offsetX", "Mover U", 0.05))
+            settingsGrid.appendChild(makeTextureInput("offsetY", "Mover V", 0.05))
+            settingsPanel.appendChild(settingsGrid)
+            section.appendChild(settingsPanel)
         })
 
         // 4.5 Visibility Controls (Invisible but Collidable)
@@ -551,6 +603,8 @@ export class ObjectInspector {
         } else {
             this.chkInvisible.checked = false
         }
+
+        this.syncTextureSettingsInputs(object.userData.textureSettings)
 
         // Logic Properties
         if (object.userData.logicProperties) {
@@ -803,6 +857,9 @@ export class ObjectInspector {
             this.selectedObject.geometry = newGeo
         }
 
+        if (this.selectedObject.userData.texturePath) {
+            this.reapplySelectedTexture()
+        }
         this.refreshPhysicsAndVisuals()
     }
 
@@ -831,32 +888,10 @@ export class ObjectInspector {
 
         this.selectedObject.userData.texturePath = pathOrDataUrl
         this.selectedObject.userData.textureAssetId = assetId
+        this.selectedObject.userData.textureSettings = normalizeTextureSettings(this.selectedObject.userData.textureSettings)
 
         if (pathOrDataUrl) {
-            const loader = new THREE.TextureLoader()
-            loader.load(pathOrDataUrl, (tex) => {
-                tex.wrapS = THREE.RepeatWrapping
-                tex.wrapT = THREE.RepeatWrapping
-
-                // Simple repeat logic (match MapObjectItem logic)
-                const dims = this.selectedObject.userData.originalScale || { x: 1, y: 1 }
-                tex.repeat.set(dims.x / 2, dims.y / 2)
-
-                const apply = (mesh) => {
-                    if (mesh.material) {
-                        mesh.material.map = tex
-                        mesh.material.needsUpdate = true
-                    }
-
-
-                }
-
-                if (this.selectedObject.isGroup) {
-                    this.selectedObject.children.forEach(apply)
-                } else {
-                    apply(this.selectedObject)
-                }
-            })
+            this.reapplySelectedTexture()
         } else {
             // Remove
             const remove = (mesh) => {
@@ -875,6 +910,47 @@ export class ObjectInspector {
         if (this.game && this.game.broadcastObjectUpdate) {
             this.game.broadcastObjectUpdate(this.selectedObject);
         }
+    }
+
+    syncTextureSettingsInputs(settings = null) {
+        const normalized = normalizeTextureSettings(settings)
+        if (this.selectedObject) {
+            this.selectedObject.userData.textureSettings = { ...normalized }
+        }
+        if (this.textureFitModeSelect) this.textureFitModeSelect.value = normalized.fitMode
+        ;["tileSize", "repeatX", "repeatY", "offsetX", "offsetY", "rotation"].forEach((key) => {
+            const input = this[`textureSettingInput_${key}`]
+            if (input) input.value = String(normalized[key])
+        })
+    }
+
+    updateTextureSetting(key, value) {
+        if (!this.selectedObject) return
+        this.selectedObject.userData.textureSettings = normalizeTextureSettings({
+            ...(this.selectedObject.userData.textureSettings || {}),
+            [key]: value
+        })
+        this.syncTextureSettingsInputs(this.selectedObject.userData.textureSettings)
+        if (this.selectedObject.userData.texturePath) {
+            this.reapplySelectedTexture()
+        }
+        if (this.game && this.game.broadcastObjectUpdate) {
+            this.game.broadcastObjectUpdate(this.selectedObject)
+        }
+    }
+
+    reapplySelectedTexture() {
+        if (!this.selectedObject || !this.selectedObject.userData.texturePath) return
+        const loader = new THREE.TextureLoader()
+        const target = this.selectedObject
+        loader.load(target.userData.texturePath, (tex) => {
+            applyMapObjectTexture(
+                target,
+                tex,
+                target.userData.originalScale || { x: 1, y: 1, z: 1 },
+                target.userData.textureSettings
+            )
+        })
     }
 
     updateTransparency(opacity) {

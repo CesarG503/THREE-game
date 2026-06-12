@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { normalizeTextureSettings } from "../utils/TextureMapping";
 
 export class MapShapeEditor {
     constructor(game, constructionMenu) {
@@ -21,7 +22,10 @@ export class MapShapeEditor {
             mapSizeX: 100,
             mapSizeZ: 100,
             customGrid: [],
-            customCellSize: 10
+            customCellSize: 10,
+            groundTexturePath: null,
+            groundTextureAssetId: null,
+            groundTextureSettings: { fitMode: "auto", tileSize: 5, repeatX: 1, repeatY: 1, offsetX: 0, offsetY: 0, rotation: 0 }
         };
 
         this.selectionBox = null; // { startX, startZ, endX, endZ, mode }
@@ -177,6 +181,88 @@ export class MapShapeEditor {
         customInfo.appendChild(instructions);
 
         sidebar.appendChild(customInfo);
+
+        const groundGroup = document.createElement('div');
+        groundGroup.style.cssText = `display: flex; flex-direction: column; gap: 10px; border-top: 1px solid #333; padding-top: 15px;`;
+        groundGroup.innerHTML = `<label style="color:#aaa; font-size:14px; text-transform:uppercase;">Suelo predeterminado</label>`;
+
+        const groundTextureGrid = document.createElement('div');
+        groundTextureGrid.style.cssText = `display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px;`;
+        const groundTextures = [
+            { name: "Ninguna", path: null, color: "#333" },
+            { name: "Ladrillo", path: "/assets/textures/obj/brick.png" },
+            { name: "Concreto", path: "/assets/textures/obj/concrete.png" },
+            { name: "Madera", path: "/assets/textures/obj/wood.png" },
+            { name: "Hierro", path: "/assets/textures/obj/hierro.png" }
+        ];
+
+        groundTextures.forEach((tex) => {
+            const btn = document.createElement('button');
+            btn.type = "button";
+            btn.className = "mse-ground-texture-btn";
+            btn.title = tex.name;
+            btn.dataset.texturePath = tex.path || "";
+            btn.style.cssText = `
+                aspect-ratio: 1;
+                border: 1px solid #555;
+                border-radius: 4px;
+                cursor: pointer;
+                background-color: ${tex.color || "transparent"};
+                background-image: ${tex.path ? `url(${tex.path})` : "none"};
+                background-size: cover;
+                background-position: center;
+            `;
+            btn.onclick = () => {
+                this.config.groundTexturePath = tex.path;
+                this.config.groundTextureAssetId = null;
+                this.syncGroundTextureButtons();
+            };
+            groundTextureGrid.appendChild(btn);
+        });
+        groundGroup.appendChild(groundTextureGrid);
+
+        const groundModeRow = document.createElement('div');
+        groundModeRow.style.cssText = `display:flex; justify-content:space-between; align-items:center; gap:8px;`;
+        const groundModeLabel = document.createElement('span');
+        groundModeLabel.textContent = "Modo";
+        this.groundFitModeSelect = document.createElement('select');
+        this.groundFitModeSelect.style.cssText = `width: 135px; padding: 6px; background:#333; color:white; border:1px solid #555; border-radius:4px;`;
+        this.groundFitModeSelect.innerHTML = `
+            <option value="auto">Repetir por tamaño</option>
+            <option value="stretch">Estirar por pieza</option>
+        `;
+        this.groundFitModeSelect.onchange = (e) => this.updateGroundTextureSetting("fitMode", e.target.value);
+        groundModeRow.appendChild(groundModeLabel);
+        groundModeRow.appendChild(this.groundFitModeSelect);
+        groundGroup.appendChild(groundModeRow);
+
+        const groundSettingsGrid = document.createElement('div');
+        groundSettingsGrid.style.cssText = `display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px;`;
+        const makeGroundInput = (key, label, step, min = null) => {
+            const wrap = document.createElement('label');
+            wrap.style.cssText = `display:flex; flex-direction:column; gap:3px; font-size:11px; color:#aaa;`;
+            const input = document.createElement('input');
+            input.type = "number";
+            input.step = String(step);
+            if (min !== null) input.min = String(min);
+            input.style.cssText = `width:100%; box-sizing:border-box; padding:5px; background:#333; color:white; border:1px solid #555; border-radius:4px;`;
+            input.onchange = (e) => {
+                const value = parseFloat(e.target.value);
+                if (!isNaN(value)) this.updateGroundTextureSetting(key, value);
+            };
+            wrap.textContent = label;
+            wrap.appendChild(input);
+            this[`groundTextureInput_${key}`] = input;
+            return wrap;
+        };
+        groundSettingsGrid.appendChild(makeGroundInput("tileSize", "Baldosa", 0.25, 0.1));
+        groundSettingsGrid.appendChild(makeGroundInput("repeatX", "Repetir U", 0.25, 0.05));
+        groundSettingsGrid.appendChild(makeGroundInput("repeatY", "Repetir V", 0.25, 0.05));
+        groundSettingsGrid.appendChild(makeGroundInput("rotation", "Rotación", 5));
+        groundSettingsGrid.appendChild(makeGroundInput("offsetX", "Mover U", 0.05));
+        groundSettingsGrid.appendChild(makeGroundInput("offsetY", "Mover V", 0.05));
+        groundGroup.appendChild(groundSettingsGrid);
+        sidebar.appendChild(groundGroup);
 
         // Apply Button
         const spacer = document.createElement('div');
@@ -335,6 +421,9 @@ export class MapShapeEditor {
         this.config.mapSizeZ = env.mapSizeZ || 100;
         this.config.customGrid = [...(env.customGrid || [])];
         this.config.customCellSize = env.customCellSize || 10;
+        this.config.groundTexturePath = env.groundTexturePath || null;
+        this.config.groundTextureAssetId = env.groundTextureAssetId || null;
+        this.config.groundTextureSettings = normalizeTextureSettings(env.groundTextureSettings || { tileSize: 5 });
         this.useAreaSelection = false;
         this.selectionBox = null;
 
@@ -343,6 +432,7 @@ export class MapShapeEditor {
         document.getElementById("mse-size-z").value = this.config.mapSizeZ;
         document.getElementById("mse-cell-size").value = this.config.customCellSize;
         document.getElementById("mse-area-select").checked = this.useAreaSelection;
+        this.syncGroundTextureControls();
 
         // Reset view
         this.zoom = 4;
@@ -374,7 +464,10 @@ export class MapShapeEditor {
             mapSizeX: this.config.mapSizeX,
             mapSizeZ: this.config.mapSizeZ,
             customGrid: this.config.customGrid,
-            customCellSize: this.config.customCellSize
+            customCellSize: this.config.customCellSize,
+            groundTexturePath: this.config.groundTexturePath,
+            groundTextureAssetId: this.config.groundTextureAssetId,
+            groundTextureSettings: normalizeTextureSettings(this.config.groundTextureSettings)
         };
 
         this.game.updateEnvironmentConfig(newConfig);
@@ -391,6 +484,34 @@ export class MapShapeEditor {
         }
 
         this.close();
+    }
+
+    syncGroundTextureButtons() {
+        const buttons = this.container.querySelectorAll(".mse-ground-texture-btn");
+        buttons.forEach((btn) => {
+            const path = btn.dataset.texturePath || "";
+            const selected = (this.config.groundTexturePath || "") === path;
+            btn.style.borderColor = selected ? "#00FF00" : "#555";
+        });
+    }
+
+    syncGroundTextureControls() {
+        const settings = normalizeTextureSettings(this.config.groundTextureSettings || { tileSize: 5 });
+        this.config.groundTextureSettings = settings;
+        if (this.groundFitModeSelect) this.groundFitModeSelect.value = settings.fitMode;
+        ["tileSize", "repeatX", "repeatY", "offsetX", "offsetY", "rotation"].forEach((key) => {
+            const input = this[`groundTextureInput_${key}`];
+            if (input) input.value = String(settings[key]);
+        });
+        this.syncGroundTextureButtons();
+    }
+
+    updateGroundTextureSetting(key, value) {
+        this.config.groundTextureSettings = normalizeTextureSettings({
+            ...(this.config.groundTextureSettings || {}),
+            [key]: value
+        });
+        this.syncGroundTextureControls();
     }
 
     updateVisibility() {

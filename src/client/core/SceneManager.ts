@@ -53,11 +53,6 @@ export class SceneManager {
   initFloor() {
     // Floor plane is now managed by Game (main_rapier.js) dynamically
 
-    const grid = new THREE.GridHelper(100, 20, 0x000000, 0x000000);
-    grid.material.opacity = 0.2;
-    grid.material.transparent = true;
-    this.scene.add(grid);
-
     // Initialize stars (hidden by default)
     this.createStars();
   }

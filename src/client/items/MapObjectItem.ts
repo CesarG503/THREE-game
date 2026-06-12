@@ -2,6 +2,7 @@ import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
 import { Item } from "./Item";
 import { StairsUtils } from "../utils/StairsUtils";
+import { applyMapObjectTexture, normalizeTextureSettings, type MapTextureSettings } from "../utils/TextureMapping";
 import type { ItemContext } from "../types";
 
 type MapObjectScale = {
@@ -18,6 +19,7 @@ export class MapObjectItem extends Item {
   scale: MapObjectScale;
   texturePath: string | null;
   textureAssetId: string | null;
+  textureSettings: Required<MapTextureSettings>;
   logicProperties: any;
   opacity: number | undefined;
   uuid: string;
@@ -30,7 +32,8 @@ export class MapObjectItem extends Item {
     color: number,
     scale: MapObjectScale = { x: 1, y: 1, z: 1 },
     texturePath: string | null = null,
-    textureAssetId: string | null = null
+    textureAssetId: string | null = null,
+    textureSettings: MapTextureSettings | null = null
   ) {
     super(id, name, iconPath);
     this.type = type;
@@ -38,6 +41,7 @@ export class MapObjectItem extends Item {
     this.scale = scale;
     this.texturePath = texturePath;
     this.textureAssetId = textureAssetId;
+    this.textureSettings = normalizeTextureSettings(textureSettings);
     this.logicProperties = null;
 
     this.iconPath = this.generateIcon();
@@ -749,22 +753,7 @@ export class MapObjectItem extends Item {
     if (this.texturePath) {
       const textureLoader = new THREE.TextureLoader();
       textureLoader.load(this.texturePath, (texture: any) => {
-        texture.wrapS = THREE.RepeatWrapping;
-        texture.wrapT = THREE.RepeatWrapping;
-
-        texture.repeat.set(this.scale.x / 2, this.scale.y / 2);
-
-        if (object3D.isGroup) {
-          object3D.children.forEach((child: any) => {
-            if (child.material) {
-              child.material.map = texture;
-              child.material.needsUpdate = true;
-            }
-          });
-        } else if (object3D.material) {
-          object3D.material.map = texture;
-          object3D.material.needsUpdate = true;
-        }
+        applyMapObjectTexture(object3D, texture, this.scale, this.textureSettings);
       });
     }
 
@@ -779,6 +768,7 @@ export class MapObjectItem extends Item {
     object3D.userData.originalRotY = object3D.rotation.y;
     object3D.userData.texturePath = this.texturePath;
     object3D.userData.textureAssetId = this.textureAssetId;
+    object3D.userData.textureSettings = { ...this.textureSettings };
 
     if (this.logicProperties) {
       object3D.userData.logicProperties = { ...this.logicProperties };

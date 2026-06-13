@@ -2094,6 +2094,19 @@ export class ConstructionMenu {
         textureSettingsGrid.appendChild(makeTextureInput("offsetX", "Mover U", 0.05));
         textureSettingsGrid.appendChild(makeTextureInput("offsetY", "Mover V", 0.05));
         textureSettingsPanel.appendChild(textureSettingsGrid);
+
+        const patternVariationRow = document.createElement("label");
+        patternVariationRow.style.cssText = "display:flex; align-items:center; justify-content:space-between; gap:8px; font-size:11px; color:#ddd; cursor:pointer;";
+        const patternVariationText = document.createElement("span");
+        patternVariationText.textContent = "Variar patrón por bloque";
+        const patternVariationInput = document.createElement("input");
+        patternVariationInput.type = "checkbox";
+        patternVariationInput.onchange = (e) => this.updateDraftTextureSetting("patternVariation", e.target.checked);
+        this.textureSettingInput_patternVariation = patternVariationInput;
+        patternVariationRow.appendChild(patternVariationText);
+        patternVariationRow.appendChild(patternVariationInput);
+        textureSettingsPanel.appendChild(patternVariationRow);
+
         textureContainer.appendChild(textureSettingsPanel);
 
         this.panelEditor.appendChild(textureContainer);
@@ -3735,6 +3748,9 @@ export class ConstructionMenu {
             const input = this[`textureSettingInput_${key}`];
             if (input) input.value = String(normalized[key]);
         });
+        if (this.textureSettingInput_patternVariation) {
+            this.textureSettingInput_patternVariation.checked = normalized.patternVariation;
+        }
     }
 
     updateDraftTextureSetting(key, value) {

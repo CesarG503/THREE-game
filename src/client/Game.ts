@@ -456,7 +456,7 @@ export class Game {
 			fallDeathY: -20,
 			groundTexturePath: null,
 			groundTextureAssetId: null,
-			groundTextureSettings: { fitMode: "auto", tileSize: 5, repeatX: 1, repeatY: 1, offsetX: 0, offsetY: 0, rotation: 0 }
+			groundTextureSettings: { fitMode: "auto", tileSize: 5, repeatX: 1, repeatY: 1, offsetX: 0, offsetY: 0, rotation: 0, patternVariation: false }
 		};
 		this.invisibleWallMeshes = [];
 		this.invisibleWallBodies = [];

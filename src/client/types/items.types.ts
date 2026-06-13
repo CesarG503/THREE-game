@@ -143,6 +143,7 @@ export interface MapObjectConfig {
 		offsetX?: number;
 		offsetY?: number;
 		rotation?: number;
+		patternVariation?: boolean;
 	} | null;
 	logicProperties?: Record<string, unknown> | null;
 }

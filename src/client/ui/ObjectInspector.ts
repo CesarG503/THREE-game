@@ -391,6 +391,19 @@ export class ObjectInspector {
             settingsGrid.appendChild(makeTextureInput("offsetX", "Mover U", 0.05))
             settingsGrid.appendChild(makeTextureInput("offsetY", "Mover V", 0.05))
             settingsPanel.appendChild(settingsGrid)
+
+            const patternVariationRow = document.createElement('label')
+            patternVariationRow.style.cssText = `display:flex; align-items:center; justify-content:space-between; gap:8px; color:#ddd; font-size:11px; cursor:pointer;`
+            const patternVariationText = document.createElement('span')
+            patternVariationText.textContent = "Variar patrón por bloque"
+            const patternVariationInput = document.createElement('input')
+            patternVariationInput.type = "checkbox"
+            patternVariationInput.onchange = (e) => this.updateTextureSetting("patternVariation", e.target.checked)
+            this.textureSettingInput_patternVariation = patternVariationInput
+            patternVariationRow.appendChild(patternVariationText)
+            patternVariationRow.appendChild(patternVariationInput)
+            settingsPanel.appendChild(patternVariationRow)
+
             section.appendChild(settingsPanel)
         })
 
@@ -922,6 +935,9 @@ export class ObjectInspector {
             const input = this[`textureSettingInput_${key}`]
             if (input) input.value = String(normalized[key])
         })
+        if (this.textureSettingInput_patternVariation) {
+            this.textureSettingInput_patternVariation.checked = normalized.patternVariation
+        }
     }
 
     updateTextureSetting(key, value) {

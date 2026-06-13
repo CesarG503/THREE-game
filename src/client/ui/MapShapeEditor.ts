@@ -25,7 +25,7 @@ export class MapShapeEditor {
             customCellSize: 10,
             groundTexturePath: null,
             groundTextureAssetId: null,
-            groundTextureSettings: { fitMode: "auto", tileSize: 5, repeatX: 1, repeatY: 1, offsetX: 0, offsetY: 0, rotation: 0 }
+            groundTextureSettings: { fitMode: "auto", tileSize: 5, repeatX: 1, repeatY: 1, offsetX: 0, offsetY: 0, rotation: 0, patternVariation: false }
         };
 
         this.selectionBox = null; // { startX, startZ, endX, endZ, mode }
@@ -262,6 +262,19 @@ export class MapShapeEditor {
         groundSettingsGrid.appendChild(makeGroundInput("offsetX", "Mover U", 0.05));
         groundSettingsGrid.appendChild(makeGroundInput("offsetY", "Mover V", 0.05));
         groundGroup.appendChild(groundSettingsGrid);
+
+        const groundPatternRow = document.createElement('label');
+        groundPatternRow.style.cssText = `display:flex; justify-content:space-between; align-items:center; gap:8px; font-size:12px; color:#ddd; cursor:pointer;`;
+        const groundPatternText = document.createElement('span');
+        groundPatternText.textContent = "Variar patrón por bloque";
+        const groundPatternInput = document.createElement('input');
+        groundPatternInput.type = "checkbox";
+        groundPatternInput.onchange = (e) => this.updateGroundTextureSetting("patternVariation", e.target.checked);
+        this.groundTextureInput_patternVariation = groundPatternInput;
+        groundPatternRow.appendChild(groundPatternText);
+        groundPatternRow.appendChild(groundPatternInput);
+        groundGroup.appendChild(groundPatternRow);
+
         sidebar.appendChild(groundGroup);
 
         // Apply Button
@@ -503,6 +516,9 @@ export class MapShapeEditor {
             const input = this[`groundTextureInput_${key}`];
             if (input) input.value = String(settings[key]);
         });
+        if (this.groundTextureInput_patternVariation) {
+            this.groundTextureInput_patternVariation.checked = settings.patternVariation;
+        }
         this.syncGroundTextureButtons();
     }
 

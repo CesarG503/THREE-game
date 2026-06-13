@@ -22,6 +22,7 @@ export interface SavedMapData {
 			offsetX?: number;
 			offsetY?: number;
 			rotation?: number;
+			patternVariation?: boolean;
 		};
 	};
 	playerConfig: {
@@ -47,7 +48,7 @@ export function createEmptyMapData(): SavedMapData {
 			skyType: "night",
 			groundTexturePath: null,
 			groundTextureAssetId: null,
-			groundTextureSettings: { fitMode: "auto", tileSize: 5, repeatX: 1, repeatY: 1, offsetX: 0, offsetY: 0, rotation: 0 },
+			groundTextureSettings: { fitMode: "auto", tileSize: 5, repeatX: 1, repeatY: 1, offsetX: 0, offsetY: 0, rotation: 0, patternVariation: false },
 		},
 		playerConfig: {
 			roles: [],

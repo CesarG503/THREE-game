@@ -32,6 +32,9 @@ export async function loadLevelFromFile(this: any, url: string, position: any, s
 
 export function updateEnvironmentConfig(this: any, config: any) {
 	this.environmentConfig = Object.assign(this.environmentConfig, config);
+	if (this.sceneManager && this.sceneManager.setSky) {
+		this.sceneManager.setSky(this.environmentConfig.skyType || "day");
+	}
 	const shapeType = this.environmentConfig.shapeType || "rect";
 	const sx = this.environmentConfig.mapSizeX || 100;
 	const sz = this.environmentConfig.mapSizeZ || 100;

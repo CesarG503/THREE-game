@@ -1,5 +1,15 @@
 import * as THREE from "three";
 
+const SKYBOX_PREFIX = "skybox:";
+const SKYBOX_FACE_LAYOUT = {
+  px: { x: 2, y: 1 },
+  nx: { x: 0, y: 1 },
+  py: { x: 1, y: 0 },
+  ny: { x: 1, y: 2 },
+  pz: { x: 1, y: 1 },
+  nz: { x: 3, y: 1 }
+};
+
 export class SceneManager {
   container: HTMLElement | null;
   scene: THREE.Scene;
@@ -10,12 +20,21 @@ export class SceneManager {
   stars: THREE.Points | null;
   currentRenderDistance: number | undefined;
   private boundResize: () => void;
+  private skyboxCache: Map<string, Promise<THREE.CubeTexture>>;
+  private loadedSkyboxTextures: Set<THREE.CubeTexture>;
+  private activeSkyboxTexture: THREE.CubeTexture | null;
+  private skyboxRequestId: number;
 
   constructor(containerId: any) {
     this.container = document.getElementById(containerId);
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x87ceeb);
     this.scene.fog = new THREE.Fog(0x87ceeb, 10, 50);
+    this.scene.environment = null;
+    this.skyboxCache = new Map();
+    this.loadedSkyboxTextures = new Set();
+    this.activeSkyboxTexture = null;
+    this.skyboxRequestId = 0;
 
     this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
     this.camera.position.set(0, 5, 10);
@@ -82,6 +101,29 @@ export class SceneManager {
   }
 
   setSky(type: any) {
+    const skyType = type || "day";
+    const requestId = ++this.skyboxRequestId;
+
+    this.applyDefaultLighting();
+
+    if (typeof skyType === "string" && skyType.startsWith(SKYBOX_PREFIX)) {
+      const atlasUrl = skyType.slice(SKYBOX_PREFIX.length);
+      this.loadSkyboxFromAtlas(atlasUrl)
+        .then((texture) => {
+          if (requestId !== this.skyboxRequestId) return;
+          this.setActiveSkybox(texture);
+        })
+        .catch((error) => {
+          console.warn("Failed to load skybox cubemap", atlasUrl, error);
+          if (requestId === this.skyboxRequestId) this.applyColorSky("day");
+        });
+      return;
+    }
+
+    this.applyColorSky(skyType);
+  }
+
+  private applyDefaultLighting() {
     // ALWAYS use Day/Default lighting to preserve object colors
     if (this.ambientLight) {
       this.ambientLight.intensity = 0.6;
@@ -92,6 +134,10 @@ export class SceneManager {
       this.dirLight.color.setHex(0xffffff);
       this.dirLight.position.set(10, 20, 10);
     }
+  }
+
+  private applyColorSky(type: any) {
+    this.clearActiveSkybox();
 
     if (type === "night") {
       this.scene.background = new THREE.Color(0x020210);
@@ -111,6 +157,76 @@ export class SceneManager {
     if (this.currentRenderDistance !== undefined) {
       this.setRenderDistance(this.currentRenderDistance);
     }
+  }
+
+  private setActiveSkybox(texture: THREE.CubeTexture) {
+    this.activeSkyboxTexture = texture;
+    this.scene.background = texture;
+    this.scene.environment = texture;
+    this.scene.fog = null;
+    if (this.stars) this.stars.visible = false;
+  }
+
+  private clearActiveSkybox() {
+    this.scene.environment = null;
+    if (this.activeSkyboxTexture) {
+      this.activeSkyboxTexture = null;
+    }
+  }
+
+  private loadSkyboxFromAtlas(atlasUrl: string): Promise<THREE.CubeTexture> {
+    const cached = this.skyboxCache.get(atlasUrl);
+    if (cached) return cached;
+
+    const promise = new Promise<THREE.CubeTexture>((resolve, reject) => {
+      const image = new Image();
+      image.crossOrigin = "anonymous";
+      image.onload = () => {
+        try {
+          const faceSize = Math.min(image.width / 4, image.height / 3);
+          const faces = [
+            this.extractSkyboxFace(image, faceSize, SKYBOX_FACE_LAYOUT.px),
+            this.extractSkyboxFace(image, faceSize, SKYBOX_FACE_LAYOUT.nx),
+            this.extractSkyboxFace(image, faceSize, SKYBOX_FACE_LAYOUT.py),
+            this.extractSkyboxFace(image, faceSize, SKYBOX_FACE_LAYOUT.ny),
+            this.extractSkyboxFace(image, faceSize, SKYBOX_FACE_LAYOUT.pz),
+            this.extractSkyboxFace(image, faceSize, SKYBOX_FACE_LAYOUT.nz)
+          ];
+          const texture = new THREE.CubeTexture(faces);
+          texture.colorSpace = THREE.SRGBColorSpace;
+          texture.needsUpdate = true;
+          this.loadedSkyboxTextures.add(texture);
+          resolve(texture);
+        } catch (error) {
+          reject(error);
+        }
+      };
+      image.onerror = () => reject(new Error(`Could not load ${atlasUrl}`));
+      image.src = atlasUrl;
+    });
+
+    this.skyboxCache.set(atlasUrl, promise);
+    return promise;
+  }
+
+  private extractSkyboxFace(image: HTMLImageElement, faceSize: number, face: { x: number; y: number }) {
+    const canvas = document.createElement("canvas");
+    canvas.width = faceSize;
+    canvas.height = faceSize;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Could not create canvas context for skybox");
+    ctx.drawImage(
+      image,
+      face.x * faceSize,
+      face.y * faceSize,
+      faceSize,
+      faceSize,
+      0,
+      0,
+      faceSize,
+      faceSize
+    );
+    return canvas;
   }
 
   onWindowResize() {
@@ -150,6 +266,10 @@ export class SceneManager {
         }
       }
     });
+
+    this.loadedSkyboxTextures.forEach((texture) => texture.dispose());
+    this.loadedSkyboxTextures.clear();
+    this.skyboxCache.clear();
 
     this.renderer.dispose();
     this.renderer.domElement.remove();

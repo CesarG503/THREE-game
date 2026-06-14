@@ -11,7 +11,7 @@ export interface SavedMapData {
 		invisibleWalls: boolean;
 		fallDeath: boolean;
 		fallDeathY: number;
-		skyType?: "day" | "night" | "sunset";
+		skyType?: string;
 		groundTexturePath?: string | null;
 		groundTextureAssetId?: string | null;
 		groundTextureSettings?: {

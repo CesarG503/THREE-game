@@ -15,11 +15,20 @@ import { savePlatformMapForRoom } from "../platform/mapRuntime";
 import { listAssets, uploadAsset } from "../platform/api";
 import { getDefaultTextureSettings, normalizeTextureSettings } from "../utils/TextureMapping";
 
+const SKYBOX_CUBEMAP_DIR = "/assets/skybox/Cubemap";
+const SKYBOX_VALUE_PREFIX = "skybox:";
+const SKYBOX_PROBE_COUNT = 99;
+
+function getSkyboxAtlasUrl(index) {
+    return `${SKYBOX_CUBEMAP_DIR}/Cubemap_Sky_${String(index).padStart(2, "0")}-512x512.png`;
+}
+
 export class ConstructionMenu {
     constructor(inventoryManager, gameInstance) {
         this.inventoryManager = inventoryManager;
         this.game = gameInstance;
         this.isVisible = false;
+        this.skyboxAssetPromise = null;
         this.mapShapeEditor = new MapShapeEditor(this.game, this);
 
         // Systems
@@ -39,6 +48,31 @@ export class ConstructionMenu {
 
         this.setupUI();
         void this.refreshCustomTextures();
+    }
+
+    discoverSkyboxAssets() {
+        if (this.skyboxAssetPromise) return this.skyboxAssetPromise;
+
+        const candidates = Array.from({ length: SKYBOX_PROBE_COUNT }, (_, i) => {
+            const index = i + 1;
+            return {
+                text: `Skybox ${String(index).padStart(2, "0")}`,
+                value: `${SKYBOX_VALUE_PREFIX}${getSkyboxAtlasUrl(index)}`
+            };
+        });
+
+        this.skyboxAssetPromise = Promise.all(candidates.map(async (asset) => {
+            const url = asset.value.slice(SKYBOX_VALUE_PREFIX.length);
+            try {
+                const response = await fetch(url, { method: "HEAD" });
+                const contentType = response.headers.get("content-type") || "";
+                return response.ok && contentType.startsWith("image/") ? asset : null;
+            } catch (error) {
+                return null;
+            }
+        })).then(results => results.filter(Boolean));
+
+        return this.skyboxAssetPromise;
     }
 
     generateLibrary() {
@@ -753,22 +787,71 @@ export class ConstructionMenu {
             font-size: 16px;
             cursor: pointer;
         `;
+        const selectedSkyType = this.game.environmentConfig?.skyType || "day";
         const options = [
             { value: "day", text: "Día (Predeterminado)" },
             { value: "night", text: "Noche" },
             { value: "sunset", text: "Atardecer" }
         ];
 
-        options.forEach(opt => {
+        const appendSkyOption = (opt) => {
             const el = document.createElement("option");
             el.value = opt.value;
             el.textContent = opt.text;
             selectSky.appendChild(el);
+            return el;
+        };
+
+        options.forEach(appendSkyOption);
+
+        const skyboxGroup = document.createElement("optgroup");
+        skyboxGroup.label = "Skybox (assets)";
+        const loadingSkyboxes = document.createElement("option");
+        loadingSkyboxes.disabled = true;
+        loadingSkyboxes.textContent = "Buscando skyboxes...";
+        skyboxGroup.appendChild(loadingSkyboxes);
+        selectSky.appendChild(skyboxGroup);
+        selectSky.value = selectedSkyType;
+
+        let savedSkyOption = null;
+        if (selectedSkyType.startsWith(SKYBOX_VALUE_PREFIX)) {
+            savedSkyOption = appendSkyOption({ value: selectedSkyType, text: "Skybox guardado" });
+            savedSkyOption.hidden = true;
+            selectSky.value = selectedSkyType;
+        }
+
+        this.discoverSkyboxAssets().then((skyboxes) => {
+            skyboxGroup.innerHTML = "";
+            if (skyboxes.length === 0) {
+                const empty = document.createElement("option");
+                empty.disabled = true;
+                empty.textContent = "No hay skyboxes en assets";
+                skyboxGroup.appendChild(empty);
+                return;
+            }
+
+            const savedSkyboxExists = skyboxes.some(opt => opt.value === selectedSkyType);
+            if (savedSkyOption && savedSkyboxExists) savedSkyOption.remove();
+
+            skyboxes.forEach((opt) => {
+                const el = document.createElement("option");
+                el.value = opt.value;
+                el.textContent = opt.text;
+                skyboxGroup.appendChild(el);
+            });
+            selectSky.value = savedSkyboxExists ? selectedSkyType : selectSky.value;
         });
 
         selectSky.addEventListener("change", (e) => {
-            if (this.game.sceneManager && this.game.sceneManager.setSky) {
-                this.game.sceneManager.setSky(e.target.value);
+            const skyType = e.target.value;
+            if (this.game && this.game.updateEnvironmentConfig) {
+                this.game.updateEnvironmentConfig({ skyType });
+                if (this.game.networkManager && this.game.networkManager.collaborativeMode) {
+                    const mapJson = this.game.saveMap();
+                    this.game.networkManager.broadcastMapSync(mapJson);
+                }
+            } else if (this.game.sceneManager && this.game.sceneManager.setSky) {
+                this.game.sceneManager.setSky(skyType);
             } else {
                 console.warn("SceneManager setSky not found");
             }
@@ -810,7 +893,8 @@ export class ConstructionMenu {
                     mapSizeZ: parseFloat(inputSizeZ.value) || 100,
                     invisibleWalls: checkInvisibleWalls.checked,
                     fallDeath: checkFallDeath.checked,
-                    fallDeathY: parseFloat(inputFallY.value) || -20
+                    fallDeathY: parseFloat(inputFallY.value) || -20,
+                    skyType: selectSky.value || "day"
                 };
                 this.game.updateEnvironmentConfig(newConfig);
                 if (this.game.networkManager && this.game.networkManager.collaborativeMode) {

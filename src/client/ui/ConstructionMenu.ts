@@ -23,6 +23,12 @@ function getSkyboxAtlasUrl(index) {
     return `${SKYBOX_CUBEMAP_DIR}/Cubemap_Sky_${String(index).padStart(2, "0")}-512x512.png`;
 }
 
+function getSkyboxUrlFromValue(value) {
+    return typeof value === "string" && value.startsWith(SKYBOX_VALUE_PREFIX)
+        ? value.slice(SKYBOX_VALUE_PREFIX.length)
+        : null;
+}
+
 export class ConstructionMenu {
     constructor(inventoryManager, gameInstance) {
         this.inventoryManager = inventoryManager;
@@ -770,10 +776,10 @@ export class ConstructionMenu {
 
         // Environment / Sky Config
         const rowSky = document.createElement("div");
-        rowSky.style.cssText = "display: flex; flex-direction: column; gap: 5px; margin-top: 15px; border-top: 1px solid #444; padding-top: 15px;";
+        rowSky.style.cssText = "display: flex; flex-direction: column; gap: 10px; margin-top: 15px; border-top: 1px solid #444; padding-top: 15px;";
 
         const labelSky = document.createElement("label");
-        labelSky.textContent = "Apariencia del Cielo (Atmósfera)";
+        labelSky.textContent = "Apariencia del Cielo";
         labelSky.style.fontSize = "18px";
         labelSky.style.color = "#aaa";
 
@@ -788,11 +794,137 @@ export class ConstructionMenu {
             cursor: pointer;
         `;
         const selectedSkyType = this.game.environmentConfig?.skyType || "day";
+        let pendingSkyType = selectedSkyType;
         const options = [
-            { value: "day", text: "Día (Predeterminado)" },
-            { value: "night", text: "Noche" },
-            { value: "sunset", text: "Atardecer" }
+            { value: "day", text: "Día", preview: "linear-gradient(180deg, #79c8ff 0%, #e4f7ff 72%, #b8e3ff 100%)" },
+            { value: "night", text: "Noche", preview: "radial-gradient(circle at 30% 28%, rgba(255,255,255,0.9) 0 2px, transparent 3px), radial-gradient(circle at 70% 38%, rgba(255,255,255,0.8) 0 1px, transparent 2px), linear-gradient(180deg, #030617 0%, #101544 100%)" },
+            { value: "sunset", text: "Atardecer", preview: "linear-gradient(180deg, #ff8f70 0%, #ffc46b 48%, #33235f 100%)" }
         ];
+        const skyOptionLabels = new Map(options.map(opt => [opt.value, opt.text]));
+        const skyOptionPreviews = new Map(options.map(opt => [opt.value, opt.preview]));
+
+        const previewWrap = document.createElement("div");
+        previewWrap.style.cssText = `
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 12px;
+            align-items: stretch;
+        `;
+
+        const previewFrame = document.createElement("div");
+        previewFrame.style.cssText = `
+            min-height: 150px;
+            border: 1px solid #555;
+            border-radius: 8px;
+            overflow: hidden;
+            background: #111;
+            position: relative;
+        `;
+
+        const previewImage = document.createElement("div");
+        previewImage.style.cssText = `
+            position: absolute;
+            inset: 0;
+            background-size: cover;
+            background-position: center;
+        `;
+        previewFrame.appendChild(previewImage);
+
+        const previewLabel = document.createElement("div");
+        previewLabel.style.cssText = `
+            position: absolute;
+            left: 8px;
+            right: 8px;
+            bottom: 8px;
+            padding: 6px 8px;
+            border-radius: 6px;
+            background: rgba(0,0,0,0.62);
+            color: white;
+            font-size: 13px;
+            font-weight: bold;
+            text-shadow: 0 1px 2px #000;
+        `;
+        previewFrame.appendChild(previewLabel);
+
+        const skyboxGrid = document.createElement("div");
+        skyboxGrid.style.cssText = `
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(82px, 1fr));
+            gap: 8px;
+            max-height: 178px;
+            overflow-y: auto;
+            padding: 2px 4px 2px 0;
+        `;
+
+        previewWrap.appendChild(previewFrame);
+        previewWrap.appendChild(skyboxGrid);
+
+        const actionsRow = document.createElement("div");
+        actionsRow.style.cssText = "display: flex; align-items: center; gap: 10px; flex-wrap: wrap;";
+
+        const applySkyBtn = document.createElement("button");
+        applySkyBtn.textContent = "Aplicar cielo";
+        applySkyBtn.style.cssText = `
+            padding: 8px 12px;
+            background: #2563eb;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+        `;
+        applySkyBtn.onmouseover = () => applySkyBtn.style.background = "#1d4ed8";
+        applySkyBtn.onmouseout = () => applySkyBtn.style.background = "#2563eb";
+
+        const previewStatus = document.createElement("span");
+        previewStatus.style.cssText = "color: #9ca3af; font-size: 13px;";
+
+        actionsRow.appendChild(selectSky);
+        actionsRow.appendChild(applySkyBtn);
+        actionsRow.appendChild(previewStatus);
+
+        const setPendingSky = (value) => {
+            pendingSkyType = value || "day";
+            selectSky.value = pendingSkyType;
+            const skyboxUrl = getSkyboxUrlFromValue(pendingSkyType);
+            const label = skyOptionLabels.get(pendingSkyType) || "Skybox guardado";
+            previewLabel.textContent = label;
+            previewStatus.textContent = pendingSkyType === (this.game.environmentConfig?.skyType || "day") ? "Aplicado" : "Vista previa";
+
+            if (skyboxUrl) {
+                previewImage.style.backgroundImage = `url("${skyboxUrl}")`;
+                previewImage.style.backgroundSize = "cover";
+                previewImage.style.backgroundPosition = "center";
+            } else {
+                previewImage.style.backgroundImage = skyOptionPreviews.get(pendingSkyType) || skyOptionPreviews.get("day");
+                previewImage.style.backgroundSize = "cover";
+                previewImage.style.backgroundPosition = "center";
+            }
+
+            Array.from(skyboxGrid.children).forEach((child) => {
+                const isActive = child.dataset.skyValue === pendingSkyType;
+                child.style.borderColor = isActive ? "#60a5fa" : "#555";
+                child.style.boxShadow = isActive ? "0 0 0 2px rgba(96,165,250,0.35)" : "none";
+            });
+        };
+
+        const applyPendingSky = () => {
+            const skyType = pendingSkyType || "day";
+            if (this.game && this.game.updateEnvironmentConfig) {
+                this.game.updateEnvironmentConfig({ skyType });
+                if (this.game.networkManager && this.game.networkManager.collaborativeMode) {
+                    const mapJson = this.game.saveMap();
+                    this.game.networkManager.broadcastMapSync(mapJson);
+                }
+                previewStatus.textContent = "Aplicado";
+            } else if (this.game.sceneManager && this.game.sceneManager.setSky) {
+                this.game.sceneManager.setSky(skyType);
+                previewStatus.textContent = "Aplicado";
+            } else {
+                console.warn("SceneManager setSky not found");
+            }
+        };
 
         const appendSkyOption = (opt) => {
             const el = document.createElement("option");
@@ -802,7 +934,59 @@ export class ConstructionMenu {
             return el;
         };
 
-        options.forEach(appendSkyOption);
+        const createSkyCard = (opt) => {
+            const card = document.createElement("button");
+            card.type = "button";
+            card.dataset.skyValue = opt.value;
+            card.title = opt.text;
+            card.style.cssText = `
+                height: 76px;
+                border: 1px solid #555;
+                border-radius: 7px;
+                background: #222;
+                overflow: hidden;
+                cursor: pointer;
+                padding: 0;
+                position: relative;
+            `;
+
+            const image = document.createElement("div");
+            image.style.cssText = `
+                position: absolute;
+                inset: 0;
+                background-size: cover;
+                background-position: center;
+            `;
+            const skyboxUrl = getSkyboxUrlFromValue(opt.value);
+            image.style.backgroundImage = skyboxUrl ? `url("${skyboxUrl}")` : (opt.preview || skyOptionPreviews.get("day"));
+            card.appendChild(image);
+
+            const name = document.createElement("span");
+            name.textContent = opt.text;
+            name.style.cssText = `
+                position: absolute;
+                left: 4px;
+                right: 4px;
+                bottom: 4px;
+                padding: 3px 4px;
+                border-radius: 4px;
+                background: rgba(0,0,0,0.64);
+                color: white;
+                font-size: 11px;
+                font-weight: bold;
+                line-height: 1.1;
+                text-align: center;
+            `;
+            card.appendChild(name);
+
+            card.onclick = () => setPendingSky(opt.value);
+            return card;
+        };
+
+        options.forEach((opt) => {
+            appendSkyOption(opt);
+            skyboxGrid.appendChild(createSkyCard(opt));
+        });
 
         const skyboxGroup = document.createElement("optgroup");
         skyboxGroup.label = "Skybox (assets)";
@@ -811,13 +995,13 @@ export class ConstructionMenu {
         loadingSkyboxes.textContent = "Buscando skyboxes...";
         skyboxGroup.appendChild(loadingSkyboxes);
         selectSky.appendChild(skyboxGroup);
-        selectSky.value = selectedSkyType;
 
         let savedSkyOption = null;
         if (selectedSkyType.startsWith(SKYBOX_VALUE_PREFIX)) {
+            const savedUrl = getSkyboxUrlFromValue(selectedSkyType);
             savedSkyOption = appendSkyOption({ value: selectedSkyType, text: "Skybox guardado" });
             savedSkyOption.hidden = true;
-            selectSky.value = selectedSkyType;
+            skyboxGrid.appendChild(createSkyCard({ value: selectedSkyType, text: "Skybox guardado", preview: savedUrl ? `url("${savedUrl}")` : skyOptionPreviews.get("day") }));
         }
 
         this.discoverSkyboxAssets().then((skyboxes) => {
@@ -834,31 +1018,27 @@ export class ConstructionMenu {
             if (savedSkyOption && savedSkyboxExists) savedSkyOption.remove();
 
             skyboxes.forEach((opt) => {
+                skyOptionLabels.set(opt.value, opt.text);
                 const el = document.createElement("option");
                 el.value = opt.value;
                 el.textContent = opt.text;
                 skyboxGroup.appendChild(el);
+                if (!Array.from(skyboxGrid.children).some((child) => child.dataset.skyValue === opt.value)) {
+                    skyboxGrid.appendChild(createSkyCard(opt));
+                }
             });
-            selectSky.value = savedSkyboxExists ? selectedSkyType : selectSky.value;
+            setPendingSky(skyboxes.some(opt => opt.value === selectedSkyType) ? selectedSkyType : pendingSkyType);
         });
 
         selectSky.addEventListener("change", (e) => {
-            const skyType = e.target.value;
-            if (this.game && this.game.updateEnvironmentConfig) {
-                this.game.updateEnvironmentConfig({ skyType });
-                if (this.game.networkManager && this.game.networkManager.collaborativeMode) {
-                    const mapJson = this.game.saveMap();
-                    this.game.networkManager.broadcastMapSync(mapJson);
-                }
-            } else if (this.game.sceneManager && this.game.sceneManager.setSky) {
-                this.game.sceneManager.setSky(skyType);
-            } else {
-                console.warn("SceneManager setSky not found");
-            }
+            setPendingSky(e.target.value);
         });
+        applySkyBtn.addEventListener("click", applyPendingSky);
 
         rowSky.appendChild(labelSky);
-        rowSky.appendChild(selectSky);
+        rowSky.appendChild(actionsRow);
+        rowSky.appendChild(previewWrap);
+        setPendingSky(selectedSkyType);
         container.appendChild(rowSky);
 
         // Map Boundaries and Rules Config
@@ -894,7 +1074,7 @@ export class ConstructionMenu {
                     invisibleWalls: checkInvisibleWalls.checked,
                     fallDeath: checkFallDeath.checked,
                     fallDeathY: parseFloat(inputFallY.value) || -20,
-                    skyType: selectSky.value || "day"
+                    skyType: this.game.environmentConfig?.skyType || "day"
                 };
                 this.game.updateEnvironmentConfig(newConfig);
                 if (this.game.networkManager && this.game.networkManager.collaborativeMode) {

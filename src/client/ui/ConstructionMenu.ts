@@ -18,6 +18,15 @@ import { getDefaultTextureSettings, normalizeTextureSettings } from "../utils/Te
 const SKYBOX_CUBEMAP_DIR = "/assets/skybox/Cubemap";
 const SKYBOX_VALUE_PREFIX = "skybox:";
 const SKYBOX_PROBE_COUNT = 99;
+const SKYBOX_PREVIEW_TEXTURE_CACHE = new Map();
+const CUBEMAP_FACE_CROPS = {
+    left: { x: 0, y: 1 },
+    front: { x: 1, y: 1 },
+    right: { x: 2, y: 1 },
+    back: { x: 3, y: 1 },
+    top: { x: 1, y: 0 },
+    bottom: { x: 1, y: 2 }
+};
 
 function getSkyboxAtlasUrl(index) {
     return `${SKYBOX_CUBEMAP_DIR}/Cubemap_Sky_${String(index).padStart(2, "0")}-512x512.png`;
@@ -27,6 +36,66 @@ function getSkyboxUrlFromValue(value) {
     return typeof value === "string" && value.startsWith(SKYBOX_VALUE_PREFIX)
         ? value.slice(SKYBOX_VALUE_PREFIX.length)
         : null;
+}
+
+function applyCubemapFacePreview(element, url, face = "front") {
+    const crop = CUBEMAP_FACE_CROPS[face] || CUBEMAP_FACE_CROPS.front;
+    element.style.backgroundImage = `url("${url}")`;
+    element.style.backgroundSize = "400% 300%";
+    element.style.backgroundPosition = `${(crop.x / 3) * 100}% ${(crop.y / 2) * 100}%`;
+}
+
+function extractCubemapFace(image, faceSize, face) {
+    const crop = CUBEMAP_FACE_CROPS[face] || CUBEMAP_FACE_CROPS.front;
+    const canvas = document.createElement("canvas");
+    canvas.width = faceSize;
+    canvas.height = faceSize;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Could not create skybox preview canvas");
+    ctx.drawImage(
+        image,
+        crop.x * faceSize,
+        crop.y * faceSize,
+        faceSize,
+        faceSize,
+        0,
+        0,
+        faceSize,
+        faceSize
+    );
+    return canvas;
+}
+
+function loadSkyboxPreviewTexture(url) {
+    if (SKYBOX_PREVIEW_TEXTURE_CACHE.has(url)) return SKYBOX_PREVIEW_TEXTURE_CACHE.get(url);
+
+    const promise = new Promise((resolve, reject) => {
+        const image = new Image();
+        image.crossOrigin = "anonymous";
+        image.onload = () => {
+            try {
+                const faceSize = Math.min(image.width / 4, image.height / 3);
+                const texture = new THREE.CubeTexture([
+                    extractCubemapFace(image, faceSize, "right"),
+                    extractCubemapFace(image, faceSize, "left"),
+                    extractCubemapFace(image, faceSize, "top"),
+                    extractCubemapFace(image, faceSize, "bottom"),
+                    extractCubemapFace(image, faceSize, "front"),
+                    extractCubemapFace(image, faceSize, "back")
+                ]);
+                texture.colorSpace = THREE.SRGBColorSpace;
+                texture.needsUpdate = true;
+                resolve(texture);
+            } catch (error) {
+                reject(error);
+            }
+        };
+        image.onerror = () => reject(new Error(`Could not load skybox preview ${url}`));
+        image.src = url;
+    });
+
+    SKYBOX_PREVIEW_TEXTURE_CACHE.set(url, promise);
+    return promise;
 }
 
 export class ConstructionMenu {
@@ -664,6 +733,11 @@ export class ConstructionMenu {
     }
 
     renderSettings(container) {
+        if (this.skyboxPreviewCleanup) {
+            this.skyboxPreviewCleanup();
+            this.skyboxPreviewCleanup = null;
+        }
+
         // Grid Toggle
         const row = document.createElement("div");
         row.style.cssText = "display: flex; align-items: center; gap: 10px;";
@@ -813,7 +887,7 @@ export class ConstructionMenu {
 
         const previewFrame = document.createElement("div");
         previewFrame.style.cssText = `
-            min-height: 150px;
+            min-height: 220px;
             border: 1px solid #555;
             border-radius: 8px;
             overflow: hidden;
@@ -830,6 +904,18 @@ export class ConstructionMenu {
         `;
         previewFrame.appendChild(previewImage);
 
+        const skyboxPreviewViewport = document.createElement("div");
+        skyboxPreviewViewport.style.cssText = `
+            position: absolute;
+            inset: 0;
+            display: none;
+            background: #070910;
+            cursor: grab;
+            user-select: none;
+            touch-action: none;
+        `;
+        previewFrame.appendChild(skyboxPreviewViewport);
+
         const previewLabel = document.createElement("div");
         previewLabel.style.cssText = `
             position: absolute;
@@ -843,8 +929,78 @@ export class ConstructionMenu {
             font-size: 13px;
             font-weight: bold;
             text-shadow: 0 1px 2px #000;
+            pointer-events: none;
         `;
         previewFrame.appendChild(previewLabel);
+
+        const skyboxPreviewScene = new THREE.Scene();
+        const skyboxPreviewCamera = new THREE.PerspectiveCamera(70, 1, 0.1, 10);
+        const skyboxPreviewRenderer = new THREE.WebGLRenderer({ antialias: true });
+        skyboxPreviewRenderer.outputColorSpace = THREE.SRGBColorSpace;
+        skyboxPreviewRenderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+        skyboxPreviewRenderer.domElement.style.width = "100%";
+        skyboxPreviewRenderer.domElement.style.height = "100%";
+        skyboxPreviewRenderer.domElement.style.display = "block";
+        skyboxPreviewViewport.appendChild(skyboxPreviewRenderer.domElement);
+
+        let previewYaw = -25;
+        let previewPitch = 0;
+        let previewDragging = false;
+        let previewDragX = 0;
+        let previewDragY = 0;
+        let skyboxPreviewToken = 0;
+        const renderSkyboxPreview = () => {
+            const width = Math.max(1, previewFrame.clientWidth || 320);
+            const height = Math.max(1, previewFrame.clientHeight || 220);
+            skyboxPreviewCamera.aspect = width / height;
+            skyboxPreviewCamera.rotation.order = "YXZ";
+            skyboxPreviewCamera.rotation.y = THREE.MathUtils.degToRad(previewYaw);
+            skyboxPreviewCamera.rotation.x = THREE.MathUtils.degToRad(previewPitch);
+            skyboxPreviewCamera.updateProjectionMatrix();
+            skyboxPreviewRenderer.setSize(width, height, false);
+            skyboxPreviewRenderer.render(skyboxPreviewScene, skyboxPreviewCamera);
+        };
+        const previewResizeObserver = new ResizeObserver(renderSkyboxPreview);
+        previewResizeObserver.observe(previewFrame);
+
+        skyboxPreviewViewport.addEventListener("pointerdown", (e) => {
+            previewDragging = true;
+            previewDragX = e.clientX;
+            previewDragY = e.clientY;
+            skyboxPreviewViewport.style.cursor = "grabbing";
+            skyboxPreviewViewport.setPointerCapture(e.pointerId);
+        });
+
+        skyboxPreviewViewport.addEventListener("pointermove", (e) => {
+            if (!previewDragging) return;
+            const dx = e.clientX - previewDragX;
+            const dy = e.clientY - previewDragY;
+            previewDragX = e.clientX;
+            previewDragY = e.clientY;
+            previewYaw -= dx * 0.22;
+            previewPitch = Math.max(-82, Math.min(82, previewPitch - dy * 0.18));
+            renderSkyboxPreview();
+        });
+
+        const stopSkyboxPreviewDrag = (e) => {
+            previewDragging = false;
+            skyboxPreviewViewport.style.cursor = "grab";
+            if (e && skyboxPreviewViewport.hasPointerCapture(e.pointerId)) {
+                skyboxPreviewViewport.releasePointerCapture(e.pointerId);
+            }
+        };
+        skyboxPreviewViewport.addEventListener("pointerup", stopSkyboxPreviewDrag);
+        skyboxPreviewViewport.addEventListener("pointercancel", stopSkyboxPreviewDrag);
+        skyboxPreviewViewport.addEventListener("pointerleave", () => {
+            if (!previewDragging) skyboxPreviewViewport.style.cursor = "grab";
+        });
+
+        this.skyboxPreviewCleanup = () => {
+            previewResizeObserver.disconnect();
+            skyboxPreviewScene.background = null;
+            skyboxPreviewRenderer.dispose();
+            skyboxPreviewRenderer.domElement.remove();
+        };
 
         const skyboxGrid = document.createElement("div");
         skyboxGrid.style.cssText = `
@@ -884,6 +1040,19 @@ export class ConstructionMenu {
         actionsRow.appendChild(applySkyBtn);
         actionsRow.appendChild(previewStatus);
 
+        const applySkyboxPreview = (skyboxUrl) => {
+            const token = ++skyboxPreviewToken;
+            loadSkyboxPreviewTexture(skyboxUrl)
+                .then((texture) => {
+                    if (token !== skyboxPreviewToken) return;
+                    skyboxPreviewScene.background = texture;
+                    renderSkyboxPreview();
+                })
+                .catch((error) => {
+                    console.warn("Failed to load skybox preview", skyboxUrl, error);
+                });
+        };
+
         const setPendingSky = (value) => {
             pendingSkyType = value || "day";
             selectSky.value = pendingSkyType;
@@ -893,10 +1062,14 @@ export class ConstructionMenu {
             previewStatus.textContent = pendingSkyType === (this.game.environmentConfig?.skyType || "day") ? "Aplicado" : "Vista previa";
 
             if (skyboxUrl) {
-                previewImage.style.backgroundImage = `url("${skyboxUrl}")`;
-                previewImage.style.backgroundSize = "cover";
-                previewImage.style.backgroundPosition = "center";
+                previewImage.style.display = "none";
+                skyboxPreviewViewport.style.display = "block";
+                applySkyboxPreview(skyboxUrl);
             } else {
+                ++skyboxPreviewToken;
+                skyboxPreviewScene.background = null;
+                skyboxPreviewViewport.style.display = "none";
+                previewImage.style.display = "block";
                 previewImage.style.backgroundImage = skyOptionPreviews.get(pendingSkyType) || skyOptionPreviews.get("day");
                 previewImage.style.backgroundSize = "cover";
                 previewImage.style.backgroundPosition = "center";
@@ -958,7 +1131,13 @@ export class ConstructionMenu {
                 background-position: center;
             `;
             const skyboxUrl = getSkyboxUrlFromValue(opt.value);
-            image.style.backgroundImage = skyboxUrl ? `url("${skyboxUrl}")` : (opt.preview || skyOptionPreviews.get("day"));
+            if (skyboxUrl) {
+                applyCubemapFacePreview(image, skyboxUrl, "front");
+            } else {
+                image.style.backgroundImage = opt.preview || skyOptionPreviews.get("day");
+                image.style.backgroundSize = "cover";
+                image.style.backgroundPosition = "center";
+            }
             card.appendChild(image);
 
             const name = document.createElement("span");

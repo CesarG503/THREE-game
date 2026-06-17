@@ -38,6 +38,7 @@ import { GameHUD } from "./ui/GameHUD";
 import { ObjectInspector } from "./ui/ObjectInspector";
 import { createItemFromNetworkData, serializeItemForNetwork } from "./items/ItemNetworkSerializer";
 import { getMapData, loadPlatformMapForRoom, type PlatformMap } from "./platform/mapRuntime";
+import { DEFAULT_SKYBOX_TYPE } from "./platform/mapDefaults";
 
 export class Game {
 	sceneManager: any;
@@ -454,7 +455,7 @@ export class Game {
 			invisibleWalls: false,
 			fallDeath: true,
 			fallDeathY: -20,
-			skyType: "day",
+			skyType: DEFAULT_SKYBOX_TYPE,
 			groundTexturePath: null,
 			groundTextureAssetId: null,
 			groundTextureSettings: { fitMode: "auto", tileSize: 5, repeatX: 1, repeatY: 1, offsetX: 0, offsetY: 0, rotation: 0, patternVariation: false }

@@ -14,7 +14,7 @@ export interface EnvironmentConfig {
 	invisibleWalls?: boolean;
 	fallDeath?: boolean;
 	fallDeathY?: number;
-	skyType?: "day" | "night" | "sunset";
+	skyType?: string;
 }
 
 export interface MainBootstrapOptions {

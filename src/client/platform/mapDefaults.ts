@@ -31,6 +31,8 @@ export interface SavedMapData {
 	};
 }
 
+export const DEFAULT_SKYBOX_TYPE = "skybox:/assets/skybox/Cubemap/Cubemap_Sky_04-512x512.png";
+
 export function createEmptyMapData(): SavedMapData {
 	return {
 		gameVersion: "1.0",
@@ -45,7 +47,7 @@ export function createEmptyMapData(): SavedMapData {
 			invisibleWalls: false,
 			fallDeath: true,
 			fallDeathY: -20,
-			skyType: "night",
+			skyType: DEFAULT_SKYBOX_TYPE,
 			groundTexturePath: null,
 			groundTextureAssetId: null,
 			groundTextureSettings: { fitMode: "auto", tileSize: 5, repeatX: 1, repeatY: 1, offsetX: 0, offsetY: 0, rotation: 0, patternVariation: false },

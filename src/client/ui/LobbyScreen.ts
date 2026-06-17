@@ -571,7 +571,7 @@ function renderCreateView(
 	fields.appendChild(publish);
 
 	side.appendChild(createElement("h3", "vp-panel-title", "Plantilla"));
-	side.appendChild(createElement("div", "vp-muted", "Mapa vacio · suelo 100x100 · cielo nocturno · listo para editor."));
+	side.appendChild(createElement("div", "vp-muted", "Mapa vacio · suelo 100x100 · Skybox 04 · listo para editor."));
 	side.appendChild(createElement("div", "vp-toast"));
 	side.appendChild(prependIcon(createButton("vp-primary-btn vp-icon-btn", "Crear y editar", () => form.requestSubmit()), "mdi:hammer-wrench"));
 

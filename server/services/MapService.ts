@@ -320,6 +320,7 @@ function normalizeBoolean(value: unknown, fallback: boolean) {
 }
 
 function normalizeMapData(value: unknown): Prisma.InputJsonValue {
+  const defaultSkyboxType = "skybox:/assets/skybox/Cubemap/Cubemap_Sky_04-512x512.png"
   const data = value ?? {
     gameVersion: "1.0",
     timestamp: Date.now(),
@@ -331,6 +332,7 @@ function normalizeMapData(value: unknown): Prisma.InputJsonValue {
       invisibleWalls: false,
       fallDeath: true,
       fallDeathY: -20,
+      skyType: defaultSkyboxType,
     },
     playerConfig: { roles: [], assignments: {} },
   }

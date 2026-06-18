@@ -758,6 +758,7 @@ export class Game {
 		this.fxBlasterSystem?.Destroy?.();
 		this.character?.dispose?.();
 		this.hud?.destroy?.();
+		this.objectInspector?.destroy?.();
 
 		if (document.pointerLockElement) {
 			document.exitPointerLock?.();

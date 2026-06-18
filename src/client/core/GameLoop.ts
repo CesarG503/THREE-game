@@ -623,6 +623,7 @@ export function animate(this: any) {
 	}
 
 	this.updateDebugRender();
+	this.objectInspector?.updateGizmo?.();
 	this.sceneManager.renderer.clear();
 	this.sceneManager.update();
 	this.renderOrientationGizmo();

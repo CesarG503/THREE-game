@@ -259,6 +259,10 @@ export class MapObjectItem extends Item {
       }
     }
 
+    if (context.isRightClick && this.type !== "movement_controller") {
+      return false;
+    }
+
     if (this.type === "spawn_point") {
       if (context.placementManager && context.placementManager.currentSpawnProperties) {
         const props = context.placementManager.currentSpawnProperties;

@@ -34,6 +34,13 @@ export function setupGameInput(this: Game) {
 			this.objectInspector.hide();
 		}
 
+		if (key === "r" && this.objectInspector?.isVisible && this.objectInspector?.selectedObject) {
+			e.preventDefault();
+			const mode = this.objectInspector.cycleTransformMode();
+			console.log("Transform Gizmo Mode:", mode);
+			return;
+		}
+
 		if (this.inputManager && !this.inputManager.enabled) return;
 
 		if (key === "r") {

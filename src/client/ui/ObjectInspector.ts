@@ -5,6 +5,7 @@ import { StairsUtils } from "../utils/StairsUtils"
 import { LogicItemsManager } from "./logic_items/LogicItemsManager"
 import { listAssets, uploadAsset } from "../platform/api"
 import { applyMapObjectTexture, normalizeTextureSettings } from "../utils/TextureMapping"
+import { TransformGizmo } from "../editor/TransformGizmo"
 
 export class ObjectInspector {
     constructor(gameInstance) {
@@ -14,6 +15,7 @@ export class ObjectInspector {
         this.customTextureAssets = []
 
         this.setupUI()
+        this.transformGizmo = new TransformGizmo(this.game, this)
         void this.refreshCustomTextures()
     }
 
@@ -578,24 +580,7 @@ export class ObjectInspector {
         // Populate Data
         this.title.textContent = `Propiedades: ${object.userData.mapObjectType || "Objeto"}`
 
-        // Position
-        this.inputPosX.input.value = object.position.x.toFixed(2)
-        this.inputPosY.input.value = object.position.y.toFixed(2)
-        this.inputPosZ.input.value = object.position.z.toFixed(2)
-
-        // Rotation (Radians -> Degrees)
-        this.inputRotX.input.value = (object.rotation.x * (180 / Math.PI)).toFixed(1)
-        this.inputRotY.input.value = (object.rotation.y * (180 / Math.PI)).toFixed(1)
-        this.inputRotZ.input.value = (object.rotation.z * (180 / Math.PI)).toFixed(1)
-
-        // Scale/Dim (Assuming box geometry for now, or reading scale from userData if available)
-        // If it's a scaled standard mesh, we use .scale properties combined with geometry params?
-        // Our system uses geometry parameters for size usually.
-        // Let's assume userData.originalScale holds the dimensions.
-        const dims = object.userData.originalScale || { x: 1, y: 1, z: 1 }
-        this.inputScaleX.input.value = dims.x
-        this.inputScaleY.input.value = dims.y
-        this.inputScaleZ.input.value = dims.z
+        this.syncTransformInputs()
 
         // Color
         if (object.material && object.material.color) {
@@ -666,30 +651,14 @@ export class ObjectInspector {
         document.exitPointerLock()
         if (this.game.cameraController) this.game.cameraController.setUIOpen(true)
 
-        // Add Axes Helper
-        if (!this.axesHelper) {
-            this.axesHelper = new THREE.AxesHelper(3) // Size 3
-            // Make it visible on top? No, just add to object.
-            // If we add to object, it rotates with object.
-            // If users want Global axes, we'd add to scene. 
-            // "Show Red/Green/Blue arrows on the selected object" implies local axes usually.
-            // Let's add to scene and copy transforms or add to object?
-            // Adding to object is easiest.
-        }
-        // Always add (re-parent) to current object
-        object.add(this.axesHelper)
+        this.transformGizmo.attach(object)
     }
 
     hide() {
         this.isVisible = false
         this.container.style.display = 'none'
 
-        // Remove Axes Helper
-        if (this.selectedObject && this.axesHelper) {
-            this.selectedObject.remove(this.axesHelper)
-            this.axesHelper.dispose()
-            this.axesHelper = null
-        }
+        this.transformGizmo.detach()
 
         this.selectedObject = null
         if (this.game.cameraController) this.game.cameraController.setUIOpen(false)
@@ -698,9 +667,58 @@ export class ObjectInspector {
         // if (this.game.inputManager) this.game.inputManager.enabled = true
     }
 
+    syncTransformInputs(dimensionsOverride = null) {
+        if (!this.selectedObject) return
+
+        this.inputPosX.input.value = this.selectedObject.position.x.toFixed(2)
+        this.inputPosY.input.value = this.selectedObject.position.y.toFixed(2)
+        this.inputPosZ.input.value = this.selectedObject.position.z.toFixed(2)
+
+        this.inputRotX.input.value = (this.selectedObject.rotation.x * (180 / Math.PI)).toFixed(1)
+        this.inputRotY.input.value = (this.selectedObject.rotation.y * (180 / Math.PI)).toFixed(1)
+        this.inputRotZ.input.value = (this.selectedObject.rotation.z * (180 / Math.PI)).toFixed(1)
+
+        const dims = dimensionsOverride || this.selectedObject.userData.originalScale || { x: 1, y: 1, z: 1 }
+        this.inputScaleX.input.value = Number(dims.x).toFixed(2)
+        this.inputScaleY.input.value = Number(dims.y).toFixed(2)
+        this.inputScaleZ.input.value = Number(dims.z).toFixed(2)
+    }
+
+    cycleTransformMode() {
+        return this.transformGizmo.cycleMode()
+    }
+
+    updateGizmo() {
+        this.transformGizmo.update()
+    }
+
+    applyGizmoDimensions(dimensions, previousDimensions = null) {
+        if (!this.selectedObject || !dimensions) return
+
+        const prev = previousDimensions || this.selectedObject.userData.originalScale || { x: 1, y: 1, z: 1 }
+        const next = {
+            x: Math.max(0.1, Number(dimensions.x) || prev.x || 1),
+            y: Math.max(0.1, Number(dimensions.y) || prev.y || 1),
+            z: Math.max(0.1, Number(dimensions.z) || prev.z || 1)
+        }
+
+        this.updateDimensions('x', next.x, false)
+        this.updateDimensions('y', next.y, false)
+        this.updateDimensions('z', next.z, false)
+        this.syncTransformInputs()
+        this.transformGizmo.update()
+        this.refreshPhysicsAndVisuals()
+    }
+
+    destroy() {
+        this.transformGizmo.dispose()
+        this.container.remove()
+    }
+
     updatePosition(axis, value) {
         if (!this.selectedObject) return
         this.selectedObject.position[axis] = value
+        this.transformGizmo.update()
         this.refreshPhysicsAndVisuals()
     }
 
@@ -713,6 +731,7 @@ export class ObjectInspector {
         if (axis === 'y') this.inputPosY.input.value = this.selectedObject.position.y.toFixed(2)
         if (axis === 'z') this.inputPosZ.input.value = this.selectedObject.position.z.toFixed(2)
 
+        this.transformGizmo.update()
         this.refreshPhysicsAndVisuals()
     }
 
@@ -721,6 +740,7 @@ export class ObjectInspector {
         // Convert to radians
         const radians = valueDegrees * (Math.PI / 180)
         this.selectedObject.rotation[axis] = radians
+        this.transformGizmo.update()
         this.refreshPhysicsAndVisuals()
     }
 
@@ -738,11 +758,13 @@ export class ObjectInspector {
         if (axis === 'y') this.inputRotY.input.value = deg.toFixed(1)
         if (axis === 'z') this.inputRotZ.input.value = deg.toFixed(1)
 
+        this.transformGizmo.update()
         this.refreshPhysicsAndVisuals()
     }
 
-    updateDimensions(axis, value) {
+    updateDimensions(axis, value, shouldRefresh = true) {
         if (!this.selectedObject) return
+        value = Math.max(0.1, Number(value) || 0.1)
 
         // Update userData dimensions
         if (!this.selectedObject.userData.originalScale) this.selectedObject.userData.originalScale = { x: 1, y: 1, z: 1 }
@@ -796,11 +818,8 @@ export class ObjectInspector {
                 material = new THREE.MeshStandardMaterial({ color: this.selectedObject.userData.color })
             }
 
-            // Remove old children (steps)
-            // Iterate backwards or use clear(), but we must NOT remove the AxesHelper if attached!
-            // Children include AxesHelper? Yes if we just added it.
-            // Filter out AxesHelper
-            const toRemove = this.selectedObject.children.filter(c => c !== this.axesHelper)
+            // The transform gizmo lives outside the object, so children here are rebuildable visuals.
+            const toRemove = [...this.selectedObject.children]
             toRemove.forEach(c => {
                 if (c.geometry) c.geometry.dispose()
                 this.selectedObject.remove(c)
@@ -821,8 +840,7 @@ export class ObjectInspector {
             const height = dims.y
             const width = dims.x
 
-            // Remove old children (Rails/Rungs)
-            const toRemove = this.selectedObject.children.filter(c => c !== this.axesHelper)
+            const toRemove = [...this.selectedObject.children]
             toRemove.forEach(c => {
                 if (c.geometry) c.geometry.dispose()
                 this.selectedObject.remove(c)
@@ -873,7 +891,9 @@ export class ObjectInspector {
         if (this.selectedObject.userData.texturePath) {
             this.reapplySelectedTexture()
         }
-        this.refreshPhysicsAndVisuals()
+        this.transformGizmo.update()
+        this.syncTransformInputs()
+        if (shouldRefresh) this.refreshPhysicsAndVisuals()
     }
 
     updateColor(hex) {

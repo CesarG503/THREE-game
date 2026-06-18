@@ -2,6 +2,7 @@
 
 import * as THREE from "three"
 import { StairsUtils } from "../utils/StairsUtils"
+import { RampUtils } from "../utils/RampUtils"
 import { LogicItemsManager } from "./logic_items/LogicItemsManager"
 import { listAssets, uploadAsset } from "../platform/api"
 import { applyMapObjectTexture, normalizeTextureSettings } from "../utils/TextureMapping"
@@ -710,6 +711,15 @@ export class ObjectInspector {
         this.refreshPhysicsAndVisuals()
     }
 
+    previewGizmoDimensions(dimensions) {
+        if (!this.selectedObject || !dimensions) return
+
+        this.updateDimensions('x', dimensions.x, false)
+        this.updateDimensions('y', dimensions.y, false)
+        this.updateDimensions('z', dimensions.z, false)
+        this.syncTransformInputs(dimensions)
+    }
+
     destroy() {
         this.transformGizmo.dispose()
         this.container.remove()
@@ -804,8 +814,7 @@ export class ObjectInspector {
         let newGeo
         // Detect type (Naively)
         if (this.selectedObject.userData.mapObjectType === 'ramp') {
-            // Rebuild shape... (Complex) - Skip/Warn?
-            console.warn("Resizing ramps dynamically not fully supported yet in simple mode")
+            newGeo = RampUtils.createGeometry(dims)
         } else if (this.selectedObject.userData.mapObjectType === 'stairs') {
             // Rebuild Stairs
             const steps = StairsUtils.calculateSteps(dims)

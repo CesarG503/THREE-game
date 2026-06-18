@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { RampUtils } from "../utils/RampUtils";
 
 /**
  * Gestor de Colocación de Objetos
@@ -27,6 +28,7 @@ export class PlacementManager {
     ghostRampMesh: THREE.Mesh | null;
     ghostStairsGroup: THREE.Group | null;
     ghostLadderGroup: THREE.Group | null;
+    ghostRampLastKey: string | null;
     ghostStairsLastKey: string | null;
     ghostLadderLastKey: string | null;
     ghostLabelSprite: THREE.Sprite | null;
@@ -65,6 +67,7 @@ export class PlacementManager {
         this.ghostRampMesh = null;
         this.ghostStairsGroup = null;
         this.ghostLadderGroup = null;
+        this.ghostRampLastKey = null;
         this.ghostStairsLastKey = null;
         this.ghostLadderLastKey = null;
         this.ghostLabelSprite = null;
@@ -149,20 +152,7 @@ export class PlacementManager {
         this.placementGhost.add(this.ghostCylinderMesh);
 
         // 2. Ghost RAMP (Prisma Triangular)
-        const shape = new THREE.Shape();
-        shape.moveTo(0, 0);
-        shape.lineTo(1, 0);
-        shape.lineTo(0, 1);
-        shape.lineTo(0, 0);
-
-        const extrudeSettings = {
-            steps: 1,
-            depth: 1,
-            bevelEnabled: false,
-        };
-        const rampGeo = new THREE.ExtrudeGeometry(shape, extrudeSettings);
-        rampGeo.center();
-
+        const rampGeo = RampUtils.createGeometry({ x: 1, y: 1, z: 1 });
         this.ghostRampMesh = new THREE.Mesh(rampGeo, material);
         this.ghostRampMesh.visible = false;
         this.placementGhost.add(this.ghostRampMesh);
@@ -764,6 +754,18 @@ export class PlacementManager {
         }
     }
 
+    rebuildRampGhost(item) {
+        if (!this.ghostRampMesh) return;
+
+        const key = `${item.scale.x}_${item.scale.y}_${item.scale.z}`;
+        if (this.ghostRampLastKey === key) return;
+
+        this.ghostRampLastKey = key;
+        this.ghostRampMesh.geometry.dispose();
+        this.ghostRampMesh.geometry = RampUtils.createGeometry(item.scale);
+        this.ghostRampMesh.scale.set(1, 1, 1);
+    }
+
     rebuildLadderGhost(item) {
         const key = `${item.scale.x}_${item.scale.y}_${item.scale.z}`;
         if (this.ghostLadderLastKey === key && this.ghostLadderGroup.children.length > 0) return;
@@ -1305,7 +1307,7 @@ export class PlacementManager {
 
                 if (item.type === "ramp") {
                     this.ghostRampMesh.visible = true;
-                    this.ghostRampMesh.scale.set(item.scale.z, item.scale.y, item.scale.x);
+                    this.rebuildRampGhost(item);
                     // Reset Y because targetPos is Center now
                     this.ghostRampMesh.position.y = 0;
                 } else if (item.type === "stairs") {

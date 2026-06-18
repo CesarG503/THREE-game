@@ -27,12 +27,14 @@ export class TransformGizmo {
 	inspector: any;
 	controls: TransformControls;
 	helper: THREE.Object3D;
+	proxy: THREE.Object3D;
 	target: THREE.Object3D | null;
 	modeIndex: number;
 	dragState: any;
 	wasInputEnabled: boolean | null;
 	tmpBox: THREE.Box3;
 	tmpSphere: THREE.Sphere;
+	tmpSize: THREE.Vector3;
 
 	constructor(game: any, inspector: any) {
 		this.game = game;
@@ -43,6 +45,13 @@ export class TransformGizmo {
 		this.wasInputEnabled = null;
 		this.tmpBox = new THREE.Box3();
 		this.tmpSphere = new THREE.Sphere();
+		this.tmpSize = new THREE.Vector3();
+
+		this.proxy = new THREE.Object3D();
+		this.proxy.name = "TransformGizmoProxy";
+		this.proxy.visible = false;
+		this.proxy.userData.ignoreRaycast = true;
+		game.sceneManager.scene.add(this.proxy);
 
 		this.controls = new TransformControls(game.sceneManager.camera, game.sceneManager.renderer.domElement);
 		this.controls.setMode("translate");
@@ -65,10 +74,10 @@ export class TransformGizmo {
 	attach(object: THREE.Object3D) {
 		this.target = object;
 		this.modeIndex = 0;
-		this.controls.attach(object);
+		this.syncProxyFromTarget(true);
+		this.controls.attach(this.proxy);
 		this.setMode("translate");
 		this.helper.visible = true;
-		this.updateSize();
 	}
 
 	detach() {
@@ -76,6 +85,7 @@ export class TransformGizmo {
 		this.dragState = null;
 		this.controls.detach();
 		this.helper.visible = false;
+		this.proxy.visible = false;
 		this.restoreInput();
 	}
 
@@ -84,6 +94,7 @@ export class TransformGizmo {
 		this.modeIndex = (this.modeIndex + 1) % TRANSFORM_MODES.length;
 		const mode = TRANSFORM_MODES[this.modeIndex];
 		this.setMode(mode);
+		this.syncProxyFromTarget(true);
 		return mode;
 	}
 
@@ -92,7 +103,8 @@ export class TransformGizmo {
 	}
 
 	update() {
-		if (!this.target) return;
+		if (!this.target || this.dragState) return;
+		this.syncProxyFromTarget(false);
 		this.updateSize();
 	}
 
@@ -103,6 +115,7 @@ export class TransformGizmo {
 		this.controls.removeEventListener("objectChange", this.handleObjectChange);
 		this.controls.disconnect();
 		this.game.sceneManager.scene.remove(this.helper);
+		this.game.sceneManager.scene.remove(this.proxy);
 		this.helper.traverse((child: any) => {
 			child.geometry?.dispose?.();
 			if (Array.isArray(child.material)) {
@@ -115,7 +128,7 @@ export class TransformGizmo {
 
 	private setMode(mode: TransformMode) {
 		this.controls.setMode(mode);
-		this.controls.setSpace(mode === "rotate" ? "local" : "local");
+		this.controls.setSpace("local");
 		this.controls.showX = true;
 		this.controls.showY = true;
 		this.controls.showZ = true;
@@ -128,7 +141,11 @@ export class TransformGizmo {
 		this.dragState = {
 			mode: this.getMode(),
 			dimensionsStart: cloneDimensions(this.target),
-			scaleStart: this.target.scale.clone(),
+			proxyPositionStart: this.proxy.position.clone(),
+			proxyQuaternionStart: this.proxy.quaternion.clone(),
+			proxyScaleStart: this.proxy.scale.clone(),
+			targetWorldPositionStart: this.target.getWorldPosition(new THREE.Vector3()),
+			targetQuaternionStart: this.target.quaternion.clone(),
 		};
 
 		if (this.game.inputManager) {
@@ -148,38 +165,43 @@ export class TransformGizmo {
 		}
 
 		if (this.dragState.mode === "scale") {
-			const dimensions = this.getPreviewDimensions();
-			this.target.scale.copy(this.dragState.scaleStart);
-			this.inspector.applyGizmoDimensions?.(dimensions, this.dragState.dimensionsStart);
+			this.inspector.applyGizmoDimensions?.(this.getPreviewDimensions(), this.dragState.dimensionsStart);
 		} else {
 			this.inspector.syncTransformInputs?.();
 			this.inspector.refreshPhysicsAndVisuals?.();
 		}
 
 		this.dragState = null;
-		this.updateSize();
+		this.proxy.scale.set(1, 1, 1);
+		this.syncProxyFromTarget(true);
 		this.restoreInput();
 		this.game.cameraController?.setUIOpen?.(true);
 	};
 
 	private handleObjectChange = () => {
-		if (!this.target) return;
+		if (!this.target || !this.dragState) return;
 
-		if (this.getMode() === "scale" && this.dragState) {
-			this.inspector.syncTransformInputs?.(this.getPreviewDimensions());
-		} else {
+		const mode = this.dragState.mode;
+		if (mode === "translate") {
+			const delta = this.proxy.position.clone().sub(this.dragState.proxyPositionStart);
+			const nextWorld = this.dragState.targetWorldPositionStart.clone().add(delta);
+			this.applyWorldPositionToTarget(nextWorld);
 			this.inspector.syncTransformInputs?.();
+		} else if (mode === "rotate") {
+			const deltaQuat = this.proxy.quaternion.clone().multiply(this.dragState.proxyQuaternionStart.clone().invert());
+			this.target.quaternion.copy(deltaQuat.multiply(this.dragState.targetQuaternionStart));
+			this.inspector.syncTransformInputs?.();
+		} else if (mode === "scale") {
+			this.inspector.previewGizmoDimensions?.(this.getPreviewDimensions());
 		}
 
 		this.updateSize();
 	};
 
-	private getPreviewDimensions() {
-		if (!this.target || !this.dragState) return cloneDimensions(this.target);
-
+	private previewDimensionsFromProxy() {
 		const dimensions = this.dragState.dimensionsStart;
-		const scaleStart = this.dragState.scaleStart;
-		const scaleNow = this.target.scale;
+		const scaleStart = this.dragState.proxyScaleStart;
+		const scaleNow = this.proxy.scale;
 
 		const next: Record<Axis, number> = { x: dimensions.x, y: dimensions.y, z: dimensions.z };
 		(["x", "y", "z"] as Axis[]).forEach((axis) => {
@@ -190,30 +212,56 @@ export class TransformGizmo {
 		return next;
 	}
 
-	private updateSize() {
-		if (!this.target) return;
+	private getPreviewDimensions() {
+		if (!this.target || !this.dragState) return cloneDimensions(this.target);
+		return this.previewDimensionsFromProxy();
+	}
 
-		const center = new THREE.Vector3();
+	private syncProxyFromTarget(force: boolean) {
+		if (!this.target || (!force && this.dragState)) return;
+
+		this.proxy.position.copy(this.getHandlePosition());
+		this.proxy.quaternion.copy(this.target.getWorldQuaternion(new THREE.Quaternion()));
+		this.proxy.scale.set(1, 1, 1);
+		this.proxy.visible = true;
+		this.proxy.updateMatrixWorld(true);
+		this.updateSize();
+	}
+
+	private getHandlePosition() {
+		if (!this.target) return new THREE.Vector3();
+
+		this.target.updateWorldMatrix(true, true);
 		this.tmpBox.setFromObject(this.target);
 		this.tmpBox.getBoundingSphere(this.tmpSphere);
-		center.copy(this.tmpSphere.center);
+		this.tmpBox.getSize(this.tmpSize);
 
-		const radius = Math.max(0.5, this.tmpSphere.radius || 0.5);
-		const camera = this.game.sceneManager.camera;
-		const distance = Math.max(1, camera.position.distanceTo(center));
+		const handlePosition = this.tmpSphere.center.clone();
+		const largest = Math.max(this.tmpSize.x, this.tmpSize.y, this.tmpSize.z);
+		const thinSurface = this.tmpSize.y <= Math.max(0.75, largest * 0.08);
 
-		let viewFactor = distance * 0.35;
-		if ((camera as THREE.PerspectiveCamera).isPerspectiveCamera) {
-			const perspectiveCamera = camera as THREE.PerspectiveCamera;
-			viewFactor = distance * Math.min(
-				1.9 * Math.tan(THREE.MathUtils.degToRad(perspectiveCamera.fov * 0.5)) / perspectiveCamera.zoom,
-				7,
-			);
+		if (largest >= 12 || thinSurface) {
+			const lift = THREE.MathUtils.clamp(largest * 0.015, 0.35, 3);
+			handlePosition.y = this.tmpBox.max.y + lift;
 		}
 
-		const desiredWorldReach = radius + Math.max(0.35, radius * 0.18);
-		const modeMultiplier = this.getMode() === "rotate" ? 4 : 8;
-		const size = THREE.MathUtils.clamp((desiredWorldReach * modeMultiplier) / Math.max(0.001, viewFactor), 0.85, 8);
+		return handlePosition;
+	}
+
+	private applyWorldPositionToTarget(worldPosition: THREE.Vector3) {
+		if (!this.target) return;
+
+		if (this.target.parent) {
+			const localPosition = worldPosition.clone();
+			this.target.parent.worldToLocal(localPosition);
+			this.target.position.copy(localPosition);
+		} else {
+			this.target.position.copy(worldPosition);
+		}
+	}
+
+	private updateSize() {
+		const size = this.getMode() === "rotate" ? 1.35 : 1.15;
 		this.controls.setSize(size);
 	}
 

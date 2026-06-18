@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
 import { StairsUtils } from "../utils/StairsUtils";
+import { RampUtils } from "../utils/RampUtils";
 import type { Game } from "../Game";
 
 export function regenerateObjectPhysics(this: Game, objectMesh: THREE.Object3D) {
@@ -22,7 +23,7 @@ export function regenerateObjectPhysics(this: Game, objectMesh: THREE.Object3D) 
 
 	let colDesc: any;
 	if (objectMesh.userData.mapObjectType === "ramp") {
-		colDesc = RAPIER.ColliderDesc.cuboid(dims.x / 2, dims.y / 2, dims.z / 2);
+		colDesc = RampUtils.createColliderDesc(dims, RAPIER);
 		this.world.createCollider(colDesc, rigidBody);
 	} else if (objectMesh.userData.mapObjectType === "stairs") {
 		const steps = StairsUtils.calculateSteps(dims);

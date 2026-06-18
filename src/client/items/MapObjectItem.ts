@@ -2,6 +2,7 @@ import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
 import { Item } from "./Item";
 import { StairsUtils } from "../utils/StairsUtils";
+import { RampUtils } from "../utils/RampUtils";
 import { applyMapObjectTexture, normalizeTextureSettings, type MapTextureSettings } from "../utils/TextureMapping";
 import type { ItemContext } from "../types";
 
@@ -400,25 +401,13 @@ export class MapObjectItem extends Item {
 
       object3D = group;
     } else if (this.type === "ramp") {
-      const shape = new THREE.Shape();
-      shape.moveTo(0, 0);
-      shape.lineTo(this.scale.z, 0);
-      shape.lineTo(0, this.scale.y);
-      shape.lineTo(0, 0);
-
-      const extrudeSettings = { steps: 1, depth: this.scale.x, bevelEnabled: false };
-      const geometry = new THREE.ExtrudeGeometry(shape, extrudeSettings);
-      geometry.center();
-
+      const geometry = RampUtils.createGeometry(this.scale);
       const material = new THREE.MeshStandardMaterial({ color: this.color });
       object3D = new THREE.Mesh(geometry, material);
       object3D.castShadow = true;
       object3D.receiveShadow = true;
 
-      const vertices = geometry.attributes.position.array;
-      let col = RAPIER.ColliderDesc.convexHull(vertices as any);
-      if (!col) col = RAPIER.ColliderDesc.cuboid(this.scale.x / 2, this.scale.y / 2, this.scale.z / 2);
-      collidersDesc.push(col);
+      collidersDesc.push(RampUtils.createColliderDesc(this.scale, RAPIER));
     } else if (this.type === "spawn_point") {
       const shapeType = this.scale.shapeType || "circle";
 

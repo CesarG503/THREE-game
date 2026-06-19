@@ -617,6 +617,7 @@ export class ObjectInspector {
         // Check if object has modifiers that should be edited in Logic Panel
         const hasLogicParams = object.userData.logicProperties && (
             object.userData.logicProperties.waypoints ||
+            (Array.isArray(object.userData.logicProperties.sequences) && object.userData.logicProperties.sequences.length > 0) ||
             object.userData.mapObjectType === 'movement_controller' ||
             object.userData.mapObjectType === 'spawn_point' ||
             object.userData.mapObjectType === 'interaction_button' ||

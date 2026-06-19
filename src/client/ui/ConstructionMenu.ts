@@ -222,10 +222,14 @@ export class ConstructionMenu {
         );
         mover.logicProperties = {
             targetUuid: null,
-            speed: 2.0,
-            loop: true,
-            active: true,
-            waypoints: []
+            sequences: [{
+                name: "Secuencia Principal",
+                speed: 2.0,
+                loop: true,
+                active: true,
+                triggerType: "none",
+                waypoints: []
+            }]
         };
         this.logicItems.push(mover);
 
@@ -4329,7 +4333,11 @@ export class ConstructionMenu {
                 type = "spawn_point";
             } else if (["impulse_jump", "impulse_lateral", "farming_zone"].includes(obj.userData.mapObjectType)) {
                 type = "interactive_zones";
-            } else if (obj.userData.logicProperties && obj.userData.logicProperties.waypoints) {
+            } else if (
+                obj.userData.logicProperties &&
+                (obj.userData.logicProperties.waypoints ||
+                    (Array.isArray(obj.userData.logicProperties.sequences) && obj.userData.logicProperties.sequences.length > 0))
+            ) {
                 type = "movement_object";
             } else {
                 // Fallback to base type if it has some other unknown logic

@@ -41,6 +41,13 @@ export function setupGameInput(this: Game) {
 			return;
 		}
 
+		if (key === "r" && this.constructionMenu?.logicSystem?.isEditingMap && this.constructionMenu.logicSystem.hasSelectedWaypoint?.()) {
+			e.preventDefault();
+			const mode = this.constructionMenu.logicSystem.cycleWaypointGizmoMode();
+			console.log("Waypoint Gizmo Mode:", mode);
+			return;
+		}
+
 		if (this.inputManager && !this.inputManager.enabled) return;
 
 		if (key === "r") {

@@ -307,11 +307,20 @@ export class MapObjectItem extends Item {
           target.userData.logicProperties = {};
         }
 
-        if (!target.userData.logicProperties.waypoints) {
-          target.userData.logicProperties.waypoints = [];
-          target.userData.logicProperties.speed = 2.0;
-          target.userData.logicProperties.loop = true;
-          target.userData.logicProperties.active = true;
+        const hasMovement = target.userData.logicProperties.waypoints ||
+          (Array.isArray(target.userData.logicProperties.sequences) && target.userData.logicProperties.sequences.length > 0);
+
+        if (!hasMovement) {
+          const moverDefaults = this.logicProperties || {};
+          const defaultSeq = (Array.isArray(moverDefaults.sequences) && moverDefaults.sequences[0]) || moverDefaults;
+          target.userData.logicProperties.sequences = [{
+            name: "Secuencia Principal",
+            waypoints: [],
+            speed: defaultSeq.speed || 2.0,
+            loop: defaultSeq.loop !== false,
+            active: defaultSeq.active !== false,
+            triggerType: "none"
+          }];
 
           alert(`Transformado en Objeto Móvil: ${target.userData.mapObjectType}`);
         } else {

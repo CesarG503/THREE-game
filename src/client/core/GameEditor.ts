@@ -1,6 +1,15 @@
 import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
 import { MapObjectItem } from "../items/MapObjectItem";
+import {
+	applyAnimatedObjectScale,
+	getWaypointPosition,
+	getWaypointRotation,
+	getWaypointScale,
+	interpolateWaypointRotation,
+	interpolateWaypointScale,
+	normalizeMovementWaypoint,
+} from "../utils/MovementWaypointUtils";
 
 export function setupEditorUI(this: any) {
 	const aerialStatus = document.createElement("div");
@@ -191,11 +200,20 @@ export function useCurrentItem(this: any, isRightClickOrItem: any = false) {
 
 			if (!targetObj.userData.logicProperties) targetObj.userData.logicProperties = {};
 
-			if (!targetObj.userData.logicProperties.waypoints) {
-				targetObj.userData.logicProperties.waypoints = [];
-				targetObj.userData.logicProperties.speed = 2.0;
-				targetObj.userData.logicProperties.loop = true;
-				targetObj.userData.logicProperties.active = true;
+			const hasMovement = targetObj.userData.logicProperties.waypoints ||
+				(Array.isArray(targetObj.userData.logicProperties.sequences) && targetObj.userData.logicProperties.sequences.length > 0);
+
+			if (!hasMovement) {
+				const moverDefaults = item.logicProperties || {};
+				const defaultSeq = (Array.isArray(moverDefaults.sequences) && moverDefaults.sequences[0]) || moverDefaults;
+				targetObj.userData.logicProperties.sequences = [{
+					name: "Secuencia Principal",
+					waypoints: [],
+					speed: defaultSeq.speed || 2.0,
+					loop: defaultSeq.loop !== false,
+					active: defaultSeq.active !== false,
+					triggerType: "none"
+				}];
 
 				alert("Controlador de movimiento aplicado a: " + (targetObj.userData.name || "Objeto"));
 				if (this.placementManager && this.placementManager.ghostLabelSprite) {
@@ -631,8 +649,45 @@ export function updateCollisionLogic(this: any, dt: number) {
 export function updateMovementLogic(this: any, dt: number) {
 	if (!this.sceneManager || !this.sceneManager.scene) return;
 
+	const applyTransform = (obj: any, position: any, rotation: any, scale: any) => {
+		if (!obj.userData.rigidBody) return;
+
+		obj.userData.rigidBody.setNextKinematicTranslation(position);
+		obj.position.set(position.x, position.y, position.z);
+
+		const euler = new THREE.Euler(rotation.x, rotation.y, rotation.z, obj.rotation.order || "XYZ");
+		const q = new THREE.Quaternion().setFromEuler(euler);
+		obj.quaternion.copy(q);
+		obj.userData.rigidBody.setNextKinematicRotation(q);
+
+		applyAnimatedObjectScale(obj, scale);
+	};
+
+	const applyWaypoint = (obj: any, waypoint: any) => {
+		normalizeMovementWaypoint(waypoint, obj);
+		const pos = getWaypointPosition(waypoint, obj);
+		const rot = getWaypointRotation(waypoint, obj);
+		const scale = getWaypointScale(waypoint, obj);
+		applyTransform(obj, pos, rot, scale);
+	};
+
 	this.sceneManager.scene.children.forEach((obj: any) => {
 		if (!obj.userData.logicProperties) return;
+
+		if (obj.userData.logicProperties.waypoints && !obj.userData.logicProperties.sequences) {
+			obj.userData.logicProperties.sequences = [{
+				name: "Secuencia Principal",
+				waypoints: obj.userData.logicProperties.waypoints,
+				loop: obj.userData.logicProperties.loop,
+				active: obj.userData.logicProperties.active,
+				speed: obj.userData.logicProperties.speed,
+				triggerType: "none"
+			}];
+			delete obj.userData.logicProperties.waypoints;
+			delete obj.userData.logicProperties.loop;
+			delete obj.userData.logicProperties.active;
+			delete obj.userData.logicProperties.speed;
+		}
 
 		const sequences = obj.userData.logicProperties.sequences;
 
@@ -644,6 +699,7 @@ export function updateMovementLogic(this: any, dt: number) {
 			sequences.forEach((seq: any) => {
 				if (!seq.active) return;
 				if (!seq.waypoints || seq.waypoints.length === 0) return;
+				seq.waypoints.forEach((wp: any) => normalizeMovementWaypoint(wp, obj));
 
 				if (!seq.currentState) {
 					seq.currentState = { wpIndex: 0, moveAlpha: 0, waiting: false, waitTimer: 0, segmentStart: obj.position.clone() };
@@ -676,8 +732,7 @@ export function updateMovementLogic(this: any, dt: number) {
 					}
 					state.waitTimer += dt;
 					if (state.waitTimer < p1.delay) {
-						obj.userData.rigidBody.setNextKinematicTranslation({ x: p1.x, y: p1.y, z: p1.z });
-						obj.position.set(p1.x, p1.y, p1.z);
+						applyWaypoint(obj, p1);
 						return;
 					} else {
 						state.waiting = false;
@@ -687,8 +742,7 @@ export function updateMovementLogic(this: any, dt: number) {
 
 				if (p1.type === "wait_signal" && !state.signalReceived) {
 					if (p1.x !== undefined) {
-						obj.userData.rigidBody.setNextKinematicTranslation({ x: p1.x, y: p1.y, z: p1.z });
-						obj.position.set(p1.x, p1.y, p1.z);
+						applyWaypoint(obj, p1);
 					}
 					return;
 				}
@@ -720,13 +774,7 @@ export function updateMovementLogic(this: any, dt: number) {
 					state.signalReceived = false;
 					state.segmentStart = null;
 					if (p2.x !== undefined) {
-						obj.userData.rigidBody.setNextKinematicTranslation({ x: p2.x, y: p2.y, z: p2.z });
-						obj.position.set(p2.x, p2.y, p2.z);
-					}
-					if (p2.rotY !== undefined) {
-						const q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), p2.rotY);
-						obj.quaternion.copy(q);
-						obj.userData.rigidBody.setNextKinematicRotation(q);
+						applyWaypoint(obj, p2);
 					}
 					state.segmentStart = obj.position.clone();
 					return;
@@ -739,6 +787,7 @@ export function updateMovementLogic(this: any, dt: number) {
 					state.moveAlpha = 0;
 					state.waitingCompleted = false;
 					state.signalReceived = false;
+					if (p2.x !== undefined) applyWaypoint(obj, p2);
 					if (p2.x !== undefined) state.segmentStart = new THREE.Vector3(p2.x, p2.y, p2.z);
 					else state.segmentStart = startPos.clone();
 					return;
@@ -757,45 +806,18 @@ export function updateMovementLogic(this: any, dt: number) {
 					else state.segmentStart = endPos.clone();
 
 					if (p2.x !== undefined) {
-						obj.userData.rigidBody.setNextKinematicTranslation({ x: p2.x, y: p2.y, z: p2.z });
-						obj.position.set(p2.x, p2.y, p2.z);
-					}
-
-					if (p2.rotY !== undefined) {
-						const q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), p2.rotY);
-						obj.quaternion.copy(q);
-						obj.userData.rigidBody.setNextKinematicRotation(q);
+						applyWaypoint(obj, p2);
 					}
 				} else {
 					const a = state.moveAlpha;
 					const x = THREE.MathUtils.lerp(startPos.x, endPos.x, a);
 					const y = THREE.MathUtils.lerp(startPos.y, endPos.y, a);
 					const z = THREE.MathUtils.lerp(startPos.z, endPos.z, a);
-
-					obj.userData.rigidBody.setNextKinematicTranslation({ x, y, z });
-					obj.position.set(x, y, z);
-
-					const r1 = (p1.rotY !== undefined) ? p1.rotY : (obj.userData.originalRotY || 0);
-					const r2 = (p2.rotY !== undefined) ? p2.rotY : r1;
-
-					let diff = r2 - r1;
-					while (diff > Math.PI) diff -= Math.PI * 2;
-					while (diff < -Math.PI) diff += Math.PI * 2;
-
-					const currentRot = r1 + diff * a;
-					const q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), currentRot);
-					obj.quaternion.copy(q);
-					obj.userData.rigidBody.setNextKinematicRotation(q);
+					const rotation = interpolateWaypointRotation(p1, p2, a, obj);
+					const scale = interpolateWaypointScale(p1, p2, a, obj);
+					applyTransform(obj, { x, y, z }, rotation, scale);
 				}
 			});
-		} else if (obj.userData.logicProperties.waypoints) {
-			obj.userData.logicProperties.sequences = [{
-				name: "Secuencia Principal",
-				waypoints: obj.userData.logicProperties.waypoints,
-				loop: obj.userData.logicProperties.loop,
-				active: obj.userData.logicProperties.active,
-				speed: obj.userData.logicProperties.speed
-			}];
 		}
 	});
 }

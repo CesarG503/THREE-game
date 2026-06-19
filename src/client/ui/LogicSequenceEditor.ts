@@ -1,6 +1,16 @@
 // @ts-nocheck
 
 import { InspectorUtils } from "./logic_items/InspectorUtils"
+import {
+    degreesToRadians,
+    describeRotationTurns,
+    getWaypointPosition,
+    getWaypointRotation,
+    getWaypointRotationTurns,
+    getWaypointScale,
+    normalizeMovementWaypoint,
+    radiansToDegrees,
+} from "../utils/MovementWaypointUtils"
 
 export class LogicSequenceEditor {
     constructor(game, logicSystem) {
@@ -98,6 +108,7 @@ export class LogicSequenceEditor {
     }
 
     render() {
+        this.logicSystem.ensureMovementSequences(this.currentObject.userData.logicProperties, this.currentObject)
         const seq = this.currentObject.userData.logicProperties.sequences[this.currentSeqIndex]
         if (!seq) return
 
@@ -271,9 +282,12 @@ export class LogicSequenceEditor {
                     // Reorder Array
                     const movedItem = seq.waypoints.splice(fromIdx, 1)[0]
                     seq.waypoints.splice(toIdx, 0, movedItem)
+                    this.logicSystem.waypointGizmo.detach()
+                    this.logicSystem.selectedWaypoint = null
 
                     this.render()
                     this.logicSystem.updateVisualization()
+                    this.logicSystem.broadcastObjectLogicUpdate(this.currentObject)
                 }
             }
 
@@ -349,16 +363,96 @@ export class LogicSequenceEditor {
 
             } else {
                 // Standard Waypoint
-                // Header: #1 -> 2.5s Delay -> ...
+                normalizeMovementWaypoint(wp, this.currentObject)
+                const pos = getWaypointPosition(wp, this.currentObject)
+                const rot = getWaypointRotation(wp, this.currentObject)
+                const scale = getWaypointScale(wp, this.currentObject)
+                const turns = getWaypointRotationTurns(wp)
+
                 const header = document.createElement('div')
                 header.className = 'lse-item-header'
                 header.style.cursor = "grab"
-                header.innerHTML = `<strong>Paso #${idx + 1}</strong> <span style='font-family:monospace; color:#aaa;'>[${wp.x.toFixed(1)}, ${wp.y.toFixed(1)}, ${wp.z.toFixed(1)}]</span> <span style="float:right; color:#666;">☰</span>`
+                header.innerHTML = `
+                    <strong>Paso #${idx + 1}</strong>
+                    <span style='font-family:monospace; color:#aaa;'>[${pos.x.toFixed(1)}, ${pos.y.toFixed(1)}, ${pos.z.toFixed(1)}]</span>
+                    <span style="float:right; color:#666;">☰</span>
+                    <div style="font-size:11px; color:#88ccff; margin-top:3px;">${describeRotationTurns(turns)}</div>
+                `
                 item.appendChild(header)
 
                 // Actions
                 const actions = document.createElement('div')
                 actions.className = 'lse-item-actions'
+                actions.style.flexWrap = "wrap"
+
+                const gizmoRow = document.createElement('div')
+                gizmoRow.style.cssText = "display:flex; gap:5px; width:100%; margin-bottom:6px;"
+
+                const makeGizmoBtn = (label, mode) => {
+                    const btn = document.createElement('button')
+                    btn.textContent = label
+                    btn.style.cssText = "flex:1; background:#064f9e; color:white; border:none; border-radius:3px; padding:4px; cursor:pointer; font-size:11px;"
+                    btn.onclick = (e) => {
+                        e.stopPropagation()
+                        this.logicSystem.selectWaypoint(this.currentObject, this.currentSeqIndex, idx, mode)
+                    }
+                    return btn
+                }
+
+                gizmoRow.appendChild(makeGizmoBtn("Mover", "translate"))
+                gizmoRow.appendChild(makeGizmoBtn("Rotar", "rotate"))
+                gizmoRow.appendChild(makeGizmoBtn("Escala", "scale"))
+
+                const captureBtn = document.createElement('button')
+                captureBtn.textContent = "Capturar Actual"
+                captureBtn.style.cssText = "flex:1.1; background:#333; color:white; border:1px solid #555; border-radius:3px; padding:4px; cursor:pointer; font-size:11px;"
+                captureBtn.onclick = (e) => {
+                    e.stopPropagation()
+                    this.logicSystem.updateWaypointFromObject(this.currentObject, this.currentSeqIndex, idx)
+                }
+                gizmoRow.appendChild(captureBtn)
+                item.appendChild(gizmoRow)
+
+                const transformGrid = document.createElement('div')
+                transformGrid.style.cssText = "display:grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap:5px; margin:6px 0;"
+
+                const addNumberInput = (label, value, onChange, step = 0.1) => {
+                    const wrap = document.createElement('label')
+                    wrap.style.cssText = "display:flex; flex-direction:column; gap:2px; font-size:10px; color:#aaa;"
+                    const span = document.createElement('span')
+                    span.textContent = label
+                    const input = document.createElement('input')
+                    input.type = "number"
+                    input.value = Number(value || 0).toFixed(label.startsWith("Rot") ? 1 : 2)
+                    input.step = String(step)
+                    input.style.cssText = "width:100%; box-sizing:border-box; background:#222; border:1px solid #444; color:white; font-size:11px; padding:3px;"
+                    input.onkeydown = (e) => e.stopPropagation()
+                    input.onchange = (e) => {
+                        onChange(parseFloat(e.target.value))
+                        normalizeMovementWaypoint(wp, this.currentObject)
+                        this.logicSystem.selectWaypoint(this.currentObject, this.currentSeqIndex, idx, this.logicSystem.waypointGizmo.getMode())
+                        this.logicSystem.updateVisualization()
+                        this.logicSystem.broadcastObjectLogicUpdate(this.currentObject)
+                    }
+                    wrap.appendChild(span)
+                    wrap.appendChild(input)
+                    transformGrid.appendChild(wrap)
+                }
+
+                addNumberInput("Pos X", pos.x, (v) => wp.x = v)
+                addNumberInput("Pos Y", pos.y, (v) => wp.y = v)
+                addNumberInput("Pos Z", pos.z, (v) => wp.z = v)
+                addNumberInput("Rot X°", radiansToDegrees(rot.x), (v) => wp.rotation.x = degreesToRadians(v), 5)
+                addNumberInput("Rot Y°", radiansToDegrees(rot.y), (v) => { wp.rotation.y = degreesToRadians(v); wp.rotY = wp.rotation.y }, 5)
+                addNumberInput("Rot Z°", radiansToDegrees(rot.z), (v) => wp.rotation.z = degreesToRadians(v), 5)
+                addNumberInput("Tam X", scale.x, (v) => wp.scale.x = v)
+                addNumberInput("Tam Y", scale.y, (v) => wp.scale.y = v)
+                addNumberInput("Tam Z", scale.z, (v) => wp.scale.z = v)
+                addNumberInput("Vueltas X", turns.x, (v) => wp.rotationTurns.x = v, 0.25)
+                addNumberInput("Vueltas Y", turns.y, (v) => wp.rotationTurns.y = v, 0.25)
+                addNumberInput("Vueltas Z", turns.z, (v) => wp.rotationTurns.z = v, 0.25)
+
+                item.appendChild(transformGrid)
 
                 // Delay Input
                 const delayLabel = document.createElement('label')
@@ -368,7 +462,11 @@ export class LogicSequenceEditor {
                 delayInput.type = "number"
                 delayInput.value = wp.delay || 0
                 delayInput.style.cssText = "width:50px; background:#222; border:1px solid #444; color:white; font-size:12px;"
-                delayInput.onchange = (e) => wp.delay = parseFloat(e.target.value)
+                delayInput.onkeydown = (e) => e.stopPropagation()
+                delayInput.onchange = (e) => {
+                    wp.delay = parseFloat(e.target.value)
+                    this.logicSystem.broadcastObjectLogicUpdate(this.currentObject)
+                }
 
                 actions.appendChild(delayLabel)
                 actions.appendChild(delayInput)
@@ -377,7 +475,10 @@ export class LogicSequenceEditor {
                 const tpLabel = document.createElement('label')
                 tpLabel.innerHTML = `<input type="checkbox" ${wp.teleport ? 'checked' : ''}> Teleport`
                 tpLabel.style.fontSize = "12px"
-                tpLabel.querySelector('input').onchange = (e) => wp.teleport = e.target.checked
+                tpLabel.querySelector('input').onchange = (e) => {
+                    wp.teleport = e.target.checked
+                    this.logicSystem.broadcastObjectLogicUpdate(this.currentObject)
+                }
                 actions.appendChild(tpLabel)
 
                 item.appendChild(actions)
@@ -401,6 +502,7 @@ export class LogicSequenceEditor {
                 seq.waypoints.splice(idx + 1, 0, clone)
                 this.render()
                 this.logicSystem.updateVisualization()
+                this.logicSystem.broadcastObjectLogicUpdate(this.currentObject)
             }
 
             // Delete Button
@@ -411,8 +513,11 @@ export class LogicSequenceEditor {
                 e.stopPropagation()
                 if (confirm("¿Eliminar este paso?")) {
                     seq.waypoints.splice(idx, 1)
+                    this.logicSystem.waypointGizmo.detach()
+                    this.logicSystem.selectedWaypoint = null
                     this.render()
                     this.logicSystem.updateVisualization()
+                    this.logicSystem.broadcastObjectLogicUpdate(this.currentObject)
                 }
             }
 
@@ -426,18 +531,12 @@ export class LogicSequenceEditor {
 
     addWaypoint(seq) {
         // Capture current transform of the object
-        const wp = {
-            type: 'move',
-            x: this.currentObject.position.x,
-            y: this.currentObject.position.y,
-            z: this.currentObject.position.z,
-            rotY: this.currentObject.rotation.y,
-            delay: 0,
-            teleport: false
-        }
+        const wp = this.logicSystem.createWaypointFromObject(this.currentObject)
         seq.waypoints.push(wp)
+        this.logicSystem.selectWaypoint(this.currentObject, this.currentSeqIndex, seq.waypoints.length - 1, "translate")
         this.render()
         this.logicSystem.updateVisualization()
+        this.logicSystem.broadcastObjectLogicUpdate(this.currentObject)
     }
 
     showSignalSelector(onSelectCallback) {

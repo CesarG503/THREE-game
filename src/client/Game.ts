@@ -583,18 +583,11 @@ export class Game {
 			if (this.gameMode === "editor") {
 				if (this.constructionMenu && this.constructionMenu.logicSystem && this.constructionMenu.logicSystem.isEditingMap) {
 					const logicSys = this.constructionMenu.logicSystem;
+					if (logicSys.isWaypointGizmoInteracting && logicSys.isWaypointGizmoInteracting()) return;
 					if (logicSys.toolbar.activeTool === "waypoint" && e.button === 0) {
 						const pos = this.placementManager.getCurrentTarget();
 						if (pos && logicSys.editingObject) {
-							const wp = {
-								x: pos.x,
-								y: pos.y,
-								z: pos.z,
-								delay: 0,
-								rotY: this.placementManager.placementGhost.rotation.y
-							};
-							logicSys.editingObject.userData.logicProperties.waypoints.push(wp);
-							logicSys.updateVisualization();
+							const wp = logicSys.addWaypointFromPlacement(pos, this.placementManager.placementGhost.rotation);
 							console.log("Waypoint Added via Map Tool", wp);
 						}
 						return;
@@ -759,6 +752,7 @@ export class Game {
 		this.character?.dispose?.();
 		this.hud?.destroy?.();
 		this.objectInspector?.destroy?.();
+		this.constructionMenu?.logicSystem?.dispose?.();
 
 		if (document.pointerLockElement) {
 			document.exitPointerLock?.();
@@ -769,6 +763,8 @@ export class Game {
 			"chat-container",
 			"construction-menu",
 			"object-inspector",
+			"logic-toolbar",
+			"logic-sequence-editor",
 			"game-hud-layer",
 			"aerial-grid-status",
 			"placement-logic-toolbar",

@@ -931,7 +931,8 @@ export class PlacementManager {
                 this.ghostLabelSprite.position.set(0, targetSize.y / 2 + 0.5, 0); // Above object
 
                 // Update text
-                const hasLogic = hit.object.userData.logicProperties && hit.object.userData.logicProperties.waypoints;
+                const logicProps = hit.object.userData.logicProperties;
+                const hasLogic = logicProps && (logicProps.waypoints || (Array.isArray(logicProps.sequences) && logicProps.sequences.length > 0));
                 const txt = hasLogic ? "Aplicado!" : "Aplicar";
                 const col = hasLogic ? "#00FF00" : "#FFFF00";
                 this.updateLabelSprite(this.ghostLabelSprite, txt, col);

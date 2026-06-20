@@ -69,6 +69,7 @@ export class LogicSystem {
 		// Toolbar Callbacks
 		this.toolbar.onClose = () => this.endMapEdit();
 		this.toolbar.onAction = (action: any) => {
+			if (action === "add_current_wp") this.addCurrentObjectWaypoint();
 			if (action === "prev_wp") this.moveEditingObjectToWaypoint(-1);
 			if (action === "next_wp") this.moveEditingObjectToWaypoint(1);
 		};
@@ -173,6 +174,23 @@ export class LogicSystem {
 
 	createWaypointFromObject(object: any) {
 		return createMovementWaypointFromTransform(object);
+	}
+
+	addCurrentObjectWaypoint() {
+		if (!this.editingObject) return null;
+		const sequenceIndex = this.editingSequenceIndex ?? 0;
+		const seq = this.getMovementSequence(this.editingObject, sequenceIndex);
+		if (!seq) return null;
+
+		const wp = this.createWaypointFromObject(this.editingObject);
+		seq.waypoints.push(wp);
+		const wpIndex = seq.waypoints.length - 1;
+		this.selectWaypoint(this.editingObject, sequenceIndex, wpIndex, "translate");
+		this.showWaypointPropertiesPanel(this.editingObject, sequenceIndex, wpIndex);
+		this.updateVisualization();
+		this.refreshOpenEditors();
+		this.broadcastObjectLogicUpdate(this.editingObject);
+		return wp;
 	}
 
 	createWaypointFromPlacement(object: any, position: any, rotation: any = null) {
@@ -299,6 +317,7 @@ export class LogicSystem {
 		const waypoint = normalizeMovementWaypoint(seq.waypoints[waypointIndex], this.editingObject);
 
 		this.applyWaypointToObject(this.editingObject, waypoint);
+		this.syncSequenceRuntimeToWaypoint(this.editingObject, sequenceIndex, waypointIndex);
 		this.selectWaypoint(this.editingObject, sequenceIndex, waypointIndex, this.waypointGizmo.getMode());
 		this.showWaypointPropertiesPanel(this.editingObject, sequenceIndex, waypointIndex);
 		this.broadcastObjectLogicUpdate(this.editingObject);
@@ -322,6 +341,23 @@ export class LogicSystem {
 			body.setNextKinematicTranslation?.(pos);
 			body.setNextKinematicRotation?.(q);
 		}
+	}
+
+	private syncSequenceRuntimeToWaypoint(object: any, sequenceIndex: number, waypointIndex: number) {
+		const seq = this.getMovementSequence(object, sequenceIndex);
+		if (!seq || !seq.waypoints?.[waypointIndex]) return;
+
+		const waypoint = normalizeMovementWaypoint(seq.waypoints[waypointIndex], object);
+		const pos = getWaypointPosition(waypoint, object);
+		seq.currentState = {
+			wpIndex: waypointIndex,
+			moveAlpha: 0,
+			waiting: false,
+			waitTimer: 0,
+			waitingCompleted: false,
+			signalReceived: false,
+			segmentStart: new THREE.Vector3(pos.x, pos.y, pos.z)
+		};
 	}
 
 	closeWaypointPropertiesPanel() {
@@ -418,7 +454,12 @@ export class LogicSystem {
 		const applyBtn = document.createElement("button");
 		applyBtn.textContent = "Mover objeto aqui";
 		applyBtn.style.cssText = "background:#064f9e; color:white; border:none; border-radius:4px; padding:7px; cursor:pointer;";
-		applyBtn.onclick = () => this.applyWaypointToObject(object, wp);
+		applyBtn.onclick = () => {
+			this.applyWaypointToObject(object, wp);
+			this.syncSequenceRuntimeToWaypoint(object, sequenceIndex, waypointIndex);
+			this.updateVisualization();
+			this.broadcastObjectLogicUpdate(object);
+		};
 		const captureBtn = document.createElement("button");
 		captureBtn.textContent = "Capturar objeto";
 		captureBtn.style.cssText = "background:#333; color:white; border:1px solid #555; border-radius:4px; padding:7px; cursor:pointer;";

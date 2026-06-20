@@ -42,6 +42,7 @@ export class LogicToolbar {
 
         // Tools
         this.addToolButton("📍", "Añadir Punto de Ruta", "waypoint")
+        this.addActionButton("◎", "Agregar posición actual del objeto como punto", "add_current_wp")
         this.addActionButton("←", "Mover objeto al punto anterior", "prev_wp")
         this.addActionButton("→", "Mover objeto al punto siguiente", "next_wp")
         this.addToolButton("▶", "Iniciar/Pausar Animación", "play_pause")

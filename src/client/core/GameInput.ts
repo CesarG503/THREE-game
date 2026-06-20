@@ -188,6 +188,12 @@ export function setupGameInput(this: Game) {
 		if (this.inputManager && !this.inputManager.enabled) return;
 		if (e.target !== this.sceneManager.renderer.domElement) return;
 
+		const logicSystem = this.constructionMenu?.logicSystem;
+		if (logicSystem?.isEditingMap) {
+			if (e.button === 2) return;
+			if (logicSystem.toolbar?.activeTool === "waypoint") return;
+		}
+
 		if (e.button === 0) {
 			if (this.isMovingFarmingZone && this.moveGhost.visible) {
 				this.farmingZone.setPosition(this.moveGhost.position);

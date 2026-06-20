@@ -600,14 +600,19 @@ export function animate(this: any) {
 		}
 
 		if (this.constructionMenu.logicSystem && this.constructionMenu.logicSystem.isEditingMap) {
-			if (this.constructionMenu.logicSystem.toolbar.activeTool === "waypoint") {
+			const logicSystem = this.constructionMenu.logicSystem;
+			if (logicSystem.toolbar.activeTool === "waypoint") {
 				if (this.placementManager && this.character) {
 					this.placementManager.updateLogicGhost(
-						this.constructionMenu.logicSystem.editingObject,
+						logicSystem.editingObject,
 						this.character.getPosition(),
 						this.placementRotationIndex || 0
 					);
 				}
+			} else if (!logicSystem.toolbar.activeTool && this.placementManager && this.inventoryManager) {
+				const currentItem = this.inventoryManager.getCurrentItem();
+				const charPos = this.character ? this.character.getPosition() : null;
+				this.placementManager.update(currentItem, this.placementRotationIndex || 0, charPos);
 			} else {
 				if (this.placementManager) this.placementManager.placementGhost.visible = false;
 			}

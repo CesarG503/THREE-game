@@ -6,6 +6,7 @@ export class LogicToolbar {
         this.isVisible = false
         this.activeTool = null // 'waypoint', 'select', etc.
         this.onToolChange = null // Callback
+        this.onAction = null // Callback for one-shot actions
         this.onClose = null // Callback
 
         this.setupUI()
@@ -41,6 +42,8 @@ export class LogicToolbar {
 
         // Tools
         this.addToolButton("📍", "Añadir Punto de Ruta", "waypoint")
+        this.addActionButton("←", "Mover objeto al punto anterior", "prev_wp")
+        this.addActionButton("→", "Mover objeto al punto siguiente", "next_wp")
         this.addToolButton("▶", "Iniciar/Pausar Animación", "play_pause")
         this.addToolButton("🕸️", "Activar/Desactivar Grid Aéreo", "aerial_grid") // New Aerial Grid Button
         // this.addToolButton("Mover Puntos", "move_wp") // Future
@@ -88,6 +91,27 @@ export class LogicToolbar {
         }
         btn.onclick = () => {
             this.setActiveTool(toolId)
+        }
+
+        this.container.appendChild(btn)
+    }
+
+    addActionButton(icon, title, actionId) {
+        const btn = document.createElement('div')
+        btn.textContent = icon
+        btn.title = title
+        btn.dataset.action = actionId
+        btn.style.cssText = `
+            width: 40px; height: 40px; background: #242424; color: white;
+            display: flex; align-items: center; justify-content: center;
+            border-radius: 6px; cursor: pointer; border: 1px solid #555;
+            font-size: 20px; transition: background 0.2s;
+        `
+
+        btn.onmouseover = () => btn.style.background = "#444"
+        btn.onmouseout = () => btn.style.background = "#242424"
+        btn.onclick = () => {
+            if (this.onAction) this.onAction(actionId)
         }
 
         this.container.appendChild(btn)

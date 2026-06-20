@@ -584,6 +584,10 @@ export class Game {
 				if (this.constructionMenu && this.constructionMenu.logicSystem && this.constructionMenu.logicSystem.isEditingMap) {
 					const logicSys = this.constructionMenu.logicSystem;
 					if (logicSys.isWaypointGizmoInteracting && logicSys.isWaypointGizmoInteracting()) return;
+					if (e.button === 2) {
+						if (logicSys.handleMapRightClick) logicSys.handleMapRightClick(e);
+						return;
+					}
 					if (logicSys.toolbar.activeTool === "waypoint" && e.button === 0) {
 						const pos = this.placementManager.getCurrentTarget();
 						if (pos && logicSys.editingObject) {

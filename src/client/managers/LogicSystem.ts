@@ -7,7 +7,9 @@ import { PlayerConfigManager } from "./PlayerConfigManager";
 import { getActiveFarmingGroups } from "../ui/GameHUD";
 import { WaypointTransformGizmo } from "../editor/WaypointTransformGizmo";
 import {
+	applyAnimatedObjectScale,
 	createMovementWaypointFromTransform,
+	degreesToRadians,
 	describeRotationTurns,
 	getObjectCurrentDimensions,
 	getWaypointPosition,
@@ -36,6 +38,8 @@ export class LogicSystem {
 	targetLogic: any;
 	waypointGizmo: any;
 	selectedWaypoint: any;
+	waypointPanel: HTMLElement | null;
+	waypointNavIndex: number;
 
 	constructor(game: any) {
 		this.game = game;
@@ -47,6 +51,8 @@ export class LogicSystem {
 		this.interactiveCollisionLogic = new InteractiveCollisionLogic(game, this);
 		this.targetLogic = new TargetLogic(game, this);
 		this.selectedWaypoint = null;
+		this.waypointPanel = null;
+		this.waypointNavIndex = -1;
 		this.waypointGizmo = new WaypointTransformGizmo(game, {
 			onChange: () => this.updateVisualization(),
 			onCommit: () => {
@@ -62,6 +68,10 @@ export class LogicSystem {
 
 		// Toolbar Callbacks
 		this.toolbar.onClose = () => this.endMapEdit();
+		this.toolbar.onAction = (action: any) => {
+			if (action === "prev_wp") this.moveEditingObjectToWaypoint(-1);
+			if (action === "next_wp") this.moveEditingObjectToWaypoint(1);
+		};
 		this.toolbar.onToolChange = (tool: any) => {
 			console.log("Herramienta Lógica:", tool);
 
@@ -207,8 +217,221 @@ export class LogicSystem {
 
 		const waypoint = normalizeMovementWaypoint(seq.waypoints[waypointIndex], object);
 		this.selectedWaypoint = { object, sequenceIndex, waypointIndex };
+		this.waypointNavIndex = waypointIndex;
 		this.waypointGizmo.attach(object, waypoint, mode);
 		this.updateVisualization();
+	}
+
+	handleMapRightClick(event: MouseEvent) {
+		if (!this.editingObject) return true;
+
+		const mouse = this.getPointerNdc(event);
+		const raycaster = new THREE.Raycaster();
+		raycaster.setFromCamera(mouse, this.game.sceneManager.camera);
+
+		const waypointHit = raycaster.intersectObjects(this.pathVisualizer.children, true).find((hit: any) => {
+			let obj = hit.object;
+			while (obj) {
+				if (obj.userData?.isMovementWaypointHandle) return true;
+				obj = obj.parent;
+			}
+			return false;
+		});
+
+		if (waypointHit) {
+			let handle = waypointHit.object;
+			while (handle && !handle.userData?.isMovementWaypointHandle) handle = handle.parent;
+			if (handle) {
+				this.selectWaypoint(this.editingObject, handle.userData.sequenceIndex, handle.userData.waypointIndex, this.waypointGizmo.getMode());
+				this.showWaypointPropertiesPanel(this.editingObject, handle.userData.sequenceIndex, handle.userData.waypointIndex);
+			}
+			return true;
+		}
+
+		const objectHit = raycaster.intersectObjects(this.game.sceneManager.scene.children, true).find((hit: any) => {
+			let obj = hit.object;
+			while (obj) {
+				if (obj.userData?.isEditableMapObject) return true;
+				obj = obj.parent;
+			}
+			return false;
+		});
+
+		if (objectHit) {
+			let target = objectHit.object;
+			while (target && !target.userData?.isEditableMapObject) target = target.parent;
+			if (target === this.editingObject && this.game.objectInspector) {
+				this.game.objectInspector.show(target);
+			}
+		}
+
+		return true;
+	}
+
+	private getPointerNdc(event: MouseEvent) {
+		if (document.pointerLockElement) return new THREE.Vector2(0, 0);
+		return new THREE.Vector2(
+			(event.clientX / window.innerWidth) * 2 - 1,
+			-(event.clientY / window.innerHeight) * 2 + 1
+		);
+	}
+
+	private getValidWaypointIndices(seq: any) {
+		if (!seq?.waypoints) return [];
+		return seq.waypoints
+			.map((wp: MovementWaypoint, idx: number) => ({ wp, idx }))
+			.filter(({ wp }) => wp && wp.type !== "wait_signal" && wp.x !== undefined && wp.y !== undefined && wp.z !== undefined)
+			.map(({ idx }) => idx);
+	}
+
+	moveEditingObjectToWaypoint(direction: number) {
+		if (!this.editingObject) return;
+		const sequenceIndex = this.editingSequenceIndex ?? 0;
+		const seq = this.getMovementSequence(this.editingObject, sequenceIndex);
+		const validIndices = this.getValidWaypointIndices(seq);
+		if (validIndices.length === 0) return;
+
+		let currentListIndex = validIndices.indexOf(this.selectedWaypoint?.object === this.editingObject ? this.selectedWaypoint.waypointIndex : this.waypointNavIndex);
+		if (currentListIndex < 0) currentListIndex = direction >= 0 ? -1 : 0;
+
+		const nextListIndex = (currentListIndex + direction + validIndices.length) % validIndices.length;
+		const waypointIndex = validIndices[nextListIndex];
+		const waypoint = normalizeMovementWaypoint(seq.waypoints[waypointIndex], this.editingObject);
+
+		this.applyWaypointToObject(this.editingObject, waypoint);
+		this.selectWaypoint(this.editingObject, sequenceIndex, waypointIndex, this.waypointGizmo.getMode());
+		this.showWaypointPropertiesPanel(this.editingObject, sequenceIndex, waypointIndex);
+		this.broadcastObjectLogicUpdate(this.editingObject);
+	}
+
+	private applyWaypointToObject(object: any, waypoint: MovementWaypoint) {
+		const pos = getWaypointPosition(waypoint, object);
+		const rot = getWaypointRotation(waypoint, object);
+		const scale = getWaypointScale(waypoint, object);
+
+		object.position.set(pos.x, pos.y, pos.z);
+		object.rotation.set(rot.x, rot.y, rot.z);
+		applyAnimatedObjectScale(object, scale);
+
+		if (this.game?.setObjectBodyType) this.game.setObjectBodyType(object, "kinematic");
+		const body = object.userData?.rigidBody;
+		if (body) {
+			const q = new THREE.Quaternion().setFromEuler(object.rotation);
+			body.setTranslation?.(pos, true);
+			body.setRotation?.(q, true);
+			body.setNextKinematicTranslation?.(pos);
+			body.setNextKinematicRotation?.(q);
+		}
+	}
+
+	closeWaypointPropertiesPanel() {
+		this.waypointPanel?.remove();
+		this.waypointPanel = null;
+	}
+
+	showWaypointPropertiesPanel(object: any, sequenceIndex: number, waypointIndex: number) {
+		const seq = this.getMovementSequence(object, sequenceIndex);
+		if (!seq || !seq.waypoints[waypointIndex]) return;
+		const wp = normalizeMovementWaypoint(seq.waypoints[waypointIndex], object);
+		this.closeWaypointPropertiesPanel();
+
+		const panel = document.createElement("div");
+		panel.id = "waypoint-properties-panel";
+		panel.style.cssText = `
+			position:absolute; right:20px; top:20px; width:320px; max-height:calc(100vh - 40px);
+			overflow:auto; background:rgba(0,0,0,0.92); color:white; z-index:2200;
+			border:2px solid #2277aa; border-radius:8px; padding:12px; box-sizing:border-box;
+			font-family:sans-serif; box-shadow:0 0 18px rgba(0,0,0,0.7);
+		`;
+
+		const header = document.createElement("div");
+		header.style.cssText = "display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #335; padding-bottom:8px; margin-bottom:10px;";
+		header.innerHTML = `<strong>Punto #${waypointIndex + 1}</strong>`;
+		const close = document.createElement("button");
+		close.textContent = "X";
+		close.style.cssText = "background:#333; color:white; border:1px solid #666; border-radius:4px; cursor:pointer;";
+		close.onclick = () => this.closeWaypointPropertiesPanel();
+		header.appendChild(close);
+		panel.appendChild(header);
+
+		const refresh = () => {
+			normalizeMovementWaypoint(wp, object);
+			this.selectWaypoint(object, sequenceIndex, waypointIndex, this.waypointGizmo.getMode());
+			this.updateVisualization();
+			this.broadcastObjectLogicUpdate(object);
+		};
+
+		const makeNumber = (label: string, value: number, onChange: (value: number) => void, step = 0.1) => {
+			const row = document.createElement("label");
+			row.style.cssText = "display:grid; grid-template-columns:90px 1fr; gap:8px; align-items:center; margin-bottom:6px; font-size:12px; color:#ccc;";
+			const span = document.createElement("span");
+			span.textContent = label;
+			const input = document.createElement("input");
+			input.type = "number";
+			input.value = Number(value || 0).toFixed(label.startsWith("Rot") ? 1 : 2);
+			input.step = String(step);
+			input.style.cssText = "background:#111; color:white; border:1px solid #444; border-radius:4px; padding:4px;";
+			input.onkeydown = (e) => e.stopPropagation();
+			input.onchange = (e: any) => {
+				onChange(parseFloat(e.target.value));
+				refresh();
+			};
+			row.appendChild(span);
+			row.appendChild(input);
+			panel.appendChild(row);
+		};
+
+		const pos = getWaypointPosition(wp, object);
+		const rot = getWaypointRotation(wp, object);
+		const scale = getWaypointScale(wp, object);
+		const turns = getWaypointRotationTurns(wp);
+
+		makeNumber("Pos X", pos.x, (v) => wp.x = v);
+		makeNumber("Pos Y", pos.y, (v) => wp.y = v);
+		makeNumber("Pos Z", pos.z, (v) => wp.z = v);
+		makeNumber("Rot X", radiansToDegrees(rot.x), (v) => wp.rotation!.x = degreesToRadians(v), 5);
+		makeNumber("Rot Y", radiansToDegrees(rot.y), (v) => { wp.rotation!.y = degreesToRadians(v); wp.rotY = wp.rotation!.y; }, 5);
+		makeNumber("Rot Z", radiansToDegrees(rot.z), (v) => wp.rotation!.z = degreesToRadians(v), 5);
+		makeNumber("Tam X", scale.x, (v) => wp.scale!.x = v);
+		makeNumber("Tam Y", scale.y, (v) => wp.scale!.y = v);
+		makeNumber("Tam Z", scale.z, (v) => wp.scale!.z = v);
+		makeNumber("Vueltas X", turns.x, (v) => wp.rotationTurns!.x = v, 0.25);
+		makeNumber("Vueltas Y", turns.y, (v) => wp.rotationTurns!.y = v, 0.25);
+		makeNumber("Vueltas Z", turns.z, (v) => wp.rotationTurns!.z = v, 0.25);
+		makeNumber("Espera", wp.delay || 0, (v) => wp.delay = v, 0.1);
+
+		const teleportLabel = document.createElement("label");
+		teleportLabel.style.cssText = "display:flex; align-items:center; gap:8px; margin:8px 0; font-size:12px; color:#ccc;";
+		const teleport = document.createElement("input");
+		teleport.type = "checkbox";
+		teleport.checked = Boolean(wp.teleport);
+		teleport.onchange = () => {
+			wp.teleport = teleport.checked;
+			refresh();
+		};
+		teleportLabel.appendChild(teleport);
+		teleportLabel.appendChild(document.createTextNode("Teleport"));
+		panel.appendChild(teleportLabel);
+
+		const buttonRow = document.createElement("div");
+		buttonRow.style.cssText = "display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:10px;";
+		const applyBtn = document.createElement("button");
+		applyBtn.textContent = "Mover objeto aqui";
+		applyBtn.style.cssText = "background:#064f9e; color:white; border:none; border-radius:4px; padding:7px; cursor:pointer;";
+		applyBtn.onclick = () => this.applyWaypointToObject(object, wp);
+		const captureBtn = document.createElement("button");
+		captureBtn.textContent = "Capturar objeto";
+		captureBtn.style.cssText = "background:#333; color:white; border:1px solid #555; border-radius:4px; padding:7px; cursor:pointer;";
+		captureBtn.onclick = () => {
+			this.updateWaypointFromObject(object, sequenceIndex, waypointIndex);
+			this.showWaypointPropertiesPanel(object, sequenceIndex, waypointIndex);
+		};
+		buttonRow.appendChild(applyBtn);
+		buttonRow.appendChild(captureBtn);
+		panel.appendChild(buttonRow);
+
+		document.body.appendChild(panel);
+		this.waypointPanel = panel;
 	}
 
 	setWaypointGizmoMode(mode: "translate" | "rotate" | "scale") {
@@ -240,6 +463,7 @@ export class LogicSystem {
 	}
 
 	dispose() {
+		this.closeWaypointPropertiesPanel();
 		this.waypointGizmo?.dispose?.();
 		this.clearVisualization();
 		this.toolbar?.hide?.();
@@ -1092,6 +1316,7 @@ export class LogicSystem {
 		this.isEditingMap = false;
 		this.editingObject = null;
 		this.selectedWaypoint = null;
+		this.closeWaypointPropertiesPanel();
 		this.waypointGizmo.detach();
 		this.toolbar.hide();
 
@@ -1237,10 +1462,14 @@ export class LogicSystem {
 				const arrowLen = Math.max(1.0, Math.min(Math.max(scale.x, scale.y, scale.z) * 0.65, 4.0));
 				const arrowDir = new THREE.Vector3(0, 0, 1).applyEuler(new THREE.Euler(rot.x, rot.y, rot.z));
 				const arrow = new THREE.ArrowHelper(arrowDir.normalize(), pos, arrowLen, isSelected ? 0xffd84d : 0x00FF00);
+				arrow.userData.isMovementWaypointPreview = true;
 				this.pathVisualizer.add(arrow);
 
 				const dot = new THREE.Mesh(dotGeo, dotMat);
 				dot.position.copy(pos);
+				dot.userData.isMovementWaypointHandle = true;
+				dot.userData.sequenceIndex = idx;
+				dot.userData.waypointIndex = wpIdx;
 				this.pathVisualizer.add(dot);
 
 				if (isEditing) {
@@ -1254,11 +1483,15 @@ export class LogicSystem {
 					const ghost = new THREE.Mesh(ghostGeo, ghostMat);
 					ghost.position.copy(pos);
 					ghost.rotation.set(rot.x, rot.y, rot.z);
+					ghost.userData.isMovementWaypointHandle = true;
+					ghost.userData.sequenceIndex = idx;
+					ghost.userData.waypointIndex = wpIdx;
 					this.pathVisualizer.add(ghost);
 
 					const label = this.createTextSprite(this.getWaypointLabel(wp, wpIdx), isSelected ? "#ffd84d" : "#88ccff");
 					label.position.copy(pos);
 					label.position.y += Math.max(scale.y / 2 + 0.55, 0.9);
+					label.userData.isMovementWaypointPreview = true;
 					this.pathVisualizer.add(label);
 				}
 			});

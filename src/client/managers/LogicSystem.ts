@@ -6,6 +6,7 @@ import { TargetLogic } from "../ui/logic_items/TargetLogic";
 import { PlayerConfigManager } from "./PlayerConfigManager";
 import { getActiveFarmingGroups } from "../ui/GameHUD";
 import { WaypointTransformGizmo } from "../editor/WaypointTransformGizmo";
+import { GRAVITY_ORIENTATION_OPTIONS, normalizeGravityOrientation } from "../utils/GravityOrientation";
 import {
 	applyAnimatedObjectScale,
 	createMovementWaypointFromTransform,
@@ -725,7 +726,7 @@ export class LogicSystem {
 				const isButton = child.userData.mapObjectType === "interaction_button";
 				const isCollision = child.userData.mapObjectType === "interactive_collision";
 				const isTarget = child.userData.mapObjectType === "target";
-				const isInteractiveZone = ["impulse_jump", "impulse_lateral", "farming_zone"].includes(child.userData.mapObjectType);
+				const isInteractiveZone = ["impulse_jump", "impulse_lateral", "gravity_pad", "farming_zone"].includes(child.userData.mapObjectType);
 				const hasWaypoints = this.hasMovementLogic(child);
 
 				if (isSpawn || isButton || isCollision || isTarget || isInteractiveZone || hasWaypoints) {
@@ -794,6 +795,10 @@ export class LogicSystem {
 			this.renderImpulsePadUI(container, object, props);
 		}
 
+		if (object.userData.mapObjectType === "gravity_pad") {
+			this.renderGravityPadUI(container, object, props);
+		}
+
 		if (object.userData.mapObjectType === "farming_zone") {
 			this.renderFarmingZoneUI(container, object, props);
 		}
@@ -828,6 +833,24 @@ export class LogicSystem {
 		hint.textContent = props.padKind === "lateral"
 			? "La rotación Y del objeto controla la dirección del empuje."
 			: "Impulsa al jugador hacia arriba al entrar en el pad.";
+		hint.style.cssText = "font-size:11px; color:#aaa; margin-top:8px; line-height:1.35;";
+		container.appendChild(hint);
+	}
+
+	renderGravityPadUI(container: HTMLElement, object: any, props: any) {
+		if (props.name === undefined) props.name = "Pad de Gravedad";
+		if (props.gravityOrientation === undefined) props.gravityOrientation = "up";
+		if (props.transitionDuration === undefined) props.transitionDuration = 0.8;
+		if (props.cooldown === undefined) props.cooldown = 0.35;
+		props.gravityOrientation = normalizeGravityOrientation(props.gravityOrientation);
+
+		this.createInput(container, object, "name", props.name, "text", "Nombre");
+		this.createSelectInput(container, object, "gravityOrientation", props.gravityOrientation, GRAVITY_ORIENTATION_OPTIONS, "Orientación");
+		this.createInput(container, object, "transitionDuration", props.transitionDuration, "number", "Duración Giro (s)");
+		this.createInput(container, object, "cooldown", props.cooldown, "number", "Cooldown (s)");
+
+		const hint = document.createElement("div");
+		hint.textContent = "Al entrar, cambia la atracción del jugador. Arriba hace que el techo sea el nuevo suelo.";
 		hint.style.cssText = "font-size:11px; color:#aaa; margin-top:8px; line-height:1.35;";
 		container.appendChild(hint);
 	}
@@ -1583,6 +1606,34 @@ export class LogicSystem {
 		container.appendChild(row);
 	}
 
+	createSelectInput(container: HTMLElement, object: any, key: string, val: any, options: Array<{ value: string; label: string }>, labelText: string) {
+		const row = document.createElement("div");
+		row.style.cssText = "display: flex; gap: 10px; align-items: center; justify-content: space-between; margin-bottom:5px;";
+
+		const label = document.createElement("label");
+		label.textContent = labelText || key;
+		label.style.color = "#aaa";
+		label.style.fontSize = "14px";
+
+		const select = document.createElement("select");
+		select.style.cssText = "background: #111; border: 1px solid #444; color: white; padding: 4px; border-radius: 4px; width: 60%;";
+		options.forEach((option) => {
+			const opt = document.createElement("option");
+			opt.value = option.value;
+			opt.textContent = option.label;
+			if (val === option.value) opt.selected = true;
+			select.appendChild(opt);
+		});
+		select.onchange = (e: any) => {
+			if (object?.userData?.logicProperties) object.userData.logicProperties[key] = e.target.value;
+			else object[key] = e.target.value;
+		};
+
+		row.appendChild(label);
+		row.appendChild(select);
+		container.appendChild(row);
+	}
+
 	broadcastSignal(signalName: string) {
 		if (!this.game) return;
 
@@ -1608,6 +1659,7 @@ export class LogicSystem {
 			case "interactive_zones": return "Pads y Zonas";
 			case "impulse_jump": return "Pad de Salto";
 			case "impulse_lateral": return "Pad de Empuje";
+			case "gravity_pad": return "Pad de Gravedad";
 			case "farming_zone": return "Zona de Farmeo";
 			default: return type ? (type.charAt(0).toUpperCase() + type.slice(1)) : "Objeto";
 		}

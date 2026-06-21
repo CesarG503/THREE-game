@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { FuegoItem } from "../items/FuegoItem";
+import { normalizeGravityOrientation } from "../utils/GravityOrientation";
 
 export function setupDebugRender(this: any) {
 	this.debugMesh = new THREE.LineSegments(
@@ -114,6 +115,49 @@ function updateMapImpulsePads(game: any) {
 		game.character.applyImpulse(direction.multiplyScalar(strength));
 		state.wasInZone = true;
 		state.lastImpulseTime = now;
+	});
+}
+
+function updateMapGravityPads(game: any) {
+	if (!game.character || !game.sceneManager?.scene) return;
+
+	const charPos = game.character.getPosition();
+	const now = game.clock ? game.clock.getElapsedTime() : performance.now() / 1000;
+	const pads = getEditableMapObjects(game.sceneManager.scene, ["gravity_pad"]);
+
+	pads.forEach((pad: any) => {
+		if (!pad.userData.logicProperties) pad.userData.logicProperties = {};
+		if (!pad.userData.runtimeState) pad.userData.runtimeState = {};
+
+		const props = pad.userData.logicProperties;
+		const state = pad.userData.runtimeState;
+		const dims = pad.userData.originalScale || { x: 3, y: 0.2, z: 3 };
+		const localPos = pad.worldToLocal(charPos.clone());
+
+		const inZone =
+			Math.abs(localPos.x) < dims.x / 2 &&
+			Math.abs(localPos.z) < dims.z / 2 &&
+			localPos.y >= -dims.y / 2 - 0.15 &&
+			localPos.y < dims.y / 2 + 0.85;
+
+		if (!inZone) {
+			state.wasInZone = false;
+			return;
+		}
+
+		const cooldown = Math.max(0, Number(props.cooldown ?? 0.35));
+		const canTrigger = !state.wasInZone && (!state.lastGravityTime || now - state.lastGravityTime >= cooldown);
+		if (!canTrigger) return;
+
+		const orientation = normalizeGravityOrientation(props.gravityOrientation);
+		const duration = Math.max(0, Number(props.transitionDuration ?? 0.8));
+
+		if (typeof game.character.setGravityOrientation === "function") {
+			game.character.setGravityOrientation(orientation, { duration });
+		}
+
+		state.wasInZone = true;
+		state.lastGravityTime = now;
 	});
 }
 
@@ -261,7 +305,12 @@ export function animate(this: any) {
 	}
 
 	// Camera Update
-	this.cameraController.update(this.character.getPosition(), this.character.getRotation(), dt);
+	this.cameraController.update(
+		this.character.getPosition(),
+		this.character.getRotation(),
+		dt,
+		this.character.getGravityUpVector ? this.character.getGravityUpVector() : null
+	);
 
 	// Fall Death Logic
 	if (this.environmentConfig && this.environmentConfig.fallDeath && this.character.getPosition().y < this.environmentConfig.fallDeathY) {
@@ -313,7 +362,8 @@ export function animate(this: any) {
 				headYaw: this.character.headYaw || 0,
 				isSuperman: this.character.isSuperman !== undefined ? this.character.isSuperman : (this.character.polygonModelSkin ? this.character.polygonModelSkin.isSuperman : false),
 				noPitchTilt: this.character.noPitchTilt !== undefined ? this.character.noPitchTilt : false,
-				isUsingJetpack: this.character.isUsingJetpack !== undefined ? this.character.isUsingJetpack : false
+				isUsingJetpack: this.character.isUsingJetpack !== undefined ? this.character.isUsingJetpack : false,
+				gravityOrientation: this.character.getGravityOrientation ? this.character.getGravityOrientation() : "down"
 			};
 
 			this.networkManager.localRoleId = playerState.roleId;
@@ -344,6 +394,7 @@ export function animate(this: any) {
 	}
 
 	updateMapImpulsePads(this);
+	updateMapGravityPads(this);
 	updateMapFarmingZones(this, dt);
 
 	if (this.projectiles) {

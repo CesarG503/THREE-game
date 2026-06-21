@@ -1,5 +1,6 @@
 import { DEFAULT_POLYGON_SKIN_URL, getSelectedSkin } from "../platform/skinPreferences";
 import { getStoredAuth } from "../platform/auth";
+import { normalizeGravityOrientation } from "../utils/GravityOrientation";
 
 const DEFAULT_VISUAL_RULE = {
     type: "none",
@@ -29,6 +30,8 @@ export class PlayerConfigManager {
                 jumpAnimationType: "none",
                 fallAnimationType: "none",
                 playerCollision: "push",
+                gravityOrientation: "down",
+                gravityTransitionDuration: 0.65,
                 skinMode: "player",
                 skinUrl: DEFAULT_POLYGON_SKIN_URL,
                 skinAssetId: null,
@@ -112,6 +115,8 @@ export class PlayerConfigManager {
                 jumpAnimationType: "none",
                 fallAnimationType: "none",
                 playerCollision: "push",
+                gravityOrientation: "down",
+                gravityTransitionDuration: 0.65,
                 skinMode: "player",
                 skinUrl: DEFAULT_POLYGON_SKIN_URL,
                 skinAssetId: null,
@@ -219,6 +224,8 @@ export class PlayerConfigManager {
             jumpAnimationType: "none",
             fallAnimationType: "none",
             playerCollision: "push",
+            gravityOrientation: "down",
+            gravityTransitionDuration: 0.65,
             skinMode: "player",
             skinUrl: DEFAULT_POLYGON_SKIN_URL,
             skinAssetId: null,
@@ -390,7 +397,9 @@ export class PlayerConfigManager {
                 maxMultiJumps: profile.maxMultiJumps,
                 jumpAnimationType: profile.jumpAnimationType,
                 fallAnimationType: profile.fallAnimationType,
-                playerCollision: profile.playerCollision
+                playerCollision: profile.playerCollision,
+                gravityOrientation: normalizeGravityOrientation(profile.gravityOrientation),
+                gravityTransitionDuration: profile.gravityTransitionDuration
             });
         } else {
             character.speed = profile.speed;
@@ -440,6 +449,8 @@ export class PlayerConfigManager {
                 skinUrl: DEFAULT_POLYGON_SKIN_URL,
                 skinAssetId: null,
                 roleVisual: createRoleVisual(),
+                gravityOrientation: "down",
+                gravityTransitionDuration: 0.65,
                 ...profile
             }));
         }

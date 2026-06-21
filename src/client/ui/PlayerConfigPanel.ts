@@ -2,6 +2,7 @@
 
 import { HUDConfigPanel } from './HUDConfigPanel'
 import { uploadAsset } from '../platform/api'
+import { GRAVITY_ORIENTATION_OPTIONS } from '../utils/GravityOrientation'
 
 const DEFAULT_POLYGON_SKIN_URL = "https://raw.githubusercontent.com/InventivetalentDev/minecraft-assets/1.19.3/assets/minecraft/textures/entity/player/wide/steve.png"
 
@@ -460,6 +461,49 @@ export class PlayerConfigPanel {
         flightContainer.appendChild(flightCheck);
         flightContainer.appendChild(flightLabel);
         statsCol.appendChild(flightContainer);
+
+        const gravityContainer = document.createElement('div');
+        gravityContainer.style.cssText = "margin-top:15px; display:flex; flex-direction:column; gap:6px;";
+
+        const gravityLabel = document.createElement('label');
+        gravityLabel.textContent = "Orientación de Gravedad";
+        gravityLabel.style.cssText = "color:#aaa; font-size:13px;";
+        gravityContainer.appendChild(gravityLabel);
+
+        const gravitySelect = document.createElement('select');
+        gravitySelect.style.cssText = "background:#333; color:white; padding:7px; border:1px solid #555; border-radius:4px; width:100%;";
+        GRAVITY_ORIENTATION_OPTIONS.forEach(optInfo => {
+            const opt = document.createElement('option');
+            opt.value = optInfo.value;
+            opt.textContent = optInfo.label;
+            if ((profile.gravityOrientation || "down") === optInfo.value) opt.selected = true;
+            gravitySelect.appendChild(opt);
+        });
+        gravitySelect.onchange = (e) => {
+            this.manager.updateProfile(profile.id, { gravityOrientation: e.target.value });
+        };
+        gravityContainer.appendChild(gravitySelect);
+
+        const gravityDurationRow = document.createElement('div');
+        gravityDurationRow.style.cssText = "display:flex; align-items:center; justify-content:space-between; gap:10px;";
+        const gravityDurationLabel = document.createElement('span');
+        gravityDurationLabel.textContent = "Giro (s)";
+        gravityDurationLabel.style.cssText = "color:#aaa; font-size:13px;";
+        const gravityDurationInput = document.createElement('input');
+        gravityDurationInput.type = "number";
+        gravityDurationInput.min = "0";
+        gravityDurationInput.step = "0.1";
+        gravityDurationInput.value = profile.gravityTransitionDuration ?? 0.65;
+        gravityDurationInput.style.cssText = "background:#333; color:white; padding:5px; border:1px solid #555; width:80px; border-radius:4px;";
+        gravityDurationInput.onchange = (e) => {
+            this.manager.updateProfile(profile.id, { gravityTransitionDuration: Math.max(0, parseFloat(e.target.value) || 0) });
+        };
+        gravityDurationInput.onkeydown = (e) => e.stopPropagation();
+        gravityDurationRow.appendChild(gravityDurationLabel);
+        gravityDurationRow.appendChild(gravityDurationInput);
+        gravityContainer.appendChild(gravityDurationRow);
+
+        statsCol.appendChild(gravityContainer);
 
         // Respawn Logic
         const respawnContainer = document.createElement('div');

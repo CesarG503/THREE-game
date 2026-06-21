@@ -40,6 +40,7 @@ export class CameraController {
   lastCharacterPos: THREE.Vector3 | null;
   dynamicOffset: number;
   smoothedStrafe: number;
+  gravityUp: THREE.Vector3;
 
   constructor(camera: THREE.Camera, domElement: HTMLElement) {
     this.camera = camera;
@@ -95,6 +96,7 @@ export class CameraController {
 
     this.isPaused = false;
     this.isUIOpen = false;
+    this.gravityUp = new THREE.Vector3(0, 1, 0);
 
     this.setupEventListeners();
   }
@@ -301,9 +303,36 @@ export class CameraController {
     document.dispatchEvent(event);
   }
 
-  update(characterPosition: THREE.Vector3 | null, characterRotation: number, dt: number) {
+  setGravityUpVector(up: THREE.Vector3) {
+    if (!up || up.lengthSq() < 0.0001) return;
+    this.gravityUp.copy(up).normalize();
+    this.camera.up.copy(this.gravityUp);
+  }
+
+  getGravityBasis(yaw: number) {
+    const up = this.gravityUp.clone().normalize();
+    let baseForward = new THREE.Vector3(0, 0, 1).projectOnPlane(up);
+    if (baseForward.lengthSq() < 0.0001) {
+      baseForward = new THREE.Vector3(1, 0, 0).projectOnPlane(up);
+    }
+    baseForward.normalize();
+
+    const baseRight = baseForward.clone().cross(up).normalize();
+    const forward = baseForward.clone().multiplyScalar(Math.cos(yaw)).addScaledVector(baseRight, -Math.sin(yaw)).normalize();
+    const right = baseRight.clone().multiplyScalar(Math.cos(yaw)).addScaledVector(baseForward, Math.sin(yaw)).normalize();
+
+    return { up, forward, right };
+  }
+
+  update(characterPosition: THREE.Vector3 | null, characterRotation: number, dt: number, gravityUp?: THREE.Vector3 | null) {
     if (!characterPosition) return;
     void characterRotation;
+
+    if (gravityUp) {
+      this.setGravityUpVector(gravityUp);
+    } else {
+      this.camera.up.copy(this.gravityUp);
+    }
 
     this.target.copy(characterPosition);
 
@@ -315,20 +344,14 @@ export class CameraController {
   }
 
   updateFirstPerson(characterPosition: THREE.Vector3) {
-    const headPosition = characterPosition.clone();
-    headPosition.y += this.firstPersonHeight;
+    const { up, forward } = this.getGravityBasis(this.fpYaw);
+    const headPosition = characterPosition.clone().addScaledVector(up, this.firstPersonHeight);
 
     this.camera.position.copy(headPosition);
 
-    const forwardOffset = new THREE.Vector3(Math.sin(this.fpYaw), 0, Math.cos(this.fpYaw)).multiplyScalar(
-      this.firstPersonForwardOffset
-    );
-    this.camera.position.add(forwardOffset);
+    this.camera.position.addScaledVector(forward, this.firstPersonForwardOffset);
 
-    const lookDirection = new THREE.Vector3();
-    lookDirection.x = Math.sin(this.fpYaw) * Math.cos(this.fpPitch);
-    lookDirection.y = Math.sin(this.fpPitch);
-    lookDirection.z = Math.cos(this.fpYaw) * Math.cos(this.fpPitch);
+    const lookDirection = forward.clone().multiplyScalar(Math.cos(this.fpPitch)).addScaledVector(up, Math.sin(this.fpPitch));
 
     const lookAt = headPosition.clone().add(lookDirection);
     this.camera.lookAt(lookAt);
@@ -344,7 +367,8 @@ export class CameraController {
     const deltaPos = characterPosition.clone().sub(this.lastCharacterPos);
     this.lastCharacterPos.copy(characterPosition);
 
-    const rightVector = new THREE.Vector3(-Math.cos(this.theta), 0, Math.sin(this.theta)).normalize();
+    const { up, forward, right } = this.getGravityBasis(this.theta);
+    const rightVector = right;
     const rawStrafeVelocity = deltaPos.dot(rightVector) / (dt || 0.016);
 
     this.smoothedStrafe += (rawStrafeVelocity - this.smoothedStrafe) * 15.0 * dt;
@@ -378,39 +402,33 @@ export class CameraController {
 
     const horizontalDist = this.thirdPersonDistance * Math.cos(this.phi);
     const verticalDist = this.thirdPersonDistance * Math.sin(this.phi);
+    const lateralOffset = right.clone().multiplyScalar(currentOffset);
 
-    targetCameraPos.x = characterPosition.x - horizontalDist * Math.sin(this.theta);
-    targetCameraPos.y = characterPosition.y + currentHeight + verticalDist;
-    targetCameraPos.z = characterPosition.z - horizontalDist * Math.cos(this.theta);
+    targetCameraPos
+      .copy(characterPosition)
+      .addScaledVector(forward, -horizontalDist)
+      .addScaledVector(up, currentHeight + verticalDist)
+      .add(lateralOffset);
 
-    const offsetX = -Math.cos(this.theta) * currentOffset;
-    const offsetZ = Math.sin(this.theta) * currentOffset;
-
-    targetCameraPos.x += offsetX;
-    targetCameraPos.z += offsetZ;
-
-    targetCameraPos.y = Math.max(targetCameraPos.y, this.minCameraHeight);
+    if (up.y > 0.99) {
+      targetCameraPos.y = Math.max(targetCameraPos.y, this.minCameraHeight);
+    }
 
     this.currentPosition.lerp(targetCameraPos, this.smoothing);
-    this.currentPosition.y = Math.max(this.currentPosition.y, this.minCameraHeight);
+    if (up.y > 0.99) {
+      this.currentPosition.y = Math.max(this.currentPosition.y, this.minCameraHeight);
+    }
 
     this.camera.position.copy(this.currentPosition);
 
-    const targetLookAt = characterPosition.clone();
-    targetLookAt.y += currentLookAtY;
-
-    targetLookAt.x += offsetX;
-    targetLookAt.z += offsetZ;
+    const targetLookAt = characterPosition.clone().addScaledVector(up, currentLookAtY).add(lateralOffset);
 
     this.currentLookAt.lerp(targetLookAt, this.smoothing);
     this.camera.lookAt(this.currentLookAt);
   }
 
   getForwardDirection() {
-    if (this.isFirstPerson) {
-      return new THREE.Vector3(Math.sin(this.fpYaw), 0, Math.cos(this.fpYaw)).normalize();
-    }
-    return new THREE.Vector3(Math.sin(this.theta), 0, Math.cos(this.theta)).normalize();
+    return this.getGravityBasis(this.isFirstPerson ? this.fpYaw : this.theta).forward;
   }
 
   consumeManualPitchDelta() {
@@ -420,9 +438,6 @@ export class CameraController {
   }
 
   getRightDirection() {
-    if (this.isFirstPerson) {
-      return new THREE.Vector3(-Math.cos(this.fpYaw), 0, Math.sin(this.fpYaw)).normalize();
-    }
-    return new THREE.Vector3(-Math.cos(this.theta), 0, Math.sin(this.theta)).normalize();
+    return this.getGravityBasis(this.isFirstPerson ? this.fpYaw : this.theta).right;
   }
 }

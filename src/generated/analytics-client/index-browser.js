@@ -147,6 +147,23 @@ exports.Prisma.RawEventScalarFieldEnum = {
   payload: 'payload'
 };
 
+exports.Prisma.PlayerFeaturesScalarFieldEnum = {
+  userId: 'userId',
+  lastActive: 'lastActive',
+  totalPlayTime: 'totalPlayTime',
+  matchesPlayed: 'matchesPlayed',
+  preferredLanguage: 'preferredLanguage'
+};
+
+exports.Prisma.MapFeaturesScalarFieldEnum = {
+  mapId: 'mapId',
+  totalJoins: 'totalJoins',
+  totalLeaves: 'totalLeaves',
+  bounceCount: 'bounceCount',
+  averageDuration: 'averageDuration',
+  bounceRate: 'bounceRate'
+};
+
 exports.Prisma.SortOrder = {
   asc: 'asc',
   desc: 'desc'
@@ -176,7 +193,9 @@ exports.Prisma.JsonNullValueFilter = {
 exports.Prisma.ModelName = {
   User: 'User',
   GameMap: 'GameMap',
-  RawEvent: 'RawEvent'
+  RawEvent: 'RawEvent',
+  PlayerFeatures: 'PlayerFeatures',
+  MapFeatures: 'MapFeatures'
 };
 
 /**

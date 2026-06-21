@@ -19,7 +19,8 @@
     "db:analytics:verify": "npx tsx scripts/verify-analytics-setup.ts",
     "db:analytics:test-broker": "npx tsx scripts/test-event-broker.ts",
     "db:analytics:generate-types": "npx tsx scripts/generate-event-types.ts",
-    "db:analytics:test-schema": "npx tsx scripts/test-schema-registry.ts"
+    "db:analytics:test-schema": "npx tsx scripts/test-schema-registry.ts",
+    "db:analytics:test-feature": "npx tsx scripts/test-feature-store.ts"
   },
   "devDependencies": {
     "@types/busboy": "^1.5.4",

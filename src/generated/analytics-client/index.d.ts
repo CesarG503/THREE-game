@@ -28,6 +28,16 @@ export type GameMap = $Result.DefaultSelection<Prisma.$GameMapPayload>
  * 
  */
 export type RawEvent = $Result.DefaultSelection<Prisma.$RawEventPayload>
+/**
+ * Model PlayerFeatures
+ * 
+ */
+export type PlayerFeatures = $Result.DefaultSelection<Prisma.$PlayerFeaturesPayload>
+/**
+ * Model MapFeatures
+ * 
+ */
+export type MapFeatures = $Result.DefaultSelection<Prisma.$MapFeaturesPayload>
 
 /**
  * ##  Prisma Client ʲˢ
@@ -179,6 +189,26 @@ export class PrismaClient<
     * ```
     */
   get rawEvent(): Prisma.RawEventDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.playerFeatures`: Exposes CRUD operations for the **PlayerFeatures** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more PlayerFeatures
+    * const playerFeatures = await prisma.playerFeatures.findMany()
+    * ```
+    */
+  get playerFeatures(): Prisma.PlayerFeaturesDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.mapFeatures`: Exposes CRUD operations for the **MapFeatures** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more MapFeatures
+    * const mapFeatures = await prisma.mapFeatures.findMany()
+    * ```
+    */
+  get mapFeatures(): Prisma.MapFeaturesDelegate<ExtArgs, ClientOptions>;
 }
 
 export namespace Prisma {
@@ -615,7 +645,9 @@ export namespace Prisma {
   export const ModelName: {
     User: 'User',
     GameMap: 'GameMap',
-    RawEvent: 'RawEvent'
+    RawEvent: 'RawEvent',
+    PlayerFeatures: 'PlayerFeatures',
+    MapFeatures: 'MapFeatures'
   };
 
   export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -631,7 +663,7 @@ export namespace Prisma {
       omit: GlobalOmitOptions
     }
     meta: {
-      modelProps: "user" | "gameMap" | "rawEvent"
+      modelProps: "user" | "gameMap" | "rawEvent" | "playerFeatures" | "mapFeatures"
       txIsolationLevel: Prisma.TransactionIsolationLevel
     }
     model: {
@@ -857,6 +889,154 @@ export namespace Prisma {
           }
         }
       }
+      PlayerFeatures: {
+        payload: Prisma.$PlayerFeaturesPayload<ExtArgs>
+        fields: Prisma.PlayerFeaturesFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.PlayerFeaturesFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$PlayerFeaturesPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.PlayerFeaturesFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$PlayerFeaturesPayload>
+          }
+          findFirst: {
+            args: Prisma.PlayerFeaturesFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$PlayerFeaturesPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.PlayerFeaturesFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$PlayerFeaturesPayload>
+          }
+          findMany: {
+            args: Prisma.PlayerFeaturesFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$PlayerFeaturesPayload>[]
+          }
+          create: {
+            args: Prisma.PlayerFeaturesCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$PlayerFeaturesPayload>
+          }
+          createMany: {
+            args: Prisma.PlayerFeaturesCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.PlayerFeaturesCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$PlayerFeaturesPayload>[]
+          }
+          delete: {
+            args: Prisma.PlayerFeaturesDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$PlayerFeaturesPayload>
+          }
+          update: {
+            args: Prisma.PlayerFeaturesUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$PlayerFeaturesPayload>
+          }
+          deleteMany: {
+            args: Prisma.PlayerFeaturesDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.PlayerFeaturesUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.PlayerFeaturesUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$PlayerFeaturesPayload>[]
+          }
+          upsert: {
+            args: Prisma.PlayerFeaturesUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$PlayerFeaturesPayload>
+          }
+          aggregate: {
+            args: Prisma.PlayerFeaturesAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregatePlayerFeatures>
+          }
+          groupBy: {
+            args: Prisma.PlayerFeaturesGroupByArgs<ExtArgs>
+            result: $Utils.Optional<PlayerFeaturesGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.PlayerFeaturesCountArgs<ExtArgs>
+            result: $Utils.Optional<PlayerFeaturesCountAggregateOutputType> | number
+          }
+        }
+      }
+      MapFeatures: {
+        payload: Prisma.$MapFeaturesPayload<ExtArgs>
+        fields: Prisma.MapFeaturesFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.MapFeaturesFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$MapFeaturesPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.MapFeaturesFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$MapFeaturesPayload>
+          }
+          findFirst: {
+            args: Prisma.MapFeaturesFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$MapFeaturesPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.MapFeaturesFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$MapFeaturesPayload>
+          }
+          findMany: {
+            args: Prisma.MapFeaturesFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$MapFeaturesPayload>[]
+          }
+          create: {
+            args: Prisma.MapFeaturesCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$MapFeaturesPayload>
+          }
+          createMany: {
+            args: Prisma.MapFeaturesCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.MapFeaturesCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$MapFeaturesPayload>[]
+          }
+          delete: {
+            args: Prisma.MapFeaturesDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$MapFeaturesPayload>
+          }
+          update: {
+            args: Prisma.MapFeaturesUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$MapFeaturesPayload>
+          }
+          deleteMany: {
+            args: Prisma.MapFeaturesDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.MapFeaturesUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.MapFeaturesUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$MapFeaturesPayload>[]
+          }
+          upsert: {
+            args: Prisma.MapFeaturesUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$MapFeaturesPayload>
+          }
+          aggregate: {
+            args: Prisma.MapFeaturesAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateMapFeatures>
+          }
+          groupBy: {
+            args: Prisma.MapFeaturesGroupByArgs<ExtArgs>
+            result: $Utils.Optional<MapFeaturesGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.MapFeaturesCountArgs<ExtArgs>
+            result: $Utils.Optional<MapFeaturesCountAggregateOutputType> | number
+          }
+        }
+      }
     }
   } & {
     other: {
@@ -968,6 +1148,8 @@ export namespace Prisma {
     user?: UserOmit
     gameMap?: GameMapOmit
     rawEvent?: RawEventOmit
+    playerFeatures?: PlayerFeaturesOmit
+    mapFeatures?: MapFeaturesOmit
   }
 
   /* Types for Logging */
@@ -1251,6 +1433,7 @@ export namespace Prisma {
     createdAt?: boolean
     updatedAt?: boolean
     events?: boolean | User$eventsArgs<ExtArgs>
+    playerFeatures?: boolean | User$playerFeaturesArgs<ExtArgs>
     _count?: boolean | UserCountOutputTypeDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["user"]>
 
@@ -1284,6 +1467,7 @@ export namespace Prisma {
   export type UserOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "email" | "username" | "displayName" | "createdAt" | "updatedAt", ExtArgs["result"]["user"]>
   export type UserInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     events?: boolean | User$eventsArgs<ExtArgs>
+    playerFeatures?: boolean | User$playerFeaturesArgs<ExtArgs>
     _count?: boolean | UserCountOutputTypeDefaultArgs<ExtArgs>
   }
   export type UserIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {}
@@ -1293,6 +1477,7 @@ export namespace Prisma {
     name: "User"
     objects: {
       events: Prisma.$RawEventPayload<ExtArgs>[]
+      playerFeatures: Prisma.$PlayerFeaturesPayload<ExtArgs> | null
     }
     scalars: $Extensions.GetPayloadResult<{
       id: string
@@ -1696,6 +1881,7 @@ export namespace Prisma {
   export interface Prisma__UserClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
     readonly [Symbol.toStringTag]: "PrismaPromise"
     events<T extends User$eventsArgs<ExtArgs> = {}>(args?: Subset<T, User$eventsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$RawEventPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    playerFeatures<T extends User$playerFeaturesArgs<ExtArgs> = {}>(args?: Subset<T, User$playerFeaturesArgs<ExtArgs>>): Prisma__PlayerFeaturesClient<$Result.GetResult<Prisma.$PlayerFeaturesPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
     /**
      * Attaches callbacks for the resolution and/or rejection of the Promise.
      * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -2148,6 +2334,25 @@ export namespace Prisma {
   }
 
   /**
+   * User.playerFeatures
+   */
+  export type User$playerFeaturesArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the PlayerFeatures
+     */
+    select?: PlayerFeaturesSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the PlayerFeatures
+     */
+    omit?: PlayerFeaturesOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: PlayerFeaturesInclude<ExtArgs> | null
+    where?: PlayerFeaturesWhereInput
+  }
+
+  /**
    * User without action
    */
   export type UserDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
@@ -2346,6 +2551,7 @@ export namespace Prisma {
     isPublished?: boolean
     createdAt?: boolean
     updatedAt?: boolean
+    mapFeatures?: boolean | GameMap$mapFeaturesArgs<ExtArgs>
   }, ExtArgs["result"]["gameMap"]>
 
   export type GameMapSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
@@ -2379,10 +2585,17 @@ export namespace Prisma {
   }
 
   export type GameMapOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "slug" | "name" | "ownerId" | "isPublished" | "createdAt" | "updatedAt", ExtArgs["result"]["gameMap"]>
+  export type GameMapInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    mapFeatures?: boolean | GameMap$mapFeaturesArgs<ExtArgs>
+  }
+  export type GameMapIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {}
+  export type GameMapIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {}
 
   export type $GameMapPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     name: "GameMap"
-    objects: {}
+    objects: {
+      mapFeatures: Prisma.$MapFeaturesPayload<ExtArgs> | null
+    }
     scalars: $Extensions.GetPayloadResult<{
       id: string
       slug: string
@@ -2785,6 +2998,7 @@ export namespace Prisma {
    */
   export interface Prisma__GameMapClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
     readonly [Symbol.toStringTag]: "PrismaPromise"
+    mapFeatures<T extends GameMap$mapFeaturesArgs<ExtArgs> = {}>(args?: Subset<T, GameMap$mapFeaturesArgs<ExtArgs>>): Prisma__MapFeaturesClient<$Result.GetResult<Prisma.$MapFeaturesPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
     /**
      * Attaches callbacks for the resolution and/or rejection of the Promise.
      * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -2838,6 +3052,10 @@ export namespace Prisma {
      */
     omit?: GameMapOmit<ExtArgs> | null
     /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: GameMapInclude<ExtArgs> | null
+    /**
      * Filter, which GameMap to fetch.
      */
     where: GameMapWhereUniqueInput
@@ -2856,6 +3074,10 @@ export namespace Prisma {
      */
     omit?: GameMapOmit<ExtArgs> | null
     /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: GameMapInclude<ExtArgs> | null
+    /**
      * Filter, which GameMap to fetch.
      */
     where: GameMapWhereUniqueInput
@@ -2873,6 +3095,10 @@ export namespace Prisma {
      * Omit specific fields from the GameMap
      */
     omit?: GameMapOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: GameMapInclude<ExtArgs> | null
     /**
      * Filter, which GameMap to fetch.
      */
@@ -2922,6 +3148,10 @@ export namespace Prisma {
      */
     omit?: GameMapOmit<ExtArgs> | null
     /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: GameMapInclude<ExtArgs> | null
+    /**
      * Filter, which GameMap to fetch.
      */
     where?: GameMapWhereInput
@@ -2969,6 +3199,10 @@ export namespace Prisma {
      * Omit specific fields from the GameMap
      */
     omit?: GameMapOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: GameMapInclude<ExtArgs> | null
     /**
      * Filter, which GameMaps to fetch.
      */
@@ -3018,6 +3252,10 @@ export namespace Prisma {
      */
     omit?: GameMapOmit<ExtArgs> | null
     /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: GameMapInclude<ExtArgs> | null
+    /**
      * The data needed to create a GameMap.
      */
     data: XOR<GameMapCreateInput, GameMapUncheckedCreateInput>
@@ -3065,6 +3303,10 @@ export namespace Prisma {
      * Omit specific fields from the GameMap
      */
     omit?: GameMapOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: GameMapInclude<ExtArgs> | null
     /**
      * The data needed to update a GameMap.
      */
@@ -3132,6 +3374,10 @@ export namespace Prisma {
      */
     omit?: GameMapOmit<ExtArgs> | null
     /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: GameMapInclude<ExtArgs> | null
+    /**
      * The filter to search for the GameMap to update in case it exists.
      */
     where: GameMapWhereUniqueInput
@@ -3158,6 +3404,10 @@ export namespace Prisma {
      */
     omit?: GameMapOmit<ExtArgs> | null
     /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: GameMapInclude<ExtArgs> | null
+    /**
      * Filter which GameMap to delete.
      */
     where: GameMapWhereUniqueInput
@@ -3178,6 +3428,25 @@ export namespace Prisma {
   }
 
   /**
+   * GameMap.mapFeatures
+   */
+  export type GameMap$mapFeaturesArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the MapFeatures
+     */
+    select?: MapFeaturesSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the MapFeatures
+     */
+    omit?: MapFeaturesOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: MapFeaturesInclude<ExtArgs> | null
+    where?: MapFeaturesWhereInput
+  }
+
+  /**
    * GameMap without action
    */
   export type GameMapDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
@@ -3189,6 +3458,10 @@ export namespace Prisma {
      * Omit specific fields from the GameMap
      */
     omit?: GameMapOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: GameMapInclude<ExtArgs> | null
   }
 
 
@@ -4271,6 +4544,2233 @@ export namespace Prisma {
 
 
   /**
+   * Model PlayerFeatures
+   */
+
+  export type AggregatePlayerFeatures = {
+    _count: PlayerFeaturesCountAggregateOutputType | null
+    _avg: PlayerFeaturesAvgAggregateOutputType | null
+    _sum: PlayerFeaturesSumAggregateOutputType | null
+    _min: PlayerFeaturesMinAggregateOutputType | null
+    _max: PlayerFeaturesMaxAggregateOutputType | null
+  }
+
+  export type PlayerFeaturesAvgAggregateOutputType = {
+    totalPlayTime: number | null
+    matchesPlayed: number | null
+  }
+
+  export type PlayerFeaturesSumAggregateOutputType = {
+    totalPlayTime: number | null
+    matchesPlayed: number | null
+  }
+
+  export type PlayerFeaturesMinAggregateOutputType = {
+    userId: string | null
+    lastActive: Date | null
+    totalPlayTime: number | null
+    matchesPlayed: number | null
+    preferredLanguage: string | null
+  }
+
+  export type PlayerFeaturesMaxAggregateOutputType = {
+    userId: string | null
+    lastActive: Date | null
+    totalPlayTime: number | null
+    matchesPlayed: number | null
+    preferredLanguage: string | null
+  }
+
+  export type PlayerFeaturesCountAggregateOutputType = {
+    userId: number
+    lastActive: number
+    totalPlayTime: number
+    matchesPlayed: number
+    preferredLanguage: number
+    _all: number
+  }
+
+
+  export type PlayerFeaturesAvgAggregateInputType = {
+    totalPlayTime?: true
+    matchesPlayed?: true
+  }
+
+  export type PlayerFeaturesSumAggregateInputType = {
+    totalPlayTime?: true
+    matchesPlayed?: true
+  }
+
+  export type PlayerFeaturesMinAggregateInputType = {
+    userId?: true
+    lastActive?: true
+    totalPlayTime?: true
+    matchesPlayed?: true
+    preferredLanguage?: true
+  }
+
+  export type PlayerFeaturesMaxAggregateInputType = {
+    userId?: true
+    lastActive?: true
+    totalPlayTime?: true
+    matchesPlayed?: true
+    preferredLanguage?: true
+  }
+
+  export type PlayerFeaturesCountAggregateInputType = {
+    userId?: true
+    lastActive?: true
+    totalPlayTime?: true
+    matchesPlayed?: true
+    preferredLanguage?: true
+    _all?: true
+  }
+
+  export type PlayerFeaturesAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which PlayerFeatures to aggregate.
+     */
+    where?: PlayerFeaturesWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of PlayerFeatures to fetch.
+     */
+    orderBy?: PlayerFeaturesOrderByWithRelationInput | PlayerFeaturesOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: PlayerFeaturesWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` PlayerFeatures from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` PlayerFeatures.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned PlayerFeatures
+    **/
+    _count?: true | PlayerFeaturesCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to average
+    **/
+    _avg?: PlayerFeaturesAvgAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to sum
+    **/
+    _sum?: PlayerFeaturesSumAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: PlayerFeaturesMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: PlayerFeaturesMaxAggregateInputType
+  }
+
+  export type GetPlayerFeaturesAggregateType<T extends PlayerFeaturesAggregateArgs> = {
+        [P in keyof T & keyof AggregatePlayerFeatures]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregatePlayerFeatures[P]>
+      : GetScalarType<T[P], AggregatePlayerFeatures[P]>
+  }
+
+
+
+
+  export type PlayerFeaturesGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: PlayerFeaturesWhereInput
+    orderBy?: PlayerFeaturesOrderByWithAggregationInput | PlayerFeaturesOrderByWithAggregationInput[]
+    by: PlayerFeaturesScalarFieldEnum[] | PlayerFeaturesScalarFieldEnum
+    having?: PlayerFeaturesScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: PlayerFeaturesCountAggregateInputType | true
+    _avg?: PlayerFeaturesAvgAggregateInputType
+    _sum?: PlayerFeaturesSumAggregateInputType
+    _min?: PlayerFeaturesMinAggregateInputType
+    _max?: PlayerFeaturesMaxAggregateInputType
+  }
+
+  export type PlayerFeaturesGroupByOutputType = {
+    userId: string
+    lastActive: Date
+    totalPlayTime: number
+    matchesPlayed: number
+    preferredLanguage: string
+    _count: PlayerFeaturesCountAggregateOutputType | null
+    _avg: PlayerFeaturesAvgAggregateOutputType | null
+    _sum: PlayerFeaturesSumAggregateOutputType | null
+    _min: PlayerFeaturesMinAggregateOutputType | null
+    _max: PlayerFeaturesMaxAggregateOutputType | null
+  }
+
+  type GetPlayerFeaturesGroupByPayload<T extends PlayerFeaturesGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<PlayerFeaturesGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof PlayerFeaturesGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], PlayerFeaturesGroupByOutputType[P]>
+            : GetScalarType<T[P], PlayerFeaturesGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type PlayerFeaturesSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    userId?: boolean
+    lastActive?: boolean
+    totalPlayTime?: boolean
+    matchesPlayed?: boolean
+    preferredLanguage?: boolean
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["playerFeatures"]>
+
+  export type PlayerFeaturesSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    userId?: boolean
+    lastActive?: boolean
+    totalPlayTime?: boolean
+    matchesPlayed?: boolean
+    preferredLanguage?: boolean
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["playerFeatures"]>
+
+  export type PlayerFeaturesSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    userId?: boolean
+    lastActive?: boolean
+    totalPlayTime?: boolean
+    matchesPlayed?: boolean
+    preferredLanguage?: boolean
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["playerFeatures"]>
+
+  export type PlayerFeaturesSelectScalar = {
+    userId?: boolean
+    lastActive?: boolean
+    totalPlayTime?: boolean
+    matchesPlayed?: boolean
+    preferredLanguage?: boolean
+  }
+
+  export type PlayerFeaturesOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"userId" | "lastActive" | "totalPlayTime" | "matchesPlayed" | "preferredLanguage", ExtArgs["result"]["playerFeatures"]>
+  export type PlayerFeaturesInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }
+  export type PlayerFeaturesIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }
+  export type PlayerFeaturesIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }
+
+  export type $PlayerFeaturesPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "PlayerFeatures"
+    objects: {
+      user: Prisma.$UserPayload<ExtArgs>
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      userId: string
+      lastActive: Date
+      totalPlayTime: number
+      matchesPlayed: number
+      preferredLanguage: string
+    }, ExtArgs["result"]["playerFeatures"]>
+    composites: {}
+  }
+
+  type PlayerFeaturesGetPayload<S extends boolean | null | undefined | PlayerFeaturesDefaultArgs> = $Result.GetResult<Prisma.$PlayerFeaturesPayload, S>
+
+  type PlayerFeaturesCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<PlayerFeaturesFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: PlayerFeaturesCountAggregateInputType | true
+    }
+
+  export interface PlayerFeaturesDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['PlayerFeatures'], meta: { name: 'PlayerFeatures' } }
+    /**
+     * Find zero or one PlayerFeatures that matches the filter.
+     * @param {PlayerFeaturesFindUniqueArgs} args - Arguments to find a PlayerFeatures
+     * @example
+     * // Get one PlayerFeatures
+     * const playerFeatures = await prisma.playerFeatures.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends PlayerFeaturesFindUniqueArgs>(args: SelectSubset<T, PlayerFeaturesFindUniqueArgs<ExtArgs>>): Prisma__PlayerFeaturesClient<$Result.GetResult<Prisma.$PlayerFeaturesPayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one PlayerFeatures that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {PlayerFeaturesFindUniqueOrThrowArgs} args - Arguments to find a PlayerFeatures
+     * @example
+     * // Get one PlayerFeatures
+     * const playerFeatures = await prisma.playerFeatures.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends PlayerFeaturesFindUniqueOrThrowArgs>(args: SelectSubset<T, PlayerFeaturesFindUniqueOrThrowArgs<ExtArgs>>): Prisma__PlayerFeaturesClient<$Result.GetResult<Prisma.$PlayerFeaturesPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first PlayerFeatures that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {PlayerFeaturesFindFirstArgs} args - Arguments to find a PlayerFeatures
+     * @example
+     * // Get one PlayerFeatures
+     * const playerFeatures = await prisma.playerFeatures.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends PlayerFeaturesFindFirstArgs>(args?: SelectSubset<T, PlayerFeaturesFindFirstArgs<ExtArgs>>): Prisma__PlayerFeaturesClient<$Result.GetResult<Prisma.$PlayerFeaturesPayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first PlayerFeatures that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {PlayerFeaturesFindFirstOrThrowArgs} args - Arguments to find a PlayerFeatures
+     * @example
+     * // Get one PlayerFeatures
+     * const playerFeatures = await prisma.playerFeatures.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends PlayerFeaturesFindFirstOrThrowArgs>(args?: SelectSubset<T, PlayerFeaturesFindFirstOrThrowArgs<ExtArgs>>): Prisma__PlayerFeaturesClient<$Result.GetResult<Prisma.$PlayerFeaturesPayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more PlayerFeatures that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {PlayerFeaturesFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all PlayerFeatures
+     * const playerFeatures = await prisma.playerFeatures.findMany()
+     * 
+     * // Get first 10 PlayerFeatures
+     * const playerFeatures = await prisma.playerFeatures.findMany({ take: 10 })
+     * 
+     * // Only select the `userId`
+     * const playerFeaturesWithUserIdOnly = await prisma.playerFeatures.findMany({ select: { userId: true } })
+     * 
+     */
+    findMany<T extends PlayerFeaturesFindManyArgs>(args?: SelectSubset<T, PlayerFeaturesFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$PlayerFeaturesPayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a PlayerFeatures.
+     * @param {PlayerFeaturesCreateArgs} args - Arguments to create a PlayerFeatures.
+     * @example
+     * // Create one PlayerFeatures
+     * const PlayerFeatures = await prisma.playerFeatures.create({
+     *   data: {
+     *     // ... data to create a PlayerFeatures
+     *   }
+     * })
+     * 
+     */
+    create<T extends PlayerFeaturesCreateArgs>(args: SelectSubset<T, PlayerFeaturesCreateArgs<ExtArgs>>): Prisma__PlayerFeaturesClient<$Result.GetResult<Prisma.$PlayerFeaturesPayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many PlayerFeatures.
+     * @param {PlayerFeaturesCreateManyArgs} args - Arguments to create many PlayerFeatures.
+     * @example
+     * // Create many PlayerFeatures
+     * const playerFeatures = await prisma.playerFeatures.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends PlayerFeaturesCreateManyArgs>(args?: SelectSubset<T, PlayerFeaturesCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many PlayerFeatures and returns the data saved in the database.
+     * @param {PlayerFeaturesCreateManyAndReturnArgs} args - Arguments to create many PlayerFeatures.
+     * @example
+     * // Create many PlayerFeatures
+     * const playerFeatures = await prisma.playerFeatures.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many PlayerFeatures and only return the `userId`
+     * const playerFeaturesWithUserIdOnly = await prisma.playerFeatures.createManyAndReturn({
+     *   select: { userId: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends PlayerFeaturesCreateManyAndReturnArgs>(args?: SelectSubset<T, PlayerFeaturesCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$PlayerFeaturesPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a PlayerFeatures.
+     * @param {PlayerFeaturesDeleteArgs} args - Arguments to delete one PlayerFeatures.
+     * @example
+     * // Delete one PlayerFeatures
+     * const PlayerFeatures = await prisma.playerFeatures.delete({
+     *   where: {
+     *     // ... filter to delete one PlayerFeatures
+     *   }
+     * })
+     * 
+     */
+    delete<T extends PlayerFeaturesDeleteArgs>(args: SelectSubset<T, PlayerFeaturesDeleteArgs<ExtArgs>>): Prisma__PlayerFeaturesClient<$Result.GetResult<Prisma.$PlayerFeaturesPayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one PlayerFeatures.
+     * @param {PlayerFeaturesUpdateArgs} args - Arguments to update one PlayerFeatures.
+     * @example
+     * // Update one PlayerFeatures
+     * const playerFeatures = await prisma.playerFeatures.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends PlayerFeaturesUpdateArgs>(args: SelectSubset<T, PlayerFeaturesUpdateArgs<ExtArgs>>): Prisma__PlayerFeaturesClient<$Result.GetResult<Prisma.$PlayerFeaturesPayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more PlayerFeatures.
+     * @param {PlayerFeaturesDeleteManyArgs} args - Arguments to filter PlayerFeatures to delete.
+     * @example
+     * // Delete a few PlayerFeatures
+     * const { count } = await prisma.playerFeatures.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends PlayerFeaturesDeleteManyArgs>(args?: SelectSubset<T, PlayerFeaturesDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more PlayerFeatures.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {PlayerFeaturesUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many PlayerFeatures
+     * const playerFeatures = await prisma.playerFeatures.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends PlayerFeaturesUpdateManyArgs>(args: SelectSubset<T, PlayerFeaturesUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more PlayerFeatures and returns the data updated in the database.
+     * @param {PlayerFeaturesUpdateManyAndReturnArgs} args - Arguments to update many PlayerFeatures.
+     * @example
+     * // Update many PlayerFeatures
+     * const playerFeatures = await prisma.playerFeatures.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more PlayerFeatures and only return the `userId`
+     * const playerFeaturesWithUserIdOnly = await prisma.playerFeatures.updateManyAndReturn({
+     *   select: { userId: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends PlayerFeaturesUpdateManyAndReturnArgs>(args: SelectSubset<T, PlayerFeaturesUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$PlayerFeaturesPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one PlayerFeatures.
+     * @param {PlayerFeaturesUpsertArgs} args - Arguments to update or create a PlayerFeatures.
+     * @example
+     * // Update or create a PlayerFeatures
+     * const playerFeatures = await prisma.playerFeatures.upsert({
+     *   create: {
+     *     // ... data to create a PlayerFeatures
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the PlayerFeatures we want to update
+     *   }
+     * })
+     */
+    upsert<T extends PlayerFeaturesUpsertArgs>(args: SelectSubset<T, PlayerFeaturesUpsertArgs<ExtArgs>>): Prisma__PlayerFeaturesClient<$Result.GetResult<Prisma.$PlayerFeaturesPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of PlayerFeatures.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {PlayerFeaturesCountArgs} args - Arguments to filter PlayerFeatures to count.
+     * @example
+     * // Count the number of PlayerFeatures
+     * const count = await prisma.playerFeatures.count({
+     *   where: {
+     *     // ... the filter for the PlayerFeatures we want to count
+     *   }
+     * })
+    **/
+    count<T extends PlayerFeaturesCountArgs>(
+      args?: Subset<T, PlayerFeaturesCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], PlayerFeaturesCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a PlayerFeatures.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {PlayerFeaturesAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends PlayerFeaturesAggregateArgs>(args: Subset<T, PlayerFeaturesAggregateArgs>): Prisma.PrismaPromise<GetPlayerFeaturesAggregateType<T>>
+
+    /**
+     * Group by PlayerFeatures.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {PlayerFeaturesGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends PlayerFeaturesGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: PlayerFeaturesGroupByArgs['orderBy'] }
+        : { orderBy?: PlayerFeaturesGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, PlayerFeaturesGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetPlayerFeaturesGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the PlayerFeatures model
+   */
+  readonly fields: PlayerFeaturesFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for PlayerFeatures.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__PlayerFeaturesClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    user<T extends UserDefaultArgs<ExtArgs> = {}>(args?: Subset<T, UserDefaultArgs<ExtArgs>>): Prisma__UserClient<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the PlayerFeatures model
+   */
+  interface PlayerFeaturesFieldRefs {
+    readonly userId: FieldRef<"PlayerFeatures", 'String'>
+    readonly lastActive: FieldRef<"PlayerFeatures", 'DateTime'>
+    readonly totalPlayTime: FieldRef<"PlayerFeatures", 'Float'>
+    readonly matchesPlayed: FieldRef<"PlayerFeatures", 'Int'>
+    readonly preferredLanguage: FieldRef<"PlayerFeatures", 'String'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * PlayerFeatures findUnique
+   */
+  export type PlayerFeaturesFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the PlayerFeatures
+     */
+    select?: PlayerFeaturesSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the PlayerFeatures
+     */
+    omit?: PlayerFeaturesOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: PlayerFeaturesInclude<ExtArgs> | null
+    /**
+     * Filter, which PlayerFeatures to fetch.
+     */
+    where: PlayerFeaturesWhereUniqueInput
+  }
+
+  /**
+   * PlayerFeatures findUniqueOrThrow
+   */
+  export type PlayerFeaturesFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the PlayerFeatures
+     */
+    select?: PlayerFeaturesSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the PlayerFeatures
+     */
+    omit?: PlayerFeaturesOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: PlayerFeaturesInclude<ExtArgs> | null
+    /**
+     * Filter, which PlayerFeatures to fetch.
+     */
+    where: PlayerFeaturesWhereUniqueInput
+  }
+
+  /**
+   * PlayerFeatures findFirst
+   */
+  export type PlayerFeaturesFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the PlayerFeatures
+     */
+    select?: PlayerFeaturesSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the PlayerFeatures
+     */
+    omit?: PlayerFeaturesOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: PlayerFeaturesInclude<ExtArgs> | null
+    /**
+     * Filter, which PlayerFeatures to fetch.
+     */
+    where?: PlayerFeaturesWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of PlayerFeatures to fetch.
+     */
+    orderBy?: PlayerFeaturesOrderByWithRelationInput | PlayerFeaturesOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for PlayerFeatures.
+     */
+    cursor?: PlayerFeaturesWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` PlayerFeatures from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` PlayerFeatures.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of PlayerFeatures.
+     */
+    distinct?: PlayerFeaturesScalarFieldEnum | PlayerFeaturesScalarFieldEnum[]
+  }
+
+  /**
+   * PlayerFeatures findFirstOrThrow
+   */
+  export type PlayerFeaturesFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the PlayerFeatures
+     */
+    select?: PlayerFeaturesSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the PlayerFeatures
+     */
+    omit?: PlayerFeaturesOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: PlayerFeaturesInclude<ExtArgs> | null
+    /**
+     * Filter, which PlayerFeatures to fetch.
+     */
+    where?: PlayerFeaturesWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of PlayerFeatures to fetch.
+     */
+    orderBy?: PlayerFeaturesOrderByWithRelationInput | PlayerFeaturesOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for PlayerFeatures.
+     */
+    cursor?: PlayerFeaturesWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` PlayerFeatures from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` PlayerFeatures.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of PlayerFeatures.
+     */
+    distinct?: PlayerFeaturesScalarFieldEnum | PlayerFeaturesScalarFieldEnum[]
+  }
+
+  /**
+   * PlayerFeatures findMany
+   */
+  export type PlayerFeaturesFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the PlayerFeatures
+     */
+    select?: PlayerFeaturesSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the PlayerFeatures
+     */
+    omit?: PlayerFeaturesOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: PlayerFeaturesInclude<ExtArgs> | null
+    /**
+     * Filter, which PlayerFeatures to fetch.
+     */
+    where?: PlayerFeaturesWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of PlayerFeatures to fetch.
+     */
+    orderBy?: PlayerFeaturesOrderByWithRelationInput | PlayerFeaturesOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing PlayerFeatures.
+     */
+    cursor?: PlayerFeaturesWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` PlayerFeatures from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` PlayerFeatures.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of PlayerFeatures.
+     */
+    distinct?: PlayerFeaturesScalarFieldEnum | PlayerFeaturesScalarFieldEnum[]
+  }
+
+  /**
+   * PlayerFeatures create
+   */
+  export type PlayerFeaturesCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the PlayerFeatures
+     */
+    select?: PlayerFeaturesSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the PlayerFeatures
+     */
+    omit?: PlayerFeaturesOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: PlayerFeaturesInclude<ExtArgs> | null
+    /**
+     * The data needed to create a PlayerFeatures.
+     */
+    data: XOR<PlayerFeaturesCreateInput, PlayerFeaturesUncheckedCreateInput>
+  }
+
+  /**
+   * PlayerFeatures createMany
+   */
+  export type PlayerFeaturesCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many PlayerFeatures.
+     */
+    data: PlayerFeaturesCreateManyInput | PlayerFeaturesCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * PlayerFeatures createManyAndReturn
+   */
+  export type PlayerFeaturesCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the PlayerFeatures
+     */
+    select?: PlayerFeaturesSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the PlayerFeatures
+     */
+    omit?: PlayerFeaturesOmit<ExtArgs> | null
+    /**
+     * The data used to create many PlayerFeatures.
+     */
+    data: PlayerFeaturesCreateManyInput | PlayerFeaturesCreateManyInput[]
+    skipDuplicates?: boolean
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: PlayerFeaturesIncludeCreateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * PlayerFeatures update
+   */
+  export type PlayerFeaturesUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the PlayerFeatures
+     */
+    select?: PlayerFeaturesSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the PlayerFeatures
+     */
+    omit?: PlayerFeaturesOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: PlayerFeaturesInclude<ExtArgs> | null
+    /**
+     * The data needed to update a PlayerFeatures.
+     */
+    data: XOR<PlayerFeaturesUpdateInput, PlayerFeaturesUncheckedUpdateInput>
+    /**
+     * Choose, which PlayerFeatures to update.
+     */
+    where: PlayerFeaturesWhereUniqueInput
+  }
+
+  /**
+   * PlayerFeatures updateMany
+   */
+  export type PlayerFeaturesUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update PlayerFeatures.
+     */
+    data: XOR<PlayerFeaturesUpdateManyMutationInput, PlayerFeaturesUncheckedUpdateManyInput>
+    /**
+     * Filter which PlayerFeatures to update
+     */
+    where?: PlayerFeaturesWhereInput
+    /**
+     * Limit how many PlayerFeatures to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * PlayerFeatures updateManyAndReturn
+   */
+  export type PlayerFeaturesUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the PlayerFeatures
+     */
+    select?: PlayerFeaturesSelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the PlayerFeatures
+     */
+    omit?: PlayerFeaturesOmit<ExtArgs> | null
+    /**
+     * The data used to update PlayerFeatures.
+     */
+    data: XOR<PlayerFeaturesUpdateManyMutationInput, PlayerFeaturesUncheckedUpdateManyInput>
+    /**
+     * Filter which PlayerFeatures to update
+     */
+    where?: PlayerFeaturesWhereInput
+    /**
+     * Limit how many PlayerFeatures to update.
+     */
+    limit?: number
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: PlayerFeaturesIncludeUpdateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * PlayerFeatures upsert
+   */
+  export type PlayerFeaturesUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the PlayerFeatures
+     */
+    select?: PlayerFeaturesSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the PlayerFeatures
+     */
+    omit?: PlayerFeaturesOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: PlayerFeaturesInclude<ExtArgs> | null
+    /**
+     * The filter to search for the PlayerFeatures to update in case it exists.
+     */
+    where: PlayerFeaturesWhereUniqueInput
+    /**
+     * In case the PlayerFeatures found by the `where` argument doesn't exist, create a new PlayerFeatures with this data.
+     */
+    create: XOR<PlayerFeaturesCreateInput, PlayerFeaturesUncheckedCreateInput>
+    /**
+     * In case the PlayerFeatures was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<PlayerFeaturesUpdateInput, PlayerFeaturesUncheckedUpdateInput>
+  }
+
+  /**
+   * PlayerFeatures delete
+   */
+  export type PlayerFeaturesDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the PlayerFeatures
+     */
+    select?: PlayerFeaturesSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the PlayerFeatures
+     */
+    omit?: PlayerFeaturesOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: PlayerFeaturesInclude<ExtArgs> | null
+    /**
+     * Filter which PlayerFeatures to delete.
+     */
+    where: PlayerFeaturesWhereUniqueInput
+  }
+
+  /**
+   * PlayerFeatures deleteMany
+   */
+  export type PlayerFeaturesDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which PlayerFeatures to delete
+     */
+    where?: PlayerFeaturesWhereInput
+    /**
+     * Limit how many PlayerFeatures to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * PlayerFeatures without action
+   */
+  export type PlayerFeaturesDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the PlayerFeatures
+     */
+    select?: PlayerFeaturesSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the PlayerFeatures
+     */
+    omit?: PlayerFeaturesOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: PlayerFeaturesInclude<ExtArgs> | null
+  }
+
+
+  /**
+   * Model MapFeatures
+   */
+
+  export type AggregateMapFeatures = {
+    _count: MapFeaturesCountAggregateOutputType | null
+    _avg: MapFeaturesAvgAggregateOutputType | null
+    _sum: MapFeaturesSumAggregateOutputType | null
+    _min: MapFeaturesMinAggregateOutputType | null
+    _max: MapFeaturesMaxAggregateOutputType | null
+  }
+
+  export type MapFeaturesAvgAggregateOutputType = {
+    totalJoins: number | null
+    totalLeaves: number | null
+    bounceCount: number | null
+    averageDuration: number | null
+    bounceRate: number | null
+  }
+
+  export type MapFeaturesSumAggregateOutputType = {
+    totalJoins: number | null
+    totalLeaves: number | null
+    bounceCount: number | null
+    averageDuration: number | null
+    bounceRate: number | null
+  }
+
+  export type MapFeaturesMinAggregateOutputType = {
+    mapId: string | null
+    totalJoins: number | null
+    totalLeaves: number | null
+    bounceCount: number | null
+    averageDuration: number | null
+    bounceRate: number | null
+  }
+
+  export type MapFeaturesMaxAggregateOutputType = {
+    mapId: string | null
+    totalJoins: number | null
+    totalLeaves: number | null
+    bounceCount: number | null
+    averageDuration: number | null
+    bounceRate: number | null
+  }
+
+  export type MapFeaturesCountAggregateOutputType = {
+    mapId: number
+    totalJoins: number
+    totalLeaves: number
+    bounceCount: number
+    averageDuration: number
+    bounceRate: number
+    _all: number
+  }
+
+
+  export type MapFeaturesAvgAggregateInputType = {
+    totalJoins?: true
+    totalLeaves?: true
+    bounceCount?: true
+    averageDuration?: true
+    bounceRate?: true
+  }
+
+  export type MapFeaturesSumAggregateInputType = {
+    totalJoins?: true
+    totalLeaves?: true
+    bounceCount?: true
+    averageDuration?: true
+    bounceRate?: true
+  }
+
+  export type MapFeaturesMinAggregateInputType = {
+    mapId?: true
+    totalJoins?: true
+    totalLeaves?: true
+    bounceCount?: true
+    averageDuration?: true
+    bounceRate?: true
+  }
+
+  export type MapFeaturesMaxAggregateInputType = {
+    mapId?: true
+    totalJoins?: true
+    totalLeaves?: true
+    bounceCount?: true
+    averageDuration?: true
+    bounceRate?: true
+  }
+
+  export type MapFeaturesCountAggregateInputType = {
+    mapId?: true
+    totalJoins?: true
+    totalLeaves?: true
+    bounceCount?: true
+    averageDuration?: true
+    bounceRate?: true
+    _all?: true
+  }
+
+  export type MapFeaturesAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which MapFeatures to aggregate.
+     */
+    where?: MapFeaturesWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of MapFeatures to fetch.
+     */
+    orderBy?: MapFeaturesOrderByWithRelationInput | MapFeaturesOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: MapFeaturesWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` MapFeatures from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` MapFeatures.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned MapFeatures
+    **/
+    _count?: true | MapFeaturesCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to average
+    **/
+    _avg?: MapFeaturesAvgAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to sum
+    **/
+    _sum?: MapFeaturesSumAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: MapFeaturesMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: MapFeaturesMaxAggregateInputType
+  }
+
+  export type GetMapFeaturesAggregateType<T extends MapFeaturesAggregateArgs> = {
+        [P in keyof T & keyof AggregateMapFeatures]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateMapFeatures[P]>
+      : GetScalarType<T[P], AggregateMapFeatures[P]>
+  }
+
+
+
+
+  export type MapFeaturesGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: MapFeaturesWhereInput
+    orderBy?: MapFeaturesOrderByWithAggregationInput | MapFeaturesOrderByWithAggregationInput[]
+    by: MapFeaturesScalarFieldEnum[] | MapFeaturesScalarFieldEnum
+    having?: MapFeaturesScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: MapFeaturesCountAggregateInputType | true
+    _avg?: MapFeaturesAvgAggregateInputType
+    _sum?: MapFeaturesSumAggregateInputType
+    _min?: MapFeaturesMinAggregateInputType
+    _max?: MapFeaturesMaxAggregateInputType
+  }
+
+  export type MapFeaturesGroupByOutputType = {
+    mapId: string
+    totalJoins: number
+    totalLeaves: number
+    bounceCount: number
+    averageDuration: number
+    bounceRate: number
+    _count: MapFeaturesCountAggregateOutputType | null
+    _avg: MapFeaturesAvgAggregateOutputType | null
+    _sum: MapFeaturesSumAggregateOutputType | null
+    _min: MapFeaturesMinAggregateOutputType | null
+    _max: MapFeaturesMaxAggregateOutputType | null
+  }
+
+  type GetMapFeaturesGroupByPayload<T extends MapFeaturesGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<MapFeaturesGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof MapFeaturesGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], MapFeaturesGroupByOutputType[P]>
+            : GetScalarType<T[P], MapFeaturesGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type MapFeaturesSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    mapId?: boolean
+    totalJoins?: boolean
+    totalLeaves?: boolean
+    bounceCount?: boolean
+    averageDuration?: boolean
+    bounceRate?: boolean
+    map?: boolean | GameMapDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["mapFeatures"]>
+
+  export type MapFeaturesSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    mapId?: boolean
+    totalJoins?: boolean
+    totalLeaves?: boolean
+    bounceCount?: boolean
+    averageDuration?: boolean
+    bounceRate?: boolean
+    map?: boolean | GameMapDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["mapFeatures"]>
+
+  export type MapFeaturesSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    mapId?: boolean
+    totalJoins?: boolean
+    totalLeaves?: boolean
+    bounceCount?: boolean
+    averageDuration?: boolean
+    bounceRate?: boolean
+    map?: boolean | GameMapDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["mapFeatures"]>
+
+  export type MapFeaturesSelectScalar = {
+    mapId?: boolean
+    totalJoins?: boolean
+    totalLeaves?: boolean
+    bounceCount?: boolean
+    averageDuration?: boolean
+    bounceRate?: boolean
+  }
+
+  export type MapFeaturesOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"mapId" | "totalJoins" | "totalLeaves" | "bounceCount" | "averageDuration" | "bounceRate", ExtArgs["result"]["mapFeatures"]>
+  export type MapFeaturesInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    map?: boolean | GameMapDefaultArgs<ExtArgs>
+  }
+  export type MapFeaturesIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    map?: boolean | GameMapDefaultArgs<ExtArgs>
+  }
+  export type MapFeaturesIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    map?: boolean | GameMapDefaultArgs<ExtArgs>
+  }
+
+  export type $MapFeaturesPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "MapFeatures"
+    objects: {
+      map: Prisma.$GameMapPayload<ExtArgs>
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      mapId: string
+      totalJoins: number
+      totalLeaves: number
+      bounceCount: number
+      averageDuration: number
+      bounceRate: number
+    }, ExtArgs["result"]["mapFeatures"]>
+    composites: {}
+  }
+
+  type MapFeaturesGetPayload<S extends boolean | null | undefined | MapFeaturesDefaultArgs> = $Result.GetResult<Prisma.$MapFeaturesPayload, S>
+
+  type MapFeaturesCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<MapFeaturesFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: MapFeaturesCountAggregateInputType | true
+    }
+
+  export interface MapFeaturesDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['MapFeatures'], meta: { name: 'MapFeatures' } }
+    /**
+     * Find zero or one MapFeatures that matches the filter.
+     * @param {MapFeaturesFindUniqueArgs} args - Arguments to find a MapFeatures
+     * @example
+     * // Get one MapFeatures
+     * const mapFeatures = await prisma.mapFeatures.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends MapFeaturesFindUniqueArgs>(args: SelectSubset<T, MapFeaturesFindUniqueArgs<ExtArgs>>): Prisma__MapFeaturesClient<$Result.GetResult<Prisma.$MapFeaturesPayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one MapFeatures that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {MapFeaturesFindUniqueOrThrowArgs} args - Arguments to find a MapFeatures
+     * @example
+     * // Get one MapFeatures
+     * const mapFeatures = await prisma.mapFeatures.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends MapFeaturesFindUniqueOrThrowArgs>(args: SelectSubset<T, MapFeaturesFindUniqueOrThrowArgs<ExtArgs>>): Prisma__MapFeaturesClient<$Result.GetResult<Prisma.$MapFeaturesPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first MapFeatures that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {MapFeaturesFindFirstArgs} args - Arguments to find a MapFeatures
+     * @example
+     * // Get one MapFeatures
+     * const mapFeatures = await prisma.mapFeatures.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends MapFeaturesFindFirstArgs>(args?: SelectSubset<T, MapFeaturesFindFirstArgs<ExtArgs>>): Prisma__MapFeaturesClient<$Result.GetResult<Prisma.$MapFeaturesPayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first MapFeatures that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {MapFeaturesFindFirstOrThrowArgs} args - Arguments to find a MapFeatures
+     * @example
+     * // Get one MapFeatures
+     * const mapFeatures = await prisma.mapFeatures.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends MapFeaturesFindFirstOrThrowArgs>(args?: SelectSubset<T, MapFeaturesFindFirstOrThrowArgs<ExtArgs>>): Prisma__MapFeaturesClient<$Result.GetResult<Prisma.$MapFeaturesPayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more MapFeatures that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {MapFeaturesFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all MapFeatures
+     * const mapFeatures = await prisma.mapFeatures.findMany()
+     * 
+     * // Get first 10 MapFeatures
+     * const mapFeatures = await prisma.mapFeatures.findMany({ take: 10 })
+     * 
+     * // Only select the `mapId`
+     * const mapFeaturesWithMapIdOnly = await prisma.mapFeatures.findMany({ select: { mapId: true } })
+     * 
+     */
+    findMany<T extends MapFeaturesFindManyArgs>(args?: SelectSubset<T, MapFeaturesFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$MapFeaturesPayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a MapFeatures.
+     * @param {MapFeaturesCreateArgs} args - Arguments to create a MapFeatures.
+     * @example
+     * // Create one MapFeatures
+     * const MapFeatures = await prisma.mapFeatures.create({
+     *   data: {
+     *     // ... data to create a MapFeatures
+     *   }
+     * })
+     * 
+     */
+    create<T extends MapFeaturesCreateArgs>(args: SelectSubset<T, MapFeaturesCreateArgs<ExtArgs>>): Prisma__MapFeaturesClient<$Result.GetResult<Prisma.$MapFeaturesPayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many MapFeatures.
+     * @param {MapFeaturesCreateManyArgs} args - Arguments to create many MapFeatures.
+     * @example
+     * // Create many MapFeatures
+     * const mapFeatures = await prisma.mapFeatures.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends MapFeaturesCreateManyArgs>(args?: SelectSubset<T, MapFeaturesCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many MapFeatures and returns the data saved in the database.
+     * @param {MapFeaturesCreateManyAndReturnArgs} args - Arguments to create many MapFeatures.
+     * @example
+     * // Create many MapFeatures
+     * const mapFeatures = await prisma.mapFeatures.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many MapFeatures and only return the `mapId`
+     * const mapFeaturesWithMapIdOnly = await prisma.mapFeatures.createManyAndReturn({
+     *   select: { mapId: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends MapFeaturesCreateManyAndReturnArgs>(args?: SelectSubset<T, MapFeaturesCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$MapFeaturesPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a MapFeatures.
+     * @param {MapFeaturesDeleteArgs} args - Arguments to delete one MapFeatures.
+     * @example
+     * // Delete one MapFeatures
+     * const MapFeatures = await prisma.mapFeatures.delete({
+     *   where: {
+     *     // ... filter to delete one MapFeatures
+     *   }
+     * })
+     * 
+     */
+    delete<T extends MapFeaturesDeleteArgs>(args: SelectSubset<T, MapFeaturesDeleteArgs<ExtArgs>>): Prisma__MapFeaturesClient<$Result.GetResult<Prisma.$MapFeaturesPayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one MapFeatures.
+     * @param {MapFeaturesUpdateArgs} args - Arguments to update one MapFeatures.
+     * @example
+     * // Update one MapFeatures
+     * const mapFeatures = await prisma.mapFeatures.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends MapFeaturesUpdateArgs>(args: SelectSubset<T, MapFeaturesUpdateArgs<ExtArgs>>): Prisma__MapFeaturesClient<$Result.GetResult<Prisma.$MapFeaturesPayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more MapFeatures.
+     * @param {MapFeaturesDeleteManyArgs} args - Arguments to filter MapFeatures to delete.
+     * @example
+     * // Delete a few MapFeatures
+     * const { count } = await prisma.mapFeatures.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends MapFeaturesDeleteManyArgs>(args?: SelectSubset<T, MapFeaturesDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more MapFeatures.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {MapFeaturesUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many MapFeatures
+     * const mapFeatures = await prisma.mapFeatures.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends MapFeaturesUpdateManyArgs>(args: SelectSubset<T, MapFeaturesUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more MapFeatures and returns the data updated in the database.
+     * @param {MapFeaturesUpdateManyAndReturnArgs} args - Arguments to update many MapFeatures.
+     * @example
+     * // Update many MapFeatures
+     * const mapFeatures = await prisma.mapFeatures.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more MapFeatures and only return the `mapId`
+     * const mapFeaturesWithMapIdOnly = await prisma.mapFeatures.updateManyAndReturn({
+     *   select: { mapId: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends MapFeaturesUpdateManyAndReturnArgs>(args: SelectSubset<T, MapFeaturesUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$MapFeaturesPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one MapFeatures.
+     * @param {MapFeaturesUpsertArgs} args - Arguments to update or create a MapFeatures.
+     * @example
+     * // Update or create a MapFeatures
+     * const mapFeatures = await prisma.mapFeatures.upsert({
+     *   create: {
+     *     // ... data to create a MapFeatures
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the MapFeatures we want to update
+     *   }
+     * })
+     */
+    upsert<T extends MapFeaturesUpsertArgs>(args: SelectSubset<T, MapFeaturesUpsertArgs<ExtArgs>>): Prisma__MapFeaturesClient<$Result.GetResult<Prisma.$MapFeaturesPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of MapFeatures.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {MapFeaturesCountArgs} args - Arguments to filter MapFeatures to count.
+     * @example
+     * // Count the number of MapFeatures
+     * const count = await prisma.mapFeatures.count({
+     *   where: {
+     *     // ... the filter for the MapFeatures we want to count
+     *   }
+     * })
+    **/
+    count<T extends MapFeaturesCountArgs>(
+      args?: Subset<T, MapFeaturesCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], MapFeaturesCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a MapFeatures.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {MapFeaturesAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends MapFeaturesAggregateArgs>(args: Subset<T, MapFeaturesAggregateArgs>): Prisma.PrismaPromise<GetMapFeaturesAggregateType<T>>
+
+    /**
+     * Group by MapFeatures.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {MapFeaturesGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends MapFeaturesGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: MapFeaturesGroupByArgs['orderBy'] }
+        : { orderBy?: MapFeaturesGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, MapFeaturesGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetMapFeaturesGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the MapFeatures model
+   */
+  readonly fields: MapFeaturesFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for MapFeatures.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__MapFeaturesClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    map<T extends GameMapDefaultArgs<ExtArgs> = {}>(args?: Subset<T, GameMapDefaultArgs<ExtArgs>>): Prisma__GameMapClient<$Result.GetResult<Prisma.$GameMapPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the MapFeatures model
+   */
+  interface MapFeaturesFieldRefs {
+    readonly mapId: FieldRef<"MapFeatures", 'String'>
+    readonly totalJoins: FieldRef<"MapFeatures", 'Int'>
+    readonly totalLeaves: FieldRef<"MapFeatures", 'Int'>
+    readonly bounceCount: FieldRef<"MapFeatures", 'Int'>
+    readonly averageDuration: FieldRef<"MapFeatures", 'Float'>
+    readonly bounceRate: FieldRef<"MapFeatures", 'Float'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * MapFeatures findUnique
+   */
+  export type MapFeaturesFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the MapFeatures
+     */
+    select?: MapFeaturesSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the MapFeatures
+     */
+    omit?: MapFeaturesOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: MapFeaturesInclude<ExtArgs> | null
+    /**
+     * Filter, which MapFeatures to fetch.
+     */
+    where: MapFeaturesWhereUniqueInput
+  }
+
+  /**
+   * MapFeatures findUniqueOrThrow
+   */
+  export type MapFeaturesFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the MapFeatures
+     */
+    select?: MapFeaturesSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the MapFeatures
+     */
+    omit?: MapFeaturesOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: MapFeaturesInclude<ExtArgs> | null
+    /**
+     * Filter, which MapFeatures to fetch.
+     */
+    where: MapFeaturesWhereUniqueInput
+  }
+
+  /**
+   * MapFeatures findFirst
+   */
+  export type MapFeaturesFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the MapFeatures
+     */
+    select?: MapFeaturesSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the MapFeatures
+     */
+    omit?: MapFeaturesOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: MapFeaturesInclude<ExtArgs> | null
+    /**
+     * Filter, which MapFeatures to fetch.
+     */
+    where?: MapFeaturesWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of MapFeatures to fetch.
+     */
+    orderBy?: MapFeaturesOrderByWithRelationInput | MapFeaturesOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for MapFeatures.
+     */
+    cursor?: MapFeaturesWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` MapFeatures from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` MapFeatures.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of MapFeatures.
+     */
+    distinct?: MapFeaturesScalarFieldEnum | MapFeaturesScalarFieldEnum[]
+  }
+
+  /**
+   * MapFeatures findFirstOrThrow
+   */
+  export type MapFeaturesFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the MapFeatures
+     */
+    select?: MapFeaturesSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the MapFeatures
+     */
+    omit?: MapFeaturesOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: MapFeaturesInclude<ExtArgs> | null
+    /**
+     * Filter, which MapFeatures to fetch.
+     */
+    where?: MapFeaturesWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of MapFeatures to fetch.
+     */
+    orderBy?: MapFeaturesOrderByWithRelationInput | MapFeaturesOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for MapFeatures.
+     */
+    cursor?: MapFeaturesWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` MapFeatures from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` MapFeatures.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of MapFeatures.
+     */
+    distinct?: MapFeaturesScalarFieldEnum | MapFeaturesScalarFieldEnum[]
+  }
+
+  /**
+   * MapFeatures findMany
+   */
+  export type MapFeaturesFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the MapFeatures
+     */
+    select?: MapFeaturesSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the MapFeatures
+     */
+    omit?: MapFeaturesOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: MapFeaturesInclude<ExtArgs> | null
+    /**
+     * Filter, which MapFeatures to fetch.
+     */
+    where?: MapFeaturesWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of MapFeatures to fetch.
+     */
+    orderBy?: MapFeaturesOrderByWithRelationInput | MapFeaturesOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing MapFeatures.
+     */
+    cursor?: MapFeaturesWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` MapFeatures from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` MapFeatures.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of MapFeatures.
+     */
+    distinct?: MapFeaturesScalarFieldEnum | MapFeaturesScalarFieldEnum[]
+  }
+
+  /**
+   * MapFeatures create
+   */
+  export type MapFeaturesCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the MapFeatures
+     */
+    select?: MapFeaturesSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the MapFeatures
+     */
+    omit?: MapFeaturesOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: MapFeaturesInclude<ExtArgs> | null
+    /**
+     * The data needed to create a MapFeatures.
+     */
+    data: XOR<MapFeaturesCreateInput, MapFeaturesUncheckedCreateInput>
+  }
+
+  /**
+   * MapFeatures createMany
+   */
+  export type MapFeaturesCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many MapFeatures.
+     */
+    data: MapFeaturesCreateManyInput | MapFeaturesCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * MapFeatures createManyAndReturn
+   */
+  export type MapFeaturesCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the MapFeatures
+     */
+    select?: MapFeaturesSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the MapFeatures
+     */
+    omit?: MapFeaturesOmit<ExtArgs> | null
+    /**
+     * The data used to create many MapFeatures.
+     */
+    data: MapFeaturesCreateManyInput | MapFeaturesCreateManyInput[]
+    skipDuplicates?: boolean
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: MapFeaturesIncludeCreateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * MapFeatures update
+   */
+  export type MapFeaturesUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the MapFeatures
+     */
+    select?: MapFeaturesSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the MapFeatures
+     */
+    omit?: MapFeaturesOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: MapFeaturesInclude<ExtArgs> | null
+    /**
+     * The data needed to update a MapFeatures.
+     */
+    data: XOR<MapFeaturesUpdateInput, MapFeaturesUncheckedUpdateInput>
+    /**
+     * Choose, which MapFeatures to update.
+     */
+    where: MapFeaturesWhereUniqueInput
+  }
+
+  /**
+   * MapFeatures updateMany
+   */
+  export type MapFeaturesUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update MapFeatures.
+     */
+    data: XOR<MapFeaturesUpdateManyMutationInput, MapFeaturesUncheckedUpdateManyInput>
+    /**
+     * Filter which MapFeatures to update
+     */
+    where?: MapFeaturesWhereInput
+    /**
+     * Limit how many MapFeatures to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * MapFeatures updateManyAndReturn
+   */
+  export type MapFeaturesUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the MapFeatures
+     */
+    select?: MapFeaturesSelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the MapFeatures
+     */
+    omit?: MapFeaturesOmit<ExtArgs> | null
+    /**
+     * The data used to update MapFeatures.
+     */
+    data: XOR<MapFeaturesUpdateManyMutationInput, MapFeaturesUncheckedUpdateManyInput>
+    /**
+     * Filter which MapFeatures to update
+     */
+    where?: MapFeaturesWhereInput
+    /**
+     * Limit how many MapFeatures to update.
+     */
+    limit?: number
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: MapFeaturesIncludeUpdateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * MapFeatures upsert
+   */
+  export type MapFeaturesUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the MapFeatures
+     */
+    select?: MapFeaturesSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the MapFeatures
+     */
+    omit?: MapFeaturesOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: MapFeaturesInclude<ExtArgs> | null
+    /**
+     * The filter to search for the MapFeatures to update in case it exists.
+     */
+    where: MapFeaturesWhereUniqueInput
+    /**
+     * In case the MapFeatures found by the `where` argument doesn't exist, create a new MapFeatures with this data.
+     */
+    create: XOR<MapFeaturesCreateInput, MapFeaturesUncheckedCreateInput>
+    /**
+     * In case the MapFeatures was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<MapFeaturesUpdateInput, MapFeaturesUncheckedUpdateInput>
+  }
+
+  /**
+   * MapFeatures delete
+   */
+  export type MapFeaturesDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the MapFeatures
+     */
+    select?: MapFeaturesSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the MapFeatures
+     */
+    omit?: MapFeaturesOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: MapFeaturesInclude<ExtArgs> | null
+    /**
+     * Filter which MapFeatures to delete.
+     */
+    where: MapFeaturesWhereUniqueInput
+  }
+
+  /**
+   * MapFeatures deleteMany
+   */
+  export type MapFeaturesDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which MapFeatures to delete
+     */
+    where?: MapFeaturesWhereInput
+    /**
+     * Limit how many MapFeatures to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * MapFeatures without action
+   */
+  export type MapFeaturesDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the MapFeatures
+     */
+    select?: MapFeaturesSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the MapFeatures
+     */
+    omit?: MapFeaturesOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: MapFeaturesInclude<ExtArgs> | null
+  }
+
+
+  /**
    * Enums
    */
 
@@ -4318,6 +6818,29 @@ export namespace Prisma {
   };
 
   export type RawEventScalarFieldEnum = (typeof RawEventScalarFieldEnum)[keyof typeof RawEventScalarFieldEnum]
+
+
+  export const PlayerFeaturesScalarFieldEnum: {
+    userId: 'userId',
+    lastActive: 'lastActive',
+    totalPlayTime: 'totalPlayTime',
+    matchesPlayed: 'matchesPlayed',
+    preferredLanguage: 'preferredLanguage'
+  };
+
+  export type PlayerFeaturesScalarFieldEnum = (typeof PlayerFeaturesScalarFieldEnum)[keyof typeof PlayerFeaturesScalarFieldEnum]
+
+
+  export const MapFeaturesScalarFieldEnum: {
+    mapId: 'mapId',
+    totalJoins: 'totalJoins',
+    totalLeaves: 'totalLeaves',
+    bounceCount: 'bounceCount',
+    averageDuration: 'averageDuration',
+    bounceRate: 'bounceRate'
+  };
+
+  export type MapFeaturesScalarFieldEnum = (typeof MapFeaturesScalarFieldEnum)[keyof typeof MapFeaturesScalarFieldEnum]
 
 
   export const SortOrder: {
@@ -4415,6 +6938,20 @@ export namespace Prisma {
 
 
   /**
+   * Reference to a field of type 'Float'
+   */
+  export type FloatFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Float'>
+    
+
+
+  /**
+   * Reference to a field of type 'Float[]'
+   */
+  export type ListFloatFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Float[]'>
+    
+
+
+  /**
    * Reference to a field of type 'Int'
    */
   export type IntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Int'>
@@ -4442,6 +6979,7 @@ export namespace Prisma {
     createdAt?: DateTimeFilter<"User"> | Date | string
     updatedAt?: DateTimeFilter<"User"> | Date | string
     events?: RawEventListRelationFilter
+    playerFeatures?: XOR<PlayerFeaturesNullableScalarRelationFilter, PlayerFeaturesWhereInput> | null
   }
 
   export type UserOrderByWithRelationInput = {
@@ -4452,6 +6990,7 @@ export namespace Prisma {
     createdAt?: SortOrder
     updatedAt?: SortOrder
     events?: RawEventOrderByRelationAggregateInput
+    playerFeatures?: PlayerFeaturesOrderByWithRelationInput
   }
 
   export type UserWhereUniqueInput = Prisma.AtLeast<{
@@ -4465,6 +7004,7 @@ export namespace Prisma {
     createdAt?: DateTimeFilter<"User"> | Date | string
     updatedAt?: DateTimeFilter<"User"> | Date | string
     events?: RawEventListRelationFilter
+    playerFeatures?: XOR<PlayerFeaturesNullableScalarRelationFilter, PlayerFeaturesWhereInput> | null
   }, "id">
 
   export type UserOrderByWithAggregationInput = {
@@ -4502,6 +7042,7 @@ export namespace Prisma {
     isPublished?: BoolFilter<"GameMap"> | boolean
     createdAt?: DateTimeFilter<"GameMap"> | Date | string
     updatedAt?: DateTimeFilter<"GameMap"> | Date | string
+    mapFeatures?: XOR<MapFeaturesNullableScalarRelationFilter, MapFeaturesWhereInput> | null
   }
 
   export type GameMapOrderByWithRelationInput = {
@@ -4512,6 +7053,7 @@ export namespace Prisma {
     isPublished?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
+    mapFeatures?: MapFeaturesOrderByWithRelationInput
   }
 
   export type GameMapWhereUniqueInput = Prisma.AtLeast<{
@@ -4525,6 +7067,7 @@ export namespace Prisma {
     isPublished?: BoolFilter<"GameMap"> | boolean
     createdAt?: DateTimeFilter<"GameMap"> | Date | string
     updatedAt?: DateTimeFilter<"GameMap"> | Date | string
+    mapFeatures?: XOR<MapFeaturesNullableScalarRelationFilter, MapFeaturesWhereInput> | null
   }, "id">
 
   export type GameMapOrderByWithAggregationInput = {
@@ -4609,6 +7152,125 @@ export namespace Prisma {
     payload?: JsonWithAggregatesFilter<"RawEvent">
   }
 
+  export type PlayerFeaturesWhereInput = {
+    AND?: PlayerFeaturesWhereInput | PlayerFeaturesWhereInput[]
+    OR?: PlayerFeaturesWhereInput[]
+    NOT?: PlayerFeaturesWhereInput | PlayerFeaturesWhereInput[]
+    userId?: StringFilter<"PlayerFeatures"> | string
+    lastActive?: DateTimeFilter<"PlayerFeatures"> | Date | string
+    totalPlayTime?: FloatFilter<"PlayerFeatures"> | number
+    matchesPlayed?: IntFilter<"PlayerFeatures"> | number
+    preferredLanguage?: StringFilter<"PlayerFeatures"> | string
+    user?: XOR<UserScalarRelationFilter, UserWhereInput>
+  }
+
+  export type PlayerFeaturesOrderByWithRelationInput = {
+    userId?: SortOrder
+    lastActive?: SortOrder
+    totalPlayTime?: SortOrder
+    matchesPlayed?: SortOrder
+    preferredLanguage?: SortOrder
+    user?: UserOrderByWithRelationInput
+  }
+
+  export type PlayerFeaturesWhereUniqueInput = Prisma.AtLeast<{
+    userId?: string
+    AND?: PlayerFeaturesWhereInput | PlayerFeaturesWhereInput[]
+    OR?: PlayerFeaturesWhereInput[]
+    NOT?: PlayerFeaturesWhereInput | PlayerFeaturesWhereInput[]
+    lastActive?: DateTimeFilter<"PlayerFeatures"> | Date | string
+    totalPlayTime?: FloatFilter<"PlayerFeatures"> | number
+    matchesPlayed?: IntFilter<"PlayerFeatures"> | number
+    preferredLanguage?: StringFilter<"PlayerFeatures"> | string
+    user?: XOR<UserScalarRelationFilter, UserWhereInput>
+  }, "userId">
+
+  export type PlayerFeaturesOrderByWithAggregationInput = {
+    userId?: SortOrder
+    lastActive?: SortOrder
+    totalPlayTime?: SortOrder
+    matchesPlayed?: SortOrder
+    preferredLanguage?: SortOrder
+    _count?: PlayerFeaturesCountOrderByAggregateInput
+    _avg?: PlayerFeaturesAvgOrderByAggregateInput
+    _max?: PlayerFeaturesMaxOrderByAggregateInput
+    _min?: PlayerFeaturesMinOrderByAggregateInput
+    _sum?: PlayerFeaturesSumOrderByAggregateInput
+  }
+
+  export type PlayerFeaturesScalarWhereWithAggregatesInput = {
+    AND?: PlayerFeaturesScalarWhereWithAggregatesInput | PlayerFeaturesScalarWhereWithAggregatesInput[]
+    OR?: PlayerFeaturesScalarWhereWithAggregatesInput[]
+    NOT?: PlayerFeaturesScalarWhereWithAggregatesInput | PlayerFeaturesScalarWhereWithAggregatesInput[]
+    userId?: StringWithAggregatesFilter<"PlayerFeatures"> | string
+    lastActive?: DateTimeWithAggregatesFilter<"PlayerFeatures"> | Date | string
+    totalPlayTime?: FloatWithAggregatesFilter<"PlayerFeatures"> | number
+    matchesPlayed?: IntWithAggregatesFilter<"PlayerFeatures"> | number
+    preferredLanguage?: StringWithAggregatesFilter<"PlayerFeatures"> | string
+  }
+
+  export type MapFeaturesWhereInput = {
+    AND?: MapFeaturesWhereInput | MapFeaturesWhereInput[]
+    OR?: MapFeaturesWhereInput[]
+    NOT?: MapFeaturesWhereInput | MapFeaturesWhereInput[]
+    mapId?: StringFilter<"MapFeatures"> | string
+    totalJoins?: IntFilter<"MapFeatures"> | number
+    totalLeaves?: IntFilter<"MapFeatures"> | number
+    bounceCount?: IntFilter<"MapFeatures"> | number
+    averageDuration?: FloatFilter<"MapFeatures"> | number
+    bounceRate?: FloatFilter<"MapFeatures"> | number
+    map?: XOR<GameMapScalarRelationFilter, GameMapWhereInput>
+  }
+
+  export type MapFeaturesOrderByWithRelationInput = {
+    mapId?: SortOrder
+    totalJoins?: SortOrder
+    totalLeaves?: SortOrder
+    bounceCount?: SortOrder
+    averageDuration?: SortOrder
+    bounceRate?: SortOrder
+    map?: GameMapOrderByWithRelationInput
+  }
+
+  export type MapFeaturesWhereUniqueInput = Prisma.AtLeast<{
+    mapId?: string
+    AND?: MapFeaturesWhereInput | MapFeaturesWhereInput[]
+    OR?: MapFeaturesWhereInput[]
+    NOT?: MapFeaturesWhereInput | MapFeaturesWhereInput[]
+    totalJoins?: IntFilter<"MapFeatures"> | number
+    totalLeaves?: IntFilter<"MapFeatures"> | number
+    bounceCount?: IntFilter<"MapFeatures"> | number
+    averageDuration?: FloatFilter<"MapFeatures"> | number
+    bounceRate?: FloatFilter<"MapFeatures"> | number
+    map?: XOR<GameMapScalarRelationFilter, GameMapWhereInput>
+  }, "mapId">
+
+  export type MapFeaturesOrderByWithAggregationInput = {
+    mapId?: SortOrder
+    totalJoins?: SortOrder
+    totalLeaves?: SortOrder
+    bounceCount?: SortOrder
+    averageDuration?: SortOrder
+    bounceRate?: SortOrder
+    _count?: MapFeaturesCountOrderByAggregateInput
+    _avg?: MapFeaturesAvgOrderByAggregateInput
+    _max?: MapFeaturesMaxOrderByAggregateInput
+    _min?: MapFeaturesMinOrderByAggregateInput
+    _sum?: MapFeaturesSumOrderByAggregateInput
+  }
+
+  export type MapFeaturesScalarWhereWithAggregatesInput = {
+    AND?: MapFeaturesScalarWhereWithAggregatesInput | MapFeaturesScalarWhereWithAggregatesInput[]
+    OR?: MapFeaturesScalarWhereWithAggregatesInput[]
+    NOT?: MapFeaturesScalarWhereWithAggregatesInput | MapFeaturesScalarWhereWithAggregatesInput[]
+    mapId?: StringWithAggregatesFilter<"MapFeatures"> | string
+    totalJoins?: IntWithAggregatesFilter<"MapFeatures"> | number
+    totalLeaves?: IntWithAggregatesFilter<"MapFeatures"> | number
+    bounceCount?: IntWithAggregatesFilter<"MapFeatures"> | number
+    averageDuration?: FloatWithAggregatesFilter<"MapFeatures"> | number
+    bounceRate?: FloatWithAggregatesFilter<"MapFeatures"> | number
+  }
+
   export type UserCreateInput = {
     id: string
     email: string
@@ -4617,6 +7279,7 @@ export namespace Prisma {
     createdAt: Date | string
     updatedAt: Date | string
     events?: RawEventCreateNestedManyWithoutUserInput
+    playerFeatures?: PlayerFeaturesCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateInput = {
@@ -4627,6 +7290,7 @@ export namespace Prisma {
     createdAt: Date | string
     updatedAt: Date | string
     events?: RawEventUncheckedCreateNestedManyWithoutUserInput
+    playerFeatures?: PlayerFeaturesUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserUpdateInput = {
@@ -4637,6 +7301,7 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     events?: RawEventUpdateManyWithoutUserNestedInput
+    playerFeatures?: PlayerFeaturesUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateInput = {
@@ -4647,6 +7312,7 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     events?: RawEventUncheckedUpdateManyWithoutUserNestedInput
+    playerFeatures?: PlayerFeaturesUncheckedUpdateOneWithoutUserNestedInput
   }
 
   export type UserCreateManyInput = {
@@ -4684,6 +7350,7 @@ export namespace Prisma {
     isPublished: boolean
     createdAt: Date | string
     updatedAt: Date | string
+    mapFeatures?: MapFeaturesCreateNestedOneWithoutMapInput
   }
 
   export type GameMapUncheckedCreateInput = {
@@ -4694,6 +7361,7 @@ export namespace Prisma {
     isPublished: boolean
     createdAt: Date | string
     updatedAt: Date | string
+    mapFeatures?: MapFeaturesUncheckedCreateNestedOneWithoutMapInput
   }
 
   export type GameMapUpdateInput = {
@@ -4704,6 +7372,7 @@ export namespace Prisma {
     isPublished?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    mapFeatures?: MapFeaturesUpdateOneWithoutMapNestedInput
   }
 
   export type GameMapUncheckedUpdateInput = {
@@ -4714,6 +7383,7 @@ export namespace Prisma {
     isPublished?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    mapFeatures?: MapFeaturesUncheckedUpdateOneWithoutMapNestedInput
   }
 
   export type GameMapCreateManyInput = {
@@ -4801,6 +7471,123 @@ export namespace Prisma {
     payload?: JsonNullValueInput | InputJsonValue
   }
 
+  export type PlayerFeaturesCreateInput = {
+    lastActive: Date | string
+    totalPlayTime?: number
+    matchesPlayed?: number
+    preferredLanguage?: string
+    user: UserCreateNestedOneWithoutPlayerFeaturesInput
+  }
+
+  export type PlayerFeaturesUncheckedCreateInput = {
+    userId: string
+    lastActive: Date | string
+    totalPlayTime?: number
+    matchesPlayed?: number
+    preferredLanguage?: string
+  }
+
+  export type PlayerFeaturesUpdateInput = {
+    lastActive?: DateTimeFieldUpdateOperationsInput | Date | string
+    totalPlayTime?: FloatFieldUpdateOperationsInput | number
+    matchesPlayed?: IntFieldUpdateOperationsInput | number
+    preferredLanguage?: StringFieldUpdateOperationsInput | string
+    user?: UserUpdateOneRequiredWithoutPlayerFeaturesNestedInput
+  }
+
+  export type PlayerFeaturesUncheckedUpdateInput = {
+    userId?: StringFieldUpdateOperationsInput | string
+    lastActive?: DateTimeFieldUpdateOperationsInput | Date | string
+    totalPlayTime?: FloatFieldUpdateOperationsInput | number
+    matchesPlayed?: IntFieldUpdateOperationsInput | number
+    preferredLanguage?: StringFieldUpdateOperationsInput | string
+  }
+
+  export type PlayerFeaturesCreateManyInput = {
+    userId: string
+    lastActive: Date | string
+    totalPlayTime?: number
+    matchesPlayed?: number
+    preferredLanguage?: string
+  }
+
+  export type PlayerFeaturesUpdateManyMutationInput = {
+    lastActive?: DateTimeFieldUpdateOperationsInput | Date | string
+    totalPlayTime?: FloatFieldUpdateOperationsInput | number
+    matchesPlayed?: IntFieldUpdateOperationsInput | number
+    preferredLanguage?: StringFieldUpdateOperationsInput | string
+  }
+
+  export type PlayerFeaturesUncheckedUpdateManyInput = {
+    userId?: StringFieldUpdateOperationsInput | string
+    lastActive?: DateTimeFieldUpdateOperationsInput | Date | string
+    totalPlayTime?: FloatFieldUpdateOperationsInput | number
+    matchesPlayed?: IntFieldUpdateOperationsInput | number
+    preferredLanguage?: StringFieldUpdateOperationsInput | string
+  }
+
+  export type MapFeaturesCreateInput = {
+    totalJoins?: number
+    totalLeaves?: number
+    bounceCount?: number
+    averageDuration?: number
+    bounceRate?: number
+    map: GameMapCreateNestedOneWithoutMapFeaturesInput
+  }
+
+  export type MapFeaturesUncheckedCreateInput = {
+    mapId: string
+    totalJoins?: number
+    totalLeaves?: number
+    bounceCount?: number
+    averageDuration?: number
+    bounceRate?: number
+  }
+
+  export type MapFeaturesUpdateInput = {
+    totalJoins?: IntFieldUpdateOperationsInput | number
+    totalLeaves?: IntFieldUpdateOperationsInput | number
+    bounceCount?: IntFieldUpdateOperationsInput | number
+    averageDuration?: FloatFieldUpdateOperationsInput | number
+    bounceRate?: FloatFieldUpdateOperationsInput | number
+    map?: GameMapUpdateOneRequiredWithoutMapFeaturesNestedInput
+  }
+
+  export type MapFeaturesUncheckedUpdateInput = {
+    mapId?: StringFieldUpdateOperationsInput | string
+    totalJoins?: IntFieldUpdateOperationsInput | number
+    totalLeaves?: IntFieldUpdateOperationsInput | number
+    bounceCount?: IntFieldUpdateOperationsInput | number
+    averageDuration?: FloatFieldUpdateOperationsInput | number
+    bounceRate?: FloatFieldUpdateOperationsInput | number
+  }
+
+  export type MapFeaturesCreateManyInput = {
+    mapId: string
+    totalJoins?: number
+    totalLeaves?: number
+    bounceCount?: number
+    averageDuration?: number
+    bounceRate?: number
+  }
+
+  export type MapFeaturesUpdateManyMutationInput = {
+    totalJoins?: IntFieldUpdateOperationsInput | number
+    totalLeaves?: IntFieldUpdateOperationsInput | number
+    bounceCount?: IntFieldUpdateOperationsInput | number
+    averageDuration?: FloatFieldUpdateOperationsInput | number
+    bounceRate?: FloatFieldUpdateOperationsInput | number
+  }
+
+  export type MapFeaturesUncheckedUpdateManyInput = {
+    mapId?: StringFieldUpdateOperationsInput | string
+    totalJoins?: IntFieldUpdateOperationsInput | number
+    totalLeaves?: IntFieldUpdateOperationsInput | number
+    bounceCount?: IntFieldUpdateOperationsInput | number
+    averageDuration?: FloatFieldUpdateOperationsInput | number
+    bounceRate?: FloatFieldUpdateOperationsInput | number
+  }
+
   export type StringFilter<$PrismaModel = never> = {
     equals?: string | StringFieldRefInput<$PrismaModel>
     in?: string[] | ListStringFieldRefInput<$PrismaModel>
@@ -4846,6 +7633,11 @@ export namespace Prisma {
     every?: RawEventWhereInput
     some?: RawEventWhereInput
     none?: RawEventWhereInput
+  }
+
+  export type PlayerFeaturesNullableScalarRelationFilter = {
+    is?: PlayerFeaturesWhereInput | null
+    isNot?: PlayerFeaturesWhereInput | null
   }
 
   export type SortOrderInput = {
@@ -4937,6 +7729,11 @@ export namespace Prisma {
   export type BoolFilter<$PrismaModel = never> = {
     equals?: boolean | BooleanFieldRefInput<$PrismaModel>
     not?: NestedBoolFilter<$PrismaModel> | boolean
+  }
+
+  export type MapFeaturesNullableScalarRelationFilter = {
+    is?: MapFeaturesWhereInput | null
+    isNot?: MapFeaturesWhereInput | null
   }
 
   export type GameMapCountOrderByAggregateInput = {
@@ -5058,6 +7855,147 @@ export namespace Prisma {
     _max?: NestedJsonFilter<$PrismaModel>
   }
 
+  export type FloatFilter<$PrismaModel = never> = {
+    equals?: number | FloatFieldRefInput<$PrismaModel>
+    in?: number[] | ListFloatFieldRefInput<$PrismaModel>
+    notIn?: number[] | ListFloatFieldRefInput<$PrismaModel>
+    lt?: number | FloatFieldRefInput<$PrismaModel>
+    lte?: number | FloatFieldRefInput<$PrismaModel>
+    gt?: number | FloatFieldRefInput<$PrismaModel>
+    gte?: number | FloatFieldRefInput<$PrismaModel>
+    not?: NestedFloatFilter<$PrismaModel> | number
+  }
+
+  export type IntFilter<$PrismaModel = never> = {
+    equals?: number | IntFieldRefInput<$PrismaModel>
+    in?: number[] | ListIntFieldRefInput<$PrismaModel>
+    notIn?: number[] | ListIntFieldRefInput<$PrismaModel>
+    lt?: number | IntFieldRefInput<$PrismaModel>
+    lte?: number | IntFieldRefInput<$PrismaModel>
+    gt?: number | IntFieldRefInput<$PrismaModel>
+    gte?: number | IntFieldRefInput<$PrismaModel>
+    not?: NestedIntFilter<$PrismaModel> | number
+  }
+
+  export type UserScalarRelationFilter = {
+    is?: UserWhereInput
+    isNot?: UserWhereInput
+  }
+
+  export type PlayerFeaturesCountOrderByAggregateInput = {
+    userId?: SortOrder
+    lastActive?: SortOrder
+    totalPlayTime?: SortOrder
+    matchesPlayed?: SortOrder
+    preferredLanguage?: SortOrder
+  }
+
+  export type PlayerFeaturesAvgOrderByAggregateInput = {
+    totalPlayTime?: SortOrder
+    matchesPlayed?: SortOrder
+  }
+
+  export type PlayerFeaturesMaxOrderByAggregateInput = {
+    userId?: SortOrder
+    lastActive?: SortOrder
+    totalPlayTime?: SortOrder
+    matchesPlayed?: SortOrder
+    preferredLanguage?: SortOrder
+  }
+
+  export type PlayerFeaturesMinOrderByAggregateInput = {
+    userId?: SortOrder
+    lastActive?: SortOrder
+    totalPlayTime?: SortOrder
+    matchesPlayed?: SortOrder
+    preferredLanguage?: SortOrder
+  }
+
+  export type PlayerFeaturesSumOrderByAggregateInput = {
+    totalPlayTime?: SortOrder
+    matchesPlayed?: SortOrder
+  }
+
+  export type FloatWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: number | FloatFieldRefInput<$PrismaModel>
+    in?: number[] | ListFloatFieldRefInput<$PrismaModel>
+    notIn?: number[] | ListFloatFieldRefInput<$PrismaModel>
+    lt?: number | FloatFieldRefInput<$PrismaModel>
+    lte?: number | FloatFieldRefInput<$PrismaModel>
+    gt?: number | FloatFieldRefInput<$PrismaModel>
+    gte?: number | FloatFieldRefInput<$PrismaModel>
+    not?: NestedFloatWithAggregatesFilter<$PrismaModel> | number
+    _count?: NestedIntFilter<$PrismaModel>
+    _avg?: NestedFloatFilter<$PrismaModel>
+    _sum?: NestedFloatFilter<$PrismaModel>
+    _min?: NestedFloatFilter<$PrismaModel>
+    _max?: NestedFloatFilter<$PrismaModel>
+  }
+
+  export type IntWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: number | IntFieldRefInput<$PrismaModel>
+    in?: number[] | ListIntFieldRefInput<$PrismaModel>
+    notIn?: number[] | ListIntFieldRefInput<$PrismaModel>
+    lt?: number | IntFieldRefInput<$PrismaModel>
+    lte?: number | IntFieldRefInput<$PrismaModel>
+    gt?: number | IntFieldRefInput<$PrismaModel>
+    gte?: number | IntFieldRefInput<$PrismaModel>
+    not?: NestedIntWithAggregatesFilter<$PrismaModel> | number
+    _count?: NestedIntFilter<$PrismaModel>
+    _avg?: NestedFloatFilter<$PrismaModel>
+    _sum?: NestedIntFilter<$PrismaModel>
+    _min?: NestedIntFilter<$PrismaModel>
+    _max?: NestedIntFilter<$PrismaModel>
+  }
+
+  export type GameMapScalarRelationFilter = {
+    is?: GameMapWhereInput
+    isNot?: GameMapWhereInput
+  }
+
+  export type MapFeaturesCountOrderByAggregateInput = {
+    mapId?: SortOrder
+    totalJoins?: SortOrder
+    totalLeaves?: SortOrder
+    bounceCount?: SortOrder
+    averageDuration?: SortOrder
+    bounceRate?: SortOrder
+  }
+
+  export type MapFeaturesAvgOrderByAggregateInput = {
+    totalJoins?: SortOrder
+    totalLeaves?: SortOrder
+    bounceCount?: SortOrder
+    averageDuration?: SortOrder
+    bounceRate?: SortOrder
+  }
+
+  export type MapFeaturesMaxOrderByAggregateInput = {
+    mapId?: SortOrder
+    totalJoins?: SortOrder
+    totalLeaves?: SortOrder
+    bounceCount?: SortOrder
+    averageDuration?: SortOrder
+    bounceRate?: SortOrder
+  }
+
+  export type MapFeaturesMinOrderByAggregateInput = {
+    mapId?: SortOrder
+    totalJoins?: SortOrder
+    totalLeaves?: SortOrder
+    bounceCount?: SortOrder
+    averageDuration?: SortOrder
+    bounceRate?: SortOrder
+  }
+
+  export type MapFeaturesSumOrderByAggregateInput = {
+    totalJoins?: SortOrder
+    totalLeaves?: SortOrder
+    bounceCount?: SortOrder
+    averageDuration?: SortOrder
+    bounceRate?: SortOrder
+  }
+
   export type RawEventCreateNestedManyWithoutUserInput = {
     create?: XOR<RawEventCreateWithoutUserInput, RawEventUncheckedCreateWithoutUserInput> | RawEventCreateWithoutUserInput[] | RawEventUncheckedCreateWithoutUserInput[]
     connectOrCreate?: RawEventCreateOrConnectWithoutUserInput | RawEventCreateOrConnectWithoutUserInput[]
@@ -5065,11 +8003,23 @@ export namespace Prisma {
     connect?: RawEventWhereUniqueInput | RawEventWhereUniqueInput[]
   }
 
+  export type PlayerFeaturesCreateNestedOneWithoutUserInput = {
+    create?: XOR<PlayerFeaturesCreateWithoutUserInput, PlayerFeaturesUncheckedCreateWithoutUserInput>
+    connectOrCreate?: PlayerFeaturesCreateOrConnectWithoutUserInput
+    connect?: PlayerFeaturesWhereUniqueInput
+  }
+
   export type RawEventUncheckedCreateNestedManyWithoutUserInput = {
     create?: XOR<RawEventCreateWithoutUserInput, RawEventUncheckedCreateWithoutUserInput> | RawEventCreateWithoutUserInput[] | RawEventUncheckedCreateWithoutUserInput[]
     connectOrCreate?: RawEventCreateOrConnectWithoutUserInput | RawEventCreateOrConnectWithoutUserInput[]
     createMany?: RawEventCreateManyUserInputEnvelope
     connect?: RawEventWhereUniqueInput | RawEventWhereUniqueInput[]
+  }
+
+  export type PlayerFeaturesUncheckedCreateNestedOneWithoutUserInput = {
+    create?: XOR<PlayerFeaturesCreateWithoutUserInput, PlayerFeaturesUncheckedCreateWithoutUserInput>
+    connectOrCreate?: PlayerFeaturesCreateOrConnectWithoutUserInput
+    connect?: PlayerFeaturesWhereUniqueInput
   }
 
   export type StringFieldUpdateOperationsInput = {
@@ -5098,6 +8048,16 @@ export namespace Prisma {
     deleteMany?: RawEventScalarWhereInput | RawEventScalarWhereInput[]
   }
 
+  export type PlayerFeaturesUpdateOneWithoutUserNestedInput = {
+    create?: XOR<PlayerFeaturesCreateWithoutUserInput, PlayerFeaturesUncheckedCreateWithoutUserInput>
+    connectOrCreate?: PlayerFeaturesCreateOrConnectWithoutUserInput
+    upsert?: PlayerFeaturesUpsertWithoutUserInput
+    disconnect?: PlayerFeaturesWhereInput | boolean
+    delete?: PlayerFeaturesWhereInput | boolean
+    connect?: PlayerFeaturesWhereUniqueInput
+    update?: XOR<XOR<PlayerFeaturesUpdateToOneWithWhereWithoutUserInput, PlayerFeaturesUpdateWithoutUserInput>, PlayerFeaturesUncheckedUpdateWithoutUserInput>
+  }
+
   export type RawEventUncheckedUpdateManyWithoutUserNestedInput = {
     create?: XOR<RawEventCreateWithoutUserInput, RawEventUncheckedCreateWithoutUserInput> | RawEventCreateWithoutUserInput[] | RawEventUncheckedCreateWithoutUserInput[]
     connectOrCreate?: RawEventCreateOrConnectWithoutUserInput | RawEventCreateOrConnectWithoutUserInput[]
@@ -5112,8 +8072,50 @@ export namespace Prisma {
     deleteMany?: RawEventScalarWhereInput | RawEventScalarWhereInput[]
   }
 
+  export type PlayerFeaturesUncheckedUpdateOneWithoutUserNestedInput = {
+    create?: XOR<PlayerFeaturesCreateWithoutUserInput, PlayerFeaturesUncheckedCreateWithoutUserInput>
+    connectOrCreate?: PlayerFeaturesCreateOrConnectWithoutUserInput
+    upsert?: PlayerFeaturesUpsertWithoutUserInput
+    disconnect?: PlayerFeaturesWhereInput | boolean
+    delete?: PlayerFeaturesWhereInput | boolean
+    connect?: PlayerFeaturesWhereUniqueInput
+    update?: XOR<XOR<PlayerFeaturesUpdateToOneWithWhereWithoutUserInput, PlayerFeaturesUpdateWithoutUserInput>, PlayerFeaturesUncheckedUpdateWithoutUserInput>
+  }
+
+  export type MapFeaturesCreateNestedOneWithoutMapInput = {
+    create?: XOR<MapFeaturesCreateWithoutMapInput, MapFeaturesUncheckedCreateWithoutMapInput>
+    connectOrCreate?: MapFeaturesCreateOrConnectWithoutMapInput
+    connect?: MapFeaturesWhereUniqueInput
+  }
+
+  export type MapFeaturesUncheckedCreateNestedOneWithoutMapInput = {
+    create?: XOR<MapFeaturesCreateWithoutMapInput, MapFeaturesUncheckedCreateWithoutMapInput>
+    connectOrCreate?: MapFeaturesCreateOrConnectWithoutMapInput
+    connect?: MapFeaturesWhereUniqueInput
+  }
+
   export type BoolFieldUpdateOperationsInput = {
     set?: boolean
+  }
+
+  export type MapFeaturesUpdateOneWithoutMapNestedInput = {
+    create?: XOR<MapFeaturesCreateWithoutMapInput, MapFeaturesUncheckedCreateWithoutMapInput>
+    connectOrCreate?: MapFeaturesCreateOrConnectWithoutMapInput
+    upsert?: MapFeaturesUpsertWithoutMapInput
+    disconnect?: MapFeaturesWhereInput | boolean
+    delete?: MapFeaturesWhereInput | boolean
+    connect?: MapFeaturesWhereUniqueInput
+    update?: XOR<XOR<MapFeaturesUpdateToOneWithWhereWithoutMapInput, MapFeaturesUpdateWithoutMapInput>, MapFeaturesUncheckedUpdateWithoutMapInput>
+  }
+
+  export type MapFeaturesUncheckedUpdateOneWithoutMapNestedInput = {
+    create?: XOR<MapFeaturesCreateWithoutMapInput, MapFeaturesUncheckedCreateWithoutMapInput>
+    connectOrCreate?: MapFeaturesCreateOrConnectWithoutMapInput
+    upsert?: MapFeaturesUpsertWithoutMapInput
+    disconnect?: MapFeaturesWhereInput | boolean
+    delete?: MapFeaturesWhereInput | boolean
+    connect?: MapFeaturesWhereUniqueInput
+    update?: XOR<XOR<MapFeaturesUpdateToOneWithWhereWithoutMapInput, MapFeaturesUpdateWithoutMapInput>, MapFeaturesUncheckedUpdateWithoutMapInput>
   }
 
   export type UserCreateNestedOneWithoutEventsInput = {
@@ -5130,6 +8132,50 @@ export namespace Prisma {
     delete?: UserWhereInput | boolean
     connect?: UserWhereUniqueInput
     update?: XOR<XOR<UserUpdateToOneWithWhereWithoutEventsInput, UserUpdateWithoutEventsInput>, UserUncheckedUpdateWithoutEventsInput>
+  }
+
+  export type UserCreateNestedOneWithoutPlayerFeaturesInput = {
+    create?: XOR<UserCreateWithoutPlayerFeaturesInput, UserUncheckedCreateWithoutPlayerFeaturesInput>
+    connectOrCreate?: UserCreateOrConnectWithoutPlayerFeaturesInput
+    connect?: UserWhereUniqueInput
+  }
+
+  export type FloatFieldUpdateOperationsInput = {
+    set?: number
+    increment?: number
+    decrement?: number
+    multiply?: number
+    divide?: number
+  }
+
+  export type IntFieldUpdateOperationsInput = {
+    set?: number
+    increment?: number
+    decrement?: number
+    multiply?: number
+    divide?: number
+  }
+
+  export type UserUpdateOneRequiredWithoutPlayerFeaturesNestedInput = {
+    create?: XOR<UserCreateWithoutPlayerFeaturesInput, UserUncheckedCreateWithoutPlayerFeaturesInput>
+    connectOrCreate?: UserCreateOrConnectWithoutPlayerFeaturesInput
+    upsert?: UserUpsertWithoutPlayerFeaturesInput
+    connect?: UserWhereUniqueInput
+    update?: XOR<XOR<UserUpdateToOneWithWhereWithoutPlayerFeaturesInput, UserUpdateWithoutPlayerFeaturesInput>, UserUncheckedUpdateWithoutPlayerFeaturesInput>
+  }
+
+  export type GameMapCreateNestedOneWithoutMapFeaturesInput = {
+    create?: XOR<GameMapCreateWithoutMapFeaturesInput, GameMapUncheckedCreateWithoutMapFeaturesInput>
+    connectOrCreate?: GameMapCreateOrConnectWithoutMapFeaturesInput
+    connect?: GameMapWhereUniqueInput
+  }
+
+  export type GameMapUpdateOneRequiredWithoutMapFeaturesNestedInput = {
+    create?: XOR<GameMapCreateWithoutMapFeaturesInput, GameMapUncheckedCreateWithoutMapFeaturesInput>
+    connectOrCreate?: GameMapCreateOrConnectWithoutMapFeaturesInput
+    upsert?: GameMapUpsertWithoutMapFeaturesInput
+    connect?: GameMapWhereUniqueInput
+    update?: XOR<XOR<GameMapUpdateToOneWithWhereWithoutMapFeaturesInput, GameMapUpdateWithoutMapFeaturesInput>, GameMapUncheckedUpdateWithoutMapFeaturesInput>
   }
 
   export type NestedStringFilter<$PrismaModel = never> = {
@@ -5277,6 +8323,49 @@ export namespace Prisma {
     not?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
   }
 
+  export type NestedFloatFilter<$PrismaModel = never> = {
+    equals?: number | FloatFieldRefInput<$PrismaModel>
+    in?: number[] | ListFloatFieldRefInput<$PrismaModel>
+    notIn?: number[] | ListFloatFieldRefInput<$PrismaModel>
+    lt?: number | FloatFieldRefInput<$PrismaModel>
+    lte?: number | FloatFieldRefInput<$PrismaModel>
+    gt?: number | FloatFieldRefInput<$PrismaModel>
+    gte?: number | FloatFieldRefInput<$PrismaModel>
+    not?: NestedFloatFilter<$PrismaModel> | number
+  }
+
+  export type NestedFloatWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: number | FloatFieldRefInput<$PrismaModel>
+    in?: number[] | ListFloatFieldRefInput<$PrismaModel>
+    notIn?: number[] | ListFloatFieldRefInput<$PrismaModel>
+    lt?: number | FloatFieldRefInput<$PrismaModel>
+    lte?: number | FloatFieldRefInput<$PrismaModel>
+    gt?: number | FloatFieldRefInput<$PrismaModel>
+    gte?: number | FloatFieldRefInput<$PrismaModel>
+    not?: NestedFloatWithAggregatesFilter<$PrismaModel> | number
+    _count?: NestedIntFilter<$PrismaModel>
+    _avg?: NestedFloatFilter<$PrismaModel>
+    _sum?: NestedFloatFilter<$PrismaModel>
+    _min?: NestedFloatFilter<$PrismaModel>
+    _max?: NestedFloatFilter<$PrismaModel>
+  }
+
+  export type NestedIntWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: number | IntFieldRefInput<$PrismaModel>
+    in?: number[] | ListIntFieldRefInput<$PrismaModel>
+    notIn?: number[] | ListIntFieldRefInput<$PrismaModel>
+    lt?: number | IntFieldRefInput<$PrismaModel>
+    lte?: number | IntFieldRefInput<$PrismaModel>
+    gt?: number | IntFieldRefInput<$PrismaModel>
+    gte?: number | IntFieldRefInput<$PrismaModel>
+    not?: NestedIntWithAggregatesFilter<$PrismaModel> | number
+    _count?: NestedIntFilter<$PrismaModel>
+    _avg?: NestedFloatFilter<$PrismaModel>
+    _sum?: NestedIntFilter<$PrismaModel>
+    _min?: NestedIntFilter<$PrismaModel>
+    _max?: NestedIntFilter<$PrismaModel>
+  }
+
   export type RawEventCreateWithoutUserInput = {
     id?: string
     eventType: string
@@ -5299,6 +8388,25 @@ export namespace Prisma {
   export type RawEventCreateManyUserInputEnvelope = {
     data: RawEventCreateManyUserInput | RawEventCreateManyUserInput[]
     skipDuplicates?: boolean
+  }
+
+  export type PlayerFeaturesCreateWithoutUserInput = {
+    lastActive: Date | string
+    totalPlayTime?: number
+    matchesPlayed?: number
+    preferredLanguage?: string
+  }
+
+  export type PlayerFeaturesUncheckedCreateWithoutUserInput = {
+    lastActive: Date | string
+    totalPlayTime?: number
+    matchesPlayed?: number
+    preferredLanguage?: string
+  }
+
+  export type PlayerFeaturesCreateOrConnectWithoutUserInput = {
+    where: PlayerFeaturesWhereUniqueInput
+    create: XOR<PlayerFeaturesCreateWithoutUserInput, PlayerFeaturesUncheckedCreateWithoutUserInput>
   }
 
   export type RawEventUpsertWithWhereUniqueWithoutUserInput = {
@@ -5328,6 +8436,79 @@ export namespace Prisma {
     payload?: JsonFilter<"RawEvent">
   }
 
+  export type PlayerFeaturesUpsertWithoutUserInput = {
+    update: XOR<PlayerFeaturesUpdateWithoutUserInput, PlayerFeaturesUncheckedUpdateWithoutUserInput>
+    create: XOR<PlayerFeaturesCreateWithoutUserInput, PlayerFeaturesUncheckedCreateWithoutUserInput>
+    where?: PlayerFeaturesWhereInput
+  }
+
+  export type PlayerFeaturesUpdateToOneWithWhereWithoutUserInput = {
+    where?: PlayerFeaturesWhereInput
+    data: XOR<PlayerFeaturesUpdateWithoutUserInput, PlayerFeaturesUncheckedUpdateWithoutUserInput>
+  }
+
+  export type PlayerFeaturesUpdateWithoutUserInput = {
+    lastActive?: DateTimeFieldUpdateOperationsInput | Date | string
+    totalPlayTime?: FloatFieldUpdateOperationsInput | number
+    matchesPlayed?: IntFieldUpdateOperationsInput | number
+    preferredLanguage?: StringFieldUpdateOperationsInput | string
+  }
+
+  export type PlayerFeaturesUncheckedUpdateWithoutUserInput = {
+    lastActive?: DateTimeFieldUpdateOperationsInput | Date | string
+    totalPlayTime?: FloatFieldUpdateOperationsInput | number
+    matchesPlayed?: IntFieldUpdateOperationsInput | number
+    preferredLanguage?: StringFieldUpdateOperationsInput | string
+  }
+
+  export type MapFeaturesCreateWithoutMapInput = {
+    totalJoins?: number
+    totalLeaves?: number
+    bounceCount?: number
+    averageDuration?: number
+    bounceRate?: number
+  }
+
+  export type MapFeaturesUncheckedCreateWithoutMapInput = {
+    totalJoins?: number
+    totalLeaves?: number
+    bounceCount?: number
+    averageDuration?: number
+    bounceRate?: number
+  }
+
+  export type MapFeaturesCreateOrConnectWithoutMapInput = {
+    where: MapFeaturesWhereUniqueInput
+    create: XOR<MapFeaturesCreateWithoutMapInput, MapFeaturesUncheckedCreateWithoutMapInput>
+  }
+
+  export type MapFeaturesUpsertWithoutMapInput = {
+    update: XOR<MapFeaturesUpdateWithoutMapInput, MapFeaturesUncheckedUpdateWithoutMapInput>
+    create: XOR<MapFeaturesCreateWithoutMapInput, MapFeaturesUncheckedCreateWithoutMapInput>
+    where?: MapFeaturesWhereInput
+  }
+
+  export type MapFeaturesUpdateToOneWithWhereWithoutMapInput = {
+    where?: MapFeaturesWhereInput
+    data: XOR<MapFeaturesUpdateWithoutMapInput, MapFeaturesUncheckedUpdateWithoutMapInput>
+  }
+
+  export type MapFeaturesUpdateWithoutMapInput = {
+    totalJoins?: IntFieldUpdateOperationsInput | number
+    totalLeaves?: IntFieldUpdateOperationsInput | number
+    bounceCount?: IntFieldUpdateOperationsInput | number
+    averageDuration?: FloatFieldUpdateOperationsInput | number
+    bounceRate?: FloatFieldUpdateOperationsInput | number
+  }
+
+  export type MapFeaturesUncheckedUpdateWithoutMapInput = {
+    totalJoins?: IntFieldUpdateOperationsInput | number
+    totalLeaves?: IntFieldUpdateOperationsInput | number
+    bounceCount?: IntFieldUpdateOperationsInput | number
+    averageDuration?: FloatFieldUpdateOperationsInput | number
+    bounceRate?: FloatFieldUpdateOperationsInput | number
+  }
+
   export type UserCreateWithoutEventsInput = {
     id: string
     email: string
@@ -5335,6 +8516,7 @@ export namespace Prisma {
     displayName?: string | null
     createdAt: Date | string
     updatedAt: Date | string
+    playerFeatures?: PlayerFeaturesCreateNestedOneWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutEventsInput = {
@@ -5344,6 +8526,7 @@ export namespace Prisma {
     displayName?: string | null
     createdAt: Date | string
     updatedAt: Date | string
+    playerFeatures?: PlayerFeaturesUncheckedCreateNestedOneWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutEventsInput = {
@@ -5369,6 +8552,7 @@ export namespace Prisma {
     displayName?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    playerFeatures?: PlayerFeaturesUpdateOneWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutEventsInput = {
@@ -5376,6 +8560,119 @@ export namespace Prisma {
     email?: StringFieldUpdateOperationsInput | string
     username?: StringFieldUpdateOperationsInput | string
     displayName?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    playerFeatures?: PlayerFeaturesUncheckedUpdateOneWithoutUserNestedInput
+  }
+
+  export type UserCreateWithoutPlayerFeaturesInput = {
+    id: string
+    email: string
+    username: string
+    displayName?: string | null
+    createdAt: Date | string
+    updatedAt: Date | string
+    events?: RawEventCreateNestedManyWithoutUserInput
+  }
+
+  export type UserUncheckedCreateWithoutPlayerFeaturesInput = {
+    id: string
+    email: string
+    username: string
+    displayName?: string | null
+    createdAt: Date | string
+    updatedAt: Date | string
+    events?: RawEventUncheckedCreateNestedManyWithoutUserInput
+  }
+
+  export type UserCreateOrConnectWithoutPlayerFeaturesInput = {
+    where: UserWhereUniqueInput
+    create: XOR<UserCreateWithoutPlayerFeaturesInput, UserUncheckedCreateWithoutPlayerFeaturesInput>
+  }
+
+  export type UserUpsertWithoutPlayerFeaturesInput = {
+    update: XOR<UserUpdateWithoutPlayerFeaturesInput, UserUncheckedUpdateWithoutPlayerFeaturesInput>
+    create: XOR<UserCreateWithoutPlayerFeaturesInput, UserUncheckedCreateWithoutPlayerFeaturesInput>
+    where?: UserWhereInput
+  }
+
+  export type UserUpdateToOneWithWhereWithoutPlayerFeaturesInput = {
+    where?: UserWhereInput
+    data: XOR<UserUpdateWithoutPlayerFeaturesInput, UserUncheckedUpdateWithoutPlayerFeaturesInput>
+  }
+
+  export type UserUpdateWithoutPlayerFeaturesInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    username?: StringFieldUpdateOperationsInput | string
+    displayName?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    events?: RawEventUpdateManyWithoutUserNestedInput
+  }
+
+  export type UserUncheckedUpdateWithoutPlayerFeaturesInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    username?: StringFieldUpdateOperationsInput | string
+    displayName?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    events?: RawEventUncheckedUpdateManyWithoutUserNestedInput
+  }
+
+  export type GameMapCreateWithoutMapFeaturesInput = {
+    id: string
+    slug: string
+    name: string
+    ownerId?: string | null
+    isPublished: boolean
+    createdAt: Date | string
+    updatedAt: Date | string
+  }
+
+  export type GameMapUncheckedCreateWithoutMapFeaturesInput = {
+    id: string
+    slug: string
+    name: string
+    ownerId?: string | null
+    isPublished: boolean
+    createdAt: Date | string
+    updatedAt: Date | string
+  }
+
+  export type GameMapCreateOrConnectWithoutMapFeaturesInput = {
+    where: GameMapWhereUniqueInput
+    create: XOR<GameMapCreateWithoutMapFeaturesInput, GameMapUncheckedCreateWithoutMapFeaturesInput>
+  }
+
+  export type GameMapUpsertWithoutMapFeaturesInput = {
+    update: XOR<GameMapUpdateWithoutMapFeaturesInput, GameMapUncheckedUpdateWithoutMapFeaturesInput>
+    create: XOR<GameMapCreateWithoutMapFeaturesInput, GameMapUncheckedCreateWithoutMapFeaturesInput>
+    where?: GameMapWhereInput
+  }
+
+  export type GameMapUpdateToOneWithWhereWithoutMapFeaturesInput = {
+    where?: GameMapWhereInput
+    data: XOR<GameMapUpdateWithoutMapFeaturesInput, GameMapUncheckedUpdateWithoutMapFeaturesInput>
+  }
+
+  export type GameMapUpdateWithoutMapFeaturesInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    ownerId?: NullableStringFieldUpdateOperationsInput | string | null
+    isPublished?: BoolFieldUpdateOperationsInput | boolean
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type GameMapUncheckedUpdateWithoutMapFeaturesInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    ownerId?: NullableStringFieldUpdateOperationsInput | string | null
+    isPublished?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }

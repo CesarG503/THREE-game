@@ -10,25 +10,27 @@ datasource db {
 }
 
 model User {
-  id          String     @id
-  email       String
-  username    String
-  displayName String?
-  createdAt   DateTime
-  updatedAt   DateTime
-  events      RawEvent[]
+  id             String          @id
+  email          String
+  username       String
+  displayName    String?
+  createdAt      DateTime
+  updatedAt      DateTime
+  events         RawEvent[]
+  playerFeatures PlayerFeatures?
 
   @@schema("analytics")
 }
 
 model GameMap {
-  id          String   @id
+  id          String       @id
   slug        String
   name        String
   ownerId     String?
   isPublished Boolean
   createdAt   DateTime
   updatedAt   DateTime
+  mapFeatures MapFeatures?
 
   @@schema("analytics")
 }
@@ -42,5 +44,28 @@ model RawEvent {
   user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@id([id, timestamp])
+  @@schema("analytics")
+}
+
+model PlayerFeatures {
+  userId            String   @id
+  lastActive        DateTime
+  totalPlayTime     Float    @default(0) // in seconds
+  matchesPlayed     Int      @default(0)
+  preferredLanguage String   @default("en")
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@schema("analytics")
+}
+
+model MapFeatures {
+  mapId           String  @id
+  totalJoins      Int     @default(0)
+  totalLeaves     Int     @default(0)
+  bounceCount     Int     @default(0)
+  averageDuration Float   @default(0) // in seconds
+  bounceRate      Float   @default(0) // fraction 0 to 1
+  map             GameMap @relation(fields: [mapId], references: [id], onDelete: Cascade)
+
   @@schema("analytics")
 }

@@ -1,0 +1,46 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["multiSchema"]
+  output          = "../src/generated/analytics-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  schemas  = ["analytics"]
+}
+
+model User {
+  id          String     @id
+  email       String
+  username    String
+  displayName String?
+  createdAt   DateTime
+  updatedAt   DateTime
+  events      RawEvent[]
+
+  @@schema("analytics")
+}
+
+model GameMap {
+  id          String   @id
+  slug        String
+  name        String
+  ownerId     String?
+  isPublished Boolean
+  createdAt   DateTime
+  updatedAt   DateTime
+
+  @@schema("analytics")
+}
+
+model RawEvent {
+  id        String   @default(cuid())
+  eventType String
+  userId    String?
+  timestamp DateTime @default(now())
+  payload   Json
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@id([id, timestamp])
+  @@schema("analytics")
+}

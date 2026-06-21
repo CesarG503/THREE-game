@@ -15,6 +15,8 @@ import { logger }         from "./utils/Logger.js"
 import { connectRedis, disconnectRedis } from "./cache/redis.js"
 import { prisma } from "./db/prisma.js"
 import { handleHttpRequest } from "./http/ApiServer.js"
+import { eventBuffer } from "./analytics/eventBuffer.js"
+import { eventWorker } from "./analytics/eventWorker.js"
 
 // ── Bootstrap ──────────────────────────────────────────────────────────────
 
@@ -26,7 +28,10 @@ const router = new MessageRouter()
 registerHandlers(router)
 
 logger.info("Server", `Registered handlers: ${router.registeredTypes().join(", ")}`)
-void connectRedis()
+void connectRedis().then(() => {
+  eventBuffer.start()
+  eventWorker.start()
+})
 
 // ── HTTP + WebSocket Server ────────────────────────────────────────────────
 
@@ -98,6 +103,16 @@ async function shutdown(signal: string): Promise<void> {
   logger.info("Server", `Received ${signal}; shutting down`)
   wss.close()
   httpServer.close()
+  
+  // Stop analytics worker & buffer, and flush remaining in-memory events to Redis
+  eventWorker.stop()
+  eventBuffer.stop()
+  try {
+    await eventBuffer.flush()
+  } catch (err) {
+    logger.error("Server", "Failed to flush event buffer during shutdown", err)
+  }
+
   await disconnectRedis()
   await prisma.$disconnect()
   process.exit(0)

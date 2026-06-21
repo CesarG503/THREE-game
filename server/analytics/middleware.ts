@@ -7,7 +7,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Initialize Ajv with strict mode disabled to allow custom configuration
-const ajv = new Ajv({
+const AjvClass = Ajv as any;
+const ajv = new AjvClass({
   allErrors: true,
   strict: false,
 });
@@ -70,7 +71,7 @@ export function validateTelemetryEvent(event: any): ValidationErrorResponse {
   // 1. Validate envelope first
   const isEnvelopeValid = validateEnvelope(event);
   if (!isEnvelopeValid) {
-    const errors = validateEnvelope.errors?.map(err => {
+    const errors = validateEnvelope.errors?.map((err: any) => {
       const field = err.instancePath || "/";
       return `envelope: Field "${field}" ${err.message}`;
     }) || ["Invalid envelope structure"];
@@ -85,7 +86,7 @@ export function validateTelemetryEvent(event: any): ValidationErrorResponse {
     case "PageView":
       isValidPayload = validatePageView(event.payload);
       if (!isValidPayload) {
-        errors = validatePageView.errors?.map(err => {
+        errors = validatePageView.errors?.map((err: any) => {
           const field = err.instancePath || "/";
           return `payload: Field "${field}" ${err.message}`;
         }) || ["Invalid PageView payload"];
@@ -94,7 +95,7 @@ export function validateTelemetryEvent(event: any): ValidationErrorResponse {
     case "SessionStart":
       isValidPayload = validateSessionStart(event.payload);
       if (!isValidPayload) {
-        errors = validateSessionStart.errors?.map(err => {
+        errors = validateSessionStart.errors?.map((err: any) => {
           const field = err.instancePath || "/";
           return `payload: Field "${field}" ${err.message}`;
         }) || ["Invalid SessionStart payload"];
@@ -103,7 +104,7 @@ export function validateTelemetryEvent(event: any): ValidationErrorResponse {
     case "MatchJoin":
       isValidPayload = validateMatchJoin(event.payload);
       if (!isValidPayload) {
-        errors = validateMatchJoin.errors?.map(err => {
+        errors = validateMatchJoin.errors?.map((err: any) => {
           const field = err.instancePath || "/";
           return `payload: Field "${field}" ${err.message}`;
         }) || ["Invalid MatchJoin payload"];
@@ -112,7 +113,7 @@ export function validateTelemetryEvent(event: any): ValidationErrorResponse {
     case "MatchLeave":
       isValidPayload = validateMatchLeave(event.payload);
       if (!isValidPayload) {
-        errors = validateMatchLeave.errors?.map(err => {
+        errors = validateMatchLeave.errors?.map((err: any) => {
           const field = err.instancePath || "/";
           return `payload: Field "${field}" ${err.message}`;
         }) || ["Invalid MatchLeave payload"];

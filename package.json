@@ -16,6 +16,8 @@
     "db:studio": "prisma studio",
     "db:analytics:generate": "PRISMA_SCHEMA_PATH=prisma/analytics.prisma PRISMA_DATABASE_URL=\"postgresql://game_user:game_password@localhost:5433/threejs_game?schema=analytics\" prisma generate --schema=prisma/analytics.prisma",
     "db:analytics:setup": "npx tsx scripts/setup-analytics-db.ts",
+    "db:analytics:migrate": "npx tsx scripts/migrate-analytics.ts",
+    "db:analytics:test-migration": "npx tsx scripts/test-analytics-migrations.ts",
     "db:analytics:verify": "npx tsx scripts/verify-analytics-setup.ts",
     "db:analytics:test-broker": "npx tsx scripts/test-event-broker.ts",
     "db:analytics:generate-types": "npx tsx scripts/generate-event-types.ts",

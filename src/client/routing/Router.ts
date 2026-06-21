@@ -1,4 +1,6 @@
 import type { GameMode, Route } from "../types";
+import { getStoredAuth } from "../platform/auth";
+import { apiFetch } from "../platform/api";
 
 type RouteListener = (route: Route) => void;
 
@@ -10,9 +12,14 @@ export class Router {
     this.currentRoute = this.parseUrl();
     this.listeners = [];
 
+    // Report initial page view on client startup
+    this.reportPageView(null, this.currentRoute);
+
     window.addEventListener("popstate", () => {
+      const previous = { ...this.currentRoute };
       this.currentRoute = this.parseUrl();
       this.notify();
+      this.reportPageView(previous, this.currentRoute);
     });
   }
 
@@ -33,8 +40,10 @@ export class Router {
   navigate(mode: GameMode, roomId: string | null = null) {
     const path = roomId ? `/${mode}/${roomId}` : `/${mode}`;
     window.history.pushState(null, "", path);
+    const previous = { ...this.currentRoute };
     this.currentRoute = { mode, roomId };
     this.notify();
+    this.reportPageView(previous, this.currentRoute);
   }
 
   getMode(): GameMode {
@@ -54,5 +63,50 @@ export class Router {
 
   notify() {
     this.listeners.forEach((cb) => cb(this.currentRoute));
+  }
+
+  private reportPageView(from: Route | null, to: Route) {
+    try {
+      const auth = getStoredAuth();
+      
+      let guestId = localStorage.getItem("veta.guest_id");
+      if (!guestId) {
+        guestId = crypto.randomUUID();
+        localStorage.setItem("veta.guest_id", guestId);
+      }
+
+      const userAgent = navigator.userAgent;
+      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent);
+      const deviceType = isMobile ? "mobile" : "desktop";
+
+      const fromRoutePath = from ? (from.roomId ? `/${from.mode}/${from.roomId}` : `/${from.mode}`) : null;
+      const toRoutePath = to.roomId ? `/${to.mode}/${to.roomId}` : `/${to.mode}`;
+
+      const payload = {
+        fromRoute: fromRoutePath,
+        toRoute: toRoutePath,
+        guestId: auth ? null : guestId,
+        deviceType,
+      };
+
+      const envelope = {
+        id: crypto.randomUUID(),
+        eventType: "PageView",
+        userId: auth?.user.id ?? null,
+        timestamp: new Date().toISOString(),
+        payload,
+      };
+
+      // Ship telemetry non-blocking
+      apiFetch("/analytics/event", {
+        method: "POST",
+        body: JSON.stringify(envelope),
+        auth: false,
+      }).catch((err) => {
+        console.warn("[Analytics] Failed to report PageView:", err);
+      });
+    } catch (e) {
+      console.warn("[Analytics] Error in reportPageView:", e);
+    }
   }
 }

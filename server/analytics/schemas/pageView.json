@@ -10,8 +10,20 @@
     },
     "title": {
       "type": "string"
+    },
+    "fromRoute": {
+      "type": ["string", "null"]
+    },
+    "toRoute": {
+      "type": "string"
+    },
+    "guestId": {
+      "type": ["string", "null"]
+    },
+    "deviceType": {
+      "type": "string"
     }
   },
-  "required": ["url"],
+  "required": ["toRoute", "deviceType"],
   "additionalProperties": false
 }

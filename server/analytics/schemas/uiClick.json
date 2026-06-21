@@ -1,0 +1,11 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "elementId": { "type": "string" },
+    "elementType": { "type": "string" },
+    "action": { "type": "string" }
+  },
+  "required": ["elementId", "elementType", "action"],
+  "additionalProperties": false
+}

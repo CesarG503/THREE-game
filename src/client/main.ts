@@ -3,6 +3,9 @@ import { Game } from "./Game";
 import { renderLobby } from "./ui/LobbyScreen";
 import { getStoredAuth, renderAuthScreen } from "./ui/AuthScreen";
 import type { GameMode } from "./types";
+import { analytics } from "./utils/analytics";
+
+analytics.init();
 
 const router = new Router();
 let game: Game | null = null;

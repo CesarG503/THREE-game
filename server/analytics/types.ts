@@ -5,22 +5,36 @@
 
 export interface TelemetryEnvelope {
   id: string;
-  eventType: "PageView" | "SessionStart" | "MatchJoin" | "MatchLeave";
+  eventType: "PageView" | "SessionStart" | "SessionHeartbeat" | "SessionEnd" | "MatchJoin" | "MatchLeave" | "MatchStart" | "MatchEnd";
   userId?: string | null;
   timestamp: string;
-  payload: PageViewPayload | SessionStartPayload | MatchJoinPayload | MatchLeavePayload;
+  payload: PageViewPayload | SessionStartPayload | SessionHeartbeatPayload | SessionEndPayload | MatchJoinPayload | MatchLeavePayload | MatchStartPayload | MatchEndPayload;
 }
 
 export interface PageViewPayload {
-  url: string;
+  url?: string;
   referrer?: string;
   title?: string;
+  fromRoute?: string | null;
+  toRoute: string;
+  guestId?: string | null;
+  deviceType: string;
 }
 
 export interface SessionStartPayload {
   userAgent: string;
   language?: string;
   screenResolution?: string;
+}
+
+export interface SessionHeartbeatPayload {
+  state: string;
+}
+
+export interface SessionEndPayload {
+  durationSeconds: number;
+  idleSeconds: number;
+  usefulSeconds: number;
 }
 
 export interface MatchJoinPayload {
@@ -34,4 +48,17 @@ export interface MatchLeavePayload {
   mapId: string;
   durationSeconds: number;
   reason?: string;
+}
+
+export interface MatchStartPayload {
+  roomId: string;
+  mapId?: string | null;
+  gameMode: string;
+}
+
+export interface MatchEndPayload {
+  roomId: string;
+  mapId?: string | null;
+  durationSeconds: number;
+  winningTeam?: string | null;
 }

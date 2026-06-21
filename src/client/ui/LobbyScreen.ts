@@ -8,6 +8,7 @@ import { DEFAULT_POLYGON_SKIN_URL, getSelectedSkin, setSelectedSkin, type Select
 import { renderAuthScreen } from "./AuthScreen";
 import { clampText, clear, createButton, createElement, createIcon, formatRelativeDate, prependIcon } from "./platform/dom";
 import { injectPlatformStyles } from "./platform/styles";
+import { initUiTelemetry } from "./analytics-ui";
 
 const HIDDEN_IDS = [
 	"loading",
@@ -62,11 +63,14 @@ export function renderLobby(router: Router): () => void {
 	container.id = "lobby-screen";
 	document.body.appendChild(container);
 
+	const uiTelemetry = initUiTelemetry(container, "lobby_catalog");
+
 	const disposeLobby = () => {
 		if (disposed) return;
 		disposed = true;
 		if (authCleanup) authCleanup();
 		if (skinPreviewCleanup) skinPreviewCleanup();
+		uiTelemetry.dispose();
 		unsubscribeRoute();
 		container.remove();
 		cleanup(hiddenStates);
@@ -104,6 +108,7 @@ export function renderLobby(router: Router): () => void {
 		}
 
 		render();
+		uiTelemetry.observeElements();
 	};
 
 	const refreshSkins = async () => {
@@ -382,6 +387,8 @@ export function renderLobby(router: Router): () => void {
 
 	const renderSessionCard = (map: PlatformMap, index: number) => {
 		const card = createElement("article", "vp-session-card");
+		card.setAttribute("data-track-id", map.slug);
+		card.setAttribute("data-track-type", "map_session_card");
 		card.style.padding = "16px";
 		card.style.display = "grid";
 		card.style.gridTemplateColumns = "86px minmax(0, 1fr) auto";
@@ -397,6 +404,7 @@ export function renderLobby(router: Router): () => void {
 		body.appendChild(createElement("div", "vp-muted", `${formatRelativeDate(map.updatedAt)} · v${map.version}`));
 
 		const edit = prependIcon(createButton("vp-primary-btn vp-icon-btn", "Seguir", () => navigateToMap("editor", map)), "mdi:play");
+		edit.setAttribute("data-click-action", "edit_map");
 		card.appendChild(preview);
 		card.appendChild(body);
 		card.appendChild(edit);
@@ -405,6 +413,8 @@ export function renderLobby(router: Router): () => void {
 
 	const renderMapCard = (map: PlatformMap, index: number) => {
 		const card = createElement("article", "vp-map-card");
+		card.setAttribute("data-track-id", map.slug);
+		card.setAttribute("data-track-type", "map_card");
 		const preview = createElement("div", `vp-map-preview alt-${index % 3}`);
 		preview.appendChild(createElement("span", "vp-map-pill", `${map.objectCount} objetos`));
 
@@ -418,11 +428,18 @@ export function renderLobby(router: Router): () => void {
 		stats.appendChild(createMeta("mdi:clock-outline", formatRelativeDate(map.updatedAt)));
 
 		const actions = createElement("div", "vp-card-actions");
-		actions.appendChild(prependIcon(createButton("vp-primary-btn vp-icon-btn", "Jugar", () => navigateToMap("play", map)), "mdi:play"));
+		const playBtn = prependIcon(createButton("vp-primary-btn vp-icon-btn", "Jugar", () => navigateToMap("play", map)), "mdi:play");
+		playBtn.setAttribute("data-click-action", "play_map");
+		actions.appendChild(playBtn);
+		
 		if (auth?.user.id === map.ownerId) {
-			actions.appendChild(prependIcon(createButton("vp-secondary-btn vp-icon-btn", "Editar", () => navigateToMap("editor", map)), "mdi:pencil-box"));
+			const editBtn = prependIcon(createButton("vp-secondary-btn vp-icon-btn", "Editar", () => navigateToMap("editor", map)), "mdi:pencil-box");
+			editBtn.setAttribute("data-click-action", "edit_map");
+			actions.appendChild(editBtn);
 		} else {
-			actions.appendChild(prependIcon(createButton("vp-secondary-btn vp-icon-btn", "Ver sala", () => navigateToMap("play", map)), "mdi:eye"));
+			const viewBtn = prependIcon(createButton("vp-secondary-btn vp-icon-btn", "Ver sala", () => navigateToMap("play", map)), "mdi:eye");
+			viewBtn.setAttribute("data-click-action", "view_room");
+			actions.appendChild(viewBtn);
 		}
 
 		body.appendChild(stats);

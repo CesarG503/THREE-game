@@ -8,11 +8,10 @@
     },
     "eventType": {
       "type": "string",
-      "enum": ["PageView", "SessionStart", "MatchJoin", "MatchLeave"]
+      "enum": ["PageView", "SessionStart", "MatchJoin", "MatchLeave", "SessionHeartbeat", "SessionEnd", "MatchStart", "MatchEnd", "UiImpression", "UiClick", "UiScrollDepth"]
     },
     "userId": {
-      "type": ["string", "null"],
-      "format": "uuid"
+      "type": ["string", "null"]
     },
     "timestamp": {
       "type": "string",

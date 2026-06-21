@@ -1,0 +1,12 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "roomId": { "type": "string" },
+    "mapId": { "type": ["string", "null"] },
+    "durationSeconds": { "type": "number", "minimum": 0 },
+    "winningTeam": { "type": ["string", "null"] }
+  },
+  "required": ["roomId", "durationSeconds"],
+  "additionalProperties": false
+}

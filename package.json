@@ -22,7 +22,11 @@
     "db:analytics:test-broker": "npx tsx scripts/test-event-broker.ts",
     "db:analytics:generate-types": "npx tsx scripts/generate-event-types.ts",
     "db:analytics:test-schema": "npx tsx scripts/test-schema-registry.ts",
-    "db:analytics:test-feature": "npx tsx scripts/test-feature-store.ts"
+    "db:analytics:test-feature": "npx tsx scripts/test-feature-store.ts",
+    "db:analytics:test-ingestion": "npx tsx scripts/test-navigation-ingestion.ts",
+    "db:analytics:test-session": "npx tsx scripts/test-session-telemetry.ts",
+    "db:analytics:test-interaction": "npx tsx scripts/test-game-interaction.ts",
+    "db:analytics:test-ui": "npx tsx scripts/test-ui-telemetry.ts"
   },
   "devDependencies": {
     "@types/busboy": "^1.5.4",

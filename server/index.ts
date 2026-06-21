@@ -17,6 +17,7 @@ import { prisma } from "./db/prisma.js"
 import { handleHttpRequest } from "./http/ApiServer.js"
 import { eventBuffer } from "./analytics/eventBuffer.js"
 import { eventWorker } from "./analytics/eventWorker.js"
+import crypto from "node:crypto"
 
 // ── Bootstrap ──────────────────────────────────────────────────────────────
 
@@ -73,8 +74,24 @@ wss.on("connection", (ws: ExtendedWebSocket) => {
   })
 
   ws.on("close", () => {
-    const { playerId, roomId } = ws
+    const { playerId, roomId, connectedAt, userId } = ws
     if (!playerId || !roomId) return
+
+    const durationSeconds = connectedAt ? Math.floor((Date.now() - connectedAt) / 1000) : 0
+
+    // Push MatchLeave telemetry
+    eventBuffer.push({
+      id: crypto.randomUUID(),
+      eventType: "MatchLeave",
+      userId: userId ?? null,
+      timestamp: new Date(),
+      payload: {
+        roomId,
+        mapId: null,
+        durationSeconds,
+        reason: "network_disconnect"
+      }
+    })
 
     logger.info(`Room:${roomId}`, `Player disconnected: ${playerId}`)
 

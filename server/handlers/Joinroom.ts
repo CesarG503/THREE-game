@@ -1,6 +1,8 @@
 import type { RoomManager } from "../managers/RoomManager.js"
 import type { ExtendedWebSocket, JoinRoomMessage } from "../types.js"
 import { logger } from "../utils/Logger.js"
+import { eventBuffer } from "../analytics/eventBuffer.js"
+import crypto from "node:crypto"
 
 function generatePlayerId(): string {
   return "player_" + Math.random().toString(36).substring(2, 9)
@@ -26,6 +28,21 @@ export function handleJoinRoom(
 
   ws.playerId = playerId
   ws.roomId   = roomId
+  ws.connectedAt = Date.now()
+  ws.userId = null // Auth extraction can be added here later
+
+  // Push MatchJoin telemetry
+  eventBuffer.push({
+    id: crypto.randomUUID(),
+    eventType: "MatchJoin",
+    userId: ws.userId,
+    timestamp: new Date(),
+    payload: {
+      roomId,
+      mapId: null, // Resolvable when Map/Game Modes are strictly enforced
+      playerRole: "player"
+    }
+  })
 
   // Snapshot existing players BEFORE adding the new one
   const existingPlayers = room.getRoomPlayers(roomId)

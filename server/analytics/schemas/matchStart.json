@@ -1,0 +1,11 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "roomId": { "type": "string" },
+    "mapId": { "type": ["string", "null"] },
+    "gameMode": { "type": "string" }
+  },
+  "required": ["roomId", "gameMode"],
+  "additionalProperties": false
+}

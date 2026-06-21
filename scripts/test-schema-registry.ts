@@ -88,7 +88,7 @@ const missingEventType = {
 };
 const resMissingType = validateTelemetryEvent(missingEventType);
 assert(!resMissingType.valid, "Envelope missing eventType was accepted");
-assert(resMissingType.errors?.some(e => e.includes("eventType")), "Error message did not mention eventType");
+assert(resMissingType.errors?.some(e => e.includes("eventType")) ?? false, "Error message did not mention eventType");
 console.log("✓ Correctly rejected missing eventType.");
 
 // Invalid ID format (not UUID)
@@ -100,7 +100,7 @@ const invalidIdFormat = {
 };
 const resInvalidId = validateTelemetryEvent(invalidIdFormat);
 assert(!resInvalidId.valid, "Envelope with invalid UUID format was accepted");
-assert(resInvalidId.errors?.some(e => e.includes("id")), "Error message did not mention id");
+assert(resInvalidId.errors?.some(e => e.includes("id")) ?? false, "Error message did not mention id");
 console.log("✓ Correctly rejected invalid UUID format in ID.");
 
 // Unsupported eventType
@@ -112,7 +112,7 @@ const unsupportedType = {
 };
 const resUnsupported = validateTelemetryEvent(unsupportedType);
 assert(!resUnsupported.valid, "Envelope with unsupported eventType was accepted");
-assert(resUnsupported.errors?.some(e => e.includes("eventType")), "Error message did not mention eventType");
+assert(resUnsupported.errors?.some(e => e.includes("eventType")) ?? false, "Error message did not mention eventType");
 console.log("✓ Correctly rejected unsupported eventType.");
 
 // --- TEST 3: Payload Validation Failures ---
@@ -129,7 +129,7 @@ const badPageView = {
 };
 const resBadPV = validateTelemetryEvent(badPageView);
 assert(!resBadPV.valid, "PageView missing 'url' was accepted");
-assert(resBadPV.errors?.some(e => e.includes("url")), "Error message did not mention url");
+assert(resBadPV.errors?.some(e => e.includes("url")) ?? false, "Error message did not mention url");
 console.log("✓ Correctly rejected PageView missing url.");
 
 // MatchLeave with wrong durationSeconds type (string instead of number)
@@ -145,7 +145,7 @@ const badMatchLeaveType = {
 };
 const resBadMLType = validateTelemetryEvent(badMatchLeaveType);
 assert(!resBadMLType.valid, "MatchLeave with durationSeconds as string was accepted");
-assert(resBadMLType.errors?.some(e => e.includes("durationSeconds")), "Error message did not mention durationSeconds");
+assert(resBadMLType.errors?.some(e => e.includes("durationSeconds")) ?? false, "Error message did not mention durationSeconds");
 console.log("✓ Correctly rejected MatchLeave with durationSeconds as string.");
 
 // MatchJoin with invalid UUID format in roomId
@@ -160,7 +160,7 @@ const badMatchJoinUuid = {
 };
 const resBadMJUuid = validateTelemetryEvent(badMatchJoinUuid);
 assert(!resBadMJUuid.valid, "MatchJoin with invalid UUID format in roomId was accepted");
-assert(resBadMJUuid.errors?.some(e => e.includes("roomId")), "Error message did not mention roomId");
+assert(resBadMJUuid.errors?.some(e => e.includes("roomId")) ?? false, "Error message did not mention roomId");
 console.log("✓ Correctly rejected MatchJoin with invalid UUID in roomId.");
 
 // --- TEST 4: Performance Benchmark ---

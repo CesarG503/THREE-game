@@ -38,21 +38,42 @@ const loadSchema = (filename: string) => {
 const envelopeSchema = loadSchema("envelope.json");
 const pageViewSchema = loadSchema("pageView.json");
 const sessionStartSchema = loadSchema("sessionStart.json");
+const sessionHeartbeatSchema = loadSchema("sessionHeartbeat.json");
+const sessionEndSchema = loadSchema("sessionEnd.json");
 const matchJoinSchema = loadSchema("matchJoin.json");
 const matchLeaveSchema = loadSchema("matchLeave.json");
+const matchStartSchema = loadSchema("matchStart.json");
+const matchEndSchema = loadSchema("matchEnd.json");
+const uiImpressionSchema = loadSchema("uiImpression.json");
+const uiClickSchema = loadSchema("uiClick.json");
+const uiScrollDepthSchema = loadSchema("uiScrollDepth.json");
 
 // Register payload schemas under specific keys for reference
 ajv.addSchema(pageViewSchema, "pageView");
 ajv.addSchema(sessionStartSchema, "sessionStart");
+ajv.addSchema(sessionHeartbeatSchema, "sessionHeartbeat");
+ajv.addSchema(sessionEndSchema, "sessionEnd");
 ajv.addSchema(matchJoinSchema, "matchJoin");
 ajv.addSchema(matchLeaveSchema, "matchLeave");
+ajv.addSchema(matchStartSchema, "matchStart");
+ajv.addSchema(matchEndSchema, "matchEnd");
+ajv.addSchema(uiImpressionSchema, "uiImpression");
+ajv.addSchema(uiClickSchema, "uiClick");
+ajv.addSchema(uiScrollDepthSchema, "uiScrollDepth");
 
 // Compile validators
 const validateEnvelope = ajv.compile(envelopeSchema);
 const validatePageView = ajv.compile(pageViewSchema);
 const validateSessionStart = ajv.compile(sessionStartSchema);
+const validateSessionHeartbeat = ajv.compile(sessionHeartbeatSchema);
+const validateSessionEnd = ajv.compile(sessionEndSchema);
 const validateMatchJoin = ajv.compile(matchJoinSchema);
 const validateMatchLeave = ajv.compile(matchLeaveSchema);
+const validateMatchStart = ajv.compile(matchStartSchema);
+const validateMatchEnd = ajv.compile(matchEndSchema);
+const validateUiImpression = ajv.compile(uiImpressionSchema);
+const validateUiClick = ajv.compile(uiClickSchema);
+const validateUiScrollDepth = ajv.compile(uiScrollDepthSchema);
 
 export interface ValidationErrorResponse {
   valid: boolean;
@@ -101,6 +122,24 @@ export function validateTelemetryEvent(event: any): ValidationErrorResponse {
         }) || ["Invalid SessionStart payload"];
       }
       break;
+    case "SessionHeartbeat":
+      isValidPayload = validateSessionHeartbeat(event.payload);
+      if (!isValidPayload) {
+        errors = validateSessionHeartbeat.errors?.map((err: any) => {
+          const field = err.instancePath || "/";
+          return `payload: Field "${field}" ${err.message}`;
+        }) || ["Invalid SessionHeartbeat payload"];
+      }
+      break;
+    case "SessionEnd":
+      isValidPayload = validateSessionEnd(event.payload);
+      if (!isValidPayload) {
+        errors = validateSessionEnd.errors?.map((err: any) => {
+          const field = err.instancePath || "/";
+          return `payload: Field "${field}" ${err.message}`;
+        }) || ["Invalid SessionEnd payload"];
+      }
+      break;
     case "MatchJoin":
       isValidPayload = validateMatchJoin(event.payload);
       if (!isValidPayload) {
@@ -117,6 +156,51 @@ export function validateTelemetryEvent(event: any): ValidationErrorResponse {
           const field = err.instancePath || "/";
           return `payload: Field "${field}" ${err.message}`;
         }) || ["Invalid MatchLeave payload"];
+      }
+      break;
+    case "MatchStart":
+      isValidPayload = validateMatchStart(event.payload);
+      if (!isValidPayload) {
+        errors = validateMatchStart.errors?.map((err: any) => {
+          const field = err.instancePath || "/";
+          return `payload: Field "${field}" ${err.message}`;
+        }) || ["Invalid MatchStart payload"];
+      }
+      break;
+    case "MatchEnd":
+      isValidPayload = validateMatchEnd(event.payload);
+      if (!isValidPayload) {
+        errors = validateMatchEnd.errors?.map((err: any) => {
+          const field = err.instancePath || "/";
+          return `payload: Field "${field}" ${err.message}`;
+        }) || ["Invalid MatchEnd payload"];
+      }
+      break;
+    case "UiImpression":
+      isValidPayload = validateUiImpression(event.payload);
+      if (!isValidPayload) {
+        errors = validateUiImpression.errors?.map((err: any) => {
+          const field = err.instancePath || "/";
+          return `payload: Field "${field}" ${err.message}`;
+        }) || ["Invalid UiImpression payload"];
+      }
+      break;
+    case "UiClick":
+      isValidPayload = validateUiClick(event.payload);
+      if (!isValidPayload) {
+        errors = validateUiClick.errors?.map((err: any) => {
+          const field = err.instancePath || "/";
+          return `payload: Field "${field}" ${err.message}`;
+        }) || ["Invalid UiClick payload"];
+      }
+      break;
+    case "UiScrollDepth":
+      isValidPayload = validateUiScrollDepth(event.payload);
+      if (!isValidPayload) {
+        errors = validateUiScrollDepth.errors?.map((err: any) => {
+          const field = err.instancePath || "/";
+          return `payload: Field "${field}" ${err.message}`;
+        }) || ["Invalid UiScrollDepth payload"];
       }
       break;
     default:

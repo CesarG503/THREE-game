@@ -3,12 +3,10 @@
   "type": "object",
   "properties": {
     "roomId": {
-      "type": "string",
-      "format": "uuid"
+      "type": "string"
     },
     "mapId": {
-      "type": "string",
-      "format": "uuid"
+      "type": "string"
     },
     "mode": {
       "type": "string"

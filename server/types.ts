@@ -47,6 +47,8 @@ export interface PlayerData {
 export interface ExtendedWebSocket extends WebSocket {
   playerId?: string
   roomId?: string
+  userId?: string | null
+  connectedAt?: number
 }
 
 // ── Incoming Messages ─────────────────────────────

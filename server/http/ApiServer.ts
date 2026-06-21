@@ -5,6 +5,8 @@ import { AuthError, getUserBySessionToken, loginUser, registerUser, requireUserB
 import { createAsset, getAsset, getAssetObject, listAssets, type UploadedAssetFile } from "../services/AssetService.js"
 import { createMap, deleteMap, getMap, listMaps, updateMap, type MapWriteInput } from "../services/MapService.js"
 import { logger } from "../utils/Logger.js"
+import { validateTelemetryEvent } from "../analytics/middleware.js"
+import { eventBuffer } from "../analytics/eventBuffer.js"
 
 const MAX_BODY_BYTES = 1024 * 1024 * 2
 
@@ -25,6 +27,22 @@ export async function handleHttpRequest(
   if (req.method === "GET" && url.pathname === "/api/health") {
     sendJson(res, 200, { ok: true })
     return
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/analytics/event") {
+    return withJsonBody(req, res, async (body) => {
+      const validation = validateTelemetryEvent(body)
+      if (!validation.valid) {
+        sendJson(res, 400, { error: "Validation failed", details: validation.errors })
+        return
+      }
+      const success = eventBuffer.push(body as any)
+      if (!success) {
+        sendJson(res, 429, { error: "Server busy, events dropped due to backpressure" })
+        return
+      }
+      sendJson(res, 202, { ok: true })
+    })
   }
 
   if (req.method === "POST" && url.pathname === "/api/auth/register") {

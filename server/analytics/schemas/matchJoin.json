@@ -1,0 +1,19 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "roomId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "mapId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "mode": {
+      "type": "string"
+    }
+  },
+  "required": ["roomId", "mapId"],
+  "additionalProperties": false
+}

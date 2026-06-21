@@ -1,0 +1,27 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "eventType": {
+      "type": "string",
+      "enum": ["PageView", "SessionStart", "MatchJoin", "MatchLeave"]
+    },
+    "userId": {
+      "type": ["string", "null"],
+      "format": "uuid"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "payload": {
+      "type": "object"
+    }
+  },
+  "required": ["id", "eventType", "timestamp", "payload"],
+  "additionalProperties": false
+}

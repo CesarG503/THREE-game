@@ -5,10 +5,10 @@
 
 export interface TelemetryEnvelope {
   id: string;
-  eventType: "PageView" | "SessionStart" | "SessionHeartbeat" | "SessionEnd" | "MatchJoin" | "MatchLeave" | "MatchStart" | "MatchEnd";
+  eventType: "PageView" | "SessionStart" | "SessionHeartbeat" | "SessionEnd" | "MatchJoin" | "MatchLeave" | "MatchStart" | "MatchEnd" | "UiImpression" | "UiClick" | "UiScrollDepth";
   userId?: string | null;
   timestamp: string;
-  payload: PageViewPayload | SessionStartPayload | SessionHeartbeatPayload | SessionEndPayload | MatchJoinPayload | MatchLeavePayload | MatchStartPayload | MatchEndPayload;
+  payload: PageViewPayload | SessionStartPayload | SessionHeartbeatPayload | SessionEndPayload | MatchJoinPayload | MatchLeavePayload | MatchStartPayload | MatchEndPayload | UiImpressionPayload | UiClickPayload | UiScrollDepthPayload;
 }
 
 export interface PageViewPayload {
@@ -61,4 +61,21 @@ export interface MatchEndPayload {
   mapId?: string | null;
   durationSeconds: number;
   winningTeam?: string | null;
+}
+
+export interface UiImpressionPayload {
+  elementId: string;
+  elementType: string;
+  visibleTimeMs: number;
+}
+
+export interface UiClickPayload {
+  elementId: string;
+  elementType: string;
+  action: string;
+}
+
+export interface UiScrollDepthPayload {
+  page: string;
+  maxDepthPercent: number;
 }

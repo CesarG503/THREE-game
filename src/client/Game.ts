@@ -39,6 +39,7 @@ import { ObjectInspector } from "./ui/ObjectInspector";
 import { createItemFromNetworkData, serializeItemForNetwork } from "./items/ItemNetworkSerializer";
 import { getMapData, loadPlatformMapForRoom, type PlatformMap } from "./platform/mapRuntime";
 import { DEFAULT_SKYBOX_TYPE } from "./platform/mapDefaults";
+import { editorTelemetry } from "./editor/analytics-editor";
 
 export class Game {
 	sceneManager: any;
@@ -190,6 +191,7 @@ export class Game {
 		if (this.gameMode === "editor") {
 			this.character.canFly = true;
 			console.log("Editor Mode Enabled: Flight Active");
+			editorTelemetry.startSession();
 		}
 
 		this.playerConfigManager = new PlayerConfigManager(this);
@@ -789,6 +791,9 @@ export class Game {
 
 		this.world = null;
 		this.eventQueue = null;
+		if (this.gameMode === "editor") {
+			editorTelemetry.endSession();
+		}
 		console.log(`[Game] Experiencia cerrada: ${this.gameMode} / ${this.roomId}`);
 	}
 

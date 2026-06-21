@@ -47,6 +47,9 @@ const matchEndSchema = loadSchema("matchEnd.json");
 const uiImpressionSchema = loadSchema("uiImpression.json");
 const uiClickSchema = loadSchema("uiClick.json");
 const uiScrollDepthSchema = loadSchema("uiScrollDepth.json");
+const editorSessionSchema = loadSchema("editorSession.json");
+const editorActionSchema = loadSchema("editorAction.json");
+const mapStateTransitionSchema = loadSchema("mapStateTransition.json");
 
 // Register payload schemas under specific keys for reference
 ajv.addSchema(pageViewSchema, "pageView");
@@ -60,6 +63,9 @@ ajv.addSchema(matchEndSchema, "matchEnd");
 ajv.addSchema(uiImpressionSchema, "uiImpression");
 ajv.addSchema(uiClickSchema, "uiClick");
 ajv.addSchema(uiScrollDepthSchema, "uiScrollDepth");
+ajv.addSchema(editorSessionSchema, "editorSession");
+ajv.addSchema(editorActionSchema, "editorAction");
+ajv.addSchema(mapStateTransitionSchema, "mapStateTransition");
 
 // Compile validators
 const validateEnvelope = ajv.compile(envelopeSchema);
@@ -74,6 +80,9 @@ const validateMatchEnd = ajv.compile(matchEndSchema);
 const validateUiImpression = ajv.compile(uiImpressionSchema);
 const validateUiClick = ajv.compile(uiClickSchema);
 const validateUiScrollDepth = ajv.compile(uiScrollDepthSchema);
+const validateEditorSession = ajv.compile(editorSessionSchema);
+const validateEditorAction = ajv.compile(editorActionSchema);
+const validateMapStateTransition = ajv.compile(mapStateTransitionSchema);
 
 export interface ValidationErrorResponse {
   valid: boolean;
@@ -201,6 +210,33 @@ export function validateTelemetryEvent(event: any): ValidationErrorResponse {
           const field = err.instancePath || "/";
           return `payload: Field "${field}" ${err.message}`;
         }) || ["Invalid UiScrollDepth payload"];
+      }
+      break;
+    case "EditorSession":
+      isValidPayload = validateEditorSession(event.payload);
+      if (!isValidPayload) {
+        errors = validateEditorSession.errors?.map((err: any) => {
+          const field = err.instancePath || "/";
+          return `payload: Field "${field}" ${err.message}`;
+        }) || ["Invalid EditorSession payload"];
+      }
+      break;
+    case "EditorAction":
+      isValidPayload = validateEditorAction(event.payload);
+      if (!isValidPayload) {
+        errors = validateEditorAction.errors?.map((err: any) => {
+          const field = err.instancePath || "/";
+          return `payload: Field "${field}" ${err.message}`;
+        }) || ["Invalid EditorAction payload"];
+      }
+      break;
+    case "MapStateTransition":
+      isValidPayload = validateMapStateTransition(event.payload);
+      if (!isValidPayload) {
+        errors = validateMapStateTransition.errors?.map((err: any) => {
+          const field = err.instancePath || "/";
+          return `payload: Field "${field}" ${err.message}`;
+        }) || ["Invalid MapStateTransition payload"];
       }
       break;
     default:

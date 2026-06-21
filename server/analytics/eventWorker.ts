@@ -53,7 +53,7 @@ export class EventWorker {
     }, this.POLL_INTERVAL);
   }
 
-  private async pollAndProcess(): Promise<void> {
+  public async pollAndProcess(): Promise<void> {
     const redis = getRedis();
     if (!redis || !redis.isOpen) {
       this.scheduleNextPoll();

@@ -1,0 +1,17 @@
+{
+  "$id": "https://example.com/schemas/mapStateTransition.json",
+  "type": "object",
+  "properties": {
+    "state": {
+      "type": "string",
+      "enum": ["saved_local", "published"],
+      "description": "The lifecycle state the map transitioned to."
+    },
+    "mapId": {
+      "type": ["string", "null"],
+      "description": "The ID or slug of the map, if available."
+    }
+  },
+  "required": ["state"],
+  "additionalProperties": false
+}

@@ -10,6 +10,7 @@ import {
 	interpolateWaypointScale,
 	normalizeMovementWaypoint,
 } from "../utils/MovementWaypointUtils";
+import { editorTelemetry } from "../editor/analytics-editor";
 
 export function setupEditorUI(this: any) {
 	const aerialStatus = document.createElement("div");
@@ -253,6 +254,10 @@ export function useCurrentItem(this: any, isRightClickOrItem: any = false) {
 
 	const consumed = item.use(context);
 
+	if (consumed) {
+		editorTelemetry.trackPlacement(item.type);
+	}
+
 	if (consumed && this.constructionMenu) {
 		this.constructionMenu.refreshLogicList();
 	}
@@ -360,6 +365,9 @@ export function deleteObjectByUuid(this: any, uuid: string) {
 	if (!uuid) return;
 	const obj = this.sceneManager.scene.children.find((c: any) => c.userData && c.userData.uuid === uuid);
 	if (!obj) return;
+	
+	editorTelemetry.trackDeletion(obj.userData.mapObjectType);
+	
 	if (obj.userData.rigidBody) {
 		try { this.world.removeRigidBody(obj.userData.rigidBody); } catch (e) { }
 	}

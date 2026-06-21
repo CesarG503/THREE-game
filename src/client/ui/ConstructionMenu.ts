@@ -12,6 +12,7 @@ import { AdvancedWeaponConfigPanel } from "./AdvancedWeaponConfigPanel";
 import { getActiveFarmingGroups } from "./GameHUD";
 import { JetpackItem } from "../items/JetpackItem";
 import { savePlatformMapForRoom } from "../platform/mapRuntime";
+import { editorTelemetry } from "../editor/analytics-editor";
 import { listAssets, uploadAsset } from "../platform/api";
 import { getDefaultTextureSettings, normalizeTextureSettings } from "../utils/TextureMapping";
 
@@ -1811,6 +1812,7 @@ export class ConstructionMenu {
             try {
                 const mapData = this.game.saveMap();
                 const saved = await savePlatformMapForRoom(this.game.roomId, mapData);
+                editorTelemetry.trackMapState("saved_local", this.game.roomId);
                 this.game.activePlatformMap = saved;
                 platformStatus.style.color = "#86efac";
                 platformStatus.textContent = `Guardado v${saved.version} · ${saved.objectCount} objetos`;

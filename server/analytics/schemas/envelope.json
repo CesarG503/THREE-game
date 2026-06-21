@@ -8,7 +8,7 @@
     },
     "eventType": {
       "type": "string",
-      "enum": ["PageView", "SessionStart", "MatchJoin", "MatchLeave", "SessionHeartbeat", "SessionEnd", "MatchStart", "MatchEnd", "UiImpression", "UiClick", "UiScrollDepth"]
+      "enum": ["PageView", "SessionStart", "MatchJoin", "MatchLeave", "SessionHeartbeat", "SessionEnd", "MatchStart", "MatchEnd", "UiImpression", "UiClick", "UiScrollDepth", "EditorSession", "EditorAction", "MapStateTransition"]
     },
     "userId": {
       "type": ["string", "null"]

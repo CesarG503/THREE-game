@@ -1,0 +1,22 @@
+{
+  "$id": "https://example.com/schemas/editorAction.json",
+  "type": "object",
+  "properties": {
+    "action": {
+      "type": "string",
+      "enum": ["place", "delete"],
+      "description": "The type of action taken by the user."
+    },
+    "objectType": {
+      "type": "string",
+      "description": "The map object type, e.g., 'wall', 'spawn_point', 'ramp'."
+    },
+    "count": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "The amount of objects placed or deleted in the time window."
+    }
+  },
+  "required": ["action", "objectType", "count"],
+  "additionalProperties": false
+}

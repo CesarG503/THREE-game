@@ -1,0 +1,18 @@
+{
+  "$id": "https://example.com/schemas/editorSession.json",
+  "type": "object",
+  "properties": {
+    "action": {
+      "type": "string",
+      "enum": ["open", "close"],
+      "description": "Lifecycle action of the editor session."
+    },
+    "durationSeconds": {
+      "type": "number",
+      "minimum": 0,
+      "description": "The length of the editing session in seconds. Only present on 'close'."
+    }
+  },
+  "required": ["action"],
+  "additionalProperties": false
+}

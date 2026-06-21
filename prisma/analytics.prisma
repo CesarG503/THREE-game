@@ -16,8 +16,10 @@ model User {
   displayName    String?
   createdAt      DateTime
   updatedAt      DateTime
-  events         RawEvent[]
-  playerFeatures PlayerFeatures?
+  events           RawEvent[]
+  playerFeatures   PlayerFeatures?
+  socialAffinity1  SocialAffinity[] @relation("AffinityUser1")
+  socialAffinity2  SocialAffinity[] @relation("AffinityUser2")
 
   @@schema("analytics")
 }
@@ -67,5 +69,21 @@ model MapFeatures {
   bounceRate      Float    @default(0) // fraction 0 to 1
   map             GameMap  @relation(fields: [mapId], references: [id], onDelete: Cascade)
 
+  @@schema("analytics")
+}
+
+model SocialAffinity {
+  id        String   @id @default(cuid())
+  userId1   String
+  userId2   String
+  affinity  Float    @default(0)
+  updatedAt DateTime @updatedAt
+
+  user1     User     @relation("AffinityUser1", fields: [userId1], references: [id], onDelete: Cascade)
+  user2     User     @relation("AffinityUser2", fields: [userId2], references: [id], onDelete: Cascade)
+
+  @@unique([userId1, userId2])
+  @@index([userId1, affinity(sort: Desc)])
+  @@index([userId2, affinity(sort: Desc)])
   @@schema("analytics")
 }

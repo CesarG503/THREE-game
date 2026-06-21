@@ -164,6 +164,14 @@ exports.Prisma.MapFeaturesScalarFieldEnum = {
   bounceRate: 'bounceRate'
 };
 
+exports.Prisma.SocialAffinityScalarFieldEnum = {
+  id: 'id',
+  userId1: 'userId1',
+  userId2: 'userId2',
+  affinity: 'affinity',
+  updatedAt: 'updatedAt'
+};
+
 exports.Prisma.SortOrder = {
   asc: 'asc',
   desc: 'desc'
@@ -195,7 +203,8 @@ exports.Prisma.ModelName = {
   GameMap: 'GameMap',
   RawEvent: 'RawEvent',
   PlayerFeatures: 'PlayerFeatures',
-  MapFeatures: 'MapFeatures'
+  MapFeatures: 'MapFeatures',
+  SocialAffinity: 'SocialAffinity'
 };
 
 /**

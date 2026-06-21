@@ -38,6 +38,11 @@ export type PlayerFeatures = $Result.DefaultSelection<Prisma.$PlayerFeaturesPayl
  * 
  */
 export type MapFeatures = $Result.DefaultSelection<Prisma.$MapFeaturesPayload>
+/**
+ * Model SocialAffinity
+ * 
+ */
+export type SocialAffinity = $Result.DefaultSelection<Prisma.$SocialAffinityPayload>
 
 /**
  * ##  Prisma Client ʲˢ
@@ -209,6 +214,16 @@ export class PrismaClient<
     * ```
     */
   get mapFeatures(): Prisma.MapFeaturesDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.socialAffinity`: Exposes CRUD operations for the **SocialAffinity** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more SocialAffinities
+    * const socialAffinities = await prisma.socialAffinity.findMany()
+    * ```
+    */
+  get socialAffinity(): Prisma.SocialAffinityDelegate<ExtArgs, ClientOptions>;
 }
 
 export namespace Prisma {
@@ -647,7 +662,8 @@ export namespace Prisma {
     GameMap: 'GameMap',
     RawEvent: 'RawEvent',
     PlayerFeatures: 'PlayerFeatures',
-    MapFeatures: 'MapFeatures'
+    MapFeatures: 'MapFeatures',
+    SocialAffinity: 'SocialAffinity'
   };
 
   export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -663,7 +679,7 @@ export namespace Prisma {
       omit: GlobalOmitOptions
     }
     meta: {
-      modelProps: "user" | "gameMap" | "rawEvent" | "playerFeatures" | "mapFeatures"
+      modelProps: "user" | "gameMap" | "rawEvent" | "playerFeatures" | "mapFeatures" | "socialAffinity"
       txIsolationLevel: Prisma.TransactionIsolationLevel
     }
     model: {
@@ -1037,6 +1053,80 @@ export namespace Prisma {
           }
         }
       }
+      SocialAffinity: {
+        payload: Prisma.$SocialAffinityPayload<ExtArgs>
+        fields: Prisma.SocialAffinityFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.SocialAffinityFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SocialAffinityPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.SocialAffinityFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SocialAffinityPayload>
+          }
+          findFirst: {
+            args: Prisma.SocialAffinityFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SocialAffinityPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.SocialAffinityFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SocialAffinityPayload>
+          }
+          findMany: {
+            args: Prisma.SocialAffinityFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SocialAffinityPayload>[]
+          }
+          create: {
+            args: Prisma.SocialAffinityCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SocialAffinityPayload>
+          }
+          createMany: {
+            args: Prisma.SocialAffinityCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.SocialAffinityCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SocialAffinityPayload>[]
+          }
+          delete: {
+            args: Prisma.SocialAffinityDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SocialAffinityPayload>
+          }
+          update: {
+            args: Prisma.SocialAffinityUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SocialAffinityPayload>
+          }
+          deleteMany: {
+            args: Prisma.SocialAffinityDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.SocialAffinityUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.SocialAffinityUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SocialAffinityPayload>[]
+          }
+          upsert: {
+            args: Prisma.SocialAffinityUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SocialAffinityPayload>
+          }
+          aggregate: {
+            args: Prisma.SocialAffinityAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateSocialAffinity>
+          }
+          groupBy: {
+            args: Prisma.SocialAffinityGroupByArgs<ExtArgs>
+            result: $Utils.Optional<SocialAffinityGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.SocialAffinityCountArgs<ExtArgs>
+            result: $Utils.Optional<SocialAffinityCountAggregateOutputType> | number
+          }
+        }
+      }
     }
   } & {
     other: {
@@ -1150,6 +1240,7 @@ export namespace Prisma {
     rawEvent?: RawEventOmit
     playerFeatures?: PlayerFeaturesOmit
     mapFeatures?: MapFeaturesOmit
+    socialAffinity?: SocialAffinityOmit
   }
 
   /* Types for Logging */
@@ -1231,10 +1322,14 @@ export namespace Prisma {
 
   export type UserCountOutputType = {
     events: number
+    socialAffinity1: number
+    socialAffinity2: number
   }
 
   export type UserCountOutputTypeSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     events?: boolean | UserCountOutputTypeCountEventsArgs
+    socialAffinity1?: boolean | UserCountOutputTypeCountSocialAffinity1Args
+    socialAffinity2?: boolean | UserCountOutputTypeCountSocialAffinity2Args
   }
 
   // Custom InputTypes
@@ -1253,6 +1348,20 @@ export namespace Prisma {
    */
   export type UserCountOutputTypeCountEventsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     where?: RawEventWhereInput
+  }
+
+  /**
+   * UserCountOutputType without action
+   */
+  export type UserCountOutputTypeCountSocialAffinity1Args<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: SocialAffinityWhereInput
+  }
+
+  /**
+   * UserCountOutputType without action
+   */
+  export type UserCountOutputTypeCountSocialAffinity2Args<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: SocialAffinityWhereInput
   }
 
 
@@ -1434,6 +1543,8 @@ export namespace Prisma {
     updatedAt?: boolean
     events?: boolean | User$eventsArgs<ExtArgs>
     playerFeatures?: boolean | User$playerFeaturesArgs<ExtArgs>
+    socialAffinity1?: boolean | User$socialAffinity1Args<ExtArgs>
+    socialAffinity2?: boolean | User$socialAffinity2Args<ExtArgs>
     _count?: boolean | UserCountOutputTypeDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["user"]>
 
@@ -1468,6 +1579,8 @@ export namespace Prisma {
   export type UserInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     events?: boolean | User$eventsArgs<ExtArgs>
     playerFeatures?: boolean | User$playerFeaturesArgs<ExtArgs>
+    socialAffinity1?: boolean | User$socialAffinity1Args<ExtArgs>
+    socialAffinity2?: boolean | User$socialAffinity2Args<ExtArgs>
     _count?: boolean | UserCountOutputTypeDefaultArgs<ExtArgs>
   }
   export type UserIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {}
@@ -1478,6 +1591,8 @@ export namespace Prisma {
     objects: {
       events: Prisma.$RawEventPayload<ExtArgs>[]
       playerFeatures: Prisma.$PlayerFeaturesPayload<ExtArgs> | null
+      socialAffinity1: Prisma.$SocialAffinityPayload<ExtArgs>[]
+      socialAffinity2: Prisma.$SocialAffinityPayload<ExtArgs>[]
     }
     scalars: $Extensions.GetPayloadResult<{
       id: string
@@ -1882,6 +1997,8 @@ export namespace Prisma {
     readonly [Symbol.toStringTag]: "PrismaPromise"
     events<T extends User$eventsArgs<ExtArgs> = {}>(args?: Subset<T, User$eventsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$RawEventPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     playerFeatures<T extends User$playerFeaturesArgs<ExtArgs> = {}>(args?: Subset<T, User$playerFeaturesArgs<ExtArgs>>): Prisma__PlayerFeaturesClient<$Result.GetResult<Prisma.$PlayerFeaturesPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+    socialAffinity1<T extends User$socialAffinity1Args<ExtArgs> = {}>(args?: Subset<T, User$socialAffinity1Args<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$SocialAffinityPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    socialAffinity2<T extends User$socialAffinity2Args<ExtArgs> = {}>(args?: Subset<T, User$socialAffinity2Args<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$SocialAffinityPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     /**
      * Attaches callbacks for the resolution and/or rejection of the Promise.
      * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -2350,6 +2467,54 @@ export namespace Prisma {
      */
     include?: PlayerFeaturesInclude<ExtArgs> | null
     where?: PlayerFeaturesWhereInput
+  }
+
+  /**
+   * User.socialAffinity1
+   */
+  export type User$socialAffinity1Args<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SocialAffinity
+     */
+    select?: SocialAffinitySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SocialAffinity
+     */
+    omit?: SocialAffinityOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SocialAffinityInclude<ExtArgs> | null
+    where?: SocialAffinityWhereInput
+    orderBy?: SocialAffinityOrderByWithRelationInput | SocialAffinityOrderByWithRelationInput[]
+    cursor?: SocialAffinityWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: SocialAffinityScalarFieldEnum | SocialAffinityScalarFieldEnum[]
+  }
+
+  /**
+   * User.socialAffinity2
+   */
+  export type User$socialAffinity2Args<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SocialAffinity
+     */
+    select?: SocialAffinitySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SocialAffinity
+     */
+    omit?: SocialAffinityOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SocialAffinityInclude<ExtArgs> | null
+    where?: SocialAffinityWhereInput
+    orderBy?: SocialAffinityOrderByWithRelationInput | SocialAffinityOrderByWithRelationInput[]
+    cursor?: SocialAffinityWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: SocialAffinityScalarFieldEnum | SocialAffinityScalarFieldEnum[]
   }
 
   /**
@@ -6771,6 +6936,1111 @@ export namespace Prisma {
 
 
   /**
+   * Model SocialAffinity
+   */
+
+  export type AggregateSocialAffinity = {
+    _count: SocialAffinityCountAggregateOutputType | null
+    _avg: SocialAffinityAvgAggregateOutputType | null
+    _sum: SocialAffinitySumAggregateOutputType | null
+    _min: SocialAffinityMinAggregateOutputType | null
+    _max: SocialAffinityMaxAggregateOutputType | null
+  }
+
+  export type SocialAffinityAvgAggregateOutputType = {
+    affinity: number | null
+  }
+
+  export type SocialAffinitySumAggregateOutputType = {
+    affinity: number | null
+  }
+
+  export type SocialAffinityMinAggregateOutputType = {
+    id: string | null
+    userId1: string | null
+    userId2: string | null
+    affinity: number | null
+    updatedAt: Date | null
+  }
+
+  export type SocialAffinityMaxAggregateOutputType = {
+    id: string | null
+    userId1: string | null
+    userId2: string | null
+    affinity: number | null
+    updatedAt: Date | null
+  }
+
+  export type SocialAffinityCountAggregateOutputType = {
+    id: number
+    userId1: number
+    userId2: number
+    affinity: number
+    updatedAt: number
+    _all: number
+  }
+
+
+  export type SocialAffinityAvgAggregateInputType = {
+    affinity?: true
+  }
+
+  export type SocialAffinitySumAggregateInputType = {
+    affinity?: true
+  }
+
+  export type SocialAffinityMinAggregateInputType = {
+    id?: true
+    userId1?: true
+    userId2?: true
+    affinity?: true
+    updatedAt?: true
+  }
+
+  export type SocialAffinityMaxAggregateInputType = {
+    id?: true
+    userId1?: true
+    userId2?: true
+    affinity?: true
+    updatedAt?: true
+  }
+
+  export type SocialAffinityCountAggregateInputType = {
+    id?: true
+    userId1?: true
+    userId2?: true
+    affinity?: true
+    updatedAt?: true
+    _all?: true
+  }
+
+  export type SocialAffinityAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which SocialAffinity to aggregate.
+     */
+    where?: SocialAffinityWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of SocialAffinities to fetch.
+     */
+    orderBy?: SocialAffinityOrderByWithRelationInput | SocialAffinityOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: SocialAffinityWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` SocialAffinities from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` SocialAffinities.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned SocialAffinities
+    **/
+    _count?: true | SocialAffinityCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to average
+    **/
+    _avg?: SocialAffinityAvgAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to sum
+    **/
+    _sum?: SocialAffinitySumAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: SocialAffinityMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: SocialAffinityMaxAggregateInputType
+  }
+
+  export type GetSocialAffinityAggregateType<T extends SocialAffinityAggregateArgs> = {
+        [P in keyof T & keyof AggregateSocialAffinity]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateSocialAffinity[P]>
+      : GetScalarType<T[P], AggregateSocialAffinity[P]>
+  }
+
+
+
+
+  export type SocialAffinityGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: SocialAffinityWhereInput
+    orderBy?: SocialAffinityOrderByWithAggregationInput | SocialAffinityOrderByWithAggregationInput[]
+    by: SocialAffinityScalarFieldEnum[] | SocialAffinityScalarFieldEnum
+    having?: SocialAffinityScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: SocialAffinityCountAggregateInputType | true
+    _avg?: SocialAffinityAvgAggregateInputType
+    _sum?: SocialAffinitySumAggregateInputType
+    _min?: SocialAffinityMinAggregateInputType
+    _max?: SocialAffinityMaxAggregateInputType
+  }
+
+  export type SocialAffinityGroupByOutputType = {
+    id: string
+    userId1: string
+    userId2: string
+    affinity: number
+    updatedAt: Date
+    _count: SocialAffinityCountAggregateOutputType | null
+    _avg: SocialAffinityAvgAggregateOutputType | null
+    _sum: SocialAffinitySumAggregateOutputType | null
+    _min: SocialAffinityMinAggregateOutputType | null
+    _max: SocialAffinityMaxAggregateOutputType | null
+  }
+
+  type GetSocialAffinityGroupByPayload<T extends SocialAffinityGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<SocialAffinityGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof SocialAffinityGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], SocialAffinityGroupByOutputType[P]>
+            : GetScalarType<T[P], SocialAffinityGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type SocialAffinitySelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    userId1?: boolean
+    userId2?: boolean
+    affinity?: boolean
+    updatedAt?: boolean
+    user1?: boolean | UserDefaultArgs<ExtArgs>
+    user2?: boolean | UserDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["socialAffinity"]>
+
+  export type SocialAffinitySelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    userId1?: boolean
+    userId2?: boolean
+    affinity?: boolean
+    updatedAt?: boolean
+    user1?: boolean | UserDefaultArgs<ExtArgs>
+    user2?: boolean | UserDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["socialAffinity"]>
+
+  export type SocialAffinitySelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    userId1?: boolean
+    userId2?: boolean
+    affinity?: boolean
+    updatedAt?: boolean
+    user1?: boolean | UserDefaultArgs<ExtArgs>
+    user2?: boolean | UserDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["socialAffinity"]>
+
+  export type SocialAffinitySelectScalar = {
+    id?: boolean
+    userId1?: boolean
+    userId2?: boolean
+    affinity?: boolean
+    updatedAt?: boolean
+  }
+
+  export type SocialAffinityOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "userId1" | "userId2" | "affinity" | "updatedAt", ExtArgs["result"]["socialAffinity"]>
+  export type SocialAffinityInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    user1?: boolean | UserDefaultArgs<ExtArgs>
+    user2?: boolean | UserDefaultArgs<ExtArgs>
+  }
+  export type SocialAffinityIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    user1?: boolean | UserDefaultArgs<ExtArgs>
+    user2?: boolean | UserDefaultArgs<ExtArgs>
+  }
+  export type SocialAffinityIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    user1?: boolean | UserDefaultArgs<ExtArgs>
+    user2?: boolean | UserDefaultArgs<ExtArgs>
+  }
+
+  export type $SocialAffinityPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "SocialAffinity"
+    objects: {
+      user1: Prisma.$UserPayload<ExtArgs>
+      user2: Prisma.$UserPayload<ExtArgs>
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      userId1: string
+      userId2: string
+      affinity: number
+      updatedAt: Date
+    }, ExtArgs["result"]["socialAffinity"]>
+    composites: {}
+  }
+
+  type SocialAffinityGetPayload<S extends boolean | null | undefined | SocialAffinityDefaultArgs> = $Result.GetResult<Prisma.$SocialAffinityPayload, S>
+
+  type SocialAffinityCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<SocialAffinityFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: SocialAffinityCountAggregateInputType | true
+    }
+
+  export interface SocialAffinityDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['SocialAffinity'], meta: { name: 'SocialAffinity' } }
+    /**
+     * Find zero or one SocialAffinity that matches the filter.
+     * @param {SocialAffinityFindUniqueArgs} args - Arguments to find a SocialAffinity
+     * @example
+     * // Get one SocialAffinity
+     * const socialAffinity = await prisma.socialAffinity.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends SocialAffinityFindUniqueArgs>(args: SelectSubset<T, SocialAffinityFindUniqueArgs<ExtArgs>>): Prisma__SocialAffinityClient<$Result.GetResult<Prisma.$SocialAffinityPayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one SocialAffinity that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {SocialAffinityFindUniqueOrThrowArgs} args - Arguments to find a SocialAffinity
+     * @example
+     * // Get one SocialAffinity
+     * const socialAffinity = await prisma.socialAffinity.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends SocialAffinityFindUniqueOrThrowArgs>(args: SelectSubset<T, SocialAffinityFindUniqueOrThrowArgs<ExtArgs>>): Prisma__SocialAffinityClient<$Result.GetResult<Prisma.$SocialAffinityPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first SocialAffinity that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {SocialAffinityFindFirstArgs} args - Arguments to find a SocialAffinity
+     * @example
+     * // Get one SocialAffinity
+     * const socialAffinity = await prisma.socialAffinity.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends SocialAffinityFindFirstArgs>(args?: SelectSubset<T, SocialAffinityFindFirstArgs<ExtArgs>>): Prisma__SocialAffinityClient<$Result.GetResult<Prisma.$SocialAffinityPayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first SocialAffinity that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {SocialAffinityFindFirstOrThrowArgs} args - Arguments to find a SocialAffinity
+     * @example
+     * // Get one SocialAffinity
+     * const socialAffinity = await prisma.socialAffinity.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends SocialAffinityFindFirstOrThrowArgs>(args?: SelectSubset<T, SocialAffinityFindFirstOrThrowArgs<ExtArgs>>): Prisma__SocialAffinityClient<$Result.GetResult<Prisma.$SocialAffinityPayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more SocialAffinities that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {SocialAffinityFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all SocialAffinities
+     * const socialAffinities = await prisma.socialAffinity.findMany()
+     * 
+     * // Get first 10 SocialAffinities
+     * const socialAffinities = await prisma.socialAffinity.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const socialAffinityWithIdOnly = await prisma.socialAffinity.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends SocialAffinityFindManyArgs>(args?: SelectSubset<T, SocialAffinityFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$SocialAffinityPayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a SocialAffinity.
+     * @param {SocialAffinityCreateArgs} args - Arguments to create a SocialAffinity.
+     * @example
+     * // Create one SocialAffinity
+     * const SocialAffinity = await prisma.socialAffinity.create({
+     *   data: {
+     *     // ... data to create a SocialAffinity
+     *   }
+     * })
+     * 
+     */
+    create<T extends SocialAffinityCreateArgs>(args: SelectSubset<T, SocialAffinityCreateArgs<ExtArgs>>): Prisma__SocialAffinityClient<$Result.GetResult<Prisma.$SocialAffinityPayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many SocialAffinities.
+     * @param {SocialAffinityCreateManyArgs} args - Arguments to create many SocialAffinities.
+     * @example
+     * // Create many SocialAffinities
+     * const socialAffinity = await prisma.socialAffinity.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends SocialAffinityCreateManyArgs>(args?: SelectSubset<T, SocialAffinityCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many SocialAffinities and returns the data saved in the database.
+     * @param {SocialAffinityCreateManyAndReturnArgs} args - Arguments to create many SocialAffinities.
+     * @example
+     * // Create many SocialAffinities
+     * const socialAffinity = await prisma.socialAffinity.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many SocialAffinities and only return the `id`
+     * const socialAffinityWithIdOnly = await prisma.socialAffinity.createManyAndReturn({
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends SocialAffinityCreateManyAndReturnArgs>(args?: SelectSubset<T, SocialAffinityCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$SocialAffinityPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a SocialAffinity.
+     * @param {SocialAffinityDeleteArgs} args - Arguments to delete one SocialAffinity.
+     * @example
+     * // Delete one SocialAffinity
+     * const SocialAffinity = await prisma.socialAffinity.delete({
+     *   where: {
+     *     // ... filter to delete one SocialAffinity
+     *   }
+     * })
+     * 
+     */
+    delete<T extends SocialAffinityDeleteArgs>(args: SelectSubset<T, SocialAffinityDeleteArgs<ExtArgs>>): Prisma__SocialAffinityClient<$Result.GetResult<Prisma.$SocialAffinityPayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one SocialAffinity.
+     * @param {SocialAffinityUpdateArgs} args - Arguments to update one SocialAffinity.
+     * @example
+     * // Update one SocialAffinity
+     * const socialAffinity = await prisma.socialAffinity.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends SocialAffinityUpdateArgs>(args: SelectSubset<T, SocialAffinityUpdateArgs<ExtArgs>>): Prisma__SocialAffinityClient<$Result.GetResult<Prisma.$SocialAffinityPayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more SocialAffinities.
+     * @param {SocialAffinityDeleteManyArgs} args - Arguments to filter SocialAffinities to delete.
+     * @example
+     * // Delete a few SocialAffinities
+     * const { count } = await prisma.socialAffinity.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends SocialAffinityDeleteManyArgs>(args?: SelectSubset<T, SocialAffinityDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more SocialAffinities.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {SocialAffinityUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many SocialAffinities
+     * const socialAffinity = await prisma.socialAffinity.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends SocialAffinityUpdateManyArgs>(args: SelectSubset<T, SocialAffinityUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more SocialAffinities and returns the data updated in the database.
+     * @param {SocialAffinityUpdateManyAndReturnArgs} args - Arguments to update many SocialAffinities.
+     * @example
+     * // Update many SocialAffinities
+     * const socialAffinity = await prisma.socialAffinity.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more SocialAffinities and only return the `id`
+     * const socialAffinityWithIdOnly = await prisma.socialAffinity.updateManyAndReturn({
+     *   select: { id: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends SocialAffinityUpdateManyAndReturnArgs>(args: SelectSubset<T, SocialAffinityUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$SocialAffinityPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one SocialAffinity.
+     * @param {SocialAffinityUpsertArgs} args - Arguments to update or create a SocialAffinity.
+     * @example
+     * // Update or create a SocialAffinity
+     * const socialAffinity = await prisma.socialAffinity.upsert({
+     *   create: {
+     *     // ... data to create a SocialAffinity
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the SocialAffinity we want to update
+     *   }
+     * })
+     */
+    upsert<T extends SocialAffinityUpsertArgs>(args: SelectSubset<T, SocialAffinityUpsertArgs<ExtArgs>>): Prisma__SocialAffinityClient<$Result.GetResult<Prisma.$SocialAffinityPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of SocialAffinities.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {SocialAffinityCountArgs} args - Arguments to filter SocialAffinities to count.
+     * @example
+     * // Count the number of SocialAffinities
+     * const count = await prisma.socialAffinity.count({
+     *   where: {
+     *     // ... the filter for the SocialAffinities we want to count
+     *   }
+     * })
+    **/
+    count<T extends SocialAffinityCountArgs>(
+      args?: Subset<T, SocialAffinityCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], SocialAffinityCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a SocialAffinity.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {SocialAffinityAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends SocialAffinityAggregateArgs>(args: Subset<T, SocialAffinityAggregateArgs>): Prisma.PrismaPromise<GetSocialAffinityAggregateType<T>>
+
+    /**
+     * Group by SocialAffinity.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {SocialAffinityGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends SocialAffinityGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: SocialAffinityGroupByArgs['orderBy'] }
+        : { orderBy?: SocialAffinityGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, SocialAffinityGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetSocialAffinityGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the SocialAffinity model
+   */
+  readonly fields: SocialAffinityFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for SocialAffinity.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__SocialAffinityClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    user1<T extends UserDefaultArgs<ExtArgs> = {}>(args?: Subset<T, UserDefaultArgs<ExtArgs>>): Prisma__UserClient<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+    user2<T extends UserDefaultArgs<ExtArgs> = {}>(args?: Subset<T, UserDefaultArgs<ExtArgs>>): Prisma__UserClient<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the SocialAffinity model
+   */
+  interface SocialAffinityFieldRefs {
+    readonly id: FieldRef<"SocialAffinity", 'String'>
+    readonly userId1: FieldRef<"SocialAffinity", 'String'>
+    readonly userId2: FieldRef<"SocialAffinity", 'String'>
+    readonly affinity: FieldRef<"SocialAffinity", 'Float'>
+    readonly updatedAt: FieldRef<"SocialAffinity", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * SocialAffinity findUnique
+   */
+  export type SocialAffinityFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SocialAffinity
+     */
+    select?: SocialAffinitySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SocialAffinity
+     */
+    omit?: SocialAffinityOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SocialAffinityInclude<ExtArgs> | null
+    /**
+     * Filter, which SocialAffinity to fetch.
+     */
+    where: SocialAffinityWhereUniqueInput
+  }
+
+  /**
+   * SocialAffinity findUniqueOrThrow
+   */
+  export type SocialAffinityFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SocialAffinity
+     */
+    select?: SocialAffinitySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SocialAffinity
+     */
+    omit?: SocialAffinityOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SocialAffinityInclude<ExtArgs> | null
+    /**
+     * Filter, which SocialAffinity to fetch.
+     */
+    where: SocialAffinityWhereUniqueInput
+  }
+
+  /**
+   * SocialAffinity findFirst
+   */
+  export type SocialAffinityFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SocialAffinity
+     */
+    select?: SocialAffinitySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SocialAffinity
+     */
+    omit?: SocialAffinityOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SocialAffinityInclude<ExtArgs> | null
+    /**
+     * Filter, which SocialAffinity to fetch.
+     */
+    where?: SocialAffinityWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of SocialAffinities to fetch.
+     */
+    orderBy?: SocialAffinityOrderByWithRelationInput | SocialAffinityOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for SocialAffinities.
+     */
+    cursor?: SocialAffinityWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` SocialAffinities from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` SocialAffinities.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of SocialAffinities.
+     */
+    distinct?: SocialAffinityScalarFieldEnum | SocialAffinityScalarFieldEnum[]
+  }
+
+  /**
+   * SocialAffinity findFirstOrThrow
+   */
+  export type SocialAffinityFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SocialAffinity
+     */
+    select?: SocialAffinitySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SocialAffinity
+     */
+    omit?: SocialAffinityOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SocialAffinityInclude<ExtArgs> | null
+    /**
+     * Filter, which SocialAffinity to fetch.
+     */
+    where?: SocialAffinityWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of SocialAffinities to fetch.
+     */
+    orderBy?: SocialAffinityOrderByWithRelationInput | SocialAffinityOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for SocialAffinities.
+     */
+    cursor?: SocialAffinityWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` SocialAffinities from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` SocialAffinities.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of SocialAffinities.
+     */
+    distinct?: SocialAffinityScalarFieldEnum | SocialAffinityScalarFieldEnum[]
+  }
+
+  /**
+   * SocialAffinity findMany
+   */
+  export type SocialAffinityFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SocialAffinity
+     */
+    select?: SocialAffinitySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SocialAffinity
+     */
+    omit?: SocialAffinityOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SocialAffinityInclude<ExtArgs> | null
+    /**
+     * Filter, which SocialAffinities to fetch.
+     */
+    where?: SocialAffinityWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of SocialAffinities to fetch.
+     */
+    orderBy?: SocialAffinityOrderByWithRelationInput | SocialAffinityOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing SocialAffinities.
+     */
+    cursor?: SocialAffinityWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` SocialAffinities from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` SocialAffinities.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of SocialAffinities.
+     */
+    distinct?: SocialAffinityScalarFieldEnum | SocialAffinityScalarFieldEnum[]
+  }
+
+  /**
+   * SocialAffinity create
+   */
+  export type SocialAffinityCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SocialAffinity
+     */
+    select?: SocialAffinitySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SocialAffinity
+     */
+    omit?: SocialAffinityOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SocialAffinityInclude<ExtArgs> | null
+    /**
+     * The data needed to create a SocialAffinity.
+     */
+    data: XOR<SocialAffinityCreateInput, SocialAffinityUncheckedCreateInput>
+  }
+
+  /**
+   * SocialAffinity createMany
+   */
+  export type SocialAffinityCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many SocialAffinities.
+     */
+    data: SocialAffinityCreateManyInput | SocialAffinityCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * SocialAffinity createManyAndReturn
+   */
+  export type SocialAffinityCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SocialAffinity
+     */
+    select?: SocialAffinitySelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the SocialAffinity
+     */
+    omit?: SocialAffinityOmit<ExtArgs> | null
+    /**
+     * The data used to create many SocialAffinities.
+     */
+    data: SocialAffinityCreateManyInput | SocialAffinityCreateManyInput[]
+    skipDuplicates?: boolean
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SocialAffinityIncludeCreateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * SocialAffinity update
+   */
+  export type SocialAffinityUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SocialAffinity
+     */
+    select?: SocialAffinitySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SocialAffinity
+     */
+    omit?: SocialAffinityOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SocialAffinityInclude<ExtArgs> | null
+    /**
+     * The data needed to update a SocialAffinity.
+     */
+    data: XOR<SocialAffinityUpdateInput, SocialAffinityUncheckedUpdateInput>
+    /**
+     * Choose, which SocialAffinity to update.
+     */
+    where: SocialAffinityWhereUniqueInput
+  }
+
+  /**
+   * SocialAffinity updateMany
+   */
+  export type SocialAffinityUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update SocialAffinities.
+     */
+    data: XOR<SocialAffinityUpdateManyMutationInput, SocialAffinityUncheckedUpdateManyInput>
+    /**
+     * Filter which SocialAffinities to update
+     */
+    where?: SocialAffinityWhereInput
+    /**
+     * Limit how many SocialAffinities to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * SocialAffinity updateManyAndReturn
+   */
+  export type SocialAffinityUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SocialAffinity
+     */
+    select?: SocialAffinitySelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the SocialAffinity
+     */
+    omit?: SocialAffinityOmit<ExtArgs> | null
+    /**
+     * The data used to update SocialAffinities.
+     */
+    data: XOR<SocialAffinityUpdateManyMutationInput, SocialAffinityUncheckedUpdateManyInput>
+    /**
+     * Filter which SocialAffinities to update
+     */
+    where?: SocialAffinityWhereInput
+    /**
+     * Limit how many SocialAffinities to update.
+     */
+    limit?: number
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SocialAffinityIncludeUpdateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * SocialAffinity upsert
+   */
+  export type SocialAffinityUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SocialAffinity
+     */
+    select?: SocialAffinitySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SocialAffinity
+     */
+    omit?: SocialAffinityOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SocialAffinityInclude<ExtArgs> | null
+    /**
+     * The filter to search for the SocialAffinity to update in case it exists.
+     */
+    where: SocialAffinityWhereUniqueInput
+    /**
+     * In case the SocialAffinity found by the `where` argument doesn't exist, create a new SocialAffinity with this data.
+     */
+    create: XOR<SocialAffinityCreateInput, SocialAffinityUncheckedCreateInput>
+    /**
+     * In case the SocialAffinity was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<SocialAffinityUpdateInput, SocialAffinityUncheckedUpdateInput>
+  }
+
+  /**
+   * SocialAffinity delete
+   */
+  export type SocialAffinityDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SocialAffinity
+     */
+    select?: SocialAffinitySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SocialAffinity
+     */
+    omit?: SocialAffinityOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SocialAffinityInclude<ExtArgs> | null
+    /**
+     * Filter which SocialAffinity to delete.
+     */
+    where: SocialAffinityWhereUniqueInput
+  }
+
+  /**
+   * SocialAffinity deleteMany
+   */
+  export type SocialAffinityDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which SocialAffinities to delete
+     */
+    where?: SocialAffinityWhereInput
+    /**
+     * Limit how many SocialAffinities to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * SocialAffinity without action
+   */
+  export type SocialAffinityDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SocialAffinity
+     */
+    select?: SocialAffinitySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SocialAffinity
+     */
+    omit?: SocialAffinityOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SocialAffinityInclude<ExtArgs> | null
+  }
+
+
+  /**
    * Enums
    */
 
@@ -6841,6 +8111,17 @@ export namespace Prisma {
   };
 
   export type MapFeaturesScalarFieldEnum = (typeof MapFeaturesScalarFieldEnum)[keyof typeof MapFeaturesScalarFieldEnum]
+
+
+  export const SocialAffinityScalarFieldEnum: {
+    id: 'id',
+    userId1: 'userId1',
+    userId2: 'userId2',
+    affinity: 'affinity',
+    updatedAt: 'updatedAt'
+  };
+
+  export type SocialAffinityScalarFieldEnum = (typeof SocialAffinityScalarFieldEnum)[keyof typeof SocialAffinityScalarFieldEnum]
 
 
   export const SortOrder: {
@@ -6980,6 +8261,8 @@ export namespace Prisma {
     updatedAt?: DateTimeFilter<"User"> | Date | string
     events?: RawEventListRelationFilter
     playerFeatures?: XOR<PlayerFeaturesNullableScalarRelationFilter, PlayerFeaturesWhereInput> | null
+    socialAffinity1?: SocialAffinityListRelationFilter
+    socialAffinity2?: SocialAffinityListRelationFilter
   }
 
   export type UserOrderByWithRelationInput = {
@@ -6991,6 +8274,8 @@ export namespace Prisma {
     updatedAt?: SortOrder
     events?: RawEventOrderByRelationAggregateInput
     playerFeatures?: PlayerFeaturesOrderByWithRelationInput
+    socialAffinity1?: SocialAffinityOrderByRelationAggregateInput
+    socialAffinity2?: SocialAffinityOrderByRelationAggregateInput
   }
 
   export type UserWhereUniqueInput = Prisma.AtLeast<{
@@ -7005,6 +8290,8 @@ export namespace Prisma {
     updatedAt?: DateTimeFilter<"User"> | Date | string
     events?: RawEventListRelationFilter
     playerFeatures?: XOR<PlayerFeaturesNullableScalarRelationFilter, PlayerFeaturesWhereInput> | null
+    socialAffinity1?: SocialAffinityListRelationFilter
+    socialAffinity2?: SocialAffinityListRelationFilter
   }, "id">
 
   export type UserOrderByWithAggregationInput = {
@@ -7271,6 +8558,67 @@ export namespace Prisma {
     bounceRate?: FloatWithAggregatesFilter<"MapFeatures"> | number
   }
 
+  export type SocialAffinityWhereInput = {
+    AND?: SocialAffinityWhereInput | SocialAffinityWhereInput[]
+    OR?: SocialAffinityWhereInput[]
+    NOT?: SocialAffinityWhereInput | SocialAffinityWhereInput[]
+    id?: StringFilter<"SocialAffinity"> | string
+    userId1?: StringFilter<"SocialAffinity"> | string
+    userId2?: StringFilter<"SocialAffinity"> | string
+    affinity?: FloatFilter<"SocialAffinity"> | number
+    updatedAt?: DateTimeFilter<"SocialAffinity"> | Date | string
+    user1?: XOR<UserScalarRelationFilter, UserWhereInput>
+    user2?: XOR<UserScalarRelationFilter, UserWhereInput>
+  }
+
+  export type SocialAffinityOrderByWithRelationInput = {
+    id?: SortOrder
+    userId1?: SortOrder
+    userId2?: SortOrder
+    affinity?: SortOrder
+    updatedAt?: SortOrder
+    user1?: UserOrderByWithRelationInput
+    user2?: UserOrderByWithRelationInput
+  }
+
+  export type SocialAffinityWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    userId1_userId2?: SocialAffinityUserId1UserId2CompoundUniqueInput
+    AND?: SocialAffinityWhereInput | SocialAffinityWhereInput[]
+    OR?: SocialAffinityWhereInput[]
+    NOT?: SocialAffinityWhereInput | SocialAffinityWhereInput[]
+    userId1?: StringFilter<"SocialAffinity"> | string
+    userId2?: StringFilter<"SocialAffinity"> | string
+    affinity?: FloatFilter<"SocialAffinity"> | number
+    updatedAt?: DateTimeFilter<"SocialAffinity"> | Date | string
+    user1?: XOR<UserScalarRelationFilter, UserWhereInput>
+    user2?: XOR<UserScalarRelationFilter, UserWhereInput>
+  }, "id" | "userId1_userId2">
+
+  export type SocialAffinityOrderByWithAggregationInput = {
+    id?: SortOrder
+    userId1?: SortOrder
+    userId2?: SortOrder
+    affinity?: SortOrder
+    updatedAt?: SortOrder
+    _count?: SocialAffinityCountOrderByAggregateInput
+    _avg?: SocialAffinityAvgOrderByAggregateInput
+    _max?: SocialAffinityMaxOrderByAggregateInput
+    _min?: SocialAffinityMinOrderByAggregateInput
+    _sum?: SocialAffinitySumOrderByAggregateInput
+  }
+
+  export type SocialAffinityScalarWhereWithAggregatesInput = {
+    AND?: SocialAffinityScalarWhereWithAggregatesInput | SocialAffinityScalarWhereWithAggregatesInput[]
+    OR?: SocialAffinityScalarWhereWithAggregatesInput[]
+    NOT?: SocialAffinityScalarWhereWithAggregatesInput | SocialAffinityScalarWhereWithAggregatesInput[]
+    id?: StringWithAggregatesFilter<"SocialAffinity"> | string
+    userId1?: StringWithAggregatesFilter<"SocialAffinity"> | string
+    userId2?: StringWithAggregatesFilter<"SocialAffinity"> | string
+    affinity?: FloatWithAggregatesFilter<"SocialAffinity"> | number
+    updatedAt?: DateTimeWithAggregatesFilter<"SocialAffinity"> | Date | string
+  }
+
   export type UserCreateInput = {
     id: string
     email: string
@@ -7280,6 +8628,8 @@ export namespace Prisma {
     updatedAt: Date | string
     events?: RawEventCreateNestedManyWithoutUserInput
     playerFeatures?: PlayerFeaturesCreateNestedOneWithoutUserInput
+    socialAffinity1?: SocialAffinityCreateNestedManyWithoutUser1Input
+    socialAffinity2?: SocialAffinityCreateNestedManyWithoutUser2Input
   }
 
   export type UserUncheckedCreateInput = {
@@ -7291,6 +8641,8 @@ export namespace Prisma {
     updatedAt: Date | string
     events?: RawEventUncheckedCreateNestedManyWithoutUserInput
     playerFeatures?: PlayerFeaturesUncheckedCreateNestedOneWithoutUserInput
+    socialAffinity1?: SocialAffinityUncheckedCreateNestedManyWithoutUser1Input
+    socialAffinity2?: SocialAffinityUncheckedCreateNestedManyWithoutUser2Input
   }
 
   export type UserUpdateInput = {
@@ -7302,6 +8654,8 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     events?: RawEventUpdateManyWithoutUserNestedInput
     playerFeatures?: PlayerFeaturesUpdateOneWithoutUserNestedInput
+    socialAffinity1?: SocialAffinityUpdateManyWithoutUser1NestedInput
+    socialAffinity2?: SocialAffinityUpdateManyWithoutUser2NestedInput
   }
 
   export type UserUncheckedUpdateInput = {
@@ -7313,6 +8667,8 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     events?: RawEventUncheckedUpdateManyWithoutUserNestedInput
     playerFeatures?: PlayerFeaturesUncheckedUpdateOneWithoutUserNestedInput
+    socialAffinity1?: SocialAffinityUncheckedUpdateManyWithoutUser1NestedInput
+    socialAffinity2?: SocialAffinityUncheckedUpdateManyWithoutUser2NestedInput
   }
 
   export type UserCreateManyInput = {
@@ -7588,6 +8944,60 @@ export namespace Prisma {
     bounceRate?: FloatFieldUpdateOperationsInput | number
   }
 
+  export type SocialAffinityCreateInput = {
+    id?: string
+    affinity?: number
+    updatedAt?: Date | string
+    user1: UserCreateNestedOneWithoutSocialAffinity1Input
+    user2: UserCreateNestedOneWithoutSocialAffinity2Input
+  }
+
+  export type SocialAffinityUncheckedCreateInput = {
+    id?: string
+    userId1: string
+    userId2: string
+    affinity?: number
+    updatedAt?: Date | string
+  }
+
+  export type SocialAffinityUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    affinity?: FloatFieldUpdateOperationsInput | number
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    user1?: UserUpdateOneRequiredWithoutSocialAffinity1NestedInput
+    user2?: UserUpdateOneRequiredWithoutSocialAffinity2NestedInput
+  }
+
+  export type SocialAffinityUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    userId1?: StringFieldUpdateOperationsInput | string
+    userId2?: StringFieldUpdateOperationsInput | string
+    affinity?: FloatFieldUpdateOperationsInput | number
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type SocialAffinityCreateManyInput = {
+    id?: string
+    userId1: string
+    userId2: string
+    affinity?: number
+    updatedAt?: Date | string
+  }
+
+  export type SocialAffinityUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    affinity?: FloatFieldUpdateOperationsInput | number
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type SocialAffinityUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    userId1?: StringFieldUpdateOperationsInput | string
+    userId2?: StringFieldUpdateOperationsInput | string
+    affinity?: FloatFieldUpdateOperationsInput | number
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
   export type StringFilter<$PrismaModel = never> = {
     equals?: string | StringFieldRefInput<$PrismaModel>
     in?: string[] | ListStringFieldRefInput<$PrismaModel>
@@ -7640,12 +9050,22 @@ export namespace Prisma {
     isNot?: PlayerFeaturesWhereInput | null
   }
 
+  export type SocialAffinityListRelationFilter = {
+    every?: SocialAffinityWhereInput
+    some?: SocialAffinityWhereInput
+    none?: SocialAffinityWhereInput
+  }
+
   export type SortOrderInput = {
     sort: SortOrder
     nulls?: NullsOrder
   }
 
   export type RawEventOrderByRelationAggregateInput = {
+    _count?: SortOrder
+  }
+
+  export type SocialAffinityOrderByRelationAggregateInput = {
     _count?: SortOrder
   }
 
@@ -7996,6 +9416,43 @@ export namespace Prisma {
     bounceRate?: SortOrder
   }
 
+  export type SocialAffinityUserId1UserId2CompoundUniqueInput = {
+    userId1: string
+    userId2: string
+  }
+
+  export type SocialAffinityCountOrderByAggregateInput = {
+    id?: SortOrder
+    userId1?: SortOrder
+    userId2?: SortOrder
+    affinity?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type SocialAffinityAvgOrderByAggregateInput = {
+    affinity?: SortOrder
+  }
+
+  export type SocialAffinityMaxOrderByAggregateInput = {
+    id?: SortOrder
+    userId1?: SortOrder
+    userId2?: SortOrder
+    affinity?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type SocialAffinityMinOrderByAggregateInput = {
+    id?: SortOrder
+    userId1?: SortOrder
+    userId2?: SortOrder
+    affinity?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type SocialAffinitySumOrderByAggregateInput = {
+    affinity?: SortOrder
+  }
+
   export type RawEventCreateNestedManyWithoutUserInput = {
     create?: XOR<RawEventCreateWithoutUserInput, RawEventUncheckedCreateWithoutUserInput> | RawEventCreateWithoutUserInput[] | RawEventUncheckedCreateWithoutUserInput[]
     connectOrCreate?: RawEventCreateOrConnectWithoutUserInput | RawEventCreateOrConnectWithoutUserInput[]
@@ -8009,6 +9466,20 @@ export namespace Prisma {
     connect?: PlayerFeaturesWhereUniqueInput
   }
 
+  export type SocialAffinityCreateNestedManyWithoutUser1Input = {
+    create?: XOR<SocialAffinityCreateWithoutUser1Input, SocialAffinityUncheckedCreateWithoutUser1Input> | SocialAffinityCreateWithoutUser1Input[] | SocialAffinityUncheckedCreateWithoutUser1Input[]
+    connectOrCreate?: SocialAffinityCreateOrConnectWithoutUser1Input | SocialAffinityCreateOrConnectWithoutUser1Input[]
+    createMany?: SocialAffinityCreateManyUser1InputEnvelope
+    connect?: SocialAffinityWhereUniqueInput | SocialAffinityWhereUniqueInput[]
+  }
+
+  export type SocialAffinityCreateNestedManyWithoutUser2Input = {
+    create?: XOR<SocialAffinityCreateWithoutUser2Input, SocialAffinityUncheckedCreateWithoutUser2Input> | SocialAffinityCreateWithoutUser2Input[] | SocialAffinityUncheckedCreateWithoutUser2Input[]
+    connectOrCreate?: SocialAffinityCreateOrConnectWithoutUser2Input | SocialAffinityCreateOrConnectWithoutUser2Input[]
+    createMany?: SocialAffinityCreateManyUser2InputEnvelope
+    connect?: SocialAffinityWhereUniqueInput | SocialAffinityWhereUniqueInput[]
+  }
+
   export type RawEventUncheckedCreateNestedManyWithoutUserInput = {
     create?: XOR<RawEventCreateWithoutUserInput, RawEventUncheckedCreateWithoutUserInput> | RawEventCreateWithoutUserInput[] | RawEventUncheckedCreateWithoutUserInput[]
     connectOrCreate?: RawEventCreateOrConnectWithoutUserInput | RawEventCreateOrConnectWithoutUserInput[]
@@ -8020,6 +9491,20 @@ export namespace Prisma {
     create?: XOR<PlayerFeaturesCreateWithoutUserInput, PlayerFeaturesUncheckedCreateWithoutUserInput>
     connectOrCreate?: PlayerFeaturesCreateOrConnectWithoutUserInput
     connect?: PlayerFeaturesWhereUniqueInput
+  }
+
+  export type SocialAffinityUncheckedCreateNestedManyWithoutUser1Input = {
+    create?: XOR<SocialAffinityCreateWithoutUser1Input, SocialAffinityUncheckedCreateWithoutUser1Input> | SocialAffinityCreateWithoutUser1Input[] | SocialAffinityUncheckedCreateWithoutUser1Input[]
+    connectOrCreate?: SocialAffinityCreateOrConnectWithoutUser1Input | SocialAffinityCreateOrConnectWithoutUser1Input[]
+    createMany?: SocialAffinityCreateManyUser1InputEnvelope
+    connect?: SocialAffinityWhereUniqueInput | SocialAffinityWhereUniqueInput[]
+  }
+
+  export type SocialAffinityUncheckedCreateNestedManyWithoutUser2Input = {
+    create?: XOR<SocialAffinityCreateWithoutUser2Input, SocialAffinityUncheckedCreateWithoutUser2Input> | SocialAffinityCreateWithoutUser2Input[] | SocialAffinityUncheckedCreateWithoutUser2Input[]
+    connectOrCreate?: SocialAffinityCreateOrConnectWithoutUser2Input | SocialAffinityCreateOrConnectWithoutUser2Input[]
+    createMany?: SocialAffinityCreateManyUser2InputEnvelope
+    connect?: SocialAffinityWhereUniqueInput | SocialAffinityWhereUniqueInput[]
   }
 
   export type StringFieldUpdateOperationsInput = {
@@ -8058,6 +9543,34 @@ export namespace Prisma {
     update?: XOR<XOR<PlayerFeaturesUpdateToOneWithWhereWithoutUserInput, PlayerFeaturesUpdateWithoutUserInput>, PlayerFeaturesUncheckedUpdateWithoutUserInput>
   }
 
+  export type SocialAffinityUpdateManyWithoutUser1NestedInput = {
+    create?: XOR<SocialAffinityCreateWithoutUser1Input, SocialAffinityUncheckedCreateWithoutUser1Input> | SocialAffinityCreateWithoutUser1Input[] | SocialAffinityUncheckedCreateWithoutUser1Input[]
+    connectOrCreate?: SocialAffinityCreateOrConnectWithoutUser1Input | SocialAffinityCreateOrConnectWithoutUser1Input[]
+    upsert?: SocialAffinityUpsertWithWhereUniqueWithoutUser1Input | SocialAffinityUpsertWithWhereUniqueWithoutUser1Input[]
+    createMany?: SocialAffinityCreateManyUser1InputEnvelope
+    set?: SocialAffinityWhereUniqueInput | SocialAffinityWhereUniqueInput[]
+    disconnect?: SocialAffinityWhereUniqueInput | SocialAffinityWhereUniqueInput[]
+    delete?: SocialAffinityWhereUniqueInput | SocialAffinityWhereUniqueInput[]
+    connect?: SocialAffinityWhereUniqueInput | SocialAffinityWhereUniqueInput[]
+    update?: SocialAffinityUpdateWithWhereUniqueWithoutUser1Input | SocialAffinityUpdateWithWhereUniqueWithoutUser1Input[]
+    updateMany?: SocialAffinityUpdateManyWithWhereWithoutUser1Input | SocialAffinityUpdateManyWithWhereWithoutUser1Input[]
+    deleteMany?: SocialAffinityScalarWhereInput | SocialAffinityScalarWhereInput[]
+  }
+
+  export type SocialAffinityUpdateManyWithoutUser2NestedInput = {
+    create?: XOR<SocialAffinityCreateWithoutUser2Input, SocialAffinityUncheckedCreateWithoutUser2Input> | SocialAffinityCreateWithoutUser2Input[] | SocialAffinityUncheckedCreateWithoutUser2Input[]
+    connectOrCreate?: SocialAffinityCreateOrConnectWithoutUser2Input | SocialAffinityCreateOrConnectWithoutUser2Input[]
+    upsert?: SocialAffinityUpsertWithWhereUniqueWithoutUser2Input | SocialAffinityUpsertWithWhereUniqueWithoutUser2Input[]
+    createMany?: SocialAffinityCreateManyUser2InputEnvelope
+    set?: SocialAffinityWhereUniqueInput | SocialAffinityWhereUniqueInput[]
+    disconnect?: SocialAffinityWhereUniqueInput | SocialAffinityWhereUniqueInput[]
+    delete?: SocialAffinityWhereUniqueInput | SocialAffinityWhereUniqueInput[]
+    connect?: SocialAffinityWhereUniqueInput | SocialAffinityWhereUniqueInput[]
+    update?: SocialAffinityUpdateWithWhereUniqueWithoutUser2Input | SocialAffinityUpdateWithWhereUniqueWithoutUser2Input[]
+    updateMany?: SocialAffinityUpdateManyWithWhereWithoutUser2Input | SocialAffinityUpdateManyWithWhereWithoutUser2Input[]
+    deleteMany?: SocialAffinityScalarWhereInput | SocialAffinityScalarWhereInput[]
+  }
+
   export type RawEventUncheckedUpdateManyWithoutUserNestedInput = {
     create?: XOR<RawEventCreateWithoutUserInput, RawEventUncheckedCreateWithoutUserInput> | RawEventCreateWithoutUserInput[] | RawEventUncheckedCreateWithoutUserInput[]
     connectOrCreate?: RawEventCreateOrConnectWithoutUserInput | RawEventCreateOrConnectWithoutUserInput[]
@@ -8080,6 +9593,34 @@ export namespace Prisma {
     delete?: PlayerFeaturesWhereInput | boolean
     connect?: PlayerFeaturesWhereUniqueInput
     update?: XOR<XOR<PlayerFeaturesUpdateToOneWithWhereWithoutUserInput, PlayerFeaturesUpdateWithoutUserInput>, PlayerFeaturesUncheckedUpdateWithoutUserInput>
+  }
+
+  export type SocialAffinityUncheckedUpdateManyWithoutUser1NestedInput = {
+    create?: XOR<SocialAffinityCreateWithoutUser1Input, SocialAffinityUncheckedCreateWithoutUser1Input> | SocialAffinityCreateWithoutUser1Input[] | SocialAffinityUncheckedCreateWithoutUser1Input[]
+    connectOrCreate?: SocialAffinityCreateOrConnectWithoutUser1Input | SocialAffinityCreateOrConnectWithoutUser1Input[]
+    upsert?: SocialAffinityUpsertWithWhereUniqueWithoutUser1Input | SocialAffinityUpsertWithWhereUniqueWithoutUser1Input[]
+    createMany?: SocialAffinityCreateManyUser1InputEnvelope
+    set?: SocialAffinityWhereUniqueInput | SocialAffinityWhereUniqueInput[]
+    disconnect?: SocialAffinityWhereUniqueInput | SocialAffinityWhereUniqueInput[]
+    delete?: SocialAffinityWhereUniqueInput | SocialAffinityWhereUniqueInput[]
+    connect?: SocialAffinityWhereUniqueInput | SocialAffinityWhereUniqueInput[]
+    update?: SocialAffinityUpdateWithWhereUniqueWithoutUser1Input | SocialAffinityUpdateWithWhereUniqueWithoutUser1Input[]
+    updateMany?: SocialAffinityUpdateManyWithWhereWithoutUser1Input | SocialAffinityUpdateManyWithWhereWithoutUser1Input[]
+    deleteMany?: SocialAffinityScalarWhereInput | SocialAffinityScalarWhereInput[]
+  }
+
+  export type SocialAffinityUncheckedUpdateManyWithoutUser2NestedInput = {
+    create?: XOR<SocialAffinityCreateWithoutUser2Input, SocialAffinityUncheckedCreateWithoutUser2Input> | SocialAffinityCreateWithoutUser2Input[] | SocialAffinityUncheckedCreateWithoutUser2Input[]
+    connectOrCreate?: SocialAffinityCreateOrConnectWithoutUser2Input | SocialAffinityCreateOrConnectWithoutUser2Input[]
+    upsert?: SocialAffinityUpsertWithWhereUniqueWithoutUser2Input | SocialAffinityUpsertWithWhereUniqueWithoutUser2Input[]
+    createMany?: SocialAffinityCreateManyUser2InputEnvelope
+    set?: SocialAffinityWhereUniqueInput | SocialAffinityWhereUniqueInput[]
+    disconnect?: SocialAffinityWhereUniqueInput | SocialAffinityWhereUniqueInput[]
+    delete?: SocialAffinityWhereUniqueInput | SocialAffinityWhereUniqueInput[]
+    connect?: SocialAffinityWhereUniqueInput | SocialAffinityWhereUniqueInput[]
+    update?: SocialAffinityUpdateWithWhereUniqueWithoutUser2Input | SocialAffinityUpdateWithWhereUniqueWithoutUser2Input[]
+    updateMany?: SocialAffinityUpdateManyWithWhereWithoutUser2Input | SocialAffinityUpdateManyWithWhereWithoutUser2Input[]
+    deleteMany?: SocialAffinityScalarWhereInput | SocialAffinityScalarWhereInput[]
   }
 
   export type MapFeaturesCreateNestedOneWithoutMapInput = {
@@ -8176,6 +9717,34 @@ export namespace Prisma {
     upsert?: GameMapUpsertWithoutMapFeaturesInput
     connect?: GameMapWhereUniqueInput
     update?: XOR<XOR<GameMapUpdateToOneWithWhereWithoutMapFeaturesInput, GameMapUpdateWithoutMapFeaturesInput>, GameMapUncheckedUpdateWithoutMapFeaturesInput>
+  }
+
+  export type UserCreateNestedOneWithoutSocialAffinity1Input = {
+    create?: XOR<UserCreateWithoutSocialAffinity1Input, UserUncheckedCreateWithoutSocialAffinity1Input>
+    connectOrCreate?: UserCreateOrConnectWithoutSocialAffinity1Input
+    connect?: UserWhereUniqueInput
+  }
+
+  export type UserCreateNestedOneWithoutSocialAffinity2Input = {
+    create?: XOR<UserCreateWithoutSocialAffinity2Input, UserUncheckedCreateWithoutSocialAffinity2Input>
+    connectOrCreate?: UserCreateOrConnectWithoutSocialAffinity2Input
+    connect?: UserWhereUniqueInput
+  }
+
+  export type UserUpdateOneRequiredWithoutSocialAffinity1NestedInput = {
+    create?: XOR<UserCreateWithoutSocialAffinity1Input, UserUncheckedCreateWithoutSocialAffinity1Input>
+    connectOrCreate?: UserCreateOrConnectWithoutSocialAffinity1Input
+    upsert?: UserUpsertWithoutSocialAffinity1Input
+    connect?: UserWhereUniqueInput
+    update?: XOR<XOR<UserUpdateToOneWithWhereWithoutSocialAffinity1Input, UserUpdateWithoutSocialAffinity1Input>, UserUncheckedUpdateWithoutSocialAffinity1Input>
+  }
+
+  export type UserUpdateOneRequiredWithoutSocialAffinity2NestedInput = {
+    create?: XOR<UserCreateWithoutSocialAffinity2Input, UserUncheckedCreateWithoutSocialAffinity2Input>
+    connectOrCreate?: UserCreateOrConnectWithoutSocialAffinity2Input
+    upsert?: UserUpsertWithoutSocialAffinity2Input
+    connect?: UserWhereUniqueInput
+    update?: XOR<XOR<UserUpdateToOneWithWhereWithoutSocialAffinity2Input, UserUpdateWithoutSocialAffinity2Input>, UserUncheckedUpdateWithoutSocialAffinity2Input>
   }
 
   export type NestedStringFilter<$PrismaModel = never> = {
@@ -8409,6 +9978,54 @@ export namespace Prisma {
     create: XOR<PlayerFeaturesCreateWithoutUserInput, PlayerFeaturesUncheckedCreateWithoutUserInput>
   }
 
+  export type SocialAffinityCreateWithoutUser1Input = {
+    id?: string
+    affinity?: number
+    updatedAt?: Date | string
+    user2: UserCreateNestedOneWithoutSocialAffinity2Input
+  }
+
+  export type SocialAffinityUncheckedCreateWithoutUser1Input = {
+    id?: string
+    userId2: string
+    affinity?: number
+    updatedAt?: Date | string
+  }
+
+  export type SocialAffinityCreateOrConnectWithoutUser1Input = {
+    where: SocialAffinityWhereUniqueInput
+    create: XOR<SocialAffinityCreateWithoutUser1Input, SocialAffinityUncheckedCreateWithoutUser1Input>
+  }
+
+  export type SocialAffinityCreateManyUser1InputEnvelope = {
+    data: SocialAffinityCreateManyUser1Input | SocialAffinityCreateManyUser1Input[]
+    skipDuplicates?: boolean
+  }
+
+  export type SocialAffinityCreateWithoutUser2Input = {
+    id?: string
+    affinity?: number
+    updatedAt?: Date | string
+    user1: UserCreateNestedOneWithoutSocialAffinity1Input
+  }
+
+  export type SocialAffinityUncheckedCreateWithoutUser2Input = {
+    id?: string
+    userId1: string
+    affinity?: number
+    updatedAt?: Date | string
+  }
+
+  export type SocialAffinityCreateOrConnectWithoutUser2Input = {
+    where: SocialAffinityWhereUniqueInput
+    create: XOR<SocialAffinityCreateWithoutUser2Input, SocialAffinityUncheckedCreateWithoutUser2Input>
+  }
+
+  export type SocialAffinityCreateManyUser2InputEnvelope = {
+    data: SocialAffinityCreateManyUser2Input | SocialAffinityCreateManyUser2Input[]
+    skipDuplicates?: boolean
+  }
+
   export type RawEventUpsertWithWhereUniqueWithoutUserInput = {
     where: RawEventWhereUniqueInput
     update: XOR<RawEventUpdateWithoutUserInput, RawEventUncheckedUpdateWithoutUserInput>
@@ -8459,6 +10076,49 @@ export namespace Prisma {
     totalPlayTime?: FloatFieldUpdateOperationsInput | number
     matchesPlayed?: IntFieldUpdateOperationsInput | number
     preferredLanguage?: StringFieldUpdateOperationsInput | string
+  }
+
+  export type SocialAffinityUpsertWithWhereUniqueWithoutUser1Input = {
+    where: SocialAffinityWhereUniqueInput
+    update: XOR<SocialAffinityUpdateWithoutUser1Input, SocialAffinityUncheckedUpdateWithoutUser1Input>
+    create: XOR<SocialAffinityCreateWithoutUser1Input, SocialAffinityUncheckedCreateWithoutUser1Input>
+  }
+
+  export type SocialAffinityUpdateWithWhereUniqueWithoutUser1Input = {
+    where: SocialAffinityWhereUniqueInput
+    data: XOR<SocialAffinityUpdateWithoutUser1Input, SocialAffinityUncheckedUpdateWithoutUser1Input>
+  }
+
+  export type SocialAffinityUpdateManyWithWhereWithoutUser1Input = {
+    where: SocialAffinityScalarWhereInput
+    data: XOR<SocialAffinityUpdateManyMutationInput, SocialAffinityUncheckedUpdateManyWithoutUser1Input>
+  }
+
+  export type SocialAffinityScalarWhereInput = {
+    AND?: SocialAffinityScalarWhereInput | SocialAffinityScalarWhereInput[]
+    OR?: SocialAffinityScalarWhereInput[]
+    NOT?: SocialAffinityScalarWhereInput | SocialAffinityScalarWhereInput[]
+    id?: StringFilter<"SocialAffinity"> | string
+    userId1?: StringFilter<"SocialAffinity"> | string
+    userId2?: StringFilter<"SocialAffinity"> | string
+    affinity?: FloatFilter<"SocialAffinity"> | number
+    updatedAt?: DateTimeFilter<"SocialAffinity"> | Date | string
+  }
+
+  export type SocialAffinityUpsertWithWhereUniqueWithoutUser2Input = {
+    where: SocialAffinityWhereUniqueInput
+    update: XOR<SocialAffinityUpdateWithoutUser2Input, SocialAffinityUncheckedUpdateWithoutUser2Input>
+    create: XOR<SocialAffinityCreateWithoutUser2Input, SocialAffinityUncheckedCreateWithoutUser2Input>
+  }
+
+  export type SocialAffinityUpdateWithWhereUniqueWithoutUser2Input = {
+    where: SocialAffinityWhereUniqueInput
+    data: XOR<SocialAffinityUpdateWithoutUser2Input, SocialAffinityUncheckedUpdateWithoutUser2Input>
+  }
+
+  export type SocialAffinityUpdateManyWithWhereWithoutUser2Input = {
+    where: SocialAffinityScalarWhereInput
+    data: XOR<SocialAffinityUpdateManyMutationInput, SocialAffinityUncheckedUpdateManyWithoutUser2Input>
   }
 
   export type MapFeaturesCreateWithoutMapInput = {
@@ -8517,6 +10177,8 @@ export namespace Prisma {
     createdAt: Date | string
     updatedAt: Date | string
     playerFeatures?: PlayerFeaturesCreateNestedOneWithoutUserInput
+    socialAffinity1?: SocialAffinityCreateNestedManyWithoutUser1Input
+    socialAffinity2?: SocialAffinityCreateNestedManyWithoutUser2Input
   }
 
   export type UserUncheckedCreateWithoutEventsInput = {
@@ -8527,6 +10189,8 @@ export namespace Prisma {
     createdAt: Date | string
     updatedAt: Date | string
     playerFeatures?: PlayerFeaturesUncheckedCreateNestedOneWithoutUserInput
+    socialAffinity1?: SocialAffinityUncheckedCreateNestedManyWithoutUser1Input
+    socialAffinity2?: SocialAffinityUncheckedCreateNestedManyWithoutUser2Input
   }
 
   export type UserCreateOrConnectWithoutEventsInput = {
@@ -8553,6 +10217,8 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     playerFeatures?: PlayerFeaturesUpdateOneWithoutUserNestedInput
+    socialAffinity1?: SocialAffinityUpdateManyWithoutUser1NestedInput
+    socialAffinity2?: SocialAffinityUpdateManyWithoutUser2NestedInput
   }
 
   export type UserUncheckedUpdateWithoutEventsInput = {
@@ -8563,6 +10229,8 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     playerFeatures?: PlayerFeaturesUncheckedUpdateOneWithoutUserNestedInput
+    socialAffinity1?: SocialAffinityUncheckedUpdateManyWithoutUser1NestedInput
+    socialAffinity2?: SocialAffinityUncheckedUpdateManyWithoutUser2NestedInput
   }
 
   export type UserCreateWithoutPlayerFeaturesInput = {
@@ -8573,6 +10241,8 @@ export namespace Prisma {
     createdAt: Date | string
     updatedAt: Date | string
     events?: RawEventCreateNestedManyWithoutUserInput
+    socialAffinity1?: SocialAffinityCreateNestedManyWithoutUser1Input
+    socialAffinity2?: SocialAffinityCreateNestedManyWithoutUser2Input
   }
 
   export type UserUncheckedCreateWithoutPlayerFeaturesInput = {
@@ -8583,6 +10253,8 @@ export namespace Prisma {
     createdAt: Date | string
     updatedAt: Date | string
     events?: RawEventUncheckedCreateNestedManyWithoutUserInput
+    socialAffinity1?: SocialAffinityUncheckedCreateNestedManyWithoutUser1Input
+    socialAffinity2?: SocialAffinityUncheckedCreateNestedManyWithoutUser2Input
   }
 
   export type UserCreateOrConnectWithoutPlayerFeaturesInput = {
@@ -8609,6 +10281,8 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     events?: RawEventUpdateManyWithoutUserNestedInput
+    socialAffinity1?: SocialAffinityUpdateManyWithoutUser1NestedInput
+    socialAffinity2?: SocialAffinityUpdateManyWithoutUser2NestedInput
   }
 
   export type UserUncheckedUpdateWithoutPlayerFeaturesInput = {
@@ -8619,6 +10293,8 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     events?: RawEventUncheckedUpdateManyWithoutUserNestedInput
+    socialAffinity1?: SocialAffinityUncheckedUpdateManyWithoutUser1NestedInput
+    socialAffinity2?: SocialAffinityUncheckedUpdateManyWithoutUser2NestedInput
   }
 
   export type GameMapCreateWithoutMapFeaturesInput = {
@@ -8677,11 +10353,153 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
+  export type UserCreateWithoutSocialAffinity1Input = {
+    id: string
+    email: string
+    username: string
+    displayName?: string | null
+    createdAt: Date | string
+    updatedAt: Date | string
+    events?: RawEventCreateNestedManyWithoutUserInput
+    playerFeatures?: PlayerFeaturesCreateNestedOneWithoutUserInput
+    socialAffinity2?: SocialAffinityCreateNestedManyWithoutUser2Input
+  }
+
+  export type UserUncheckedCreateWithoutSocialAffinity1Input = {
+    id: string
+    email: string
+    username: string
+    displayName?: string | null
+    createdAt: Date | string
+    updatedAt: Date | string
+    events?: RawEventUncheckedCreateNestedManyWithoutUserInput
+    playerFeatures?: PlayerFeaturesUncheckedCreateNestedOneWithoutUserInput
+    socialAffinity2?: SocialAffinityUncheckedCreateNestedManyWithoutUser2Input
+  }
+
+  export type UserCreateOrConnectWithoutSocialAffinity1Input = {
+    where: UserWhereUniqueInput
+    create: XOR<UserCreateWithoutSocialAffinity1Input, UserUncheckedCreateWithoutSocialAffinity1Input>
+  }
+
+  export type UserCreateWithoutSocialAffinity2Input = {
+    id: string
+    email: string
+    username: string
+    displayName?: string | null
+    createdAt: Date | string
+    updatedAt: Date | string
+    events?: RawEventCreateNestedManyWithoutUserInput
+    playerFeatures?: PlayerFeaturesCreateNestedOneWithoutUserInput
+    socialAffinity1?: SocialAffinityCreateNestedManyWithoutUser1Input
+  }
+
+  export type UserUncheckedCreateWithoutSocialAffinity2Input = {
+    id: string
+    email: string
+    username: string
+    displayName?: string | null
+    createdAt: Date | string
+    updatedAt: Date | string
+    events?: RawEventUncheckedCreateNestedManyWithoutUserInput
+    playerFeatures?: PlayerFeaturesUncheckedCreateNestedOneWithoutUserInput
+    socialAffinity1?: SocialAffinityUncheckedCreateNestedManyWithoutUser1Input
+  }
+
+  export type UserCreateOrConnectWithoutSocialAffinity2Input = {
+    where: UserWhereUniqueInput
+    create: XOR<UserCreateWithoutSocialAffinity2Input, UserUncheckedCreateWithoutSocialAffinity2Input>
+  }
+
+  export type UserUpsertWithoutSocialAffinity1Input = {
+    update: XOR<UserUpdateWithoutSocialAffinity1Input, UserUncheckedUpdateWithoutSocialAffinity1Input>
+    create: XOR<UserCreateWithoutSocialAffinity1Input, UserUncheckedCreateWithoutSocialAffinity1Input>
+    where?: UserWhereInput
+  }
+
+  export type UserUpdateToOneWithWhereWithoutSocialAffinity1Input = {
+    where?: UserWhereInput
+    data: XOR<UserUpdateWithoutSocialAffinity1Input, UserUncheckedUpdateWithoutSocialAffinity1Input>
+  }
+
+  export type UserUpdateWithoutSocialAffinity1Input = {
+    id?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    username?: StringFieldUpdateOperationsInput | string
+    displayName?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    events?: RawEventUpdateManyWithoutUserNestedInput
+    playerFeatures?: PlayerFeaturesUpdateOneWithoutUserNestedInput
+    socialAffinity2?: SocialAffinityUpdateManyWithoutUser2NestedInput
+  }
+
+  export type UserUncheckedUpdateWithoutSocialAffinity1Input = {
+    id?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    username?: StringFieldUpdateOperationsInput | string
+    displayName?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    events?: RawEventUncheckedUpdateManyWithoutUserNestedInput
+    playerFeatures?: PlayerFeaturesUncheckedUpdateOneWithoutUserNestedInput
+    socialAffinity2?: SocialAffinityUncheckedUpdateManyWithoutUser2NestedInput
+  }
+
+  export type UserUpsertWithoutSocialAffinity2Input = {
+    update: XOR<UserUpdateWithoutSocialAffinity2Input, UserUncheckedUpdateWithoutSocialAffinity2Input>
+    create: XOR<UserCreateWithoutSocialAffinity2Input, UserUncheckedCreateWithoutSocialAffinity2Input>
+    where?: UserWhereInput
+  }
+
+  export type UserUpdateToOneWithWhereWithoutSocialAffinity2Input = {
+    where?: UserWhereInput
+    data: XOR<UserUpdateWithoutSocialAffinity2Input, UserUncheckedUpdateWithoutSocialAffinity2Input>
+  }
+
+  export type UserUpdateWithoutSocialAffinity2Input = {
+    id?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    username?: StringFieldUpdateOperationsInput | string
+    displayName?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    events?: RawEventUpdateManyWithoutUserNestedInput
+    playerFeatures?: PlayerFeaturesUpdateOneWithoutUserNestedInput
+    socialAffinity1?: SocialAffinityUpdateManyWithoutUser1NestedInput
+  }
+
+  export type UserUncheckedUpdateWithoutSocialAffinity2Input = {
+    id?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    username?: StringFieldUpdateOperationsInput | string
+    displayName?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    events?: RawEventUncheckedUpdateManyWithoutUserNestedInput
+    playerFeatures?: PlayerFeaturesUncheckedUpdateOneWithoutUserNestedInput
+    socialAffinity1?: SocialAffinityUncheckedUpdateManyWithoutUser1NestedInput
+  }
+
   export type RawEventCreateManyUserInput = {
     id?: string
     eventType: string
     timestamp?: Date | string
     payload: JsonNullValueInput | InputJsonValue
+  }
+
+  export type SocialAffinityCreateManyUser1Input = {
+    id?: string
+    userId2: string
+    affinity?: number
+    updatedAt?: Date | string
+  }
+
+  export type SocialAffinityCreateManyUser2Input = {
+    id?: string
+    userId1: string
+    affinity?: number
+    updatedAt?: Date | string
   }
 
   export type RawEventUpdateWithoutUserInput = {
@@ -8703,6 +10521,48 @@ export namespace Prisma {
     eventType?: StringFieldUpdateOperationsInput | string
     timestamp?: DateTimeFieldUpdateOperationsInput | Date | string
     payload?: JsonNullValueInput | InputJsonValue
+  }
+
+  export type SocialAffinityUpdateWithoutUser1Input = {
+    id?: StringFieldUpdateOperationsInput | string
+    affinity?: FloatFieldUpdateOperationsInput | number
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    user2?: UserUpdateOneRequiredWithoutSocialAffinity2NestedInput
+  }
+
+  export type SocialAffinityUncheckedUpdateWithoutUser1Input = {
+    id?: StringFieldUpdateOperationsInput | string
+    userId2?: StringFieldUpdateOperationsInput | string
+    affinity?: FloatFieldUpdateOperationsInput | number
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type SocialAffinityUncheckedUpdateManyWithoutUser1Input = {
+    id?: StringFieldUpdateOperationsInput | string
+    userId2?: StringFieldUpdateOperationsInput | string
+    affinity?: FloatFieldUpdateOperationsInput | number
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type SocialAffinityUpdateWithoutUser2Input = {
+    id?: StringFieldUpdateOperationsInput | string
+    affinity?: FloatFieldUpdateOperationsInput | number
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    user1?: UserUpdateOneRequiredWithoutSocialAffinity1NestedInput
+  }
+
+  export type SocialAffinityUncheckedUpdateWithoutUser2Input = {
+    id?: StringFieldUpdateOperationsInput | string
+    userId1?: StringFieldUpdateOperationsInput | string
+    affinity?: FloatFieldUpdateOperationsInput | number
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type SocialAffinityUncheckedUpdateManyWithoutUser2Input = {
+    id?: StringFieldUpdateOperationsInput | string
+    userId1?: StringFieldUpdateOperationsInput | string
+    affinity?: FloatFieldUpdateOperationsInput | number
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
 

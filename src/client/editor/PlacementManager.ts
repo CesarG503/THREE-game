@@ -714,6 +714,23 @@ export class PlacementManager {
         return size;
     }
 
+    getRotationAngle(rotationIndex) {
+        if (rotationIndex === 1) return -Math.PI / 2;
+        if (rotationIndex === 2) return -Math.PI;
+        if (rotationIndex === 3) return Math.PI / 2;
+        return 0;
+    }
+
+    getSurfaceAlignedQuaternion(normal, rotationIndex = 0) {
+        const safeNormal = normal.clone().normalize();
+        if (safeNormal.lengthSq() < 0.0001) safeNormal.set(0, 1, 0);
+
+        const quaternion = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), safeNormal);
+        const twist = new THREE.Quaternion().setFromAxisAngle(safeNormal, this.getRotationAngle(rotationIndex));
+        quaternion.premultiply(twist);
+        return quaternion;
+    }
+
     rebuildStairsGhost(item) {
         // Prevent rebuilding if same item scale
         const key = `${item.scale.x}_${item.scale.y}_${item.scale.z}`;
@@ -1071,14 +1088,13 @@ export class PlacementManager {
                 const isAerialHit = (hit.object === this.aerialCollider);
                 const isMapObject = hit.object.userData && hit.object.userData.isMapObject;
 
-                if ((item.type === "interaction_button" || item.type === "target") && hit.face) {
+                if ((item.type === "interaction_button" || item.type === "target" || item.type === "gravity_pad") && hit.face) {
                     // --- BUTTON/TARGET SURFACE LOGIC (GRID) ---
                     // Size is already set above
 
                     // Align to Normal
                     const normal = hit.face.normal.clone().transformDirection(hit.object.matrixWorld).normalize();
-                    const quaternion = new THREE.Quaternion();
-                    quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), normal);
+                    const quaternion = this.getSurfaceAlignedQuaternion(normal, rotationIndex);
 
                     this.lastValidQuaternion = quaternion.clone();
                     this.placementGhost.quaternion.copy(quaternion);
@@ -1158,12 +1174,11 @@ export class PlacementManager {
                 } else {
                     // --- GROUND / GLOBAL LOGIC (STATIC MAP & FALLBACK) ---
 
-                    // Special Handling for Buttons and Targets on Static Geometry (Walls/Floors)
-                    if ((item.type === "interaction_button" || item.type === "target") && hit.face) {
+                    // Special Handling for Buttons, Targets and Gravity Pads on Static Geometry (Walls/Floors)
+                    if ((item.type === "interaction_button" || item.type === "target" || item.type === "gravity_pad") && hit.face) {
                         // Align to Normal
                         const normal = hit.face.normal.clone().transformDirection(hit.object.matrixWorld).normalize();
-                        const quaternion = new THREE.Quaternion();
-                        quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), normal);
+                        const quaternion = this.getSurfaceAlignedQuaternion(normal, rotationIndex);
 
                         this.lastValidQuaternion = quaternion.clone();
                         this.placementGhost.quaternion.copy(quaternion);
@@ -1224,8 +1239,8 @@ export class PlacementManager {
             } else {
                 // --- FREE PLACEMENT & SURFACE ALIGNMENT ---
 
-                // Special case: Interaction Buttons and Targets Align to Surface Normal
-                if ((item.type === "interaction_button" || item.type === "target") && hit.face) {
+                // Special case: Interaction Buttons, Targets and Gravity Pads align to the hit surface normal.
+                if ((item.type === "interaction_button" || item.type === "target" || item.type === "gravity_pad") && hit.face) {
                     // Custom Size override for free placement too for buttons
                     if (item.type === "interaction_button") {
                         realSize = new THREE.Vector3(0.6, 0.1, 0.6);
@@ -1233,8 +1248,7 @@ export class PlacementManager {
                     const normal = hit.face.normal.clone().transformDirection(hit.object.matrixWorld).normalize();
 
                     // Align Y up to Normal
-                    const quaternion = new THREE.Quaternion();
-                    quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), normal);
+                    const quaternion = this.getSurfaceAlignedQuaternion(normal, rotationIndex);
 
                     // Apply to ghost
                     this.placementGhost.quaternion.copy(quaternion);
@@ -1256,7 +1270,7 @@ export class PlacementManager {
                 // We still want the object to sit ON the surface, not sink into it.
                 // Move center away from hit point by half extent along normal.
                 if (hit.face) {
-                    if (item.type !== "interaction_button" && item.type !== "target") {
+                    if (item.type !== "interaction_button" && item.type !== "target" && item.type !== "gravity_pad") {
                         // Generic surface offset logic
                         const normal = hit.face.normal.clone().transformDirection(hit.object.matrixWorld).normalize();
                         const yOffset = realSize.y / 2;
@@ -1420,7 +1434,17 @@ export class PlacementManager {
             let isValid = true;
 
             // Validation uses Center
-            if (this.checkCollision(targetPos, realSize)) {
+            let collisionPosition = targetPos;
+            let collisionSize = realSize;
+            if (this.lastValidQuaternion) {
+                const ghostBox = new THREE.Box3().setFromObject(this.placementGhost);
+                collisionPosition = new THREE.Vector3();
+                collisionSize = new THREE.Vector3();
+                ghostBox.getCenter(collisionPosition);
+                ghostBox.getSize(collisionSize);
+            }
+
+            if (this.checkCollision(collisionPosition, collisionSize)) {
                 isValid = false;
             }
 

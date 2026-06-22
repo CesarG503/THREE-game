@@ -151,9 +151,13 @@ function updateMapGravityPads(game: any) {
 
 		const orientation = normalizeGravityOrientation(props.gravityOrientation);
 		const duration = Math.max(0, Number(props.transitionDuration ?? 0.8));
+		const padUp = new THREE.Vector3(0, 1, 0).applyQuaternion(pad.quaternion).normalize();
+		const surfaceSide = localPos.y >= 0 ? 1 : -1;
+		const contactNormal = padUp.clone().multiplyScalar(surfaceSide);
+		const contactPoint = pad.position.clone().addScaledVector(contactNormal, dims.y / 2);
 
 		if (typeof game.character.setGravityOrientation === "function") {
-			game.character.setGravityOrientation(orientation, { duration });
+			game.character.setGravityOrientation(orientation, { duration, contactNormal, contactPoint });
 		}
 
 		state.wasInZone = true;
@@ -363,7 +367,8 @@ export function animate(this: any) {
 				isSuperman: this.character.isSuperman !== undefined ? this.character.isSuperman : (this.character.polygonModelSkin ? this.character.polygonModelSkin.isSuperman : false),
 				noPitchTilt: this.character.noPitchTilt !== undefined ? this.character.noPitchTilt : false,
 				isUsingJetpack: this.character.isUsingJetpack !== undefined ? this.character.isUsingJetpack : false,
-				gravityOrientation: this.character.getGravityOrientation ? this.character.getGravityOrientation() : "down"
+				gravityOrientation: this.character.getGravityOrientation ? this.character.getGravityOrientation() : "down",
+				gravityTransitionDuration: this.character.gravityTransitionDuration ?? 0.65
 			};
 
 			this.networkManager.localRoleId = playerState.roleId;

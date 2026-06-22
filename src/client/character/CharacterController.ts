@@ -313,7 +313,7 @@ export class CharacterController {
     };
   }
 
-  setGravityOrientation(orientation: any, options: { duration?: number; instant?: boolean } = {}) {
+  setGravityOrientation(orientation: any, options: { duration?: number; instant?: boolean; contactNormal?: THREE.Vector3; contactPoint?: THREE.Vector3 } = {}) {
     const nextOrientation = normalizeGravityOrientation(orientation);
     const nextQuaternion = getGravityQuaternion(nextOrientation);
     const duration = Math.max(0, Number(options.duration ?? 0.65));
@@ -325,7 +325,7 @@ export class CharacterController {
 
     this.targetGravityOrientation = nextOrientation;
     this.targetGravityQuaternion.copy(nextQuaternion);
-    this.captureGravityContactAnchor(duration);
+    this.captureGravityContactAnchor(duration, options.contactNormal, options.contactPoint);
 
     if (options.instant || duration <= 0) {
       this.gravityOrientation = nextOrientation;
@@ -352,9 +352,9 @@ export class CharacterController {
     return center.dot(normal) - this.capsuleHalfHeight * Math.abs(axis.dot(normal)) - this.capsuleRadius;
   }
 
-  captureGravityContactAnchor(duration: number) {
+  captureGravityContactAnchor(duration: number, contactNormal?: THREE.Vector3, contactPoint?: THREE.Vector3) {
     const isGrounded = this.characterController ? this.characterController.computedGrounded() : this.grounded;
-    if (!this.rigidBody || !isGrounded || this.noClip || this.isFlying) {
+    if (!this.rigidBody || this.noClip || this.isFlying || (!contactNormal && !isGrounded)) {
       this.gravityContactAnchorPoint = null;
       this.gravityContactAnchorNormal = null;
       this.gravityContactPreserveTime = 0;
@@ -362,10 +362,16 @@ export class CharacterController {
     }
 
     const position = this.getPosition();
-    const normal = this.getGravityUpVector();
+    const normal = contactNormal ? contactNormal.clone().normalize() : this.getGravityUpVector();
+    if (normal.lengthSq() < 0.0001) {
+      this.gravityContactAnchorPoint = null;
+      this.gravityContactAnchorNormal = null;
+      this.gravityContactPreserveTime = 0;
+      return;
+    }
     const supportOffset = this.getCapsuleSupportOffsetAlong(normal, this.currentGravityQuaternion);
 
-    this.gravityContactAnchorPoint = position.clone().addScaledVector(normal, supportOffset);
+    this.gravityContactAnchorPoint = contactPoint ? contactPoint.clone() : position.clone().addScaledVector(normal, supportOffset);
     this.gravityContactAnchorNormal = normal;
     this.gravityContactPreserveTime = Math.max(0.12, duration + 0.12);
   }

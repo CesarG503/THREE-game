@@ -210,7 +210,8 @@ export class RemotePlayer {
         this.state = state;
 
         if (state.gravityOrientation !== undefined) {
-            this.setGravityOrientation(state.gravityOrientation);
+            const gravityDuration = Number(state.gravityTransitionDuration ?? 0.65);
+            this.setGravityOrientation(state.gravityOrientation, Number.isFinite(gravityDuration) ? gravityDuration : 0.65);
         }
 
         if (state.modelType && state.modelType !== this.currentType) {
@@ -290,7 +291,7 @@ export class RemotePlayer {
 
     setGravityOrientation(orientation: any, duration = 0.65) {
         const nextOrientation = normalizeGravityOrientation(orientation);
-        if (nextOrientation === this.targetGravityOrientation && !this.gravityTransitionActive) return;
+        if (nextOrientation === this.targetGravityOrientation) return;
 
         this.targetGravityOrientation = nextOrientation;
         this.targetGravityQuaternion.copy(getGravityQuaternion(nextOrientation));

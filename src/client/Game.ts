@@ -637,7 +637,7 @@ export class Game {
 					return;
 				}
 
-				if (this.objectInspector && e.button === 2) {
+				const selectEditableObjectFromPointer = () => {
 					const mouse = new THREE.Vector2();
 					if (document.pointerLockElement) {
 						mouse.x = 0;
@@ -661,19 +661,32 @@ export class Game {
 						return false;
 					});
 
-					if (hit) {
-						let target = hit.object;
-						while (target && (!target.userData || !target.userData.isEditableMapObject)) {
-							target = target.parent;
-						}
+					if (!hit) return null;
 
+					let target = hit.object;
+					while (target && (!target.userData || !target.userData.isEditableMapObject)) {
+						target = target.parent;
+					}
+					return target || null;
+				};
+
+					if (this.objectInspector && e.button === 2) {
+						const target = selectEditableObjectFromPointer();
 						if (target) {
 							this.objectInspector.show(target);
 						}
+					} else if (this.objectInspector && e.button === 0) {
+						const currentItem = this.inventoryManager ? this.inventoryManager.getCurrentItem() : null;
+						const isLogicMapEdit = !!this.constructionMenu?.logicSystem?.isEditingMap;
+						if (!currentItem && !isLogicMapEdit) {
+							const target = selectEditableObjectFromPointer();
+							if (target) {
+								this.objectInspector.show(target);
+							}
+						}
 					}
 				}
-			}
-		}, false);
+			}, false);
 
 		document.addEventListener("contextmenu", (e) => e.preventDefault(), false);
 

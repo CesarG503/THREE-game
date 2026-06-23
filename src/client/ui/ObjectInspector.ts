@@ -623,6 +623,7 @@ export class ObjectInspector {
             object.userData.mapObjectType === 'interaction_button' ||
             object.userData.mapObjectType === 'impulse_jump' ||
             object.userData.mapObjectType === 'impulse_lateral' ||
+            object.userData.mapObjectType === 'gravity_pad' ||
             object.userData.mapObjectType === 'farming_zone'
         )
 

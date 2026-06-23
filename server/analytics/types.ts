@@ -73,6 +73,8 @@ export interface UiClickPayload {
   elementId: string;
   elementType: string;
   action: string;
+  catalogPosition?: number;
+  mapId?: string;
 }
 
 export interface UiScrollDepthPayload {

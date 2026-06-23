@@ -4,7 +4,9 @@
   "properties": {
     "elementId": { "type": "string" },
     "elementType": { "type": "string" },
-    "action": { "type": "string" }
+    "action": { "type": "string" },
+    "catalogPosition": { "type": "number" },
+    "mapId": { "type": "string" }
   },
   "required": ["elementId", "elementType", "action"],
   "additionalProperties": false

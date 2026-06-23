@@ -152,7 +152,10 @@ exports.Prisma.PlayerFeaturesScalarFieldEnum = {
   lastActive: 'lastActive',
   totalPlayTime: 'totalPlayTime',
   matchesPlayed: 'matchesPlayed',
-  preferredLanguage: 'preferredLanguage'
+  preferredLanguage: 'preferredLanguage',
+  explorerRatio: 'explorerRatio',
+  playerProfile: 'playerProfile',
+  popularitySensitivity: 'popularitySensitivity'
 };
 
 exports.Prisma.MapFeaturesScalarFieldEnum = {

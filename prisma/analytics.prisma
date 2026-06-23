@@ -50,12 +50,15 @@ model RawEvent {
 }
 
 model PlayerFeatures {
-  userId            String   @id
-  lastActive        DateTime
-  totalPlayTime     Float    @default(0) // in seconds
-  matchesPlayed     Int      @default(0)
-  preferredLanguage String   @default("en")
-  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId                String   @id
+  lastActive            DateTime
+  totalPlayTime         Float    @default(0) // in seconds
+  matchesPlayed         Int      @default(0)
+  preferredLanguage     String   @default("en")
+  explorerRatio         Float?
+  playerProfile         String?
+  popularitySensitivity Float?
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@schema("analytics")
 }

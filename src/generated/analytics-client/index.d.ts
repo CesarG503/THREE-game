@@ -4723,11 +4723,15 @@ export namespace Prisma {
   export type PlayerFeaturesAvgAggregateOutputType = {
     totalPlayTime: number | null
     matchesPlayed: number | null
+    explorerRatio: number | null
+    popularitySensitivity: number | null
   }
 
   export type PlayerFeaturesSumAggregateOutputType = {
     totalPlayTime: number | null
     matchesPlayed: number | null
+    explorerRatio: number | null
+    popularitySensitivity: number | null
   }
 
   export type PlayerFeaturesMinAggregateOutputType = {
@@ -4736,6 +4740,9 @@ export namespace Prisma {
     totalPlayTime: number | null
     matchesPlayed: number | null
     preferredLanguage: string | null
+    explorerRatio: number | null
+    playerProfile: string | null
+    popularitySensitivity: number | null
   }
 
   export type PlayerFeaturesMaxAggregateOutputType = {
@@ -4744,6 +4751,9 @@ export namespace Prisma {
     totalPlayTime: number | null
     matchesPlayed: number | null
     preferredLanguage: string | null
+    explorerRatio: number | null
+    playerProfile: string | null
+    popularitySensitivity: number | null
   }
 
   export type PlayerFeaturesCountAggregateOutputType = {
@@ -4752,6 +4762,9 @@ export namespace Prisma {
     totalPlayTime: number
     matchesPlayed: number
     preferredLanguage: number
+    explorerRatio: number
+    playerProfile: number
+    popularitySensitivity: number
     _all: number
   }
 
@@ -4759,11 +4772,15 @@ export namespace Prisma {
   export type PlayerFeaturesAvgAggregateInputType = {
     totalPlayTime?: true
     matchesPlayed?: true
+    explorerRatio?: true
+    popularitySensitivity?: true
   }
 
   export type PlayerFeaturesSumAggregateInputType = {
     totalPlayTime?: true
     matchesPlayed?: true
+    explorerRatio?: true
+    popularitySensitivity?: true
   }
 
   export type PlayerFeaturesMinAggregateInputType = {
@@ -4772,6 +4789,9 @@ export namespace Prisma {
     totalPlayTime?: true
     matchesPlayed?: true
     preferredLanguage?: true
+    explorerRatio?: true
+    playerProfile?: true
+    popularitySensitivity?: true
   }
 
   export type PlayerFeaturesMaxAggregateInputType = {
@@ -4780,6 +4800,9 @@ export namespace Prisma {
     totalPlayTime?: true
     matchesPlayed?: true
     preferredLanguage?: true
+    explorerRatio?: true
+    playerProfile?: true
+    popularitySensitivity?: true
   }
 
   export type PlayerFeaturesCountAggregateInputType = {
@@ -4788,6 +4811,9 @@ export namespace Prisma {
     totalPlayTime?: true
     matchesPlayed?: true
     preferredLanguage?: true
+    explorerRatio?: true
+    playerProfile?: true
+    popularitySensitivity?: true
     _all?: true
   }
 
@@ -4883,6 +4909,9 @@ export namespace Prisma {
     totalPlayTime: number
     matchesPlayed: number
     preferredLanguage: string
+    explorerRatio: number | null
+    playerProfile: string | null
+    popularitySensitivity: number | null
     _count: PlayerFeaturesCountAggregateOutputType | null
     _avg: PlayerFeaturesAvgAggregateOutputType | null
     _sum: PlayerFeaturesSumAggregateOutputType | null
@@ -4910,6 +4939,9 @@ export namespace Prisma {
     totalPlayTime?: boolean
     matchesPlayed?: boolean
     preferredLanguage?: boolean
+    explorerRatio?: boolean
+    playerProfile?: boolean
+    popularitySensitivity?: boolean
     user?: boolean | UserDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["playerFeatures"]>
 
@@ -4919,6 +4951,9 @@ export namespace Prisma {
     totalPlayTime?: boolean
     matchesPlayed?: boolean
     preferredLanguage?: boolean
+    explorerRatio?: boolean
+    playerProfile?: boolean
+    popularitySensitivity?: boolean
     user?: boolean | UserDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["playerFeatures"]>
 
@@ -4928,6 +4963,9 @@ export namespace Prisma {
     totalPlayTime?: boolean
     matchesPlayed?: boolean
     preferredLanguage?: boolean
+    explorerRatio?: boolean
+    playerProfile?: boolean
+    popularitySensitivity?: boolean
     user?: boolean | UserDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["playerFeatures"]>
 
@@ -4937,9 +4975,12 @@ export namespace Prisma {
     totalPlayTime?: boolean
     matchesPlayed?: boolean
     preferredLanguage?: boolean
+    explorerRatio?: boolean
+    playerProfile?: boolean
+    popularitySensitivity?: boolean
   }
 
-  export type PlayerFeaturesOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"userId" | "lastActive" | "totalPlayTime" | "matchesPlayed" | "preferredLanguage", ExtArgs["result"]["playerFeatures"]>
+  export type PlayerFeaturesOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"userId" | "lastActive" | "totalPlayTime" | "matchesPlayed" | "preferredLanguage" | "explorerRatio" | "playerProfile" | "popularitySensitivity", ExtArgs["result"]["playerFeatures"]>
   export type PlayerFeaturesInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     user?: boolean | UserDefaultArgs<ExtArgs>
   }
@@ -4961,6 +5002,9 @@ export namespace Prisma {
       totalPlayTime: number
       matchesPlayed: number
       preferredLanguage: string
+      explorerRatio: number | null
+      playerProfile: string | null
+      popularitySensitivity: number | null
     }, ExtArgs["result"]["playerFeatures"]>
     composites: {}
   }
@@ -5390,6 +5434,9 @@ export namespace Prisma {
     readonly totalPlayTime: FieldRef<"PlayerFeatures", 'Float'>
     readonly matchesPlayed: FieldRef<"PlayerFeatures", 'Int'>
     readonly preferredLanguage: FieldRef<"PlayerFeatures", 'String'>
+    readonly explorerRatio: FieldRef<"PlayerFeatures", 'Float'>
+    readonly playerProfile: FieldRef<"PlayerFeatures", 'String'>
+    readonly popularitySensitivity: FieldRef<"PlayerFeatures", 'Float'>
   }
     
 
@@ -8095,7 +8142,10 @@ export namespace Prisma {
     lastActive: 'lastActive',
     totalPlayTime: 'totalPlayTime',
     matchesPlayed: 'matchesPlayed',
-    preferredLanguage: 'preferredLanguage'
+    preferredLanguage: 'preferredLanguage',
+    explorerRatio: 'explorerRatio',
+    playerProfile: 'playerProfile',
+    popularitySensitivity: 'popularitySensitivity'
   };
 
   export type PlayerFeaturesScalarFieldEnum = (typeof PlayerFeaturesScalarFieldEnum)[keyof typeof PlayerFeaturesScalarFieldEnum]
@@ -8448,6 +8498,9 @@ export namespace Prisma {
     totalPlayTime?: FloatFilter<"PlayerFeatures"> | number
     matchesPlayed?: IntFilter<"PlayerFeatures"> | number
     preferredLanguage?: StringFilter<"PlayerFeatures"> | string
+    explorerRatio?: FloatNullableFilter<"PlayerFeatures"> | number | null
+    playerProfile?: StringNullableFilter<"PlayerFeatures"> | string | null
+    popularitySensitivity?: FloatNullableFilter<"PlayerFeatures"> | number | null
     user?: XOR<UserScalarRelationFilter, UserWhereInput>
   }
 
@@ -8457,6 +8510,9 @@ export namespace Prisma {
     totalPlayTime?: SortOrder
     matchesPlayed?: SortOrder
     preferredLanguage?: SortOrder
+    explorerRatio?: SortOrderInput | SortOrder
+    playerProfile?: SortOrderInput | SortOrder
+    popularitySensitivity?: SortOrderInput | SortOrder
     user?: UserOrderByWithRelationInput
   }
 
@@ -8469,6 +8525,9 @@ export namespace Prisma {
     totalPlayTime?: FloatFilter<"PlayerFeatures"> | number
     matchesPlayed?: IntFilter<"PlayerFeatures"> | number
     preferredLanguage?: StringFilter<"PlayerFeatures"> | string
+    explorerRatio?: FloatNullableFilter<"PlayerFeatures"> | number | null
+    playerProfile?: StringNullableFilter<"PlayerFeatures"> | string | null
+    popularitySensitivity?: FloatNullableFilter<"PlayerFeatures"> | number | null
     user?: XOR<UserScalarRelationFilter, UserWhereInput>
   }, "userId">
 
@@ -8478,6 +8537,9 @@ export namespace Prisma {
     totalPlayTime?: SortOrder
     matchesPlayed?: SortOrder
     preferredLanguage?: SortOrder
+    explorerRatio?: SortOrderInput | SortOrder
+    playerProfile?: SortOrderInput | SortOrder
+    popularitySensitivity?: SortOrderInput | SortOrder
     _count?: PlayerFeaturesCountOrderByAggregateInput
     _avg?: PlayerFeaturesAvgOrderByAggregateInput
     _max?: PlayerFeaturesMaxOrderByAggregateInput
@@ -8494,6 +8556,9 @@ export namespace Prisma {
     totalPlayTime?: FloatWithAggregatesFilter<"PlayerFeatures"> | number
     matchesPlayed?: IntWithAggregatesFilter<"PlayerFeatures"> | number
     preferredLanguage?: StringWithAggregatesFilter<"PlayerFeatures"> | string
+    explorerRatio?: FloatNullableWithAggregatesFilter<"PlayerFeatures"> | number | null
+    playerProfile?: StringNullableWithAggregatesFilter<"PlayerFeatures"> | string | null
+    popularitySensitivity?: FloatNullableWithAggregatesFilter<"PlayerFeatures"> | number | null
   }
 
   export type MapFeaturesWhereInput = {
@@ -8832,6 +8897,9 @@ export namespace Prisma {
     totalPlayTime?: number
     matchesPlayed?: number
     preferredLanguage?: string
+    explorerRatio?: number | null
+    playerProfile?: string | null
+    popularitySensitivity?: number | null
     user: UserCreateNestedOneWithoutPlayerFeaturesInput
   }
 
@@ -8841,6 +8909,9 @@ export namespace Prisma {
     totalPlayTime?: number
     matchesPlayed?: number
     preferredLanguage?: string
+    explorerRatio?: number | null
+    playerProfile?: string | null
+    popularitySensitivity?: number | null
   }
 
   export type PlayerFeaturesUpdateInput = {
@@ -8848,6 +8919,9 @@ export namespace Prisma {
     totalPlayTime?: FloatFieldUpdateOperationsInput | number
     matchesPlayed?: IntFieldUpdateOperationsInput | number
     preferredLanguage?: StringFieldUpdateOperationsInput | string
+    explorerRatio?: NullableFloatFieldUpdateOperationsInput | number | null
+    playerProfile?: NullableStringFieldUpdateOperationsInput | string | null
+    popularitySensitivity?: NullableFloatFieldUpdateOperationsInput | number | null
     user?: UserUpdateOneRequiredWithoutPlayerFeaturesNestedInput
   }
 
@@ -8857,6 +8931,9 @@ export namespace Prisma {
     totalPlayTime?: FloatFieldUpdateOperationsInput | number
     matchesPlayed?: IntFieldUpdateOperationsInput | number
     preferredLanguage?: StringFieldUpdateOperationsInput | string
+    explorerRatio?: NullableFloatFieldUpdateOperationsInput | number | null
+    playerProfile?: NullableStringFieldUpdateOperationsInput | string | null
+    popularitySensitivity?: NullableFloatFieldUpdateOperationsInput | number | null
   }
 
   export type PlayerFeaturesCreateManyInput = {
@@ -8865,6 +8942,9 @@ export namespace Prisma {
     totalPlayTime?: number
     matchesPlayed?: number
     preferredLanguage?: string
+    explorerRatio?: number | null
+    playerProfile?: string | null
+    popularitySensitivity?: number | null
   }
 
   export type PlayerFeaturesUpdateManyMutationInput = {
@@ -8872,6 +8952,9 @@ export namespace Prisma {
     totalPlayTime?: FloatFieldUpdateOperationsInput | number
     matchesPlayed?: IntFieldUpdateOperationsInput | number
     preferredLanguage?: StringFieldUpdateOperationsInput | string
+    explorerRatio?: NullableFloatFieldUpdateOperationsInput | number | null
+    playerProfile?: NullableStringFieldUpdateOperationsInput | string | null
+    popularitySensitivity?: NullableFloatFieldUpdateOperationsInput | number | null
   }
 
   export type PlayerFeaturesUncheckedUpdateManyInput = {
@@ -8880,6 +8963,9 @@ export namespace Prisma {
     totalPlayTime?: FloatFieldUpdateOperationsInput | number
     matchesPlayed?: IntFieldUpdateOperationsInput | number
     preferredLanguage?: StringFieldUpdateOperationsInput | string
+    explorerRatio?: NullableFloatFieldUpdateOperationsInput | number | null
+    playerProfile?: NullableStringFieldUpdateOperationsInput | string | null
+    popularitySensitivity?: NullableFloatFieldUpdateOperationsInput | number | null
   }
 
   export type MapFeaturesCreateInput = {
@@ -9297,6 +9383,17 @@ export namespace Prisma {
     not?: NestedIntFilter<$PrismaModel> | number
   }
 
+  export type FloatNullableFilter<$PrismaModel = never> = {
+    equals?: number | FloatFieldRefInput<$PrismaModel> | null
+    in?: number[] | ListFloatFieldRefInput<$PrismaModel> | null
+    notIn?: number[] | ListFloatFieldRefInput<$PrismaModel> | null
+    lt?: number | FloatFieldRefInput<$PrismaModel>
+    lte?: number | FloatFieldRefInput<$PrismaModel>
+    gt?: number | FloatFieldRefInput<$PrismaModel>
+    gte?: number | FloatFieldRefInput<$PrismaModel>
+    not?: NestedFloatNullableFilter<$PrismaModel> | number | null
+  }
+
   export type UserScalarRelationFilter = {
     is?: UserWhereInput
     isNot?: UserWhereInput
@@ -9308,11 +9405,16 @@ export namespace Prisma {
     totalPlayTime?: SortOrder
     matchesPlayed?: SortOrder
     preferredLanguage?: SortOrder
+    explorerRatio?: SortOrder
+    playerProfile?: SortOrder
+    popularitySensitivity?: SortOrder
   }
 
   export type PlayerFeaturesAvgOrderByAggregateInput = {
     totalPlayTime?: SortOrder
     matchesPlayed?: SortOrder
+    explorerRatio?: SortOrder
+    popularitySensitivity?: SortOrder
   }
 
   export type PlayerFeaturesMaxOrderByAggregateInput = {
@@ -9321,6 +9423,9 @@ export namespace Prisma {
     totalPlayTime?: SortOrder
     matchesPlayed?: SortOrder
     preferredLanguage?: SortOrder
+    explorerRatio?: SortOrder
+    playerProfile?: SortOrder
+    popularitySensitivity?: SortOrder
   }
 
   export type PlayerFeaturesMinOrderByAggregateInput = {
@@ -9329,11 +9434,16 @@ export namespace Prisma {
     totalPlayTime?: SortOrder
     matchesPlayed?: SortOrder
     preferredLanguage?: SortOrder
+    explorerRatio?: SortOrder
+    playerProfile?: SortOrder
+    popularitySensitivity?: SortOrder
   }
 
   export type PlayerFeaturesSumOrderByAggregateInput = {
     totalPlayTime?: SortOrder
     matchesPlayed?: SortOrder
+    explorerRatio?: SortOrder
+    popularitySensitivity?: SortOrder
   }
 
   export type FloatWithAggregatesFilter<$PrismaModel = never> = {
@@ -9366,6 +9476,22 @@ export namespace Prisma {
     _sum?: NestedIntFilter<$PrismaModel>
     _min?: NestedIntFilter<$PrismaModel>
     _max?: NestedIntFilter<$PrismaModel>
+  }
+
+  export type FloatNullableWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: number | FloatFieldRefInput<$PrismaModel> | null
+    in?: number[] | ListFloatFieldRefInput<$PrismaModel> | null
+    notIn?: number[] | ListFloatFieldRefInput<$PrismaModel> | null
+    lt?: number | FloatFieldRefInput<$PrismaModel>
+    lte?: number | FloatFieldRefInput<$PrismaModel>
+    gt?: number | FloatFieldRefInput<$PrismaModel>
+    gte?: number | FloatFieldRefInput<$PrismaModel>
+    not?: NestedFloatNullableWithAggregatesFilter<$PrismaModel> | number | null
+    _count?: NestedIntNullableFilter<$PrismaModel>
+    _avg?: NestedFloatNullableFilter<$PrismaModel>
+    _sum?: NestedFloatNullableFilter<$PrismaModel>
+    _min?: NestedFloatNullableFilter<$PrismaModel>
+    _max?: NestedFloatNullableFilter<$PrismaModel>
   }
 
   export type GameMapScalarRelationFilter = {
@@ -9697,6 +9823,14 @@ export namespace Prisma {
     divide?: number
   }
 
+  export type NullableFloatFieldUpdateOperationsInput = {
+    set?: number | null
+    increment?: number
+    decrement?: number
+    multiply?: number
+    divide?: number
+  }
+
   export type UserUpdateOneRequiredWithoutPlayerFeaturesNestedInput = {
     create?: XOR<UserCreateWithoutPlayerFeaturesInput, UserUncheckedCreateWithoutPlayerFeaturesInput>
     connectOrCreate?: UserCreateOrConnectWithoutPlayerFeaturesInput
@@ -9903,6 +10037,17 @@ export namespace Prisma {
     not?: NestedFloatFilter<$PrismaModel> | number
   }
 
+  export type NestedFloatNullableFilter<$PrismaModel = never> = {
+    equals?: number | FloatFieldRefInput<$PrismaModel> | null
+    in?: number[] | ListFloatFieldRefInput<$PrismaModel> | null
+    notIn?: number[] | ListFloatFieldRefInput<$PrismaModel> | null
+    lt?: number | FloatFieldRefInput<$PrismaModel>
+    lte?: number | FloatFieldRefInput<$PrismaModel>
+    gt?: number | FloatFieldRefInput<$PrismaModel>
+    gte?: number | FloatFieldRefInput<$PrismaModel>
+    not?: NestedFloatNullableFilter<$PrismaModel> | number | null
+  }
+
   export type NestedFloatWithAggregatesFilter<$PrismaModel = never> = {
     equals?: number | FloatFieldRefInput<$PrismaModel>
     in?: number[] | ListFloatFieldRefInput<$PrismaModel>
@@ -9935,6 +10080,22 @@ export namespace Prisma {
     _max?: NestedIntFilter<$PrismaModel>
   }
 
+  export type NestedFloatNullableWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: number | FloatFieldRefInput<$PrismaModel> | null
+    in?: number[] | ListFloatFieldRefInput<$PrismaModel> | null
+    notIn?: number[] | ListFloatFieldRefInput<$PrismaModel> | null
+    lt?: number | FloatFieldRefInput<$PrismaModel>
+    lte?: number | FloatFieldRefInput<$PrismaModel>
+    gt?: number | FloatFieldRefInput<$PrismaModel>
+    gte?: number | FloatFieldRefInput<$PrismaModel>
+    not?: NestedFloatNullableWithAggregatesFilter<$PrismaModel> | number | null
+    _count?: NestedIntNullableFilter<$PrismaModel>
+    _avg?: NestedFloatNullableFilter<$PrismaModel>
+    _sum?: NestedFloatNullableFilter<$PrismaModel>
+    _min?: NestedFloatNullableFilter<$PrismaModel>
+    _max?: NestedFloatNullableFilter<$PrismaModel>
+  }
+
   export type RawEventCreateWithoutUserInput = {
     id?: string
     eventType: string
@@ -9964,6 +10125,9 @@ export namespace Prisma {
     totalPlayTime?: number
     matchesPlayed?: number
     preferredLanguage?: string
+    explorerRatio?: number | null
+    playerProfile?: string | null
+    popularitySensitivity?: number | null
   }
 
   export type PlayerFeaturesUncheckedCreateWithoutUserInput = {
@@ -9971,6 +10135,9 @@ export namespace Prisma {
     totalPlayTime?: number
     matchesPlayed?: number
     preferredLanguage?: string
+    explorerRatio?: number | null
+    playerProfile?: string | null
+    popularitySensitivity?: number | null
   }
 
   export type PlayerFeaturesCreateOrConnectWithoutUserInput = {
@@ -10069,6 +10236,9 @@ export namespace Prisma {
     totalPlayTime?: FloatFieldUpdateOperationsInput | number
     matchesPlayed?: IntFieldUpdateOperationsInput | number
     preferredLanguage?: StringFieldUpdateOperationsInput | string
+    explorerRatio?: NullableFloatFieldUpdateOperationsInput | number | null
+    playerProfile?: NullableStringFieldUpdateOperationsInput | string | null
+    popularitySensitivity?: NullableFloatFieldUpdateOperationsInput | number | null
   }
 
   export type PlayerFeaturesUncheckedUpdateWithoutUserInput = {
@@ -10076,6 +10246,9 @@ export namespace Prisma {
     totalPlayTime?: FloatFieldUpdateOperationsInput | number
     matchesPlayed?: IntFieldUpdateOperationsInput | number
     preferredLanguage?: StringFieldUpdateOperationsInput | string
+    explorerRatio?: NullableFloatFieldUpdateOperationsInput | number | null
+    playerProfile?: NullableStringFieldUpdateOperationsInput | string | null
+    popularitySensitivity?: NullableFloatFieldUpdateOperationsInput | number | null
   }
 
   export type SocialAffinityUpsertWithWhereUniqueWithoutUser1Input = {

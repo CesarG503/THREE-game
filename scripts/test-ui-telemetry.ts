@@ -62,7 +62,7 @@ async function main() {
   try {
     await connectRedis();
     eventBuffer.start(100);
-    eventWorker.start(100);
+    eventWorker.start();
 
     await prisma.user.deleteMany({ where: { id: testUserId } });
     await prisma.user.create({

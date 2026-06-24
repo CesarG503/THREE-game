@@ -41,6 +41,7 @@ export class CameraController {
   dynamicOffset: number;
   smoothedStrafe: number;
   gravityUp: THREE.Vector3;
+  gravityQuaternion: THREE.Quaternion;
 
   constructor(camera: THREE.Camera, domElement: HTMLElement) {
     this.camera = camera;
@@ -97,6 +98,7 @@ export class CameraController {
     this.isPaused = false;
     this.isUIOpen = false;
     this.gravityUp = new THREE.Vector3(0, 1, 0);
+    this.gravityQuaternion = new THREE.Quaternion();
 
     this.setupEventListeners();
   }
@@ -307,29 +309,47 @@ export class CameraController {
     if (!up || up.lengthSq() < 0.0001) return;
     this.gravityUp.copy(up).normalize();
     this.camera.up.copy(this.gravityUp);
+
+    // Reconstruct gravityQuaternion from up for backwards compatibility
+    let forward = new THREE.Vector3(0, 0, 1).projectOnPlane(this.gravityUp);
+    if (forward.lengthSq() < 0.0001) {
+      forward = new THREE.Vector3(1, 0, 0).projectOnPlane(this.gravityUp);
+    }
+    forward.normalize();
+    const right = forward.clone().cross(this.gravityUp).normalize();
+    const matrix = new THREE.Matrix4();
+    matrix.makeBasis(right.clone().multiplyScalar(-1), this.gravityUp, forward);
+    this.gravityQuaternion.setFromRotationMatrix(matrix);
+  }
+
+  setGravityQuaternion(q: THREE.Quaternion) {
+    this.gravityQuaternion.copy(q);
+    const up = new THREE.Vector3(0, 1, 0).applyQuaternion(q).normalize();
+    this.gravityUp.copy(up);
+    this.camera.up.copy(up);
   }
 
   getGravityBasis(yaw: number) {
     const up = this.gravityUp.clone().normalize();
-    let baseForward = new THREE.Vector3(0, 0, 1).projectOnPlane(up);
-    if (baseForward.lengthSq() < 0.0001) {
-      baseForward = new THREE.Vector3(1, 0, 0).projectOnPlane(up);
-    }
-    baseForward.normalize();
+    const baseForward = new THREE.Vector3(0, 0, 1).applyQuaternion(this.gravityQuaternion).normalize();
+    const baseRight = new THREE.Vector3(-1, 0, 0).applyQuaternion(this.gravityQuaternion).normalize();
 
-    const baseRight = baseForward.clone().cross(up).normalize();
     const forward = baseForward.clone().multiplyScalar(Math.cos(yaw)).addScaledVector(baseRight, -Math.sin(yaw)).normalize();
     const right = baseRight.clone().multiplyScalar(Math.cos(yaw)).addScaledVector(baseForward, Math.sin(yaw)).normalize();
 
     return { up, forward, right };
   }
 
-  update(characterPosition: THREE.Vector3 | null, characterRotation: number, dt: number, gravityUp?: THREE.Vector3 | null) {
+  update(characterPosition: THREE.Vector3 | null, characterRotation: number, dt: number, gravityUpOrQuaternion?: THREE.Vector3 | THREE.Quaternion | null) {
     if (!characterPosition) return;
     void characterRotation;
 
-    if (gravityUp) {
-      this.setGravityUpVector(gravityUp);
+    if (gravityUpOrQuaternion) {
+      if (gravityUpOrQuaternion instanceof THREE.Quaternion) {
+        this.setGravityQuaternion(gravityUpOrQuaternion);
+      } else {
+        this.setGravityUpVector(gravityUpOrQuaternion);
+      }
     } else {
       this.camera.up.copy(this.gravityUp);
     }

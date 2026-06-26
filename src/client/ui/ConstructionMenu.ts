@@ -251,6 +251,23 @@ export class ConstructionMenu {
         };
         this.logicItems.push(button);
 
+        // Gravity Sphere
+        const gravitySphere = new MapObjectItem(
+            "gravity_sphere",
+            "Esfera de Gravedad",
+            "gravity_sphere",
+            "",
+            0x9C27B0,
+            { x: 1.5, y: 1.5, z: 1.5, radius: 0.75 }
+        );
+        gravitySphere.logicProperties = {
+            holdTime: 0.5,
+            oneShot: false,
+            pulsationMode: false,
+            targetUuid: null
+        };
+        this.logicItems.push(gravitySphere);
+
         // Interactive Collision
         const collision = new MapObjectItem(
             "interactive_collision",
@@ -2107,14 +2124,13 @@ export class ConstructionMenu {
             container.appendChild(card);
         });
     }
-
-    renderLogicLibraryGrid(container) {
+renderLogicLibraryGrid(container) {
         container.innerHTML = "";
 
         const groups = [
             {
                 title: "Bases y Señales",
-                types: ["spawn_point", "movement_controller", "interaction_button", "interactive_collision", "target"]
+                types: ["spawn_point", "movement_controller", "interaction_button", "interactive_collision", "target", "gravity_sphere"]
             },
             {
                 title: "Pads y Zonas",
@@ -3828,7 +3844,7 @@ export class ConstructionMenu {
     updateLogicControls(baseItem) {
         this.editorLogicControlsContainer.innerHTML = "";
 
-        const logicTypes = ["spawn_point", "movement_controller", "interaction_button", "interactive_collision", "target", "impulse_jump", "impulse_lateral", "gravity_pad", "farming_zone"];
+        const logicTypes = ["spawn_point", "movement_controller", "interaction_button", "interactive_collision", "target", "impulse_jump", "impulse_lateral", "gravity_pad", "farming_zone", "gravity_sphere"];
         if (!logicTypes.includes(baseItem.type) && !baseItem.logicProperties) {
             this.editorLogicControlsContainer.style.display = "none";
             return;
@@ -3857,6 +3873,10 @@ export class ConstructionMenu {
             this.createLogicDraftInput(this.editorLogicControlsContainer, "Activo al Inicio:", "active", "boolean", true);
         } else if (type === "interaction_button") {
             this.createLogicDraftInput(this.editorLogicControlsContainer, "Tiempo Retener (s):", "holdTime", "number", 1.0);
+            this.createLogicDraftInput(this.editorLogicControlsContainer, "Un Solo Uso:", "oneShot", "boolean", false);
+            this.createLogicDraftInput(this.editorLogicControlsContainer, "Modo Pulsación:", "pulsationMode", "boolean", false);
+        } else if (type === "gravity_sphere") {
+            this.createLogicDraftInput(this.editorLogicControlsContainer, "Tiempo Retener (s):", "holdTime", "number", 0.5);
             this.createLogicDraftInput(this.editorLogicControlsContainer, "Un Solo Uso:", "oneShot", "boolean", false);
             this.createLogicDraftInput(this.editorLogicControlsContainer, "Modo Pulsación:", "pulsationMode", "boolean", false);
         } else if (type === "interactive_collision") {

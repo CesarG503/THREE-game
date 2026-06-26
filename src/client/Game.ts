@@ -32,7 +32,7 @@ import { setupGameInput } from "./core/GameInput";
 import { animate, setupDebugRender, setupOrientationGizmo, updateDebugRender, renderOrientationGizmo } from "./core/GameLoop";
 import { setupMultiplayerUI, updateConnectionStatus, handleRemoteShoot } from "./core/GameNetwork";
 import { buildEnvironment, loadLevelFromFile, updateEnvironmentConfig } from "./core/GameEnvironment";
-import { setupEditorUI, saveMap, loadMap, useCurrentItem, _loadSingleMapObject, deleteObjectByUuid, broadcastObjectUpdate, setObjectBodyType, updateButtonInteraction, emitSignal, triggerButton, updateCollisionLogic, updateMovementLogic } from "./core/GameEditor";
+import { setupEditorUI, saveMap, loadMap, useCurrentItem, _loadSingleMapObject, deleteObjectByUuid, broadcastObjectUpdate, setObjectBodyType, updateButtonInteraction, emitSignal, triggerButton, updateCollisionLogic, updateMovementLogic, triggerGravitySphere } from "./core/GameEditor";
 import { regenerateObjectPhysics, updateObjectPhysics } from "./core/GamePhysics";
 import { GameHUD } from "./ui/GameHUD";
 import { ObjectInspector } from "./ui/ObjectInspector";
@@ -119,6 +119,7 @@ export class Game {
 	updateButtonInteraction: any;
 	emitSignal: any;
 	triggerButton: any;
+	triggerGravitySphere: any;
 	updateCollisionLogic: any;
 	updateMovementLogic: any;
 	regenerateObjectPhysics: any;
@@ -161,6 +162,7 @@ export class Game {
 		this.updateButtonInteraction = updateButtonInteraction.bind(this);
 		this.emitSignal = emitSignal.bind(this);
 		this.triggerButton = triggerButton.bind(this);
+		this.triggerGravitySphere = triggerGravitySphere.bind(this);
 		this.updateCollisionLogic = updateCollisionLogic.bind(this);
 		this.updateMovementLogic = updateMovementLogic.bind(this);
 		this.regenerateObjectPhysics = regenerateObjectPhysics.bind(this);

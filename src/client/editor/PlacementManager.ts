@@ -695,6 +695,9 @@ export class PlacementManager {
             } else {
                 size.set(this.currentCollisionSize.x, this.currentCollisionSize.y, this.currentCollisionSize.z);
             }
+        } else if (item.type === "gravity_sphere") {
+            const radius = item.scale.radius !== undefined ? item.scale.radius : (item.scale.x / 2 || 0.75);
+            size.set(radius * 2, radius * 2, radius * 2);
         } else if (item.type === "target") {
             const diameter = (this.currentTargetProperties && this.currentTargetProperties.radius) ? this.currentTargetProperties.radius * 2 : (item.scale.x || 2);
             size.set(diameter, item.scale.y || 0.2, diameter);
@@ -1368,6 +1371,13 @@ export class PlacementManager {
                                 this.currentCollisionSize.z
                             );
                         }
+                    } else if (item.type === "gravity_sphere") {
+                        this.ghostBoxMesh.visible = false;
+                        this.ghostCylinderMesh.visible = false;
+                        this.ghostSphereMesh.visible = true;
+                        const radius = item.scale.radius !== undefined ? item.scale.radius : (item.scale.x / 2 || 0.75);
+                        this.ghostSphereMesh.scale.set(radius, radius, radius);
+                        this.ghostSphereMesh.position.y = 0;
                     } else if (item.type === "spawn_point") {
                         // SPAWN POINT GHOST
                         // Check properties

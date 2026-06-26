@@ -775,6 +775,11 @@ export class LogicSystem {
 			this.renderButtonUI(container, object, props);
 		}
 
+		// 3b. Gravity Sphere Logic
+		if (object.userData.mapObjectType === "gravity_sphere") {
+			this.renderButtonUI(container, object, props);
+		}
+
 		// 4. Interactive Collision Logic
 		if (object.userData.mapObjectType === "interactive_collision") {
 			this.interactiveCollisionLogic.render(container, props, (key: string, value: any) => {

@@ -332,7 +332,9 @@ export function animate(this: any) {
 		this.gravityHelperGroup.group.position.copy(feetPos).addScaledVector(upVector, 1.0);
 		
 		if (this.character.getGravityQuaternion) {
-			this.gravityHelperGroup.group.quaternion.copy(this.character.getGravityQuaternion());
+			// Align helper group with character's feet plane and horizontal facing direction
+			const yawQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), this.character.currentRotation);
+			this.gravityHelperGroup.group.quaternion.copy(this.character.getGravityQuaternion()).multiply(yawQuat);
 		}
 
 		// Billboard the Space keycap to face the camera

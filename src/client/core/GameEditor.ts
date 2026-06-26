@@ -878,19 +878,18 @@ function createGravityHelper3D() {
 	const helperGroup = new THREE.Group();
 	helperGroup.name = "gravityHelper3D";
 
-	const innerRadius = 1.6;
-	const outerRadius = 1.8;
+	const innerRadius = 1.0;
+	const outerRadius = 1.4;
 
 	const sectors = [
-		{ name: "w", color: 0xff3333, thetaStart: Math.PI / 4, thetaLength: Math.PI / 2, dir: new THREE.Vector3(0, 0, -1.7), key: "W" },
-		{ name: "a", color: 0x33ff33, thetaStart: 3 * Math.PI / 4, thetaLength: Math.PI / 2, dir: new THREE.Vector3(-1.7, 0, 0), key: "A" },
-		{ name: "s", color: 0x3333ff, thetaStart: 5 * Math.PI / 4, thetaLength: Math.PI / 2, dir: new THREE.Vector3(0, 0, 1.7), key: "S" },
-		{ name: "d", color: 0xffff33, thetaStart: -Math.PI / 4, thetaLength: Math.PI / 2, dir: new THREE.Vector3(1.7, 0, 0), key: "D" }
+		{ name: "w", color: 0xff3333, thetaStart: Math.PI / 4, thetaLength: Math.PI / 2, dir: new THREE.Vector3(0, 0, -1.2), key: "W" },
+		{ name: "a", color: 0x33ff33, thetaStart: 3 * Math.PI / 4, thetaLength: Math.PI / 2, dir: new THREE.Vector3(-1.2, 0, 0), key: "A" },
+		{ name: "s", color: 0x3333ff, thetaStart: 5 * Math.PI / 4, thetaLength: Math.PI / 2, dir: new THREE.Vector3(0, 0, 1.2), key: "S" },
+		{ name: "d", color: 0xffff33, thetaStart: -Math.PI / 4, thetaLength: Math.PI / 2, dir: new THREE.Vector3(1.2, 0, 0), key: "D" }
 	];
 
 	const materials: Record<string, THREE.MeshBasicMaterial> = {};
 	const keycaps: Record<string, THREE.Mesh> = {};
-	const arrows: Record<string, THREE.Group> = {};
 
 	sectors.forEach(s => {
 		// Sector Mesh
@@ -907,36 +906,9 @@ function createGravityHelper3D() {
 		mesh.rotation.x = -Math.PI / 2;
 		helperGroup.add(mesh);
 
-		// Arrow
-		const arrow = new THREE.Group();
-		const shaftGeo = new THREE.CylinderGeometry(0.03, 0.03, 0.5, 8);
-		const arrowMat = new THREE.MeshBasicMaterial({ color: s.color, transparent: true, opacity: 0.8 });
-		const shaft = new THREE.Mesh(shaftGeo, arrowMat);
-		shaft.position.y = 0.25;
-		arrow.add(shaft);
-
-		const headGeo = new THREE.ConeGeometry(0.1, 0.2, 8);
-		const head = new THREE.Mesh(headGeo, arrowMat);
-		head.position.y = 0.6;
-		arrow.add(head);
-
-		if (s.name === "w") {
-			arrow.rotation.x = -Math.PI / 2;
-		} else if (s.name === "s") {
-			arrow.rotation.x = Math.PI / 2;
-		} else if (s.name === "a") {
-			arrow.rotation.z = Math.PI / 2;
-		} else if (s.name === "d") {
-			arrow.rotation.z = -Math.PI / 2;
-		}
-
-		arrow.position.copy(s.dir).multiplyScalar(0.7);
-		helperGroup.add(arrow);
-		arrows[s.name] = arrow;
-
 		// Keycap
 		const tex = createKeycapTexture(s.key, false);
-		const keycapGeo = new THREE.PlaneGeometry(0.45, 0.45);
+		const keycapGeo = new THREE.PlaneGeometry(0.35, 0.35);
 		const keycapMat = new THREE.MeshBasicMaterial({
 			map: tex,
 			transparent: true,
@@ -951,27 +923,9 @@ function createGravityHelper3D() {
 		keycaps[s.name] = keycap;
 	});
 
-	// Space Sector
-	const spaceColor = 0xe040fb;
-
-	const spaceArrow = new THREE.Group();
-	const spaceShaftGeo = new THREE.CylinderGeometry(0.03, 0.03, 0.4, 8);
-	const spaceArrowMat = new THREE.MeshBasicMaterial({ color: spaceColor, transparent: true, opacity: 0.8 });
-	const spaceShaft = new THREE.Mesh(spaceShaftGeo, spaceArrowMat);
-	spaceShaft.position.y = 0.2;
-	spaceArrow.add(spaceShaft);
-
-	const spaceHeadGeo = new THREE.ConeGeometry(0.1, 0.2, 8);
-	const spaceHead = new THREE.Mesh(spaceHeadGeo, spaceArrowMat);
-	spaceHead.position.y = 0.5;
-	spaceArrow.add(spaceHead);
-
-	spaceArrow.position.set(0, 1.2, 0);
-	helperGroup.add(spaceArrow);
-	arrows["space"] = spaceArrow;
-
+	// Space Keycap (floating 1.0 unit above ring/hip height)
 	const spaceTex = createKeycapTexture("SPACE", false);
-	const spaceGeo = new THREE.PlaneGeometry(0.8, 0.4);
+	const spaceGeo = new THREE.PlaneGeometry(0.6, 0.3);
 	const spaceMat = new THREE.MeshBasicMaterial({
 		map: spaceTex,
 		transparent: true,
@@ -979,15 +933,14 @@ function createGravityHelper3D() {
 		side: THREE.DoubleSide
 	});
 	const spaceKeycap = new THREE.Mesh(spaceGeo, spaceMat);
-	spaceKeycap.position.set(0, 1.9, 0);
+	spaceKeycap.position.set(0, 1.0, 0);
 	helperGroup.add(spaceKeycap);
 	keycaps["space"] = spaceKeycap;
 
 	return {
 		group: helperGroup,
 		materials,
-		keycaps,
-		arrows
+		keycaps
 	};
 }
 
@@ -1045,6 +998,7 @@ export function triggerGravitySphere(this: any, sphereObj: any) {
 
 	const closeOverlay = (onCompleteCallback: () => void = () => { }) => {
 		document.removeEventListener("keydown", keydownHandler);
+		document.removeEventListener("mousedown", mousedownHandler);
 		overlay.remove();
 
 		if (this.gravityHelperGroup) {
@@ -1072,20 +1026,19 @@ export function triggerGravitySphere(this: any, sphereObj: any) {
 		if (keyName && this.gravityHelperGroup) {
 			// Change 3D keycap to active style
 			const keycap = this.gravityHelperGroup.keycaps[keyName];
-			if (keycap && keycap.material.map) {
-				keycap.material.map.dispose();
+			if (keycap) {
+				if (keycap.material.map) {
+					keycap.material.map.dispose();
+				}
 				const label = keyName === "space" ? "SPACE" : keyName.toUpperCase();
 				keycap.material.map = createKeycapTexture(label, true);
 				keycap.material.needsUpdate = true;
-			}
 
-			// Highlight the 3D arrow by scaling it
-			const arrow = this.gravityHelperGroup.arrows[keyName];
-			if (arrow) {
-				animate(arrow.scale, {
-					x: 1.5,
-					y: 1.5,
-					z: 1.5,
+				// Scale active keycap for visual feedback
+				animate(keycap.scale, {
+					x: 1.4,
+					y: 1.4,
+					z: 1.4,
 					duration: 250,
 					easing: 'easeOutBack'
 				});
@@ -1120,7 +1073,7 @@ export function triggerGravitySphere(this: any, sphereObj: any) {
 
 	const keydownHandler = (e: KeyboardEvent) => {
 		const k = e.key.toLowerCase();
-		if (k === "escape" || k === "f") {
+		if (k === "escape") {
 			e.preventDefault();
 			closeOverlay();
 			return;
@@ -1132,5 +1085,12 @@ export function triggerGravitySphere(this: any, sphereObj: any) {
 		}
 	};
 
+	const mousedownHandler = (e: MouseEvent) => {
+		if (e.button === 0) { // Left click
+			closeOverlay();
+		}
+	};
+
 	document.addEventListener("keydown", keydownHandler);
+	document.addEventListener("mousedown", mousedownHandler);
 }

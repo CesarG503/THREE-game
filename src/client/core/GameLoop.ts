@@ -328,8 +328,8 @@ export function animate(this: any) {
 		const feetPos = this.character.getPosition();
 		const upVector = this.character.getGravityUpVector ? this.character.getGravityUpVector() : new THREE.Vector3(0, 1, 0);
 		
-		// Place slightly above the feet plane to avoid Z-fighting
-		this.gravityHelperGroup.group.position.copy(feetPos).addScaledVector(upVector, 0.05);
+		// Place at hip height (1.0 unit above feet)
+		this.gravityHelperGroup.group.position.copy(feetPos).addScaledVector(upVector, 1.0);
 		
 		if (this.character.getGravityQuaternion) {
 			this.gravityHelperGroup.group.quaternion.copy(this.character.getGravityQuaternion());

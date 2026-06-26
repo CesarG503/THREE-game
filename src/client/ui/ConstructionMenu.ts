@@ -4408,7 +4408,7 @@ renderLogicLibraryGrid(container) {
             // Determine primary logic category
             if (obj.userData.mapObjectType === "spawn_point") {
                 type = "spawn_point";
-            } else if (["impulse_jump", "impulse_lateral", "gravity_pad", "farming_zone"].includes(obj.userData.mapObjectType)) {
+            } else if (["impulse_jump", "impulse_lateral", "gravity_pad", "farming_zone", "gravity_sphere"].includes(obj.userData.mapObjectType)) {
                 type = "interactive_zones";
             } else if (
                 obj.userData.logicProperties &&

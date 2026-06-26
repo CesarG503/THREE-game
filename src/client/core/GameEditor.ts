@@ -827,6 +827,189 @@ export function updateMovementLogic(this: any, dt: number) {
 	});
 }
 
+function createKeycapTexture(char: string, isHovered = false): THREE.Texture {
+	const canvas = document.createElement("canvas");
+	canvas.width = 128;
+	canvas.height = 128;
+	const ctx = canvas.getContext("2d")!;
+
+	ctx.clearRect(0, 0, 128, 128);
+
+	// Keycap shape
+	ctx.fillStyle = isHovered ? "#4a148c" : "#1e1e1e";
+	ctx.beginPath();
+	if (typeof ctx.roundRect === "function") {
+		ctx.roundRect(8, 8, 112, 112, 16);
+	} else {
+		ctx.rect(8, 8, 112, 112);
+	}
+	ctx.fill();
+
+	// Border
+	ctx.strokeStyle = isHovered ? "#e040fb" : "#555555";
+	ctx.lineWidth = 6;
+	ctx.stroke();
+
+	// Inner bevel
+	ctx.fillStyle = isHovered ? "#6a1b9a" : "#2d2d2d";
+	ctx.beginPath();
+	if (typeof ctx.roundRect === "function") {
+		ctx.roundRect(16, 16, 96, 96, 12);
+	} else {
+		ctx.rect(16, 16, 96, 96);
+	}
+	ctx.fill();
+
+	// Text
+	ctx.fillStyle = isHovered ? "#ffffff" : "#cccccc";
+	ctx.font = char === "SPACE" ? "bold 24px sans-serif" : "bold 56px sans-serif";
+	ctx.textAlign = "center";
+	ctx.textBaseline = "middle";
+	ctx.shadowColor = "rgba(0, 0, 0, 0.6)";
+	ctx.shadowBlur = 4;
+	ctx.shadowOffsetY = 3;
+	ctx.fillText(char, 64, 64);
+
+	const texture = new THREE.CanvasTexture(canvas);
+	return texture;
+}
+
+function createGravityHelper3D() {
+	const helperGroup = new THREE.Group();
+	helperGroup.name = "gravityHelper3D";
+
+	const innerRadius = 1.6;
+	const outerRadius = 1.8;
+
+	const sectors = [
+		{ name: "w", color: 0xff3333, thetaStart: Math.PI / 4, thetaLength: Math.PI / 2, dir: new THREE.Vector3(0, 0, -1.7), key: "W" },
+		{ name: "a", color: 0x33ff33, thetaStart: 3 * Math.PI / 4, thetaLength: Math.PI / 2, dir: new THREE.Vector3(-1.7, 0, 0), key: "A" },
+		{ name: "s", color: 0x3333ff, thetaStart: 5 * Math.PI / 4, thetaLength: Math.PI / 2, dir: new THREE.Vector3(0, 0, 1.7), key: "S" },
+		{ name: "d", color: 0xffff33, thetaStart: -Math.PI / 4, thetaLength: Math.PI / 2, dir: new THREE.Vector3(1.7, 0, 0), key: "D" }
+	];
+
+	const materials: Record<string, THREE.MeshBasicMaterial> = {};
+	const keycaps: Record<string, THREE.Mesh> = {};
+	const arrows: Record<string, THREE.Group> = {};
+
+	sectors.forEach(s => {
+		// Sector Mesh
+		const geom = new THREE.RingGeometry(innerRadius, outerRadius, 32, 1, s.thetaStart, s.thetaLength);
+		const mat = new THREE.MeshBasicMaterial({
+			color: s.color,
+			transparent: true,
+			opacity: 0.4,
+			side: THREE.DoubleSide
+		});
+		materials[s.name] = mat;
+
+		const mesh = new THREE.Mesh(geom, mat);
+		mesh.rotation.x = -Math.PI / 2;
+		helperGroup.add(mesh);
+
+		// Arrow
+		const arrow = new THREE.Group();
+		const shaftGeo = new THREE.CylinderGeometry(0.03, 0.03, 0.5, 8);
+		const arrowMat = new THREE.MeshBasicMaterial({ color: s.color, transparent: true, opacity: 0.8 });
+		const shaft = new THREE.Mesh(shaftGeo, arrowMat);
+		shaft.position.y = 0.25;
+		arrow.add(shaft);
+
+		const headGeo = new THREE.ConeGeometry(0.1, 0.2, 8);
+		const head = new THREE.Mesh(headGeo, arrowMat);
+		head.position.y = 0.6;
+		arrow.add(head);
+
+		if (s.name === "w") {
+			arrow.rotation.x = -Math.PI / 2;
+		} else if (s.name === "s") {
+			arrow.rotation.x = Math.PI / 2;
+		} else if (s.name === "a") {
+			arrow.rotation.z = Math.PI / 2;
+		} else if (s.name === "d") {
+			arrow.rotation.z = -Math.PI / 2;
+		}
+
+		arrow.position.copy(s.dir).multiplyScalar(0.7);
+		helperGroup.add(arrow);
+		arrows[s.name] = arrow;
+
+		// Keycap
+		const tex = createKeycapTexture(s.key, false);
+		const keycapGeo = new THREE.PlaneGeometry(0.45, 0.45);
+		const keycapMat = new THREE.MeshBasicMaterial({
+			map: tex,
+			transparent: true,
+			opacity: 0.9,
+			side: THREE.DoubleSide
+		});
+		const keycap = new THREE.Mesh(keycapGeo, keycapMat);
+		keycap.position.copy(s.dir);
+		keycap.position.y = 0.01;
+		keycap.rotation.x = -Math.PI / 2;
+		helperGroup.add(keycap);
+		keycaps[s.name] = keycap;
+	});
+
+	// Space Sector
+	const spaceColor = 0xe040fb;
+
+	const spaceArrow = new THREE.Group();
+	const spaceShaftGeo = new THREE.CylinderGeometry(0.03, 0.03, 0.4, 8);
+	const spaceArrowMat = new THREE.MeshBasicMaterial({ color: spaceColor, transparent: true, opacity: 0.8 });
+	const spaceShaft = new THREE.Mesh(spaceShaftGeo, spaceArrowMat);
+	spaceShaft.position.y = 0.2;
+	spaceArrow.add(spaceShaft);
+
+	const spaceHeadGeo = new THREE.ConeGeometry(0.1, 0.2, 8);
+	const spaceHead = new THREE.Mesh(spaceHeadGeo, spaceArrowMat);
+	spaceHead.position.y = 0.5;
+	spaceArrow.add(spaceHead);
+
+	spaceArrow.position.set(0, 1.2, 0);
+	helperGroup.add(spaceArrow);
+	arrows["space"] = spaceArrow;
+
+	const spaceTex = createKeycapTexture("SPACE", false);
+	const spaceGeo = new THREE.PlaneGeometry(0.8, 0.4);
+	const spaceMat = new THREE.MeshBasicMaterial({
+		map: spaceTex,
+		transparent: true,
+		opacity: 0.9,
+		side: THREE.DoubleSide
+	});
+	const spaceKeycap = new THREE.Mesh(spaceGeo, spaceMat);
+	spaceKeycap.position.set(0, 1.9, 0);
+	helperGroup.add(spaceKeycap);
+	keycaps["space"] = spaceKeycap;
+
+	return {
+		group: helperGroup,
+		materials,
+		keycaps,
+		arrows
+	};
+}
+
+function disposeGravityHelper(helper: any, scene: THREE.Scene) {
+	if (!helper) return;
+	scene.remove(helper.group);
+	helper.group.traverse((child: any) => {
+		if (child.geometry) child.geometry.dispose();
+		if (child.material) {
+			if (Array.isArray(child.material)) {
+				child.material.forEach((m: any) => {
+					if (m.map) m.map.dispose();
+					m.dispose();
+				});
+			} else {
+				if (child.material.map) child.material.map.dispose();
+				child.material.dispose();
+			}
+		}
+	});
+}
+
 export function triggerGravitySphere(this: any, sphereObj: any) {
 	if (document.getElementById("gravity-qte-overlay")) return;
 
@@ -846,192 +1029,70 @@ export function triggerGravitySphere(this: any, sphereObj: any) {
 		this.inputManager.reset();
 	}
 
+	this.gravityQteActive = true;
+	this.gravityInitialPos = this.character.getPosition().clone();
+	this.gravityHelperGroup = createGravityHelper3D();
+	this.sceneManager.scene.add(this.gravityHelperGroup.group);
+
 	const overlay = document.createElement("div");
 	overlay.id = "gravity-qte-overlay";
 	overlay.style.cssText = `
 		position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-		display: flex; flex-direction: column; justify-content: center; align-items: center;
-		background: rgba(5, 5, 10, 0.45); backdrop-filter: blur(16px);
-		z-index: 99999; font-family: 'Outfit', 'Inter', sans-serif; color: white;
-		opacity: 0; pointer-events: all;
-	`;
-
-	const fontLink = document.createElement("link");
-	fontLink.rel = "stylesheet";
-	fontLink.href = "https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800&display=swap";
-	document.head.appendChild(fontLink);
-
-	const styleBlock = document.createElement("style");
-	styleBlock.innerHTML = `
-		.qte-key {
-			position: relative;
-			width: 68px; height: 68px;
-			background: linear-gradient(135deg, #2c2c2c 0%, #151515 100%);
-			border-radius: 14px;
-			border: 1px solid #111;
-			box-shadow: 
-				0 6px 12px rgba(0, 0, 0, 0.6), 
-				0 5px 0 #0c0c0c, 
-				inset 0 1px 0 rgba(255, 255, 255, 0.15);
-			cursor: pointer;
-			display: flex;
-			justify-content: center;
-			align-items: center;
-			padding: 6px;
-			box-sizing: border-box;
-			transition: transform 0.08s ease, box-shadow 0.08s ease;
-		}
-		.qte-key-face {
-			width: 100%; height: 100%;
-			background: linear-gradient(180deg, #373737 0%, #212121 100%);
-			border-radius: 9px;
-			border-bottom: 2px solid #161616;
-			box-shadow: 
-				inset 0 3px 6px rgba(0, 0, 0, 0.4), 
-				inset 0 -2px 3px rgba(255, 255, 255, 0.05),
-				0 1px 2px rgba(0, 0, 0, 0.2);
-			display: flex;
-			justify-content: center;
-			align-items: center;
-			color: #f0f0f0;
-			font-family: 'Outfit', sans-serif;
-			font-size: 26px;
-			font-weight: 700;
-			text-shadow: 0 -1px 1px rgba(0, 0, 0, 0.6);
-			user-select: none;
-			box-sizing: border-box;
-		}
-		.qte-key:hover {
-			background: linear-gradient(135deg, #333333 0%, #1a1a1a 100%);
-		}
-		.qte-key:hover .qte-key-face {
-			background: linear-gradient(180deg, #404040 0%, #262626 100%);
-			color: #ffffff;
-		}
-		.qte-key:active, .qte-key.active-press {
-			transform: translateY(5px);
-			box-shadow: 
-				0 1px 2px rgba(0, 0, 0, 0.6), 
-				0 1px 0 #0c0c0c, 
-				inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
-		}
-		.qte-key.active-press .qte-key-face {
-			background: linear-gradient(180deg, #6a1b9a 0%, #4a148c 100%) !important;
-			color: #ffffff !important;
-			box-shadow: 0 0 15px rgba(224, 64, 251, 0.8), inset 0 2px 4px rgba(0,0,0,0.5) !important;
-			border-bottom-color: #310b5a !important;
-		}
-	`;
-	document.head.appendChild(styleBlock);
-
-	overlay.innerHTML = `
-		<div id="gravity-qte-container" style="border-radius: 28px; padding: 40px; display: flex; flex-direction: column; align-items: center; transform: scale(0.85); width: fit-content; gap: 14px;">
-			<!-- W Key -->
-			<div style="display: flex; justify-content: center; width: 100%;">
-				<div id="qte-key-w" class="qte-key" data-key="w">
-					<div class="qte-key-face">W</div>
-				</div>
-			</div>
-			<!-- A S D Keys -->
-			<div style="display: flex; gap: 14px;">
-				<div id="qte-key-a" class="qte-key" data-key="a">
-					<div class="qte-key-face">A</div>
-				</div>
-				<div id="qte-key-s" class="qte-key" data-key="s">
-					<div class="qte-key-face">S</div>
-				</div>
-				<div id="qte-key-d" class="qte-key" data-key="d">
-					<div class="qte-key-face">D</div>
-				</div>
-			</div>
-			<!-- Spacebar -->
-			<div style="display: flex; justify-content: center; width: 100%; margin-top: 4px;">
-				<div id="qte-key-space" class="qte-key" data-key=" " style="width: 232px; height: 56px; padding: 5px;">
-					<div class="qte-key-face" style="font-size: 15px; color: rgba(240, 240, 240, 0.35);">───</div>
-				</div>
-			</div>
-		</div>
+		background: transparent; backdrop-filter: none;
+		pointer-events: none; z-index: 99999;
 	`;
 	document.body.appendChild(overlay);
 
-	animate(overlay, {
-		opacity: [0, 1],
-		duration: 350,
-		easing: 'easeOutQuad'
-	});
-
-	animate('#gravity-qte-container', {
-		scale: [0.85, 1],
-		duration: 400,
-		easing: 'elasticOut(1, 0.75)'
-	});
-
-	animate('.qte-key', {
-		scale: [0.5, 1],
-		opacity: [0, 1],
-		delay: (el, i) => 120 + i * 40,
-		duration: 350,
-		easing: 'easeOutBack'
-	});
-
-	const closeOverlay = (selectedKeyId: string | null = null, onCompleteCallback: () => void = () => { }) => {
+	const closeOverlay = (onCompleteCallback: () => void = () => { }) => {
 		document.removeEventListener("keydown", keydownHandler);
+		overlay.remove();
 
-		const cleanup = () => {
-			overlay.remove();
-			styleBlock.remove();
-			fontLink.remove();
-			if (this.inputManager) {
-				this.inputManager.enabled = true;
-				this.inputManager.reset();
-			}
-			onCompleteCallback();
-		};
-
-		if (selectedKeyId) {
-			setTimeout(() => {
-				animate(overlay, {
-					opacity: 0,
-					duration: 250,
-					easing: 'easeInQuad',
-					complete: cleanup
-				});
-				animate('#gravity-qte-container', {
-					scale: 0.9,
-					duration: 250,
-					easing: 'easeInQuad'
-				});
-			}, 250);
-		} else {
-			animate(overlay, {
-				opacity: 0,
-				duration: 200,
-				easing: 'easeInQuad',
-				complete: cleanup
-			});
+		if (this.gravityHelperGroup) {
+			disposeGravityHelper(this.gravityHelperGroup, this.sceneManager.scene);
+			this.gravityHelperGroup = null;
 		}
+
+		this.gravityQteActive = false;
+
+		if (this.inputManager) {
+			this.inputManager.enabled = true;
+			this.inputManager.reset();
+		}
+		onCompleteCallback();
 	};
 
-	const keysElements = overlay.querySelectorAll('.qte-key');
-	keysElements.forEach((el: any) => {
-		el.addEventListener('click', () => {
-			const keyChar = el.getAttribute('data-key');
-			handleKeySelection(keyChar, el.id);
-		});
-	});
+	const handleKeySelection = (key: string) => {
+		let keyName = "";
+		if (key === "w") keyName = "w";
+		else if (key === "a") keyName = "a";
+		else if (key === "s") keyName = "s";
+		else if (key === "d") keyName = "d";
+		else if (key === " ") keyName = "space";
 
-	const handleKeySelection = (key: string, elementId: string) => {
-		const keyEl = document.getElementById(elementId);
-		if (keyEl) {
-			keyEl.classList.add("active-press");
-			animate(keyEl, {
-				scale: [1, 0.9, 1.15, 1],
-				duration: 250,
-				easing: 'easeInOutQuad'
-			});
+		if (keyName && this.gravityHelperGroup) {
+			// Change 3D keycap to active style
+			const keycap = this.gravityHelperGroup.keycaps[keyName];
+			if (keycap && keycap.material.map) {
+				keycap.material.map.dispose();
+				const label = keyName === "space" ? "SPACE" : keyName.toUpperCase();
+				keycap.material.map = createKeycapTexture(label, true);
+				keycap.material.needsUpdate = true;
+			}
+
+			// Highlight the 3D arrow by scaling it
+			const arrow = this.gravityHelperGroup.arrows[keyName];
+			if (arrow) {
+				animate(arrow.scale, {
+					x: 1.5,
+					y: 1.5,
+					z: 1.5,
+					duration: 250,
+					easing: 'easeOutBack'
+				});
+			}
 		}
 
-		let orientation = null;
+		let orientation: string | null = null;
 		if (key === "w") orientation = "front";
 		else if (key === "s") orientation = "back";
 		else if (key === "a") orientation = "left";
@@ -1039,19 +1100,27 @@ export function triggerGravitySphere(this: any, sphereObj: any) {
 		else if (key === " ") orientation = "up";
 
 		if (orientation && this.character) {
-			closeOverlay(elementId, () => {
-				this.character.setGravityOrientation(orientation, { duration: 0.65 });
-				if (props.oneShot) {
-					props.triggered = true;
-				}
-				this.emitSignal(sphereObj.userData.uuid);
-			});
+			const currentOrient = this.character.getGravityOrientation();
+			if (currentOrient === orientation) {
+				orientation = "down";
+			}
+
+			const finalOrientation = orientation;
+			setTimeout(() => {
+				closeOverlay(() => {
+					this.character.setGravityOrientation(finalOrientation, { duration: 0.65 });
+					if (props.oneShot) {
+						props.triggered = true;
+					}
+					this.emitSignal(sphereObj.userData.uuid);
+				});
+			}, 250);
 		}
 	};
 
 	const keydownHandler = (e: KeyboardEvent) => {
 		const k = e.key.toLowerCase();
-		if (k === "escape") {
+		if (k === "escape" || k === "f") {
 			e.preventDefault();
 			closeOverlay();
 			return;
@@ -1059,20 +1128,7 @@ export function triggerGravitySphere(this: any, sphereObj: any) {
 
 		if (["w", "a", "s", "d", " "].includes(k)) {
 			e.preventDefault();
-			let id = "";
-			if (k === "w") id = "qte-key-w";
-			else if (k === "a") id = "qte-key-a";
-			else if (k === "s") id = "qte-key-s";
-			else if (k === "d") id = "qte-key-d";
-			else if (k === " ") id = "qte-key-space";
-
-			handleKeySelection(k, id);
-		} else {
-			animate('#gravity-qte-container', {
-				translateX: [0, -10, 10, -10, 10, 0],
-				duration: 350,
-				easing: 'easeInOutQuad'
-			});
+			handleKeySelection(k);
 		}
 	};
 

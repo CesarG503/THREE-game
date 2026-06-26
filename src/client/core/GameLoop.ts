@@ -303,7 +303,45 @@ export function animate(this: any) {
 
 	// Character Update
 	const remotePlayers = this.networkManager ? this.networkManager.remotePlayers : null;
+
+	if (this.gravityQteActive && this.gravityInitialPos) {
+		// 1. Freeze character position and velocities
+		if (this.character.rigidBody) {
+			this.character.rigidBody.setTranslation(this.gravityInitialPos, true);
+			this.character.rigidBody.setNextKinematicTranslation(this.gravityInitialPos);
+			this.character.rigidBody.setLinvel({ x: 0, y: 0, z: 0 }, true);
+			this.character.rigidBody.setAngvel({ x: 0, y: 0, z: 0 }, true);
+		}
+		this.character.verticalVelocity = 0;
+
+		// 2. Rotate character to face camera looking direction
+		if (this.cameraController) {
+			const targetBodyRot = this.character.getAimYaw() + Math.PI;
+			this.character.currentRotation = targetBodyRot;
+		}
+	}
+
 	this.character.update(dt, this.inputManager, remotePlayers);
+
+	// Update 3D Gravity Helper Group
+	if (this.gravityQteActive && this.gravityHelperGroup && this.character) {
+		const feetPos = this.character.getPosition();
+		const upVector = this.character.getGravityUpVector ? this.character.getGravityUpVector() : new THREE.Vector3(0, 1, 0);
+		
+		// Place slightly above the feet plane to avoid Z-fighting
+		this.gravityHelperGroup.group.position.copy(feetPos).addScaledVector(upVector, 0.05);
+		
+		if (this.character.getGravityQuaternion) {
+			this.gravityHelperGroup.group.quaternion.copy(this.character.getGravityQuaternion());
+		}
+
+		// Billboard the Space keycap to face the camera
+		if (this.gravityHelperGroup.keycaps["space"] && this.sceneManager?.camera) {
+			const cameraQuat = this.sceneManager.camera.quaternion;
+			this.gravityHelperGroup.keycaps["space"].quaternion.copy(this.gravityHelperGroup.group.quaternion).invert().multiply(cameraQuat);
+		}
+	}
+
 	if (this.inventoryManager) {
 		this.inventoryManager.updateFuelBars();
 	}

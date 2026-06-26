@@ -726,7 +726,7 @@ export class LogicSystem {
 				const isButton = child.userData.mapObjectType === "interaction_button";
 				const isCollision = child.userData.mapObjectType === "interactive_collision";
 				const isTarget = child.userData.mapObjectType === "target";
-				const isInteractiveZone = ["impulse_jump", "impulse_lateral", "gravity_pad", "farming_zone"].includes(child.userData.mapObjectType);
+				const isInteractiveZone = ["impulse_jump", "impulse_lateral", "gravity_pad", "farming_zone", "gravity_sphere"].includes(child.userData.mapObjectType);
 				const hasWaypoints = this.hasMovementLogic(child);
 
 				if (isSpawn || isButton || isCollision || isTarget || isInteractiveZone || hasWaypoints) {

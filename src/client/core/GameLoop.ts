@@ -331,10 +331,63 @@ export function animate(this: any) {
 		// Place at hip height (1.0 unit above feet)
 		this.gravityHelperGroup.group.position.copy(feetPos).addScaledVector(upVector, 1.0);
 		
-		if (this.character.getGravityQuaternion) {
-			// Align helper group with character's feet plane and horizontal facing direction
-			const yawQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), this.character.currentRotation);
-			this.gravityHelperGroup.group.quaternion.copy(this.character.getGravityQuaternion()).multiply(yawQuat);
+		const currentMode = this.gravitySelectorMode || "dynamic";
+		const gravityQuat = this.character.getGravityQuaternion ? this.character.getGravityQuaternion() : new THREE.Quaternion();
+		const yawQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), this.character.currentRotation);
+
+		if (currentMode === "dynamic") {
+			// Both ring and keycaps rotate with character
+			this.gravityHelperGroup.group.quaternion.copy(gravityQuat).multiply(yawQuat);
+			const keys = ["w", "a", "s", "d"];
+			keys.forEach(k => {
+				const keycap = this.gravityHelperGroup.keycaps[k];
+				if (keycap) {
+					keycap.position.set(
+						k === "w" ? 0 : (k === "a" ? -1.2 : (k === "s" ? 0 : 1.2)),
+						0.01,
+						k === "w" ? -1.2 : (k === "a" ? 0 : (k === "s" ? 1.2 : 0))
+					);
+					keycap.quaternion.setFromEuler(new THREE.Euler(-Math.PI / 2, 0, 0));
+				}
+			});
+		} else if (currentMode === "ring_static") {
+			// Ring is static, keycaps rotate with character
+			this.gravityHelperGroup.group.quaternion.copy(gravityQuat);
+
+			const sectors = [
+				{ name: "w", dir: new THREE.Vector3(0, 0, -1.2) },
+				{ name: "a", dir: new THREE.Vector3(-1.2, 0, 0) },
+				{ name: "s", dir: new THREE.Vector3(0, 0, 1.2) },
+				{ name: "d", dir: new THREE.Vector3(1.2, 0, 0) }
+			];
+
+			sectors.forEach(s => {
+				const keycap = this.gravityHelperGroup.keycaps[s.name];
+				if (keycap) {
+					keycap.position.copy(s.dir).applyAxisAngle(new THREE.Vector3(0, 1, 0), this.character.currentRotation);
+					keycap.position.y = 0.01; // Offset slightly to prevent Z-fighting flickering
+					const localRot = new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI / 2, 0, this.character.currentRotation, "YXZ"));
+					keycap.quaternion.copy(localRot);
+				}
+			});
+		} else if (currentMode === "static") {
+			// Both ring and keycaps are static
+			this.gravityHelperGroup.group.quaternion.copy(gravityQuat);
+
+			const sectors = [
+				{ name: "w", dir: new THREE.Vector3(0, 0, -1.2) },
+				{ name: "a", dir: new THREE.Vector3(-1.2, 0, 0) },
+				{ name: "s", dir: new THREE.Vector3(0, 0, 1.2) },
+				{ name: "d", dir: new THREE.Vector3(1.2, 0, 0) }
+			];
+			sectors.forEach(s => {
+				const keycap = this.gravityHelperGroup.keycaps[s.name];
+				if (keycap) {
+					keycap.position.copy(s.dir);
+					keycap.position.y = 0.01; // Offset slightly to prevent Z-fighting flickering
+					keycap.quaternion.setFromEuler(new THREE.Euler(-Math.PI / 2, 0, 0));
+				}
+			});
 		}
 
 		// Billboard the Space keycap to face the camera

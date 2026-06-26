@@ -778,6 +778,13 @@ export class LogicSystem {
 		// 3b. Gravity Sphere Logic
 		if (object.userData.mapObjectType === "gravity_sphere") {
 			this.renderButtonUI(container, object, props);
+			if (props.selectorMode === undefined) props.selectorMode = "dynamic";
+			const SELECTOR_MODE_OPTIONS = [
+				{ value: "dynamic", label: "Dinámico (Círculo y Teclas móviles)" },
+				{ value: "ring_static", label: "Círculo fijo, Teclas móviles" },
+				{ value: "static", label: "Círculo y Teclas fijos" }
+			];
+			this.createSelectInput(container, object, "selectorMode", props.selectorMode, SELECTOR_MODE_OPTIONS, "Modo Selección 3D");
 		}
 
 		// 4. Interactive Collision Logic

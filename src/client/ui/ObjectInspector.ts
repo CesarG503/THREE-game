@@ -621,6 +621,7 @@ export class ObjectInspector {
             object.userData.mapObjectType === 'movement_controller' ||
             object.userData.mapObjectType === 'spawn_point' ||
             object.userData.mapObjectType === 'interaction_button' ||
+            object.userData.mapObjectType === 'gravity_sphere' ||
             object.userData.mapObjectType === 'impulse_jump' ||
             object.userData.mapObjectType === 'impulse_lateral' ||
             object.userData.mapObjectType === 'gravity_pad' ||

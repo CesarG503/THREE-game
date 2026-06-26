@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
+import { animate } from "animejs";
 import { MapObjectItem } from "../items/MapObjectItem";
 import {
 	applyAnimatedObjectScale,
@@ -424,9 +425,9 @@ export function updateButtonInteraction(this: any, dt: number) {
 	let minDistSq = 9.0;
 
 	this.sceneManager.scene.children.forEach((obj: any) => {
-		if (obj.userData.mapObjectType === "interaction_button") {
+		if (obj.userData.mapObjectType === "interaction_button" || obj.userData.mapObjectType === "gravity_sphere") {
 			const props = obj.userData.logicProperties;
-			if (props.oneShot && props.triggered) return;
+			if (props && props.oneShot && props.triggered) return;
 
 			const dSq = obj.position.distanceToSquared(charPos);
 			if (dSq < minDistSq) {
@@ -491,7 +492,11 @@ export function updateButtonInteraction(this: any, dt: number) {
 					(progressCircle as unknown as SVGElement).style.strokeDashoffset = String(offset);
 
 					if (props._currentHoldTime >= holdTime) {
-						this.triggerButton(nearest);
+						if (nearest.userData.mapObjectType === "gravity_sphere") {
+							this.triggerGravitySphere(nearest);
+						} else {
+							this.triggerButton(nearest);
+						}
 						props._currentHoldTime = 0;
 						(progressCircle as unknown as SVGElement).style.strokeDashoffset = String(circumference);
 						this.isFKeyDown = false;
@@ -820,4 +825,227 @@ export function updateMovementLogic(this: any, dt: number) {
 			});
 		}
 	});
+}
+
+export function triggerGravitySphere(this: any, sphereObj: any) {
+	if (document.getElementById("gravity-qte-overlay")) return;
+
+	const props = sphereObj.userData.logicProperties;
+	if (props.oneShot && props.triggered) return;
+
+	animate(sphereObj.scale, {
+		x: [1.3, 1.0],
+		y: [1.3, 1.0],
+		z: [1.3, 1.0],
+		duration: 350,
+		easing: 'easeOutBack'
+	});
+
+	if (this.inputManager) {
+		this.inputManager.enabled = false;
+		this.inputManager.reset();
+	}
+
+	const overlay = document.createElement("div");
+	overlay.id = "gravity-qte-overlay";
+	overlay.style.cssText = `
+		position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+		display: flex; flex-direction: column; justify-content: center; align-items: center;
+		background: rgba(10, 5, 20, 0.5); backdrop-filter: blur(12px);
+		z-index: 99999; font-family: 'Outfit', 'Inter', sans-serif; color: white;
+		opacity: 0; pointer-events: all;
+	`;
+
+	const fontLink = document.createElement("link");
+	fontLink.rel = "stylesheet";
+	fontLink.href = "https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800&display=swap";
+	document.head.appendChild(fontLink);
+
+	const styleBlock = document.createElement("style");
+	styleBlock.innerHTML = `
+		.qte-key {
+			width: 68px; height: 68px;
+			display: flex; flex-direction: column; justify-content: center; align-items: center;
+			background: rgba(255, 255, 255, 0.05);
+			border: 2px solid rgba(255, 255, 255, 0.15);
+			border-radius: 16px;
+			box-shadow: 0 4px 15px rgba(0,0,0,0.4), inset 0 1px 2px rgba(255,255,255,0.1);
+			cursor: pointer;
+			transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+			backdrop-filter: blur(4px);
+		}
+		.qte-key:hover {
+			background: rgba(255, 255, 255, 0.12);
+			border-color: rgba(255, 255, 255, 0.35);
+			box-shadow: 0 6px 20px rgba(0,0,0,0.5), inset 0 1px 2px rgba(255,255,255,0.2);
+		}
+		.qte-key.active-press {
+			background: rgba(224, 64, 251, 0.25) !important;
+			border-color: #e040fb !important;
+			box-shadow: 0 0 25px rgba(224, 64, 251, 0.8), inset 0 1px 3px rgba(224, 64, 251, 0.5) !important;
+		}
+	`;
+	document.head.appendChild(styleBlock);
+
+	overlay.innerHTML = `
+		<div id="gravity-qte-container" style="background: rgba(18, 10, 30, 0.65); border: 1px solid rgba(224, 64, 251, 0.25); box-shadow: 0 12px 40px rgba(156, 39, 176, 0.25), inset 0 1px 3px rgba(255,255,255,0.05); backdrop-filter: blur(16px); border-radius: 28px; padding: 45px 50px; display: flex; flex-direction: column; align-items: center; gap: 32px; transform: scale(0.85); width: 340px;">
+			<div style="font-size: 26px; font-weight: 800; letter-spacing: 1.5px; text-shadow: 0 0 12px rgba(224, 64, 251, 0.7); color: #e040fb; text-transform: uppercase; text-align: center;">Control de Gravedad</div>
+			<div style="font-size: 13px; color: rgba(255,255,255,0.55); margin-top: -24px; text-align: center; font-weight: 600;">PRESIONA PARA ADQUIRIR GRAVEDAD</div>
+			
+			<div style="display: flex; flex-direction: column; align-items: center; gap: 14px; width: 100%;">
+				<!-- W Key (Front) -->
+				<div id="qte-key-w" class="qte-key" data-key="w">
+					<span style="font-size: 22px; font-weight: 800; color: white;">W</span>
+					<span style="font-size: 9px; font-weight: 800; color: #e040fb; margin-top: 1px; letter-spacing: 0.5px;">FRENTE</span>
+				</div>
+				<!-- A S D Keys -->
+				<div style="display: flex; gap: 14px;">
+					<div id="qte-key-a" class="qte-key" data-key="a">
+						<span style="font-size: 22px; font-weight: 800; color: white;">A</span>
+						<span style="font-size: 9px; font-weight: 800; color: #e040fb; margin-top: 1px; letter-spacing: 0.5px;">IZQ</span>
+					</div>
+					<div id="qte-key-s" class="qte-key" data-key="s">
+						<span style="font-size: 22px; font-weight: 800; color: white;">S</span>
+						<span style="font-size: 9px; font-weight: 800; color: #e040fb; margin-top: 1px; letter-spacing: 0.5px;">ATRÁS</span>
+					</div>
+					<div id="qte-key-d" class="qte-key" data-key="d">
+						<span style="font-size: 22px; font-weight: 800; color: white;">D</span>
+						<span style="font-size: 9px; font-weight: 800; color: #e040fb; margin-top: 1px; letter-spacing: 0.5px;">DER</span>
+					</div>
+				</div>
+				<!-- Spacebar (Up) -->
+				<div id="qte-key-space" class="qte-key" data-key=" " style="width: 232px; height: 56px;">
+					<span style="font-size: 15px; font-weight: 800; color: white; letter-spacing: 1px;">ESPACIO</span>
+					<span style="font-size: 9px; font-weight: 800; color: #e040fb; margin-top: 1px; letter-spacing: 0.5px;">ARRIBA</span>
+				</div>
+			</div>
+			
+			<div style="font-size: 11px; color: rgba(255,255,255,0.4); text-align: center; font-weight: 600; letter-spacing: 0.5px; border-top: 1px solid rgba(255,255,255,0.08); width: 100%; padding-top: 15px;">ESC PARA CANCELAR</div>
+		</div>
+	`;
+	document.body.appendChild(overlay);
+
+	animate(overlay, {
+		opacity: [0, 1],
+		duration: 350,
+		easing: 'easeOutQuad'
+	});
+
+	animate('#gravity-qte-container', {
+		scale: [0.85, 1],
+		duration: 400,
+		easing: 'elasticOut(1, 0.75)'
+	});
+
+	animate('.qte-key', {
+		scale: [0.5, 1],
+		opacity: [0, 1],
+		delay: (el, i) => 120 + i * 40,
+		duration: 350,
+		easing: 'easeOutBack'
+	});
+
+	const closeOverlay = (selectedKeyId: string | null = null, onCompleteCallback: () => void = () => {}) => {
+		document.removeEventListener("keydown", keydownHandler);
+
+		const cleanup = () => {
+			overlay.remove();
+			styleBlock.remove();
+			fontLink.remove();
+			if (this.inputManager) {
+				this.inputManager.enabled = true;
+				this.inputManager.reset();
+			}
+			onCompleteCallback();
+		};
+
+		if (selectedKeyId) {
+			setTimeout(() => {
+				animate(overlay, {
+					opacity: 0,
+					duration: 250,
+					easing: 'easeInQuad',
+					complete: cleanup
+				});
+				animate('#gravity-qte-container', {
+					scale: 0.9,
+					duration: 250,
+					easing: 'easeInQuad'
+				});
+			}, 250);
+		} else {
+			animate(overlay, {
+				opacity: 0,
+				duration: 200,
+				easing: 'easeInQuad',
+				complete: cleanup
+			});
+		}
+	};
+
+	const keysElements = overlay.querySelectorAll('.qte-key');
+	keysElements.forEach((el: any) => {
+		el.addEventListener('click', () => {
+			const keyChar = el.getAttribute('data-key');
+			handleKeySelection(keyChar, el.id);
+		});
+	});
+
+	const handleKeySelection = (key: string, elementId: string) => {
+		const keyEl = document.getElementById(elementId);
+		if (keyEl) {
+			keyEl.classList.add("active-press");
+			animate(keyEl, {
+				scale: [1, 0.9, 1.15, 1],
+				duration: 250,
+				easing: 'easeInOutQuad'
+			});
+		}
+
+		let orientation = null;
+		if (key === "w") orientation = "front";
+		else if (key === "s") orientation = "back";
+		else if (key === "a") orientation = "left";
+		else if (key === "d") orientation = "right";
+		else if (key === " ") orientation = "up";
+
+		if (orientation && this.character) {
+			closeOverlay(elementId, () => {
+				this.character.setGravityOrientation(orientation, { duration: 0.65 });
+				if (props.oneShot) {
+					props.triggered = true;
+				}
+				this.emitSignal(sphereObj.userData.uuid);
+			});
+		}
+	};
+
+	const keydownHandler = (e: KeyboardEvent) => {
+		const k = e.key.toLowerCase();
+		if (k === "escape") {
+			e.preventDefault();
+			closeOverlay();
+			return;
+		}
+
+		if (["w", "a", "s", "d", " "].includes(k)) {
+			e.preventDefault();
+			let id = "";
+			if (k === "w") id = "qte-key-w";
+			else if (k === "a") id = "qte-key-a";
+			else if (k === "s") id = "qte-key-s";
+			else if (k === "d") id = "qte-key-d";
+			else if (k === " ") id = "qte-key-space";
+
+			handleKeySelection(k, id);
+		} else {
+			animate('#gravity-qte-container', {
+				translateX: [0, -10, 10, -10, 10, 0],
+				duration: 350,
+				easing: 'easeInOutQuad'
+			});
+		}
+	};
+
+	document.addEventListener("keydown", keydownHandler);
 }

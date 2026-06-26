@@ -1009,6 +1009,7 @@ export function triggerGravitySphere(this: any, sphereObj: any) {
 
 	this.gravityQteActive = true;
 	this.gravityInitialPos = this.character.getPosition().clone();
+	this.gravitySelectorMode = props.selectorMode || "dynamic";
 	this.gravityHelperGroup = createGravityHelper3D();
 	this.sceneManager.scene.add(this.gravityHelperGroup.group);
 
@@ -1071,29 +1072,39 @@ export function triggerGravitySphere(this: any, sphereObj: any) {
 		}
 
 		let orientation: string | null = null;
-		if (this.cameraController) {
-			const basis = this.cameraController.getGravityBasis(this.cameraController.isFirstPerson ? this.cameraController.fpYaw : this.cameraController.theta);
-			const targetVector = new THREE.Vector3();
+		const currentMode = this.gravitySelectorMode || "dynamic";
 
-			if (key === "w") {
-				targetVector.copy(basis.forward);
-			} else if (key === "s") {
-				targetVector.copy(basis.forward).multiplyScalar(-1);
-			} else if (key === "a") {
-				targetVector.copy(basis.right).multiplyScalar(-1);
-			} else if (key === "d") {
-				targetVector.copy(basis.right);
-			} else if (key === " ") {
-				targetVector.copy(basis.up);
-			}
-
-			orientation = getClosestGravityOrientation(targetVector);
-		} else {
+		if (currentMode === "static") {
 			if (key === "w") orientation = "front";
 			else if (key === "s") orientation = "back";
 			else if (key === "a") orientation = "left";
 			else if (key === "d") orientation = "right";
 			else if (key === " ") orientation = "up";
+		} else {
+			if (this.cameraController) {
+				const basis = this.cameraController.getGravityBasis(this.cameraController.isFirstPerson ? this.cameraController.fpYaw : this.cameraController.theta);
+				const targetVector = new THREE.Vector3();
+
+				if (key === "w") {
+					targetVector.copy(basis.forward);
+				} else if (key === "s") {
+					targetVector.copy(basis.forward).multiplyScalar(-1);
+				} else if (key === "a") {
+					targetVector.copy(basis.right).multiplyScalar(-1);
+				} else if (key === "d") {
+					targetVector.copy(basis.right);
+				} else if (key === " ") {
+					targetVector.copy(basis.up);
+				}
+
+				orientation = getClosestGravityOrientation(targetVector);
+			} else {
+				if (key === "w") orientation = "front";
+				else if (key === "s") orientation = "back";
+				else if (key === "a") orientation = "left";
+				else if (key === "d") orientation = "right";
+				else if (key === " ") orientation = "up";
+			}
 		}
 
 		if (orientation && this.character) {

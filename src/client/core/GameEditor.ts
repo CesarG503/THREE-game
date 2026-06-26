@@ -851,7 +851,7 @@ export function triggerGravitySphere(this: any, sphereObj: any) {
 	overlay.style.cssText = `
 		position: fixed; top: 0; left: 0; width: 100%; height: 100%;
 		display: flex; flex-direction: column; justify-content: center; align-items: center;
-		background: rgba(10, 5, 20, 0.5); backdrop-filter: blur(12px);
+		background: rgba(5, 5, 10, 0.45); backdrop-filter: blur(16px);
 		z-index: 99999; font-family: 'Outfit', 'Inter', sans-serif; color: white;
 		opacity: 0; pointer-events: all;
 	`;
@@ -864,63 +864,92 @@ export function triggerGravitySphere(this: any, sphereObj: any) {
 	const styleBlock = document.createElement("style");
 	styleBlock.innerHTML = `
 		.qte-key {
+			position: relative;
 			width: 68px; height: 68px;
-			display: flex; flex-direction: column; justify-content: center; align-items: center;
-			background: rgba(255, 255, 255, 0.05);
-			border: 2px solid rgba(255, 255, 255, 0.15);
-			border-radius: 16px;
-			box-shadow: 0 4px 15px rgba(0,0,0,0.4), inset 0 1px 2px rgba(255,255,255,0.1);
+			background: linear-gradient(135deg, #2c2c2c 0%, #151515 100%);
+			border-radius: 14px;
+			border: 1px solid #111;
+			box-shadow: 
+				0 6px 12px rgba(0, 0, 0, 0.6), 
+				0 5px 0 #0c0c0c, 
+				inset 0 1px 0 rgba(255, 255, 255, 0.15);
 			cursor: pointer;
-			transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
-			backdrop-filter: blur(4px);
+			display: flex;
+			justify-content: center;
+			align-items: center;
+			padding: 6px;
+			box-sizing: border-box;
+			transition: transform 0.08s ease, box-shadow 0.08s ease;
+		}
+		.qte-key-face {
+			width: 100%; height: 100%;
+			background: linear-gradient(180deg, #373737 0%, #212121 100%);
+			border-radius: 9px;
+			border-bottom: 2px solid #161616;
+			box-shadow: 
+				inset 0 3px 6px rgba(0, 0, 0, 0.4), 
+				inset 0 -2px 3px rgba(255, 255, 255, 0.05),
+				0 1px 2px rgba(0, 0, 0, 0.2);
+			display: flex;
+			justify-content: center;
+			align-items: center;
+			color: #f0f0f0;
+			font-family: 'Outfit', sans-serif;
+			font-size: 26px;
+			font-weight: 700;
+			text-shadow: 0 -1px 1px rgba(0, 0, 0, 0.6);
+			user-select: none;
+			box-sizing: border-box;
 		}
 		.qte-key:hover {
-			background: rgba(255, 255, 255, 0.12);
-			border-color: rgba(255, 255, 255, 0.35);
-			box-shadow: 0 6px 20px rgba(0,0,0,0.5), inset 0 1px 2px rgba(255,255,255,0.2);
+			background: linear-gradient(135deg, #333333 0%, #1a1a1a 100%);
 		}
-		.qte-key.active-press {
-			background: rgba(224, 64, 251, 0.25) !important;
-			border-color: #e040fb !important;
-			box-shadow: 0 0 25px rgba(224, 64, 251, 0.8), inset 0 1px 3px rgba(224, 64, 251, 0.5) !important;
+		.qte-key:hover .qte-key-face {
+			background: linear-gradient(180deg, #404040 0%, #262626 100%);
+			color: #ffffff;
+		}
+		.qte-key:active, .qte-key.active-press {
+			transform: translateY(5px);
+			box-shadow: 
+				0 1px 2px rgba(0, 0, 0, 0.6), 
+				0 1px 0 #0c0c0c, 
+				inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
+		}
+		.qte-key.active-press .qte-key-face {
+			background: linear-gradient(180deg, #6a1b9a 0%, #4a148c 100%) !important;
+			color: #ffffff !important;
+			box-shadow: 0 0 15px rgba(224, 64, 251, 0.8), inset 0 2px 4px rgba(0,0,0,0.5) !important;
+			border-bottom-color: #310b5a !important;
 		}
 	`;
 	document.head.appendChild(styleBlock);
 
 	overlay.innerHTML = `
-		<div id="gravity-qte-container" style="background: rgba(18, 10, 30, 0.65); border: 1px solid rgba(224, 64, 251, 0.25); box-shadow: 0 12px 40px rgba(156, 39, 176, 0.25), inset 0 1px 3px rgba(255,255,255,0.05); backdrop-filter: blur(16px); border-radius: 28px; padding: 45px 50px; display: flex; flex-direction: column; align-items: center; gap: 32px; transform: scale(0.85); width: 340px;">
-			<div style="font-size: 26px; font-weight: 800; letter-spacing: 1.5px; text-shadow: 0 0 12px rgba(224, 64, 251, 0.7); color: #e040fb; text-transform: uppercase; text-align: center;">Control de Gravedad</div>
-			<div style="font-size: 13px; color: rgba(255,255,255,0.55); margin-top: -24px; text-align: center; font-weight: 600;">PRESIONA PARA ADQUIRIR GRAVEDAD</div>
-			
-			<div style="display: flex; flex-direction: column; align-items: center; gap: 14px; width: 100%;">
-				<!-- W Key (Front) -->
+		<div id="gravity-qte-container" style="border-radius: 28px; padding: 40px; display: flex; flex-direction: column; align-items: center; transform: scale(0.85); width: fit-content; gap: 14px;">
+			<!-- W Key -->
+			<div style="display: flex; justify-content: center; width: 100%;">
 				<div id="qte-key-w" class="qte-key" data-key="w">
-					<span style="font-size: 22px; font-weight: 800; color: white;">W</span>
-					<span style="font-size: 9px; font-weight: 800; color: #e040fb; margin-top: 1px; letter-spacing: 0.5px;">FRENTE</span>
-				</div>
-				<!-- A S D Keys -->
-				<div style="display: flex; gap: 14px;">
-					<div id="qte-key-a" class="qte-key" data-key="a">
-						<span style="font-size: 22px; font-weight: 800; color: white;">A</span>
-						<span style="font-size: 9px; font-weight: 800; color: #e040fb; margin-top: 1px; letter-spacing: 0.5px;">IZQ</span>
-					</div>
-					<div id="qte-key-s" class="qte-key" data-key="s">
-						<span style="font-size: 22px; font-weight: 800; color: white;">S</span>
-						<span style="font-size: 9px; font-weight: 800; color: #e040fb; margin-top: 1px; letter-spacing: 0.5px;">ATRÁS</span>
-					</div>
-					<div id="qte-key-d" class="qte-key" data-key="d">
-						<span style="font-size: 22px; font-weight: 800; color: white;">D</span>
-						<span style="font-size: 9px; font-weight: 800; color: #e040fb; margin-top: 1px; letter-spacing: 0.5px;">DER</span>
-					</div>
-				</div>
-				<!-- Spacebar (Up) -->
-				<div id="qte-key-space" class="qte-key" data-key=" " style="width: 232px; height: 56px;">
-					<span style="font-size: 15px; font-weight: 800; color: white; letter-spacing: 1px;">ESPACIO</span>
-					<span style="font-size: 9px; font-weight: 800; color: #e040fb; margin-top: 1px; letter-spacing: 0.5px;">ARRIBA</span>
+					<div class="qte-key-face">W</div>
 				</div>
 			</div>
-			
-			<div style="font-size: 11px; color: rgba(255,255,255,0.4); text-align: center; font-weight: 600; letter-spacing: 0.5px; border-top: 1px solid rgba(255,255,255,0.08); width: 100%; padding-top: 15px;">ESC PARA CANCELAR</div>
+			<!-- A S D Keys -->
+			<div style="display: flex; gap: 14px;">
+				<div id="qte-key-a" class="qte-key" data-key="a">
+					<div class="qte-key-face">A</div>
+				</div>
+				<div id="qte-key-s" class="qte-key" data-key="s">
+					<div class="qte-key-face">S</div>
+				</div>
+				<div id="qte-key-d" class="qte-key" data-key="d">
+					<div class="qte-key-face">D</div>
+				</div>
+			</div>
+			<!-- Spacebar -->
+			<div style="display: flex; justify-content: center; width: 100%; margin-top: 4px;">
+				<div id="qte-key-space" class="qte-key" data-key=" " style="width: 232px; height: 56px; padding: 5px;">
+					<div class="qte-key-face" style="font-size: 15px; color: rgba(240, 240, 240, 0.35);">───</div>
+				</div>
+			</div>
 		</div>
 	`;
 	document.body.appendChild(overlay);
@@ -945,7 +974,7 @@ export function triggerGravitySphere(this: any, sphereObj: any) {
 		easing: 'easeOutBack'
 	});
 
-	const closeOverlay = (selectedKeyId: string | null = null, onCompleteCallback: () => void = () => {}) => {
+	const closeOverlay = (selectedKeyId: string | null = null, onCompleteCallback: () => void = () => { }) => {
 		document.removeEventListener("keydown", keydownHandler);
 
 		const cleanup = () => {

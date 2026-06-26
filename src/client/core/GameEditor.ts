@@ -963,6 +963,31 @@ function disposeGravityHelper(helper: any, scene: THREE.Scene) {
 	});
 }
 
+function getClosestGravityOrientation(dir: THREE.Vector3): string {
+	const orientations = ["down", "up", "left", "right", "front", "back"];
+	const targetDirs: Record<string, THREE.Vector3> = {
+		down: new THREE.Vector3(0, -1, 0),
+		up: new THREE.Vector3(0, 1, 0),
+		left: new THREE.Vector3(-1, 0, 0),
+		right: new THREE.Vector3(1, 0, 0),
+		front: new THREE.Vector3(0, 0, -1),
+		back: new THREE.Vector3(0, 0, 1)
+	};
+
+	let maxDot = -Infinity;
+	let closest = "down";
+
+	const normDir = dir.clone().normalize();
+	for (const orient of orientations) {
+		const dot = normDir.dot(targetDirs[orient]);
+		if (dot > maxDot) {
+			maxDot = dot;
+			closest = orient;
+		}
+	}
+	return closest;
+}
+
 export function triggerGravitySphere(this: any, sphereObj: any) {
 	if (document.getElementById("gravity-qte-overlay")) return;
 
@@ -1046,11 +1071,30 @@ export function triggerGravitySphere(this: any, sphereObj: any) {
 		}
 
 		let orientation: string | null = null;
-		if (key === "w") orientation = "front";
-		else if (key === "s") orientation = "back";
-		else if (key === "a") orientation = "left";
-		else if (key === "d") orientation = "right";
-		else if (key === " ") orientation = "up";
+		if (this.cameraController) {
+			const basis = this.cameraController.getGravityBasis(this.cameraController.isFirstPerson ? this.cameraController.fpYaw : this.cameraController.theta);
+			const targetVector = new THREE.Vector3();
+
+			if (key === "w") {
+				targetVector.copy(basis.forward);
+			} else if (key === "s") {
+				targetVector.copy(basis.forward).multiplyScalar(-1);
+			} else if (key === "a") {
+				targetVector.copy(basis.right).multiplyScalar(-1);
+			} else if (key === "d") {
+				targetVector.copy(basis.right);
+			} else if (key === " ") {
+				targetVector.copy(basis.up);
+			}
+
+			orientation = getClosestGravityOrientation(targetVector);
+		} else {
+			if (key === "w") orientation = "front";
+			else if (key === "s") orientation = "back";
+			else if (key === "a") orientation = "left";
+			else if (key === "d") orientation = "right";
+			else if (key === " ") orientation = "up";
+		}
 
 		if (orientation && this.character) {
 			const currentOrient = this.character.getGravityOrientation();

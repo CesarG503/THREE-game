@@ -778,7 +778,6 @@ export class Game {
 		}
 
 		[
-			"multiplayer-panel",
 			"chat-container",
 			"construction-menu",
 			"object-inspector",

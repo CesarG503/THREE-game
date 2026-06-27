@@ -327,10 +327,10 @@ export function animate(this: any) {
 	if (this.gravityQteActive && this.gravityHelperGroup && this.character) {
 		const feetPos = this.character.getPosition();
 		const upVector = this.character.getGravityUpVector ? this.character.getGravityUpVector() : new THREE.Vector3(0, 1, 0);
-		
+
 		// Place at hip height (1.0 unit above feet)
 		this.gravityHelperGroup.group.position.copy(feetPos).addScaledVector(upVector, 1.0);
-		
+
 		const currentMode = this.gravitySelectorMode || "dynamic";
 		const gravityQuat = this.character.getGravityQuaternion ? this.character.getGravityQuaternion() : new THREE.Quaternion();
 		const yawQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), this.character.currentRotation);
@@ -477,8 +477,6 @@ export function animate(this: any) {
 			}
 		}
 
-		const countEl = document.getElementById("player-count");
-		if (countEl) countEl.textContent = `Jugadores: ${this.networkManager.getPlayerCount()}`;
 	}
 
 	if (this.npc) this.npc.update(dt);

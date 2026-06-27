@@ -1293,45 +1293,6 @@ class Game {
         const hostname = window.location.hostname || 'localhost';
         const defaultWsUrl = `${protocol}//${hostname}:8080`;
 
-        const panel = document.createElement("div")
-        panel.id = "multiplayer-panel"
-        panel.innerHTML = `
-      <div class="mp-header">Multijugador (Sala: ${this.roomId})</div>
-      <div class="mp-status" id="connection-status">Desconectado</div>
-      <input type="text" id="server-url" placeholder="${defaultWsUrl}" value="${defaultWsUrl}">
-      <button id="connect-btn">Conectar</button>
-      <div class="mp-players" id="player-count">Jugadores: 0</div>
-    `
-        document.body.appendChild(panel)
-
-        // Atenuamos el panel visualmente porque ahora es automático
-        panel.style.opacity = "0.75"
-        panel.style.transition = "opacity 0.3s"
-        panel.addEventListener("mouseenter", () => panel.style.opacity = "1")
-        panel.addEventListener("mouseleave", () => panel.style.opacity = "0.75")
-
-        const connectBtn = document.getElementById("connect-btn")
-        const serverUrlInput = document.getElementById("server-url")
-
-        connectBtn.addEventListener("click", () => {
-            if (this.networkManager.isConnected) {
-                this.networkManager.disconnect()
-                this.updateConnectionStatus(false)
-            } else {
-                const url = serverUrlInput.value.trim()
-                if (url) {
-                    this.networkManager.connect(url)
-                }
-            }
-        })
-
-        const showNamesCheckbox = document.getElementById("show-names")
-        if (showNamesCheckbox) {
-            showNamesCheckbox.addEventListener("change", (e) => {
-                this.networkManager.setShowPlayerNames(e.target.checked)
-            })
-        }
-
         // [Nuevo] Auto-Conexión silenciosa al cargar
         setTimeout(() => {
             if (!this.networkManager.isConnected) {
@@ -1342,20 +1303,8 @@ class Game {
     }
 
     updateConnectionStatus(connected, playerId = null) {
-        const statusEl = document.getElementById("connection-status")
-        const connectBtn = document.getElementById("connect-btn")
-
-        if (connected) {
-            statusEl.textContent = `Conectado: ${playerId?.slice(-6) || ""}`
-            statusEl.className = "mp-status connected"
-            connectBtn.textContent = "Desconectar"
-            connectBtn.className = "disconnect"
-        } else {
-            statusEl.textContent = "Desconectado"
-            statusEl.className = "mp-status disconnected"
-            connectBtn.textContent = "Conectar"
-            connectBtn.className = ""
-        }
+        void connected
+        void playerId
     }
 
     setupSettingsPanel() {

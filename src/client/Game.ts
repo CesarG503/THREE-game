@@ -675,16 +675,12 @@ export class Game {
 					if (this.objectInspector && e.button === 2) {
 						const target = selectEditableObjectFromPointer();
 						if (target) {
-							this.objectInspector.show(target);
-						}
-					} else if (this.objectInspector && e.button === 0) {
-						const currentItem = this.inventoryManager ? this.inventoryManager.getCurrentItem() : null;
-						const isLogicMapEdit = !!this.constructionMenu?.logicSystem?.isEditingMap;
-						if (!currentItem && !isLogicMapEdit) {
-							const target = selectEditableObjectFromPointer();
-							if (target) {
-								this.objectInspector.show(target);
+							if (this.objectInspector.isVisible && this.objectInspector.selectedObject && this.objectInspector.selectedObject !== target) {
+								if (!this.objectInspector.allowDynamicSwitch) {
+									return;
+								}
 							}
+							this.objectInspector.show(target);
 						}
 					}
 				}

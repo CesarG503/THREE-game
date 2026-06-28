@@ -11,6 +11,9 @@ export function setupGameInput(this: Game) {
 		if (activeElement && (activeElement.tagName === "INPUT" || activeElement.tagName === "SELECT" || activeElement.tagName === "TEXTAREA")) {
 			if (e.key === "Escape") {
 				activeElement.blur();
+				if (this.objectInspector && this.objectInspector.isVisible) {
+					this.objectInspector.hide();
+				}
 			} else {
 				return;
 			}

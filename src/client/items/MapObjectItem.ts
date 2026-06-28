@@ -869,6 +869,7 @@ export class MapObjectItem extends Item {
     object3D.userData.isEditableMapObject = true;
     object3D.userData.isMapObject = true;
     object3D.userData.mapObjectType = this.type;
+    object3D.userData.customName = this.name || "";
     object3D.userData.uuid = THREE.MathUtils.generateUUID();
     object3D.userData.originalUUID = object3D.userData.uuid;
     object3D.userData.color = this.color;

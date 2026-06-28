@@ -48,7 +48,8 @@ export function saveMap(this: any) {
 				uuid: obj.userData.uuid,
 				invisible: obj.userData.invisible,
 				opacity: obj.userData.opacity,
-				authorId: obj.userData.authorId
+				authorId: obj.userData.authorId,
+				customName: obj.userData.customName || ""
 			});
 		}
 	});
@@ -109,7 +110,7 @@ export function loadMap(this: any, jsonData: any) {
 	jsonData.objects.forEach((data: any) => {
 		const tempItem = new MapObjectItem(
 			"loaded_" + Math.random(),
-			"Loaded Obj",
+			data.customName || data.type || "Loaded Obj",
 			data.type,
 			"",
 			data.color,
@@ -131,8 +132,13 @@ export function loadMap(this: any, jsonData: any) {
 
 		const lastObj = this.sceneManager.scene.children[this.sceneManager.scene.children.length - 1];
 
-		if (lastObj && data.authorId) {
-			lastObj.userData.authorId = data.authorId;
+		if (lastObj) {
+			if (data.authorId) {
+				lastObj.userData.authorId = data.authorId;
+			}
+			if (data.customName) {
+				lastObj.userData.customName = data.customName;
+			}
 		}
 
 		if (data.opacity !== undefined && lastObj) {

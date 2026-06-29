@@ -67,33 +67,33 @@ export class Game {
 	objectInspector: any;
 	inventoryManager: any;
 	itemDropManager: any;
-	pendingItemPickups: Map<string, any>;
-	fuegoCount: number;
-	farmingZoneCounts: { [groupId: string]: number };
+	pendingItemPickups!: Map<string, any>;
+	fuegoCount!: number;
+	farmingZoneCounts!: { [groupId: string]: number };
 	environmentConfig: any;
 	invisibleWallMeshes: any;
 	invisibleWallBodies: any;
 	groundGroup: any;
 	groundBody: any;
 	groundColliders: any;
-	debugEnabled: boolean;
+	debugEnabled!: boolean;
 	debugMesh: any;
 	gizmoScene: any;
 	gizmoAxes: any;
 	gizmoCamera: any;
-	placementRotationIndex: number;
-	isFKeyDown: boolean;
-	fKeyHeldTime: number;
+	placementRotationIndex!: number;
+	isFKeyDown!: boolean;
+	fKeyHeldTime!: number;
 	farmingZone: any;
-	isMovingFarmingZone: boolean;
+	isMovingFarmingZone!: boolean;
 	moveGhost: any;
 	npc: any;
-	_netAttackLatch: boolean;
-	_isApplyingRemoteEdit: boolean;
+	_netAttackLatch!: boolean;
+	_isApplyingRemoteEdit!: boolean;
 	GunItemClass: any;
 	PelotaItemClass: any;
-	activePlatformMap: PlatformMap | null;
-	_routeMapLoadStarted: boolean;
+	activePlatformMap!: PlatformMap | null;
+	_routeMapLoadStarted!: boolean;
 	isDisposed: boolean;
 	animationFrameId: number | null;
 
@@ -664,7 +664,7 @@ export class Game {
 					});
 
 					if (hit) {
-						let target = hit.object;
+						let target: THREE.Object3D | null = hit.object;
 						while (target && (!target.userData || !target.userData.isEditableMapObject)) {
 							target = target.parent;
 						}

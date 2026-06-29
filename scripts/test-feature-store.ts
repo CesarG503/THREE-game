@@ -141,8 +141,9 @@ async function main() {
       where: { mapId: testMapId },
     });
 
-    assert(!!playerFeatures, "PlayerFeatures record not found.");
-    assert(!!mapFeatures, "MapFeatures record not found.");
+    if (!playerFeatures || !mapFeatures) {
+      throw new Error("playerFeatures or mapFeatures not found in DB.");
+    }
 
     // Assert PlayerFeatures
     console.log("\nChecking PlayerFeatures values:");

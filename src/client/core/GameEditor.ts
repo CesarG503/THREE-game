@@ -428,7 +428,7 @@ export function updateButtonInteraction(this: any, dt: number) {
 	const charPos = this.character ? this.character.getPosition() : null;
 	if (!charPos) return;
 
-	let nearest = null;
+	let nearest: any = null;
 	let minDistSq = 9.0;
 
 	this.sceneManager.scene.children.forEach((obj: any) => {

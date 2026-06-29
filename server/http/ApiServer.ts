@@ -43,7 +43,10 @@ export async function handleHttpRequest(
       if (!validation.valid) {
         // Log details internally, don't expose schema to clients
         logger.warn("HTTP", `Invalid telemetry event from ${ip}`, validation.errors)
-        sendJson(res, 400, { error: "Validation failed" })
+        sendJson(res, 400, { 
+          error: "Validation failed", 
+          details: ["The event payload does not match the registered schema."] 
+        })
         return
       }
       const success = eventBuffer.push(body as any)

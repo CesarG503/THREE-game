@@ -69,7 +69,7 @@ async function main() {
     // 1. Setup connection to Redis & start worker/buffer
     await connectRedis();
     eventBuffer.start(100); // Flush every 100ms
-    eventWorker.start(100); // Poll every 100ms
+    eventWorker.start(); // Poll every 100ms
 
     // Pre-create test user in public (replicates to analytics)
     await prisma.user.deleteMany({ where: { id: testUserId } });
@@ -129,8 +129,8 @@ async function main() {
 
     assert(!!dbEvent, "Event was not written to analytics database.");
     console.log("✓ Event successfully verified in PostgreSQL analytics.RawEvent table!");
-    assert(dbEvent.eventType === "PageView", "Event type mismatch.");
-    assert((dbEvent.payload as any).toRoute === "/play", "Payload contents mismatch.");
+    assert(dbEvent!.eventType === "PageView", "Event type mismatch.");
+    assert((dbEvent!.payload as any).toRoute === "/play", "Payload contents mismatch.");
 
     // --- TEST B: Validation Failure (Invalid Payload Schema) ---
     console.log("\n--- TEST B: Validation Failure ---");

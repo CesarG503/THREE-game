@@ -165,7 +165,10 @@ exports.Prisma.MapFeaturesScalarFieldEnum = {
   totalLeaves: 'totalLeaves',
   bounceCount: 'bounceCount',
   averageDuration: 'averageDuration',
-  bounceRate: 'bounceRate'
+  bounceRate: 'bounceRate',
+  medianPlaytime: 'medianPlaytime',
+  completionRate: 'completionRate',
+  retentionCurve: 'retentionCurve'
 };
 
 exports.Prisma.SocialAffinityScalarFieldEnum = {
@@ -189,6 +192,11 @@ exports.Prisma.SortOrder = {
 };
 
 exports.Prisma.JsonNullValueInput = {
+  JsonNull: Prisma.JsonNull
+};
+
+exports.Prisma.NullableJsonNullValueInput = {
+  DbNull: Prisma.DbNull,
   JsonNull: Prisma.JsonNull
 };
 

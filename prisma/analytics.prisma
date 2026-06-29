@@ -73,6 +73,9 @@ model MapFeatures {
   bounceCount     Int      @default(0)
   averageDuration Float    @default(0) // in seconds
   bounceRate      Float    @default(0) // fraction 0 to 1
+  medianPlaytime  Float?
+  completionRate  Float?
+  retentionCurve  Json?
   map             GameMap  @relation(fields: [mapId], references: [id], onDelete: Cascade)
 
   @@schema("analytics")

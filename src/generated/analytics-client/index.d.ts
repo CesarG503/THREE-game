@@ -6080,6 +6080,8 @@ export namespace Prisma {
     bounceCount: number | null
     averageDuration: number | null
     bounceRate: number | null
+    medianPlaytime: number | null
+    completionRate: number | null
   }
 
   export type MapFeaturesSumAggregateOutputType = {
@@ -6088,6 +6090,8 @@ export namespace Prisma {
     bounceCount: number | null
     averageDuration: number | null
     bounceRate: number | null
+    medianPlaytime: number | null
+    completionRate: number | null
   }
 
   export type MapFeaturesMinAggregateOutputType = {
@@ -6097,6 +6101,8 @@ export namespace Prisma {
     bounceCount: number | null
     averageDuration: number | null
     bounceRate: number | null
+    medianPlaytime: number | null
+    completionRate: number | null
   }
 
   export type MapFeaturesMaxAggregateOutputType = {
@@ -6106,6 +6112,8 @@ export namespace Prisma {
     bounceCount: number | null
     averageDuration: number | null
     bounceRate: number | null
+    medianPlaytime: number | null
+    completionRate: number | null
   }
 
   export type MapFeaturesCountAggregateOutputType = {
@@ -6115,6 +6123,9 @@ export namespace Prisma {
     bounceCount: number
     averageDuration: number
     bounceRate: number
+    medianPlaytime: number
+    completionRate: number
+    retentionCurve: number
     _all: number
   }
 
@@ -6125,6 +6136,8 @@ export namespace Prisma {
     bounceCount?: true
     averageDuration?: true
     bounceRate?: true
+    medianPlaytime?: true
+    completionRate?: true
   }
 
   export type MapFeaturesSumAggregateInputType = {
@@ -6133,6 +6146,8 @@ export namespace Prisma {
     bounceCount?: true
     averageDuration?: true
     bounceRate?: true
+    medianPlaytime?: true
+    completionRate?: true
   }
 
   export type MapFeaturesMinAggregateInputType = {
@@ -6142,6 +6157,8 @@ export namespace Prisma {
     bounceCount?: true
     averageDuration?: true
     bounceRate?: true
+    medianPlaytime?: true
+    completionRate?: true
   }
 
   export type MapFeaturesMaxAggregateInputType = {
@@ -6151,6 +6168,8 @@ export namespace Prisma {
     bounceCount?: true
     averageDuration?: true
     bounceRate?: true
+    medianPlaytime?: true
+    completionRate?: true
   }
 
   export type MapFeaturesCountAggregateInputType = {
@@ -6160,6 +6179,9 @@ export namespace Prisma {
     bounceCount?: true
     averageDuration?: true
     bounceRate?: true
+    medianPlaytime?: true
+    completionRate?: true
+    retentionCurve?: true
     _all?: true
   }
 
@@ -6256,6 +6278,9 @@ export namespace Prisma {
     bounceCount: number
     averageDuration: number
     bounceRate: number
+    medianPlaytime: number | null
+    completionRate: number | null
+    retentionCurve: JsonValue | null
     _count: MapFeaturesCountAggregateOutputType | null
     _avg: MapFeaturesAvgAggregateOutputType | null
     _sum: MapFeaturesSumAggregateOutputType | null
@@ -6284,6 +6309,9 @@ export namespace Prisma {
     bounceCount?: boolean
     averageDuration?: boolean
     bounceRate?: boolean
+    medianPlaytime?: boolean
+    completionRate?: boolean
+    retentionCurve?: boolean
     map?: boolean | GameMapDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["mapFeatures"]>
 
@@ -6294,6 +6322,9 @@ export namespace Prisma {
     bounceCount?: boolean
     averageDuration?: boolean
     bounceRate?: boolean
+    medianPlaytime?: boolean
+    completionRate?: boolean
+    retentionCurve?: boolean
     map?: boolean | GameMapDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["mapFeatures"]>
 
@@ -6304,6 +6335,9 @@ export namespace Prisma {
     bounceCount?: boolean
     averageDuration?: boolean
     bounceRate?: boolean
+    medianPlaytime?: boolean
+    completionRate?: boolean
+    retentionCurve?: boolean
     map?: boolean | GameMapDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["mapFeatures"]>
 
@@ -6314,9 +6348,12 @@ export namespace Prisma {
     bounceCount?: boolean
     averageDuration?: boolean
     bounceRate?: boolean
+    medianPlaytime?: boolean
+    completionRate?: boolean
+    retentionCurve?: boolean
   }
 
-  export type MapFeaturesOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"mapId" | "totalJoins" | "totalLeaves" | "bounceCount" | "averageDuration" | "bounceRate", ExtArgs["result"]["mapFeatures"]>
+  export type MapFeaturesOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"mapId" | "totalJoins" | "totalLeaves" | "bounceCount" | "averageDuration" | "bounceRate" | "medianPlaytime" | "completionRate" | "retentionCurve", ExtArgs["result"]["mapFeatures"]>
   export type MapFeaturesInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     map?: boolean | GameMapDefaultArgs<ExtArgs>
   }
@@ -6339,6 +6376,9 @@ export namespace Prisma {
       bounceCount: number
       averageDuration: number
       bounceRate: number
+      medianPlaytime: number | null
+      completionRate: number | null
+      retentionCurve: Prisma.JsonValue | null
     }, ExtArgs["result"]["mapFeatures"]>
     composites: {}
   }
@@ -6769,6 +6809,9 @@ export namespace Prisma {
     readonly bounceCount: FieldRef<"MapFeatures", 'Int'>
     readonly averageDuration: FieldRef<"MapFeatures", 'Float'>
     readonly bounceRate: FieldRef<"MapFeatures", 'Float'>
+    readonly medianPlaytime: FieldRef<"MapFeatures", 'Float'>
+    readonly completionRate: FieldRef<"MapFeatures", 'Float'>
+    readonly retentionCurve: FieldRef<"MapFeatures", 'Json'>
   }
     
 
@@ -9422,7 +9465,10 @@ export namespace Prisma {
     totalLeaves: 'totalLeaves',
     bounceCount: 'bounceCount',
     averageDuration: 'averageDuration',
-    bounceRate: 'bounceRate'
+    bounceRate: 'bounceRate',
+    medianPlaytime: 'medianPlaytime',
+    completionRate: 'completionRate',
+    retentionCurve: 'retentionCurve'
   };
 
   export type MapFeaturesScalarFieldEnum = (typeof MapFeaturesScalarFieldEnum)[keyof typeof MapFeaturesScalarFieldEnum]
@@ -9462,6 +9508,14 @@ export namespace Prisma {
   };
 
   export type JsonNullValueInput = (typeof JsonNullValueInput)[keyof typeof JsonNullValueInput]
+
+
+  export const NullableJsonNullValueInput: {
+    DbNull: typeof DbNull,
+    JsonNull: typeof JsonNull
+  };
+
+  export type NullableJsonNullValueInput = (typeof NullableJsonNullValueInput)[keyof typeof NullableJsonNullValueInput]
 
 
   export const QueryMode: {
@@ -9857,6 +9911,9 @@ export namespace Prisma {
     bounceCount?: IntFilter<"MapFeatures"> | number
     averageDuration?: FloatFilter<"MapFeatures"> | number
     bounceRate?: FloatFilter<"MapFeatures"> | number
+    medianPlaytime?: FloatNullableFilter<"MapFeatures"> | number | null
+    completionRate?: FloatNullableFilter<"MapFeatures"> | number | null
+    retentionCurve?: JsonNullableFilter<"MapFeatures">
     map?: XOR<GameMapScalarRelationFilter, GameMapWhereInput>
   }
 
@@ -9867,6 +9924,9 @@ export namespace Prisma {
     bounceCount?: SortOrder
     averageDuration?: SortOrder
     bounceRate?: SortOrder
+    medianPlaytime?: SortOrderInput | SortOrder
+    completionRate?: SortOrderInput | SortOrder
+    retentionCurve?: SortOrderInput | SortOrder
     map?: GameMapOrderByWithRelationInput
   }
 
@@ -9880,6 +9940,9 @@ export namespace Prisma {
     bounceCount?: IntFilter<"MapFeatures"> | number
     averageDuration?: FloatFilter<"MapFeatures"> | number
     bounceRate?: FloatFilter<"MapFeatures"> | number
+    medianPlaytime?: FloatNullableFilter<"MapFeatures"> | number | null
+    completionRate?: FloatNullableFilter<"MapFeatures"> | number | null
+    retentionCurve?: JsonNullableFilter<"MapFeatures">
     map?: XOR<GameMapScalarRelationFilter, GameMapWhereInput>
   }, "mapId">
 
@@ -9890,6 +9953,9 @@ export namespace Prisma {
     bounceCount?: SortOrder
     averageDuration?: SortOrder
     bounceRate?: SortOrder
+    medianPlaytime?: SortOrderInput | SortOrder
+    completionRate?: SortOrderInput | SortOrder
+    retentionCurve?: SortOrderInput | SortOrder
     _count?: MapFeaturesCountOrderByAggregateInput
     _avg?: MapFeaturesAvgOrderByAggregateInput
     _max?: MapFeaturesMaxOrderByAggregateInput
@@ -9907,6 +9973,9 @@ export namespace Prisma {
     bounceCount?: IntWithAggregatesFilter<"MapFeatures"> | number
     averageDuration?: FloatWithAggregatesFilter<"MapFeatures"> | number
     bounceRate?: FloatWithAggregatesFilter<"MapFeatures"> | number
+    medianPlaytime?: FloatNullableWithAggregatesFilter<"MapFeatures"> | number | null
+    completionRate?: FloatNullableWithAggregatesFilter<"MapFeatures"> | number | null
+    retentionCurve?: JsonNullableWithAggregatesFilter<"MapFeatures">
   }
 
   export type SocialAffinityWhereInput = {
@@ -10329,6 +10398,9 @@ export namespace Prisma {
     bounceCount?: number
     averageDuration?: number
     bounceRate?: number
+    medianPlaytime?: number | null
+    completionRate?: number | null
+    retentionCurve?: NullableJsonNullValueInput | InputJsonValue
     map: GameMapCreateNestedOneWithoutMapFeaturesInput
   }
 
@@ -10339,6 +10411,9 @@ export namespace Prisma {
     bounceCount?: number
     averageDuration?: number
     bounceRate?: number
+    medianPlaytime?: number | null
+    completionRate?: number | null
+    retentionCurve?: NullableJsonNullValueInput | InputJsonValue
   }
 
   export type MapFeaturesUpdateInput = {
@@ -10347,6 +10422,9 @@ export namespace Prisma {
     bounceCount?: IntFieldUpdateOperationsInput | number
     averageDuration?: FloatFieldUpdateOperationsInput | number
     bounceRate?: FloatFieldUpdateOperationsInput | number
+    medianPlaytime?: NullableFloatFieldUpdateOperationsInput | number | null
+    completionRate?: NullableFloatFieldUpdateOperationsInput | number | null
+    retentionCurve?: NullableJsonNullValueInput | InputJsonValue
     map?: GameMapUpdateOneRequiredWithoutMapFeaturesNestedInput
   }
 
@@ -10357,6 +10435,9 @@ export namespace Prisma {
     bounceCount?: IntFieldUpdateOperationsInput | number
     averageDuration?: FloatFieldUpdateOperationsInput | number
     bounceRate?: FloatFieldUpdateOperationsInput | number
+    medianPlaytime?: NullableFloatFieldUpdateOperationsInput | number | null
+    completionRate?: NullableFloatFieldUpdateOperationsInput | number | null
+    retentionCurve?: NullableJsonNullValueInput | InputJsonValue
   }
 
   export type MapFeaturesCreateManyInput = {
@@ -10366,6 +10447,9 @@ export namespace Prisma {
     bounceCount?: number
     averageDuration?: number
     bounceRate?: number
+    medianPlaytime?: number | null
+    completionRate?: number | null
+    retentionCurve?: NullableJsonNullValueInput | InputJsonValue
   }
 
   export type MapFeaturesUpdateManyMutationInput = {
@@ -10374,6 +10458,9 @@ export namespace Prisma {
     bounceCount?: IntFieldUpdateOperationsInput | number
     averageDuration?: FloatFieldUpdateOperationsInput | number
     bounceRate?: FloatFieldUpdateOperationsInput | number
+    medianPlaytime?: NullableFloatFieldUpdateOperationsInput | number | null
+    completionRate?: NullableFloatFieldUpdateOperationsInput | number | null
+    retentionCurve?: NullableJsonNullValueInput | InputJsonValue
   }
 
   export type MapFeaturesUncheckedUpdateManyInput = {
@@ -10383,6 +10470,9 @@ export namespace Prisma {
     bounceCount?: IntFieldUpdateOperationsInput | number
     averageDuration?: FloatFieldUpdateOperationsInput | number
     bounceRate?: FloatFieldUpdateOperationsInput | number
+    medianPlaytime?: NullableFloatFieldUpdateOperationsInput | number | null
+    completionRate?: NullableFloatFieldUpdateOperationsInput | number | null
+    retentionCurve?: NullableJsonNullValueInput | InputJsonValue
   }
 
   export type SocialAffinityCreateInput = {
@@ -10910,6 +11000,29 @@ export namespace Prisma {
     _min?: NestedFloatNullableFilter<$PrismaModel>
     _max?: NestedFloatNullableFilter<$PrismaModel>
   }
+  export type JsonNullableFilter<$PrismaModel = never> =
+    | PatchUndefined<
+        Either<Required<JsonNullableFilterBase<$PrismaModel>>, Exclude<keyof Required<JsonNullableFilterBase<$PrismaModel>>, 'path'>>,
+        Required<JsonNullableFilterBase<$PrismaModel>>
+      >
+    | OptionalFlat<Omit<Required<JsonNullableFilterBase<$PrismaModel>>, 'path'>>
+
+  export type JsonNullableFilterBase<$PrismaModel = never> = {
+    equals?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
+    path?: string[]
+    mode?: QueryMode | EnumQueryModeFieldRefInput<$PrismaModel>
+    string_contains?: string | StringFieldRefInput<$PrismaModel>
+    string_starts_with?: string | StringFieldRefInput<$PrismaModel>
+    string_ends_with?: string | StringFieldRefInput<$PrismaModel>
+    array_starts_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    array_ends_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    array_contains?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    lt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    lte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    gt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    gte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    not?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
+  }
 
   export type GameMapScalarRelationFilter = {
     is?: GameMapWhereInput
@@ -10923,6 +11036,9 @@ export namespace Prisma {
     bounceCount?: SortOrder
     averageDuration?: SortOrder
     bounceRate?: SortOrder
+    medianPlaytime?: SortOrder
+    completionRate?: SortOrder
+    retentionCurve?: SortOrder
   }
 
   export type MapFeaturesAvgOrderByAggregateInput = {
@@ -10931,6 +11047,8 @@ export namespace Prisma {
     bounceCount?: SortOrder
     averageDuration?: SortOrder
     bounceRate?: SortOrder
+    medianPlaytime?: SortOrder
+    completionRate?: SortOrder
   }
 
   export type MapFeaturesMaxOrderByAggregateInput = {
@@ -10940,6 +11058,8 @@ export namespace Prisma {
     bounceCount?: SortOrder
     averageDuration?: SortOrder
     bounceRate?: SortOrder
+    medianPlaytime?: SortOrder
+    completionRate?: SortOrder
   }
 
   export type MapFeaturesMinOrderByAggregateInput = {
@@ -10949,6 +11069,8 @@ export namespace Prisma {
     bounceCount?: SortOrder
     averageDuration?: SortOrder
     bounceRate?: SortOrder
+    medianPlaytime?: SortOrder
+    completionRate?: SortOrder
   }
 
   export type MapFeaturesSumOrderByAggregateInput = {
@@ -10957,6 +11079,34 @@ export namespace Prisma {
     bounceCount?: SortOrder
     averageDuration?: SortOrder
     bounceRate?: SortOrder
+    medianPlaytime?: SortOrder
+    completionRate?: SortOrder
+  }
+  export type JsonNullableWithAggregatesFilter<$PrismaModel = never> =
+    | PatchUndefined<
+        Either<Required<JsonNullableWithAggregatesFilterBase<$PrismaModel>>, Exclude<keyof Required<JsonNullableWithAggregatesFilterBase<$PrismaModel>>, 'path'>>,
+        Required<JsonNullableWithAggregatesFilterBase<$PrismaModel>>
+      >
+    | OptionalFlat<Omit<Required<JsonNullableWithAggregatesFilterBase<$PrismaModel>>, 'path'>>
+
+  export type JsonNullableWithAggregatesFilterBase<$PrismaModel = never> = {
+    equals?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
+    path?: string[]
+    mode?: QueryMode | EnumQueryModeFieldRefInput<$PrismaModel>
+    string_contains?: string | StringFieldRefInput<$PrismaModel>
+    string_starts_with?: string | StringFieldRefInput<$PrismaModel>
+    string_ends_with?: string | StringFieldRefInput<$PrismaModel>
+    array_starts_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    array_ends_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    array_contains?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    lt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    lte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    gt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    gte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    not?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
+    _count?: NestedIntNullableFilter<$PrismaModel>
+    _min?: NestedJsonNullableFilter<$PrismaModel>
+    _max?: NestedJsonNullableFilter<$PrismaModel>
   }
 
   export type SocialAffinityUserId1UserId2CompoundUniqueInput = {
@@ -11650,6 +11800,29 @@ export namespace Prisma {
     _min?: NestedFloatNullableFilter<$PrismaModel>
     _max?: NestedFloatNullableFilter<$PrismaModel>
   }
+  export type NestedJsonNullableFilter<$PrismaModel = never> =
+    | PatchUndefined<
+        Either<Required<NestedJsonNullableFilterBase<$PrismaModel>>, Exclude<keyof Required<NestedJsonNullableFilterBase<$PrismaModel>>, 'path'>>,
+        Required<NestedJsonNullableFilterBase<$PrismaModel>>
+      >
+    | OptionalFlat<Omit<Required<NestedJsonNullableFilterBase<$PrismaModel>>, 'path'>>
+
+  export type NestedJsonNullableFilterBase<$PrismaModel = never> = {
+    equals?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
+    path?: string[]
+    mode?: QueryMode | EnumQueryModeFieldRefInput<$PrismaModel>
+    string_contains?: string | StringFieldRefInput<$PrismaModel>
+    string_starts_with?: string | StringFieldRefInput<$PrismaModel>
+    string_ends_with?: string | StringFieldRefInput<$PrismaModel>
+    array_starts_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    array_ends_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    array_contains?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    lt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    lte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    gt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    gte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    not?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
+  }
 
   export type RawEventCreateWithoutUserInput = {
     id?: string
@@ -11907,6 +12080,9 @@ export namespace Prisma {
     bounceCount?: number
     averageDuration?: number
     bounceRate?: number
+    medianPlaytime?: number | null
+    completionRate?: number | null
+    retentionCurve?: NullableJsonNullValueInput | InputJsonValue
   }
 
   export type MapFeaturesUncheckedCreateWithoutMapInput = {
@@ -11915,6 +12091,9 @@ export namespace Prisma {
     bounceCount?: number
     averageDuration?: number
     bounceRate?: number
+    medianPlaytime?: number | null
+    completionRate?: number | null
+    retentionCurve?: NullableJsonNullValueInput | InputJsonValue
   }
 
   export type MapFeaturesCreateOrConnectWithoutMapInput = {
@@ -11961,6 +12140,9 @@ export namespace Prisma {
     bounceCount?: IntFieldUpdateOperationsInput | number
     averageDuration?: FloatFieldUpdateOperationsInput | number
     bounceRate?: FloatFieldUpdateOperationsInput | number
+    medianPlaytime?: NullableFloatFieldUpdateOperationsInput | number | null
+    completionRate?: NullableFloatFieldUpdateOperationsInput | number | null
+    retentionCurve?: NullableJsonNullValueInput | InputJsonValue
   }
 
   export type MapFeaturesUncheckedUpdateWithoutMapInput = {
@@ -11969,6 +12151,9 @@ export namespace Prisma {
     bounceCount?: IntFieldUpdateOperationsInput | number
     averageDuration?: FloatFieldUpdateOperationsInput | number
     bounceRate?: FloatFieldUpdateOperationsInput | number
+    medianPlaytime?: NullableFloatFieldUpdateOperationsInput | number | null
+    completionRate?: NullableFloatFieldUpdateOperationsInput | number | null
+    retentionCurve?: NullableJsonNullValueInput | InputJsonValue
   }
 
   export type FatiguedMapUpsertWithWhereUniqueWithoutMapInput = {

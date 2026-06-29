@@ -16,6 +16,7 @@ export async function handleHttpRequest(
   res: ServerResponse,
 ): Promise<void> {
   setCorsHeaders(req, res)
+  setSecurityHeaders(res)
 
   if (req.method === "OPTIONS") {
     res.writeHead(204)
@@ -31,8 +32,8 @@ export async function handleHttpRequest(
   }
 
   if (req.method === "POST" && url.pathname === "/api/analytics/event") {
-    // Rate limiting: max 100 events per IP per minute
-    const ip = req.socket.remoteAddress ?? "unknown"
+    // Rate limiting: max 100 events per IP per minute (fail-open: analytics are not safety-critical)
+    const ip = getClientIp(req)
     const rateLimited = await checkRateLimit(ip, 100, 60)
     if (rateLimited) {
       sendJson(res, 429, { error: "Rate limit exceeded" })
@@ -59,8 +60,8 @@ export async function handleHttpRequest(
   }
 
   if (req.method === "POST" && url.pathname === "/api/auth/register") {
-    const ip = req.socket.remoteAddress ?? "unknown"
-    if (await checkRateLimit(`register:${ip}`, 10, 60)) {
+    const ip = getClientIp(req)
+    if (await checkRateLimit(`register:${ip}`, 10, 60, true)) {
       sendJson(res, 429, { error: "Demasiados intentos. Intenta de nuevo en un minuto." })
       return
     }
@@ -71,8 +72,8 @@ export async function handleHttpRequest(
   }
 
   if (req.method === "POST" && url.pathname === "/api/auth/login") {
-    const ip = req.socket.remoteAddress ?? "unknown"
-    if (await checkRateLimit(`login:${ip}`, 5, 60)) {
+    const ip = getClientIp(req)
+    if (await checkRateLimit(`login:${ip}`, 5, 60, true)) {
       sendJson(res, 429, { error: "Demasiados intentos. Intenta de nuevo en un minuto." })
       return
     }
@@ -260,11 +261,13 @@ function setCorsHeaders(req: HttpIncomingMessage, res: ServerResponse): void {
   const origin = req.headers.origin
   if (typeof origin === "string" && ALLOWED_ORIGINS.has(origin)) {
     res.setHeader("Access-Control-Allow-Origin", origin)
+    // Only send credentials header when the origin is explicitly whitelisted,
+    // preventing CSRF via wildcard-credential combinations.
+    res.setHeader("Access-Control-Allow-Credentials", "true")
   }
   res.setHeader("Vary", "Origin")
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS")
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization")
-  res.setHeader("Access-Control-Allow-Credentials", "true")
 }
 
 async function withMultipartBody(
@@ -418,14 +421,49 @@ function isDatabaseConnectionError(err: unknown) {
 }
 
 /**
+ * Resolves the real client IP address.
+ * When TRUSTED_PROXY=true, reads X-Forwarded-For / X-Real-IP set by the reverse proxy.
+ * Otherwise falls back to the TCP socket address to prevent IP spoofing.
+ */
+function getClientIp(req: HttpIncomingMessage): string {
+  if (process.env.TRUSTED_PROXY === "true") {
+    const forwarded = req.headers["x-forwarded-for"]
+    if (typeof forwarded === "string") {
+      const first = forwarded.split(",")[0]?.trim()
+      if (first) return first
+    }
+    const realIp = req.headers["x-real-ip"]
+    if (typeof realIp === "string" && realIp.trim()) return realIp.trim()
+  }
+  return req.socket.remoteAddress ?? "unknown"
+}
+
+/**
+ * Adds defensive HTTP headers to every response.
+ * These prevent MIME sniffing, framing attacks, and info leakage via Referer.
+ */
+function setSecurityHeaders(res: ServerResponse): void {
+  res.setHeader("X-Content-Type-Options", "nosniff")
+  res.setHeader("X-Frame-Options", "DENY")
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin")
+}
+
+/**
  * Sliding-window rate limiter backed by Redis.
+ * @param failClosed - when true, BLOCKS requests if Redis is unavailable (use for auth).
+ *                     when false, ALLOWS requests on Redis failure (use for analytics).
  * Returns true if the caller should be rejected (limit exceeded).
  */
-async function checkRateLimit(key: string, maxRequests: number, windowSeconds: number): Promise<boolean> {
+async function checkRateLimit(
+  key: string,
+  maxRequests: number,
+  windowSeconds: number,
+  failClosed = false,
+): Promise<boolean> {
   const redis = getRedis()
-  if (!redis || !redis.isOpen) return false // Fail open if Redis unavailable
+  if (!redis || !redis.isOpen) return failClosed
 
-  const rlKey = `rl:analytics:${key}`
+  const rlKey = `rl:${key}`
   try {
     const count = await redis.incr(rlKey)
     if (count === 1) {
@@ -433,6 +471,6 @@ async function checkRateLimit(key: string, maxRequests: number, windowSeconds: n
     }
     return count > maxRequests
   } catch {
-    return false // Fail open on Redis error
+    return failClosed
   }
 }

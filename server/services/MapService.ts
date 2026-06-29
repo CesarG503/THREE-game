@@ -258,18 +258,19 @@ function toMapDto(map: MapWithInclude, includeData: boolean) {
 async function createUniqueSlug(name: string) {
   const base = slugify(name) || "mapa"
 
-  for (let attempt = 0; attempt < 50; attempt += 1) {
-    const suffix = attempt === 0 ? "" : `-${attempt + 1}`
-    const slug = `${base}${suffix}`
-    const exists = await prisma.gameMap.findUnique({
-      where: { slug },
-      select: { id: true },
-    })
-    if (!exists) return slug
-  }
+  // Append 4 random hex chars to prevent sequential enumeration of private maps.
+  // e.g. "castle" → "castle-a3f9" — readable yet non-guessable.
+  const { randomBytes } = await import("node:crypto")
+  const suffix = randomBytes(2).toString("hex") // 4 hex chars = 65 536 combinations per base
+  const slug = `${base}-${suffix}`.slice(0, 56) // guard total length
 
-  return `${base}-${Date.now().toString(36)}`
+  const exists = await prisma.gameMap.findUnique({ where: { slug }, select: { id: true } })
+  if (!exists) return slug
+
+  // Collision fallback (probability: 1/65536 per slug) — add timestamp for guaranteed uniqueness
+  return `${base}-${Date.now().toString(36)}`.slice(0, 56)
 }
+
 
 function slugify(value: string) {
   return value

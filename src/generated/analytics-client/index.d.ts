@@ -6091,6 +6091,9 @@ export namespace Prisma {
     bounceRate: number | null
     medianPlaytime: number | null
     completionRate: number | null
+    difficultyScore: number | null
+    paceScore: number | null
+    earlyAbandonRate: number | null
   }
 
   export type MapFeaturesSumAggregateOutputType = {
@@ -6101,6 +6104,9 @@ export namespace Prisma {
     bounceRate: number | null
     medianPlaytime: number | null
     completionRate: number | null
+    difficultyScore: number | null
+    paceScore: number | null
+    earlyAbandonRate: number | null
   }
 
   export type MapFeaturesMinAggregateOutputType = {
@@ -6112,6 +6118,11 @@ export namespace Prisma {
     bounceRate: number | null
     medianPlaytime: number | null
     completionRate: number | null
+    difficultyScore: number | null
+    difficultyLabel: string | null
+    paceScore: number | null
+    paceLabel: string | null
+    earlyAbandonRate: number | null
   }
 
   export type MapFeaturesMaxAggregateOutputType = {
@@ -6123,6 +6134,11 @@ export namespace Prisma {
     bounceRate: number | null
     medianPlaytime: number | null
     completionRate: number | null
+    difficultyScore: number | null
+    difficultyLabel: string | null
+    paceScore: number | null
+    paceLabel: string | null
+    earlyAbandonRate: number | null
   }
 
   export type MapFeaturesCountAggregateOutputType = {
@@ -6135,6 +6151,11 @@ export namespace Prisma {
     medianPlaytime: number
     completionRate: number
     retentionCurve: number
+    difficultyScore: number
+    difficultyLabel: number
+    paceScore: number
+    paceLabel: number
+    earlyAbandonRate: number
     _all: number
   }
 
@@ -6147,6 +6168,9 @@ export namespace Prisma {
     bounceRate?: true
     medianPlaytime?: true
     completionRate?: true
+    difficultyScore?: true
+    paceScore?: true
+    earlyAbandonRate?: true
   }
 
   export type MapFeaturesSumAggregateInputType = {
@@ -6157,6 +6181,9 @@ export namespace Prisma {
     bounceRate?: true
     medianPlaytime?: true
     completionRate?: true
+    difficultyScore?: true
+    paceScore?: true
+    earlyAbandonRate?: true
   }
 
   export type MapFeaturesMinAggregateInputType = {
@@ -6168,6 +6195,11 @@ export namespace Prisma {
     bounceRate?: true
     medianPlaytime?: true
     completionRate?: true
+    difficultyScore?: true
+    difficultyLabel?: true
+    paceScore?: true
+    paceLabel?: true
+    earlyAbandonRate?: true
   }
 
   export type MapFeaturesMaxAggregateInputType = {
@@ -6179,6 +6211,11 @@ export namespace Prisma {
     bounceRate?: true
     medianPlaytime?: true
     completionRate?: true
+    difficultyScore?: true
+    difficultyLabel?: true
+    paceScore?: true
+    paceLabel?: true
+    earlyAbandonRate?: true
   }
 
   export type MapFeaturesCountAggregateInputType = {
@@ -6191,6 +6228,11 @@ export namespace Prisma {
     medianPlaytime?: true
     completionRate?: true
     retentionCurve?: true
+    difficultyScore?: true
+    difficultyLabel?: true
+    paceScore?: true
+    paceLabel?: true
+    earlyAbandonRate?: true
     _all?: true
   }
 
@@ -6290,6 +6332,11 @@ export namespace Prisma {
     medianPlaytime: number | null
     completionRate: number | null
     retentionCurve: JsonValue | null
+    difficultyScore: number | null
+    difficultyLabel: string | null
+    paceScore: number | null
+    paceLabel: string | null
+    earlyAbandonRate: number | null
     _count: MapFeaturesCountAggregateOutputType | null
     _avg: MapFeaturesAvgAggregateOutputType | null
     _sum: MapFeaturesSumAggregateOutputType | null
@@ -6321,6 +6368,11 @@ export namespace Prisma {
     medianPlaytime?: boolean
     completionRate?: boolean
     retentionCurve?: boolean
+    difficultyScore?: boolean
+    difficultyLabel?: boolean
+    paceScore?: boolean
+    paceLabel?: boolean
+    earlyAbandonRate?: boolean
     map?: boolean | GameMapDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["mapFeatures"]>
 
@@ -6334,6 +6386,11 @@ export namespace Prisma {
     medianPlaytime?: boolean
     completionRate?: boolean
     retentionCurve?: boolean
+    difficultyScore?: boolean
+    difficultyLabel?: boolean
+    paceScore?: boolean
+    paceLabel?: boolean
+    earlyAbandonRate?: boolean
     map?: boolean | GameMapDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["mapFeatures"]>
 
@@ -6347,6 +6404,11 @@ export namespace Prisma {
     medianPlaytime?: boolean
     completionRate?: boolean
     retentionCurve?: boolean
+    difficultyScore?: boolean
+    difficultyLabel?: boolean
+    paceScore?: boolean
+    paceLabel?: boolean
+    earlyAbandonRate?: boolean
     map?: boolean | GameMapDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["mapFeatures"]>
 
@@ -6360,9 +6422,14 @@ export namespace Prisma {
     medianPlaytime?: boolean
     completionRate?: boolean
     retentionCurve?: boolean
+    difficultyScore?: boolean
+    difficultyLabel?: boolean
+    paceScore?: boolean
+    paceLabel?: boolean
+    earlyAbandonRate?: boolean
   }
 
-  export type MapFeaturesOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"mapId" | "totalJoins" | "totalLeaves" | "bounceCount" | "averageDuration" | "bounceRate" | "medianPlaytime" | "completionRate" | "retentionCurve", ExtArgs["result"]["mapFeatures"]>
+  export type MapFeaturesOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"mapId" | "totalJoins" | "totalLeaves" | "bounceCount" | "averageDuration" | "bounceRate" | "medianPlaytime" | "completionRate" | "retentionCurve" | "difficultyScore" | "difficultyLabel" | "paceScore" | "paceLabel" | "earlyAbandonRate", ExtArgs["result"]["mapFeatures"]>
   export type MapFeaturesInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     map?: boolean | GameMapDefaultArgs<ExtArgs>
   }
@@ -6388,6 +6455,11 @@ export namespace Prisma {
       medianPlaytime: number | null
       completionRate: number | null
       retentionCurve: Prisma.JsonValue | null
+      difficultyScore: number | null
+      difficultyLabel: string | null
+      paceScore: number | null
+      paceLabel: string | null
+      earlyAbandonRate: number | null
     }, ExtArgs["result"]["mapFeatures"]>
     composites: {}
   }
@@ -6821,6 +6893,11 @@ export namespace Prisma {
     readonly medianPlaytime: FieldRef<"MapFeatures", 'Float'>
     readonly completionRate: FieldRef<"MapFeatures", 'Float'>
     readonly retentionCurve: FieldRef<"MapFeatures", 'Json'>
+    readonly difficultyScore: FieldRef<"MapFeatures", 'Float'>
+    readonly difficultyLabel: FieldRef<"MapFeatures", 'String'>
+    readonly paceScore: FieldRef<"MapFeatures", 'Float'>
+    readonly paceLabel: FieldRef<"MapFeatures", 'String'>
+    readonly earlyAbandonRate: FieldRef<"MapFeatures", 'Float'>
   }
     
 
@@ -9478,7 +9555,12 @@ export namespace Prisma {
     bounceRate: 'bounceRate',
     medianPlaytime: 'medianPlaytime',
     completionRate: 'completionRate',
-    retentionCurve: 'retentionCurve'
+    retentionCurve: 'retentionCurve',
+    difficultyScore: 'difficultyScore',
+    difficultyLabel: 'difficultyLabel',
+    paceScore: 'paceScore',
+    paceLabel: 'paceLabel',
+    earlyAbandonRate: 'earlyAbandonRate'
   };
 
   export type MapFeaturesScalarFieldEnum = (typeof MapFeaturesScalarFieldEnum)[keyof typeof MapFeaturesScalarFieldEnum]
@@ -9929,6 +10011,11 @@ export namespace Prisma {
     medianPlaytime?: FloatNullableFilter<"MapFeatures"> | number | null
     completionRate?: FloatNullableFilter<"MapFeatures"> | number | null
     retentionCurve?: JsonNullableFilter<"MapFeatures">
+    difficultyScore?: FloatNullableFilter<"MapFeatures"> | number | null
+    difficultyLabel?: StringNullableFilter<"MapFeatures"> | string | null
+    paceScore?: FloatNullableFilter<"MapFeatures"> | number | null
+    paceLabel?: StringNullableFilter<"MapFeatures"> | string | null
+    earlyAbandonRate?: FloatNullableFilter<"MapFeatures"> | number | null
     map?: XOR<GameMapScalarRelationFilter, GameMapWhereInput>
   }
 
@@ -9942,6 +10029,11 @@ export namespace Prisma {
     medianPlaytime?: SortOrderInput | SortOrder
     completionRate?: SortOrderInput | SortOrder
     retentionCurve?: SortOrderInput | SortOrder
+    difficultyScore?: SortOrderInput | SortOrder
+    difficultyLabel?: SortOrderInput | SortOrder
+    paceScore?: SortOrderInput | SortOrder
+    paceLabel?: SortOrderInput | SortOrder
+    earlyAbandonRate?: SortOrderInput | SortOrder
     map?: GameMapOrderByWithRelationInput
   }
 
@@ -9958,6 +10050,11 @@ export namespace Prisma {
     medianPlaytime?: FloatNullableFilter<"MapFeatures"> | number | null
     completionRate?: FloatNullableFilter<"MapFeatures"> | number | null
     retentionCurve?: JsonNullableFilter<"MapFeatures">
+    difficultyScore?: FloatNullableFilter<"MapFeatures"> | number | null
+    difficultyLabel?: StringNullableFilter<"MapFeatures"> | string | null
+    paceScore?: FloatNullableFilter<"MapFeatures"> | number | null
+    paceLabel?: StringNullableFilter<"MapFeatures"> | string | null
+    earlyAbandonRate?: FloatNullableFilter<"MapFeatures"> | number | null
     map?: XOR<GameMapScalarRelationFilter, GameMapWhereInput>
   }, "mapId">
 
@@ -9971,6 +10068,11 @@ export namespace Prisma {
     medianPlaytime?: SortOrderInput | SortOrder
     completionRate?: SortOrderInput | SortOrder
     retentionCurve?: SortOrderInput | SortOrder
+    difficultyScore?: SortOrderInput | SortOrder
+    difficultyLabel?: SortOrderInput | SortOrder
+    paceScore?: SortOrderInput | SortOrder
+    paceLabel?: SortOrderInput | SortOrder
+    earlyAbandonRate?: SortOrderInput | SortOrder
     _count?: MapFeaturesCountOrderByAggregateInput
     _avg?: MapFeaturesAvgOrderByAggregateInput
     _max?: MapFeaturesMaxOrderByAggregateInput
@@ -9991,6 +10093,11 @@ export namespace Prisma {
     medianPlaytime?: FloatNullableWithAggregatesFilter<"MapFeatures"> | number | null
     completionRate?: FloatNullableWithAggregatesFilter<"MapFeatures"> | number | null
     retentionCurve?: JsonNullableWithAggregatesFilter<"MapFeatures">
+    difficultyScore?: FloatNullableWithAggregatesFilter<"MapFeatures"> | number | null
+    difficultyLabel?: StringNullableWithAggregatesFilter<"MapFeatures"> | string | null
+    paceScore?: FloatNullableWithAggregatesFilter<"MapFeatures"> | number | null
+    paceLabel?: StringNullableWithAggregatesFilter<"MapFeatures"> | string | null
+    earlyAbandonRate?: FloatNullableWithAggregatesFilter<"MapFeatures"> | number | null
   }
 
   export type SocialAffinityWhereInput = {
@@ -10423,6 +10530,11 @@ export namespace Prisma {
     medianPlaytime?: number | null
     completionRate?: number | null
     retentionCurve?: NullableJsonNullValueInput | InputJsonValue
+    difficultyScore?: number | null
+    difficultyLabel?: string | null
+    paceScore?: number | null
+    paceLabel?: string | null
+    earlyAbandonRate?: number | null
     map: GameMapCreateNestedOneWithoutMapFeaturesInput
   }
 
@@ -10436,6 +10548,11 @@ export namespace Prisma {
     medianPlaytime?: number | null
     completionRate?: number | null
     retentionCurve?: NullableJsonNullValueInput | InputJsonValue
+    difficultyScore?: number | null
+    difficultyLabel?: string | null
+    paceScore?: number | null
+    paceLabel?: string | null
+    earlyAbandonRate?: number | null
   }
 
   export type MapFeaturesUpdateInput = {
@@ -10447,6 +10564,11 @@ export namespace Prisma {
     medianPlaytime?: NullableFloatFieldUpdateOperationsInput | number | null
     completionRate?: NullableFloatFieldUpdateOperationsInput | number | null
     retentionCurve?: NullableJsonNullValueInput | InputJsonValue
+    difficultyScore?: NullableFloatFieldUpdateOperationsInput | number | null
+    difficultyLabel?: NullableStringFieldUpdateOperationsInput | string | null
+    paceScore?: NullableFloatFieldUpdateOperationsInput | number | null
+    paceLabel?: NullableStringFieldUpdateOperationsInput | string | null
+    earlyAbandonRate?: NullableFloatFieldUpdateOperationsInput | number | null
     map?: GameMapUpdateOneRequiredWithoutMapFeaturesNestedInput
   }
 
@@ -10460,6 +10582,11 @@ export namespace Prisma {
     medianPlaytime?: NullableFloatFieldUpdateOperationsInput | number | null
     completionRate?: NullableFloatFieldUpdateOperationsInput | number | null
     retentionCurve?: NullableJsonNullValueInput | InputJsonValue
+    difficultyScore?: NullableFloatFieldUpdateOperationsInput | number | null
+    difficultyLabel?: NullableStringFieldUpdateOperationsInput | string | null
+    paceScore?: NullableFloatFieldUpdateOperationsInput | number | null
+    paceLabel?: NullableStringFieldUpdateOperationsInput | string | null
+    earlyAbandonRate?: NullableFloatFieldUpdateOperationsInput | number | null
   }
 
   export type MapFeaturesCreateManyInput = {
@@ -10472,6 +10599,11 @@ export namespace Prisma {
     medianPlaytime?: number | null
     completionRate?: number | null
     retentionCurve?: NullableJsonNullValueInput | InputJsonValue
+    difficultyScore?: number | null
+    difficultyLabel?: string | null
+    paceScore?: number | null
+    paceLabel?: string | null
+    earlyAbandonRate?: number | null
   }
 
   export type MapFeaturesUpdateManyMutationInput = {
@@ -10483,6 +10615,11 @@ export namespace Prisma {
     medianPlaytime?: NullableFloatFieldUpdateOperationsInput | number | null
     completionRate?: NullableFloatFieldUpdateOperationsInput | number | null
     retentionCurve?: NullableJsonNullValueInput | InputJsonValue
+    difficultyScore?: NullableFloatFieldUpdateOperationsInput | number | null
+    difficultyLabel?: NullableStringFieldUpdateOperationsInput | string | null
+    paceScore?: NullableFloatFieldUpdateOperationsInput | number | null
+    paceLabel?: NullableStringFieldUpdateOperationsInput | string | null
+    earlyAbandonRate?: NullableFloatFieldUpdateOperationsInput | number | null
   }
 
   export type MapFeaturesUncheckedUpdateManyInput = {
@@ -10495,6 +10632,11 @@ export namespace Prisma {
     medianPlaytime?: NullableFloatFieldUpdateOperationsInput | number | null
     completionRate?: NullableFloatFieldUpdateOperationsInput | number | null
     retentionCurve?: NullableJsonNullValueInput | InputJsonValue
+    difficultyScore?: NullableFloatFieldUpdateOperationsInput | number | null
+    difficultyLabel?: NullableStringFieldUpdateOperationsInput | string | null
+    paceScore?: NullableFloatFieldUpdateOperationsInput | number | null
+    paceLabel?: NullableStringFieldUpdateOperationsInput | string | null
+    earlyAbandonRate?: NullableFloatFieldUpdateOperationsInput | number | null
   }
 
   export type SocialAffinityCreateInput = {
@@ -11088,6 +11230,11 @@ export namespace Prisma {
     medianPlaytime?: SortOrder
     completionRate?: SortOrder
     retentionCurve?: SortOrder
+    difficultyScore?: SortOrder
+    difficultyLabel?: SortOrder
+    paceScore?: SortOrder
+    paceLabel?: SortOrder
+    earlyAbandonRate?: SortOrder
   }
 
   export type MapFeaturesAvgOrderByAggregateInput = {
@@ -11098,6 +11245,9 @@ export namespace Prisma {
     bounceRate?: SortOrder
     medianPlaytime?: SortOrder
     completionRate?: SortOrder
+    difficultyScore?: SortOrder
+    paceScore?: SortOrder
+    earlyAbandonRate?: SortOrder
   }
 
   export type MapFeaturesMaxOrderByAggregateInput = {
@@ -11109,6 +11259,11 @@ export namespace Prisma {
     bounceRate?: SortOrder
     medianPlaytime?: SortOrder
     completionRate?: SortOrder
+    difficultyScore?: SortOrder
+    difficultyLabel?: SortOrder
+    paceScore?: SortOrder
+    paceLabel?: SortOrder
+    earlyAbandonRate?: SortOrder
   }
 
   export type MapFeaturesMinOrderByAggregateInput = {
@@ -11120,6 +11275,11 @@ export namespace Prisma {
     bounceRate?: SortOrder
     medianPlaytime?: SortOrder
     completionRate?: SortOrder
+    difficultyScore?: SortOrder
+    difficultyLabel?: SortOrder
+    paceScore?: SortOrder
+    paceLabel?: SortOrder
+    earlyAbandonRate?: SortOrder
   }
 
   export type MapFeaturesSumOrderByAggregateInput = {
@@ -11130,6 +11290,9 @@ export namespace Prisma {
     bounceRate?: SortOrder
     medianPlaytime?: SortOrder
     completionRate?: SortOrder
+    difficultyScore?: SortOrder
+    paceScore?: SortOrder
+    earlyAbandonRate?: SortOrder
   }
 
   export type SocialAffinityUserId1UserId2CompoundUniqueInput = {
@@ -12110,6 +12273,11 @@ export namespace Prisma {
     medianPlaytime?: number | null
     completionRate?: number | null
     retentionCurve?: NullableJsonNullValueInput | InputJsonValue
+    difficultyScore?: number | null
+    difficultyLabel?: string | null
+    paceScore?: number | null
+    paceLabel?: string | null
+    earlyAbandonRate?: number | null
   }
 
   export type MapFeaturesUncheckedCreateWithoutMapInput = {
@@ -12121,6 +12289,11 @@ export namespace Prisma {
     medianPlaytime?: number | null
     completionRate?: number | null
     retentionCurve?: NullableJsonNullValueInput | InputJsonValue
+    difficultyScore?: number | null
+    difficultyLabel?: string | null
+    paceScore?: number | null
+    paceLabel?: string | null
+    earlyAbandonRate?: number | null
   }
 
   export type MapFeaturesCreateOrConnectWithoutMapInput = {
@@ -12170,6 +12343,11 @@ export namespace Prisma {
     medianPlaytime?: NullableFloatFieldUpdateOperationsInput | number | null
     completionRate?: NullableFloatFieldUpdateOperationsInput | number | null
     retentionCurve?: NullableJsonNullValueInput | InputJsonValue
+    difficultyScore?: NullableFloatFieldUpdateOperationsInput | number | null
+    difficultyLabel?: NullableStringFieldUpdateOperationsInput | string | null
+    paceScore?: NullableFloatFieldUpdateOperationsInput | number | null
+    paceLabel?: NullableStringFieldUpdateOperationsInput | string | null
+    earlyAbandonRate?: NullableFloatFieldUpdateOperationsInput | number | null
   }
 
   export type MapFeaturesUncheckedUpdateWithoutMapInput = {
@@ -12181,6 +12359,11 @@ export namespace Prisma {
     medianPlaytime?: NullableFloatFieldUpdateOperationsInput | number | null
     completionRate?: NullableFloatFieldUpdateOperationsInput | number | null
     retentionCurve?: NullableJsonNullValueInput | InputJsonValue
+    difficultyScore?: NullableFloatFieldUpdateOperationsInput | number | null
+    difficultyLabel?: NullableStringFieldUpdateOperationsInput | string | null
+    paceScore?: NullableFloatFieldUpdateOperationsInput | number | null
+    paceLabel?: NullableStringFieldUpdateOperationsInput | string | null
+    earlyAbandonRate?: NullableFloatFieldUpdateOperationsInput | number | null
   }
 
   export type FatiguedMapUpsertWithWhereUniqueWithoutMapInput = {

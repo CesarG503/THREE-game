@@ -169,7 +169,12 @@ exports.Prisma.MapFeaturesScalarFieldEnum = {
   bounceRate: 'bounceRate',
   medianPlaytime: 'medianPlaytime',
   completionRate: 'completionRate',
-  retentionCurve: 'retentionCurve'
+  retentionCurve: 'retentionCurve',
+  difficultyScore: 'difficultyScore',
+  difficultyLabel: 'difficultyLabel',
+  paceScore: 'paceScore',
+  paceLabel: 'paceLabel',
+  earlyAbandonRate: 'earlyAbandonRate'
 };
 
 exports.Prisma.SocialAffinityScalarFieldEnum = {

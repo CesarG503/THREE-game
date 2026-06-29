@@ -24,6 +24,11 @@ export interface IGameMapProfile {
   medianPlaytime: number | null; // in seconds
   completionRate: number | null; // fraction
   retentionCurve: number[] | null; // array of fractions
+  difficultyScore: number | null;
+  difficultyLabel: string | null;
+  paceScore: number | null;
+  paceLabel: string | null;
+  earlyAbandonRate: number | null;
 }
 
 export class MapProfileRepository {
@@ -115,6 +120,11 @@ export class MapProfileRepository {
       medianPlaytime: features?.medianPlaytime ?? null,
       completionRate: features?.completionRate ?? null,
       retentionCurve: retentionArray,
+      difficultyScore: features?.difficultyScore ?? null,
+      difficultyLabel: features?.difficultyLabel ?? null,
+      paceScore: features?.paceScore ?? null,
+      paceLabel: features?.paceLabel ?? null,
+      earlyAbandonRate: features?.earlyAbandonRate ?? null,
     };
 
     // 5. Intentar escribir en el caché de Redis

@@ -3,6 +3,7 @@ import { prisma } from "../server/db/prisma.js";
 import { getRedis, connectRedis } from "../server/cache/redis.js";
 import { logger } from "../server/utils/Logger.js";
 import { MapProfileRepository } from "../server/analytics/models/MapProfile.js";
+import { computeMapDifficultyAndPace } from "../server/analytics/features/map_difficulty.js";
 import "dotenv/config";
 
 function computeMedian(values: number[]): number | null {
@@ -125,7 +126,10 @@ export async function runMapAggregation(lookbackDays = 30): Promise<void> {
         }
       });
 
-      // E) Invalidar/Actualizar caché en Redis inmediatamente
+      // E) Calcular dificultad y ritmo
+      await computeMapDifficultyAndPace(mapId);
+
+      // F) Invalidar/Actualizar caché en Redis inmediatamente
       await MapProfileRepository.clearCache(mapId);
       // Precargar en caché de forma activa
       await MapProfileRepository.getMapProfile(mapId);

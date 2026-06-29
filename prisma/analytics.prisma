@@ -77,6 +77,11 @@ model MapFeatures {
   medianPlaytime  Float?
   completionRate  Float?
   retentionCurve  Json?
+  difficultyScore  Float?
+  difficultyLabel  String?
+  paceScore        Float?
+  paceLabel        String?
+  earlyAbandonRate Float?
   map             GameMap  @relation(fields: [mapId], references: [id], onDelete: Cascade)
 
   @@schema("analytics")

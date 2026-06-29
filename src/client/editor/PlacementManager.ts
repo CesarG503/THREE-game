@@ -123,6 +123,7 @@ export class PlacementManager {
 
         // Crear grupo fantasma
         this.placementGhost = new THREE.Group();
+        this.placementGhost.name = "placementGhost";
         this.scene.add(this.placementGhost);
 
         // 1. Ghost BOX (Paredes, Pilares, Pads)
@@ -588,10 +589,12 @@ export class PlacementManager {
         geometry.rotateX(-Math.PI / 2); // Horizontal
         const material = new THREE.MeshBasicMaterial({ visible: false, side: THREE.DoubleSide });
         this.aerialCollider = new THREE.Mesh(geometry, material);
+        this.aerialCollider.name = "aerialColliderGhost";
         this.scene.add(this.aerialCollider);
 
         // 2. Visual Grid (Single Layer)
         this.aerialVisual = new THREE.Group();
+        this.aerialVisual.name = "aerialVisualHelper";
 
         // Single Grid Helper
         // 100 size, 100 divisions = 1x1 cells

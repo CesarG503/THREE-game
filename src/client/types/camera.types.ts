@@ -1,6 +1,6 @@
 import * as THREE from "three";
 
-export type CameraMode = 'first-person' | 'third-person';
+export type CameraMode = 'first-person' | 'third-person-free' | 'third-person-collision';
 
 export interface CameraState {
     isFirstPerson: boolean;
@@ -24,6 +24,7 @@ export interface CameraConfig {
 
 export interface CameraModeEventDetail {
     isFirstPerson: boolean;
+    cameraMode?: CameraMode;
 }
 
 export interface CameraPauseEventDetail {

@@ -203,6 +203,7 @@ export class Game {
 			this.sceneManager.camera,
 			this.sceneManager.renderer.domElement
 		);
+		this.cameraController.character = this.character;
 		this.scopeController = new ScopeController(this.sceneManager.camera, this);
 		this.sceneManager.renderer.autoClear = false;
 		this.setupOrientationGizmo();

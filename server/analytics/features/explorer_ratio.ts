@@ -37,7 +37,7 @@ export async function computeExplorerProfile(lookbackDays: number = 7) {
   // 2. Agrupar eventos por usuario y mapa
   for (const ev of joinEvents) {
     const payload = ev.payload as any;
-    const uid = ev.userId || payload?.userId; // Fallback to payload para testeos sin FK
+    const uid = ev.userId;
     const mapId = payload?.mapId;
 
     if (!uid || !mapId) continue;

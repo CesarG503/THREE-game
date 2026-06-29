@@ -39,7 +39,7 @@ export async function computeSocialAffinity(startTime: Date, endTime: Date) {
   const intervals: SessionInterval[] = [];
   for (const ev of leaveEvents) {
     const payload = ev.payload as any;
-    const uid = ev.userId || payload.userId;
+    const uid = ev.userId;
     if (!payload.roomId || typeof payload.durationSeconds !== "number" || !uid) continue;
 
     const endMs = ev.timestamp.getTime();
@@ -71,6 +71,7 @@ export async function computeSocialAffinity(startTime: Date, endTime: Date) {
         const a = roomIntervals[i];
         const b = roomIntervals[j];
 
+        if (!a || !b) continue; // Guard for TS strict mode
         if (a.userId === b.userId) continue; // Same user, e.g. reconnects. Ignore.
 
         const overlapStart = Math.max(a.startMs, b.startMs);
@@ -100,7 +101,10 @@ export async function computeSocialAffinity(startTime: Date, endTime: Date) {
   // 6. Hacer Upsert de las nuevas afinidades a los pares afectados
   let updatedPairs = 0;
   for (const [pairKey, addedSeconds] of newCoplay.entries()) {
-    const [userId1, userId2] = pairKey.split("::");
+    const parts = pairKey.split("::");
+    const userId1 = parts[0];
+    const userId2 = parts[1];
+    if (!userId1 || !userId2) continue; // Guard against malformed keys
 
     // Fetch existing
     const existing = await analyticsPrisma.socialAffinity.findUnique({

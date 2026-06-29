@@ -47,7 +47,7 @@ export async function computePopularitySensitivity(lookbackDays: number = 7) {
     if (payload.elementType !== "MapCard") continue;
 
     const mapId = payload.mapId || payload.elementId;
-    const uid = ev.userId || payload.userId; // Soporte para fallback testing
+    const uid = ev.userId;
 
     if (!uid || !mapId || !mapPercentiles.has(mapId)) continue;
 

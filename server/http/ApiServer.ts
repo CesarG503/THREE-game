@@ -7,6 +7,7 @@ import { createMap, deleteMap, getMap, listMaps, updateMap, type MapWriteInput }
 import { logger } from "../utils/Logger.js"
 import { validateTelemetryEvent } from "../analytics/middleware.js"
 import { eventBuffer } from "../analytics/eventBuffer.js"
+import { getRedis } from "../cache/redis.js"
 
 const MAX_BODY_BYTES = 1024 * 1024 * 2
 
@@ -30,15 +31,24 @@ export async function handleHttpRequest(
   }
 
   if (req.method === "POST" && url.pathname === "/api/analytics/event") {
+    // Rate limiting: max 100 events per IP per minute
+    const ip = req.socket.remoteAddress ?? "unknown"
+    const rateLimited = await checkRateLimit(ip, 100, 60)
+    if (rateLimited) {
+      sendJson(res, 429, { error: "Rate limit exceeded" })
+      return
+    }
     return withJsonBody(req, res, async (body) => {
       const validation = validateTelemetryEvent(body)
       if (!validation.valid) {
-        sendJson(res, 400, { error: "Validation failed", details: validation.errors })
+        // Log details internally, don't expose schema to clients
+        logger.warn("HTTP", `Invalid telemetry event from ${ip}`, validation.errors)
+        sendJson(res, 400, { error: "Validation failed" })
         return
       }
       const success = eventBuffer.push(body as any)
       if (!success) {
-        sendJson(res, 429, { error: "Server busy, events dropped due to backpressure" })
+        sendJson(res, 429, { error: "Server busy" })
         return
       }
       sendJson(res, 202, { ok: true })
@@ -226,12 +236,22 @@ function sendJson(res: ServerResponse, status: number, payload: unknown): void {
   res.end(JSON.stringify(payload))
 }
 
+const ALLOWED_ORIGINS: ReadonlySet<string> = new Set(
+  (process.env.ALLOWED_ORIGINS ?? "http://localhost:3000")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean)
+)
+
 function setCorsHeaders(req: HttpIncomingMessage, res: ServerResponse): void {
   const origin = req.headers.origin
-  res.setHeader("Access-Control-Allow-Origin", typeof origin === "string" ? origin : "*")
+  if (typeof origin === "string" && ALLOWED_ORIGINS.has(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", origin)
+  }
   res.setHeader("Vary", "Origin")
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS")
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization")
+  res.setHeader("Access-Control-Allow-Credentials", "true")
 }
 
 async function withMultipartBody(
@@ -382,4 +402,24 @@ function isDatabaseConnectionError(err: unknown) {
   const code = "code" in err ? String(err.code) : ""
   const message = err instanceof Error ? err.message : ""
   return code === "ECONNREFUSED" || message.includes("ECONNREFUSED")
+}
+
+/**
+ * Sliding-window rate limiter backed by Redis.
+ * Returns true if the caller should be rejected (limit exceeded).
+ */
+async function checkRateLimit(key: string, maxRequests: number, windowSeconds: number): Promise<boolean> {
+  const redis = getRedis()
+  if (!redis || !redis.isOpen) return false // Fail open if Redis unavailable
+
+  const rlKey = `rl:analytics:${key}`
+  try {
+    const count = await redis.incr(rlKey)
+    if (count === 1) {
+      await redis.expire(rlKey, windowSeconds)
+    }
+    return count > maxRequests
+  } catch {
+    return false // Fail open on Redis error
+  }
 }

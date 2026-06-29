@@ -13,6 +13,10 @@
     "usefulSeconds": {
       "type": "number",
       "minimum": 0
+    },
+    "averageLatencyMs": {
+      "type": "number",
+      "minimum": 0
     }
   },
   "required": ["durationSeconds", "idleSeconds", "usefulSeconds"],

@@ -2,6 +2,7 @@ import { getRedis } from "../cache/redis.js";
 import { analyticsPrisma } from "../db/analyticsPrisma.js";
 import { logger } from "../utils/Logger.js";
 import type { TelemetryEvent } from "./eventBuffer.js";
+import { computeReturnIntentForUser } from "./features/return_intent.js";
 
 export class EventWorker {
   private isRunning = false;
@@ -102,6 +103,22 @@ export class EventWorker {
         err
       );
       await this.processEventsIndividually(events);
+    }
+
+    // Post-ingestion: Trigger IRI calculation for SessionEnd events
+    const sessionEndUserIds = new Set<string>();
+    for (const event of events) {
+      if (event.eventType === "SessionEnd" && event.userId) {
+        sessionEndUserIds.add(event.userId);
+      }
+    }
+
+    if (sessionEndUserIds.size > 0) {
+      for (const userId of sessionEndUserIds) {
+        computeReturnIntentForUser(userId).catch((err) => {
+          logger.error("EventWorker", `Failed to run background IRI calculation for user ${userId}`, err);
+        });
+      }
     }
   }
 

@@ -155,7 +155,8 @@ exports.Prisma.PlayerFeaturesScalarFieldEnum = {
   preferredLanguage: 'preferredLanguage',
   explorerRatio: 'explorerRatio',
   playerProfile: 'playerProfile',
-  popularitySensitivity: 'popularitySensitivity'
+  popularitySensitivity: 'popularitySensitivity',
+  returnIntent: 'returnIntent'
 };
 
 exports.Prisma.MapFeaturesScalarFieldEnum = {

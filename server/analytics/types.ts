@@ -35,6 +35,7 @@ export interface SessionEndPayload {
   durationSeconds: number;
   idleSeconds: number;
   usefulSeconds: number;
+  averageLatencyMs?: number;
 }
 
 export interface MatchJoinPayload {

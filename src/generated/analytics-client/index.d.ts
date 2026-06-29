@@ -4914,6 +4914,7 @@ export namespace Prisma {
     matchesPlayed: number | null
     explorerRatio: number | null
     popularitySensitivity: number | null
+    returnIntent: number | null
   }
 
   export type PlayerFeaturesSumAggregateOutputType = {
@@ -4921,6 +4922,7 @@ export namespace Prisma {
     matchesPlayed: number | null
     explorerRatio: number | null
     popularitySensitivity: number | null
+    returnIntent: number | null
   }
 
   export type PlayerFeaturesMinAggregateOutputType = {
@@ -4932,6 +4934,7 @@ export namespace Prisma {
     explorerRatio: number | null
     playerProfile: string | null
     popularitySensitivity: number | null
+    returnIntent: number | null
   }
 
   export type PlayerFeaturesMaxAggregateOutputType = {
@@ -4943,6 +4946,7 @@ export namespace Prisma {
     explorerRatio: number | null
     playerProfile: string | null
     popularitySensitivity: number | null
+    returnIntent: number | null
   }
 
   export type PlayerFeaturesCountAggregateOutputType = {
@@ -4954,6 +4958,7 @@ export namespace Prisma {
     explorerRatio: number
     playerProfile: number
     popularitySensitivity: number
+    returnIntent: number
     _all: number
   }
 
@@ -4963,6 +4968,7 @@ export namespace Prisma {
     matchesPlayed?: true
     explorerRatio?: true
     popularitySensitivity?: true
+    returnIntent?: true
   }
 
   export type PlayerFeaturesSumAggregateInputType = {
@@ -4970,6 +4976,7 @@ export namespace Prisma {
     matchesPlayed?: true
     explorerRatio?: true
     popularitySensitivity?: true
+    returnIntent?: true
   }
 
   export type PlayerFeaturesMinAggregateInputType = {
@@ -4981,6 +4988,7 @@ export namespace Prisma {
     explorerRatio?: true
     playerProfile?: true
     popularitySensitivity?: true
+    returnIntent?: true
   }
 
   export type PlayerFeaturesMaxAggregateInputType = {
@@ -4992,6 +5000,7 @@ export namespace Prisma {
     explorerRatio?: true
     playerProfile?: true
     popularitySensitivity?: true
+    returnIntent?: true
   }
 
   export type PlayerFeaturesCountAggregateInputType = {
@@ -5003,6 +5012,7 @@ export namespace Prisma {
     explorerRatio?: true
     playerProfile?: true
     popularitySensitivity?: true
+    returnIntent?: true
     _all?: true
   }
 
@@ -5101,6 +5111,7 @@ export namespace Prisma {
     explorerRatio: number | null
     playerProfile: string | null
     popularitySensitivity: number | null
+    returnIntent: number | null
     _count: PlayerFeaturesCountAggregateOutputType | null
     _avg: PlayerFeaturesAvgAggregateOutputType | null
     _sum: PlayerFeaturesSumAggregateOutputType | null
@@ -5131,6 +5142,7 @@ export namespace Prisma {
     explorerRatio?: boolean
     playerProfile?: boolean
     popularitySensitivity?: boolean
+    returnIntent?: boolean
     user?: boolean | UserDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["playerFeatures"]>
 
@@ -5143,6 +5155,7 @@ export namespace Prisma {
     explorerRatio?: boolean
     playerProfile?: boolean
     popularitySensitivity?: boolean
+    returnIntent?: boolean
     user?: boolean | UserDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["playerFeatures"]>
 
@@ -5155,6 +5168,7 @@ export namespace Prisma {
     explorerRatio?: boolean
     playerProfile?: boolean
     popularitySensitivity?: boolean
+    returnIntent?: boolean
     user?: boolean | UserDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["playerFeatures"]>
 
@@ -5167,9 +5181,10 @@ export namespace Prisma {
     explorerRatio?: boolean
     playerProfile?: boolean
     popularitySensitivity?: boolean
+    returnIntent?: boolean
   }
 
-  export type PlayerFeaturesOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"userId" | "lastActive" | "totalPlayTime" | "matchesPlayed" | "preferredLanguage" | "explorerRatio" | "playerProfile" | "popularitySensitivity", ExtArgs["result"]["playerFeatures"]>
+  export type PlayerFeaturesOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"userId" | "lastActive" | "totalPlayTime" | "matchesPlayed" | "preferredLanguage" | "explorerRatio" | "playerProfile" | "popularitySensitivity" | "returnIntent", ExtArgs["result"]["playerFeatures"]>
   export type PlayerFeaturesInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     user?: boolean | UserDefaultArgs<ExtArgs>
   }
@@ -5194,6 +5209,7 @@ export namespace Prisma {
       explorerRatio: number | null
       playerProfile: string | null
       popularitySensitivity: number | null
+      returnIntent: number | null
     }, ExtArgs["result"]["playerFeatures"]>
     composites: {}
   }
@@ -5626,6 +5642,7 @@ export namespace Prisma {
     readonly explorerRatio: FieldRef<"PlayerFeatures", 'Float'>
     readonly playerProfile: FieldRef<"PlayerFeatures", 'String'>
     readonly popularitySensitivity: FieldRef<"PlayerFeatures", 'Float'>
+    readonly returnIntent: FieldRef<"PlayerFeatures", 'Float'>
   }
     
 
@@ -9392,7 +9409,8 @@ export namespace Prisma {
     preferredLanguage: 'preferredLanguage',
     explorerRatio: 'explorerRatio',
     playerProfile: 'playerProfile',
-    popularitySensitivity: 'popularitySensitivity'
+    popularitySensitivity: 'popularitySensitivity',
+    returnIntent: 'returnIntent'
   };
 
   export type PlayerFeaturesScalarFieldEnum = (typeof PlayerFeaturesScalarFieldEnum)[keyof typeof PlayerFeaturesScalarFieldEnum]
@@ -9764,6 +9782,7 @@ export namespace Prisma {
     explorerRatio?: FloatNullableFilter<"PlayerFeatures"> | number | null
     playerProfile?: StringNullableFilter<"PlayerFeatures"> | string | null
     popularitySensitivity?: FloatNullableFilter<"PlayerFeatures"> | number | null
+    returnIntent?: FloatNullableFilter<"PlayerFeatures"> | number | null
     user?: XOR<UserScalarRelationFilter, UserWhereInput>
   }
 
@@ -9776,6 +9795,7 @@ export namespace Prisma {
     explorerRatio?: SortOrderInput | SortOrder
     playerProfile?: SortOrderInput | SortOrder
     popularitySensitivity?: SortOrderInput | SortOrder
+    returnIntent?: SortOrderInput | SortOrder
     user?: UserOrderByWithRelationInput
   }
 
@@ -9791,6 +9811,7 @@ export namespace Prisma {
     explorerRatio?: FloatNullableFilter<"PlayerFeatures"> | number | null
     playerProfile?: StringNullableFilter<"PlayerFeatures"> | string | null
     popularitySensitivity?: FloatNullableFilter<"PlayerFeatures"> | number | null
+    returnIntent?: FloatNullableFilter<"PlayerFeatures"> | number | null
     user?: XOR<UserScalarRelationFilter, UserWhereInput>
   }, "userId">
 
@@ -9803,6 +9824,7 @@ export namespace Prisma {
     explorerRatio?: SortOrderInput | SortOrder
     playerProfile?: SortOrderInput | SortOrder
     popularitySensitivity?: SortOrderInput | SortOrder
+    returnIntent?: SortOrderInput | SortOrder
     _count?: PlayerFeaturesCountOrderByAggregateInput
     _avg?: PlayerFeaturesAvgOrderByAggregateInput
     _max?: PlayerFeaturesMaxOrderByAggregateInput
@@ -9822,6 +9844,7 @@ export namespace Prisma {
     explorerRatio?: FloatNullableWithAggregatesFilter<"PlayerFeatures"> | number | null
     playerProfile?: StringNullableWithAggregatesFilter<"PlayerFeatures"> | string | null
     popularitySensitivity?: FloatNullableWithAggregatesFilter<"PlayerFeatures"> | number | null
+    returnIntent?: FloatNullableWithAggregatesFilter<"PlayerFeatures"> | number | null
   }
 
   export type MapFeaturesWhereInput = {
@@ -10225,6 +10248,7 @@ export namespace Prisma {
     explorerRatio?: number | null
     playerProfile?: string | null
     popularitySensitivity?: number | null
+    returnIntent?: number | null
     user: UserCreateNestedOneWithoutPlayerFeaturesInput
   }
 
@@ -10237,6 +10261,7 @@ export namespace Prisma {
     explorerRatio?: number | null
     playerProfile?: string | null
     popularitySensitivity?: number | null
+    returnIntent?: number | null
   }
 
   export type PlayerFeaturesUpdateInput = {
@@ -10247,6 +10272,7 @@ export namespace Prisma {
     explorerRatio?: NullableFloatFieldUpdateOperationsInput | number | null
     playerProfile?: NullableStringFieldUpdateOperationsInput | string | null
     popularitySensitivity?: NullableFloatFieldUpdateOperationsInput | number | null
+    returnIntent?: NullableFloatFieldUpdateOperationsInput | number | null
     user?: UserUpdateOneRequiredWithoutPlayerFeaturesNestedInput
   }
 
@@ -10259,6 +10285,7 @@ export namespace Prisma {
     explorerRatio?: NullableFloatFieldUpdateOperationsInput | number | null
     playerProfile?: NullableStringFieldUpdateOperationsInput | string | null
     popularitySensitivity?: NullableFloatFieldUpdateOperationsInput | number | null
+    returnIntent?: NullableFloatFieldUpdateOperationsInput | number | null
   }
 
   export type PlayerFeaturesCreateManyInput = {
@@ -10270,6 +10297,7 @@ export namespace Prisma {
     explorerRatio?: number | null
     playerProfile?: string | null
     popularitySensitivity?: number | null
+    returnIntent?: number | null
   }
 
   export type PlayerFeaturesUpdateManyMutationInput = {
@@ -10280,6 +10308,7 @@ export namespace Prisma {
     explorerRatio?: NullableFloatFieldUpdateOperationsInput | number | null
     playerProfile?: NullableStringFieldUpdateOperationsInput | string | null
     popularitySensitivity?: NullableFloatFieldUpdateOperationsInput | number | null
+    returnIntent?: NullableFloatFieldUpdateOperationsInput | number | null
   }
 
   export type PlayerFeaturesUncheckedUpdateManyInput = {
@@ -10291,6 +10320,7 @@ export namespace Prisma {
     explorerRatio?: NullableFloatFieldUpdateOperationsInput | number | null
     playerProfile?: NullableStringFieldUpdateOperationsInput | string | null
     popularitySensitivity?: NullableFloatFieldUpdateOperationsInput | number | null
+    returnIntent?: NullableFloatFieldUpdateOperationsInput | number | null
   }
 
   export type MapFeaturesCreateInput = {
@@ -10790,6 +10820,7 @@ export namespace Prisma {
     explorerRatio?: SortOrder
     playerProfile?: SortOrder
     popularitySensitivity?: SortOrder
+    returnIntent?: SortOrder
   }
 
   export type PlayerFeaturesAvgOrderByAggregateInput = {
@@ -10797,6 +10828,7 @@ export namespace Prisma {
     matchesPlayed?: SortOrder
     explorerRatio?: SortOrder
     popularitySensitivity?: SortOrder
+    returnIntent?: SortOrder
   }
 
   export type PlayerFeaturesMaxOrderByAggregateInput = {
@@ -10808,6 +10840,7 @@ export namespace Prisma {
     explorerRatio?: SortOrder
     playerProfile?: SortOrder
     popularitySensitivity?: SortOrder
+    returnIntent?: SortOrder
   }
 
   export type PlayerFeaturesMinOrderByAggregateInput = {
@@ -10819,6 +10852,7 @@ export namespace Prisma {
     explorerRatio?: SortOrder
     playerProfile?: SortOrder
     popularitySensitivity?: SortOrder
+    returnIntent?: SortOrder
   }
 
   export type PlayerFeaturesSumOrderByAggregateInput = {
@@ -10826,6 +10860,7 @@ export namespace Prisma {
     matchesPlayed?: SortOrder
     explorerRatio?: SortOrder
     popularitySensitivity?: SortOrder
+    returnIntent?: SortOrder
   }
 
   export type FloatWithAggregatesFilter<$PrismaModel = never> = {
@@ -11648,6 +11683,7 @@ export namespace Prisma {
     explorerRatio?: number | null
     playerProfile?: string | null
     popularitySensitivity?: number | null
+    returnIntent?: number | null
   }
 
   export type PlayerFeaturesUncheckedCreateWithoutUserInput = {
@@ -11658,6 +11694,7 @@ export namespace Prisma {
     explorerRatio?: number | null
     playerProfile?: string | null
     popularitySensitivity?: number | null
+    returnIntent?: number | null
   }
 
   export type PlayerFeaturesCreateOrConnectWithoutUserInput = {
@@ -11781,6 +11818,7 @@ export namespace Prisma {
     explorerRatio?: NullableFloatFieldUpdateOperationsInput | number | null
     playerProfile?: NullableStringFieldUpdateOperationsInput | string | null
     popularitySensitivity?: NullableFloatFieldUpdateOperationsInput | number | null
+    returnIntent?: NullableFloatFieldUpdateOperationsInput | number | null
   }
 
   export type PlayerFeaturesUncheckedUpdateWithoutUserInput = {
@@ -11791,6 +11829,7 @@ export namespace Prisma {
     explorerRatio?: NullableFloatFieldUpdateOperationsInput | number | null
     playerProfile?: NullableStringFieldUpdateOperationsInput | string | null
     popularitySensitivity?: NullableFloatFieldUpdateOperationsInput | number | null
+    returnIntent?: NullableFloatFieldUpdateOperationsInput | number | null
   }
 
   export type SocialAffinityUpsertWithWhereUniqueWithoutUser1Input = {

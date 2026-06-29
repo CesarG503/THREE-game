@@ -7,6 +7,8 @@ class AnalyticsTracker {
   private lastInactiveStart: number | null = null;
   private isActive: boolean = true;
   private heartbeatInterval: number | null = null;
+  private latencySum: number = 0;
+  private latencyCount: number = 0;
   private hasSentEnd: boolean = false;
 
   constructor() {
@@ -77,6 +79,19 @@ class AnalyticsTracker {
     };
   }
 
+  private async trackLatencyCall<T>(fn: () => Promise<T>): Promise<T> {
+    const start = Date.now();
+    try {
+      const res = await fn();
+      const elapsed = Date.now() - start;
+      this.latencySum += elapsed;
+      this.latencyCount++;
+      return res;
+    } catch (err) {
+      throw err;
+    }
+  }
+
   private sendSessionStart() {
     const payload = {
       userAgent: navigator.userAgent,
@@ -86,11 +101,13 @@ class AnalyticsTracker {
     
     const envelope = this.buildEnvelope("SessionStart", payload);
     
-    apiFetch("/analytics/event", {
-      method: "POST",
-      body: JSON.stringify(envelope),
-      auth: false,
-    }).catch(console.warn);
+    this.trackLatencyCall(() =>
+      apiFetch("/analytics/event", {
+        method: "POST",
+        body: JSON.stringify(envelope),
+        auth: false,
+      })
+    ).catch(console.warn);
   }
 
   private sendHeartbeat() {
@@ -98,11 +115,13 @@ class AnalyticsTracker {
       state: this.isActive ? "tab_active" : "tab_inactive"
     });
 
-    apiFetch("/analytics/event", {
-      method: "POST",
-      body: JSON.stringify(envelope),
-      auth: false,
-    }).catch(console.warn);
+    this.trackLatencyCall(() =>
+      apiFetch("/analytics/event", {
+        method: "POST",
+        body: JSON.stringify(envelope),
+        auth: false,
+      })
+    ).catch(console.warn);
   }
 
   private handleUnload = () => {
@@ -116,11 +135,13 @@ class AnalyticsTracker {
     const durationSeconds = Math.floor((now - this.sessionStartTime) / 1000);
     const idleSeconds = Math.floor(this.totalIdleTimeMs / 1000);
     const usefulSeconds = Math.max(0, durationSeconds - idleSeconds);
+    const averageLatencyMs = this.latencyCount > 0 ? Math.round(this.latencySum / this.latencyCount) : undefined;
 
     const envelope = this.buildEnvelope("SessionEnd", {
       durationSeconds,
       idleSeconds,
       usefulSeconds,
+      averageLatencyMs,
     });
 
     // Use sendBeacon for reliable delivery during page unload

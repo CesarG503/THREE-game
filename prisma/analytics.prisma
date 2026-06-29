@@ -60,6 +60,7 @@ model PlayerFeatures {
   explorerRatio         Float?
   playerProfile         String?
   popularitySensitivity Float?
+  returnIntent          Float?
   user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@schema("analytics")

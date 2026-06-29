@@ -918,6 +918,49 @@ export class PlayerConfigPanel {
 
         extraCol.appendChild(collisionContainer);
 
+        // --- MODO DE CÁMARA POR DEFECTO ---
+        const cameraHeader = document.createElement('h4');
+        cameraHeader.textContent = "Modo de Cámara";
+        cameraHeader.style.cssText = "color:#aaa; border-bottom:1px solid #444; margin-top: 20px;";
+        extraCol.appendChild(cameraHeader);
+
+        const cameraContainer = document.createElement('div');
+        cameraContainer.style.marginBottom = "15px";
+
+        const cameraLabel = document.createElement('label');
+        cameraLabel.textContent = "Modo Predeterminado";
+        cameraLabel.style.display = "block";
+        cameraLabel.style.color = "#ddd";
+        cameraLabel.style.marginBottom = "5px";
+        cameraContainer.appendChild(cameraLabel);
+
+        const cameraSelect = document.createElement('select');
+        cameraSelect.style.cssText = "background:#333; color:white; padding:5px; border:1px solid #555; width: 100%; box-sizing: border-box;";
+
+        const cameraOptions = [
+            { v: 'third-person-collision', t: "3ra Persona: Choque con Objetos" },
+            { v: 'third-person-free', t: "3ra Persona: Libre (Sin límites)" },
+            { v: 'first-person', t: "1ra Persona" }
+        ];
+
+        cameraOptions.forEach(opt => {
+            const o = document.createElement('option');
+            o.value = opt.v;
+            o.textContent = opt.t;
+            if ((profile.cameraMode || 'third-person-collision') === opt.v) o.selected = true;
+            cameraSelect.appendChild(o);
+        });
+
+        cameraSelect.onchange = (e) => {
+            this.manager.updateProfile(profile.id, { cameraMode: e.target.value });
+            if (this.manager.assignments.defaultProfileId === profile.id) {
+                this.manager.applyConfiguration();
+            }
+        };
+
+        cameraContainer.appendChild(cameraSelect);
+        extraCol.appendChild(cameraContainer);
+
         // --- HUD CONFIG BUTTON ---
         const hudBtn = document.createElement('button');
         hudBtn.textContent = "Editar HUD e Inventario";

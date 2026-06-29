@@ -406,7 +406,8 @@ export function animate(this: any) {
 		this.character.getPosition(),
 		this.character.getRotation(),
 		dt,
-		this.character.getGravityQuaternion ? this.character.getGravityQuaternion() : (this.character.getGravityUpVector ? this.character.getGravityUpVector() : null)
+		this.character.getGravityQuaternion ? this.character.getGravityQuaternion() : (this.character.getGravityUpVector ? this.character.getGravityUpVector() : null),
+		this.sceneManager.scene
 	);
 
 	// Fall Death Logic

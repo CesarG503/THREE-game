@@ -20,6 +20,7 @@ export interface IPlayerProfile {
   playerProfile: string | null;
   popularitySensitivity: number | null;
   returnIntent: number | null;
+  scheduleProfile: any | null;
 }
 
 export class PlayerProfileRepository {
@@ -95,6 +96,7 @@ export class PlayerProfileRepository {
       playerProfile: features?.playerProfile ?? null,
       popularitySensitivity: features?.popularitySensitivity ?? null,
       returnIntent: features?.returnIntent ?? null,
+      scheduleProfile: features?.scheduleProfile ?? null,
     };
 
     // 5. Intentar escribir en el caché de Redis

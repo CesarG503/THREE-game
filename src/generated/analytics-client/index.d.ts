@@ -4959,6 +4959,7 @@ export namespace Prisma {
     playerProfile: number
     popularitySensitivity: number
     returnIntent: number
+    scheduleProfile: number
     _all: number
   }
 
@@ -5013,6 +5014,7 @@ export namespace Prisma {
     playerProfile?: true
     popularitySensitivity?: true
     returnIntent?: true
+    scheduleProfile?: true
     _all?: true
   }
 
@@ -5112,6 +5114,7 @@ export namespace Prisma {
     playerProfile: string | null
     popularitySensitivity: number | null
     returnIntent: number | null
+    scheduleProfile: JsonValue | null
     _count: PlayerFeaturesCountAggregateOutputType | null
     _avg: PlayerFeaturesAvgAggregateOutputType | null
     _sum: PlayerFeaturesSumAggregateOutputType | null
@@ -5143,6 +5146,7 @@ export namespace Prisma {
     playerProfile?: boolean
     popularitySensitivity?: boolean
     returnIntent?: boolean
+    scheduleProfile?: boolean
     user?: boolean | UserDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["playerFeatures"]>
 
@@ -5156,6 +5160,7 @@ export namespace Prisma {
     playerProfile?: boolean
     popularitySensitivity?: boolean
     returnIntent?: boolean
+    scheduleProfile?: boolean
     user?: boolean | UserDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["playerFeatures"]>
 
@@ -5169,6 +5174,7 @@ export namespace Prisma {
     playerProfile?: boolean
     popularitySensitivity?: boolean
     returnIntent?: boolean
+    scheduleProfile?: boolean
     user?: boolean | UserDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["playerFeatures"]>
 
@@ -5182,9 +5188,10 @@ export namespace Prisma {
     playerProfile?: boolean
     popularitySensitivity?: boolean
     returnIntent?: boolean
+    scheduleProfile?: boolean
   }
 
-  export type PlayerFeaturesOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"userId" | "lastActive" | "totalPlayTime" | "matchesPlayed" | "preferredLanguage" | "explorerRatio" | "playerProfile" | "popularitySensitivity" | "returnIntent", ExtArgs["result"]["playerFeatures"]>
+  export type PlayerFeaturesOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"userId" | "lastActive" | "totalPlayTime" | "matchesPlayed" | "preferredLanguage" | "explorerRatio" | "playerProfile" | "popularitySensitivity" | "returnIntent" | "scheduleProfile", ExtArgs["result"]["playerFeatures"]>
   export type PlayerFeaturesInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     user?: boolean | UserDefaultArgs<ExtArgs>
   }
@@ -5210,6 +5217,7 @@ export namespace Prisma {
       playerProfile: string | null
       popularitySensitivity: number | null
       returnIntent: number | null
+      scheduleProfile: Prisma.JsonValue | null
     }, ExtArgs["result"]["playerFeatures"]>
     composites: {}
   }
@@ -5643,6 +5651,7 @@ export namespace Prisma {
     readonly playerProfile: FieldRef<"PlayerFeatures", 'String'>
     readonly popularitySensitivity: FieldRef<"PlayerFeatures", 'Float'>
     readonly returnIntent: FieldRef<"PlayerFeatures", 'Float'>
+    readonly scheduleProfile: FieldRef<"PlayerFeatures", 'Json'>
   }
     
 
@@ -9453,7 +9462,8 @@ export namespace Prisma {
     explorerRatio: 'explorerRatio',
     playerProfile: 'playerProfile',
     popularitySensitivity: 'popularitySensitivity',
-    returnIntent: 'returnIntent'
+    returnIntent: 'returnIntent',
+    scheduleProfile: 'scheduleProfile'
   };
 
   export type PlayerFeaturesScalarFieldEnum = (typeof PlayerFeaturesScalarFieldEnum)[keyof typeof PlayerFeaturesScalarFieldEnum]
@@ -9837,6 +9847,7 @@ export namespace Prisma {
     playerProfile?: StringNullableFilter<"PlayerFeatures"> | string | null
     popularitySensitivity?: FloatNullableFilter<"PlayerFeatures"> | number | null
     returnIntent?: FloatNullableFilter<"PlayerFeatures"> | number | null
+    scheduleProfile?: JsonNullableFilter<"PlayerFeatures">
     user?: XOR<UserScalarRelationFilter, UserWhereInput>
   }
 
@@ -9850,6 +9861,7 @@ export namespace Prisma {
     playerProfile?: SortOrderInput | SortOrder
     popularitySensitivity?: SortOrderInput | SortOrder
     returnIntent?: SortOrderInput | SortOrder
+    scheduleProfile?: SortOrderInput | SortOrder
     user?: UserOrderByWithRelationInput
   }
 
@@ -9866,6 +9878,7 @@ export namespace Prisma {
     playerProfile?: StringNullableFilter<"PlayerFeatures"> | string | null
     popularitySensitivity?: FloatNullableFilter<"PlayerFeatures"> | number | null
     returnIntent?: FloatNullableFilter<"PlayerFeatures"> | number | null
+    scheduleProfile?: JsonNullableFilter<"PlayerFeatures">
     user?: XOR<UserScalarRelationFilter, UserWhereInput>
   }, "userId">
 
@@ -9879,6 +9892,7 @@ export namespace Prisma {
     playerProfile?: SortOrderInput | SortOrder
     popularitySensitivity?: SortOrderInput | SortOrder
     returnIntent?: SortOrderInput | SortOrder
+    scheduleProfile?: SortOrderInput | SortOrder
     _count?: PlayerFeaturesCountOrderByAggregateInput
     _avg?: PlayerFeaturesAvgOrderByAggregateInput
     _max?: PlayerFeaturesMaxOrderByAggregateInput
@@ -9899,6 +9913,7 @@ export namespace Prisma {
     playerProfile?: StringNullableWithAggregatesFilter<"PlayerFeatures"> | string | null
     popularitySensitivity?: FloatNullableWithAggregatesFilter<"PlayerFeatures"> | number | null
     returnIntent?: FloatNullableWithAggregatesFilter<"PlayerFeatures"> | number | null
+    scheduleProfile?: JsonNullableWithAggregatesFilter<"PlayerFeatures">
   }
 
   export type MapFeaturesWhereInput = {
@@ -10318,6 +10333,7 @@ export namespace Prisma {
     playerProfile?: string | null
     popularitySensitivity?: number | null
     returnIntent?: number | null
+    scheduleProfile?: NullableJsonNullValueInput | InputJsonValue
     user: UserCreateNestedOneWithoutPlayerFeaturesInput
   }
 
@@ -10331,6 +10347,7 @@ export namespace Prisma {
     playerProfile?: string | null
     popularitySensitivity?: number | null
     returnIntent?: number | null
+    scheduleProfile?: NullableJsonNullValueInput | InputJsonValue
   }
 
   export type PlayerFeaturesUpdateInput = {
@@ -10342,6 +10359,7 @@ export namespace Prisma {
     playerProfile?: NullableStringFieldUpdateOperationsInput | string | null
     popularitySensitivity?: NullableFloatFieldUpdateOperationsInput | number | null
     returnIntent?: NullableFloatFieldUpdateOperationsInput | number | null
+    scheduleProfile?: NullableJsonNullValueInput | InputJsonValue
     user?: UserUpdateOneRequiredWithoutPlayerFeaturesNestedInput
   }
 
@@ -10355,6 +10373,7 @@ export namespace Prisma {
     playerProfile?: NullableStringFieldUpdateOperationsInput | string | null
     popularitySensitivity?: NullableFloatFieldUpdateOperationsInput | number | null
     returnIntent?: NullableFloatFieldUpdateOperationsInput | number | null
+    scheduleProfile?: NullableJsonNullValueInput | InputJsonValue
   }
 
   export type PlayerFeaturesCreateManyInput = {
@@ -10367,6 +10386,7 @@ export namespace Prisma {
     playerProfile?: string | null
     popularitySensitivity?: number | null
     returnIntent?: number | null
+    scheduleProfile?: NullableJsonNullValueInput | InputJsonValue
   }
 
   export type PlayerFeaturesUpdateManyMutationInput = {
@@ -10378,6 +10398,7 @@ export namespace Prisma {
     playerProfile?: NullableStringFieldUpdateOperationsInput | string | null
     popularitySensitivity?: NullableFloatFieldUpdateOperationsInput | number | null
     returnIntent?: NullableFloatFieldUpdateOperationsInput | number | null
+    scheduleProfile?: NullableJsonNullValueInput | InputJsonValue
   }
 
   export type PlayerFeaturesUncheckedUpdateManyInput = {
@@ -10390,6 +10411,7 @@ export namespace Prisma {
     playerProfile?: NullableStringFieldUpdateOperationsInput | string | null
     popularitySensitivity?: NullableFloatFieldUpdateOperationsInput | number | null
     returnIntent?: NullableFloatFieldUpdateOperationsInput | number | null
+    scheduleProfile?: NullableJsonNullValueInput | InputJsonValue
   }
 
   export type MapFeaturesCreateInput = {
@@ -10895,6 +10917,29 @@ export namespace Prisma {
     gte?: number | FloatFieldRefInput<$PrismaModel>
     not?: NestedFloatNullableFilter<$PrismaModel> | number | null
   }
+  export type JsonNullableFilter<$PrismaModel = never> =
+    | PatchUndefined<
+        Either<Required<JsonNullableFilterBase<$PrismaModel>>, Exclude<keyof Required<JsonNullableFilterBase<$PrismaModel>>, 'path'>>,
+        Required<JsonNullableFilterBase<$PrismaModel>>
+      >
+    | OptionalFlat<Omit<Required<JsonNullableFilterBase<$PrismaModel>>, 'path'>>
+
+  export type JsonNullableFilterBase<$PrismaModel = never> = {
+    equals?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
+    path?: string[]
+    mode?: QueryMode | EnumQueryModeFieldRefInput<$PrismaModel>
+    string_contains?: string | StringFieldRefInput<$PrismaModel>
+    string_starts_with?: string | StringFieldRefInput<$PrismaModel>
+    string_ends_with?: string | StringFieldRefInput<$PrismaModel>
+    array_starts_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    array_ends_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    array_contains?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    lt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    lte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    gt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    gte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    not?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
+  }
 
   export type UserScalarRelationFilter = {
     is?: UserWhereInput
@@ -10911,6 +10956,7 @@ export namespace Prisma {
     playerProfile?: SortOrder
     popularitySensitivity?: SortOrder
     returnIntent?: SortOrder
+    scheduleProfile?: SortOrder
   }
 
   export type PlayerFeaturesAvgOrderByAggregateInput = {
@@ -11000,14 +11046,14 @@ export namespace Prisma {
     _min?: NestedFloatNullableFilter<$PrismaModel>
     _max?: NestedFloatNullableFilter<$PrismaModel>
   }
-  export type JsonNullableFilter<$PrismaModel = never> =
+  export type JsonNullableWithAggregatesFilter<$PrismaModel = never> =
     | PatchUndefined<
-        Either<Required<JsonNullableFilterBase<$PrismaModel>>, Exclude<keyof Required<JsonNullableFilterBase<$PrismaModel>>, 'path'>>,
-        Required<JsonNullableFilterBase<$PrismaModel>>
+        Either<Required<JsonNullableWithAggregatesFilterBase<$PrismaModel>>, Exclude<keyof Required<JsonNullableWithAggregatesFilterBase<$PrismaModel>>, 'path'>>,
+        Required<JsonNullableWithAggregatesFilterBase<$PrismaModel>>
       >
-    | OptionalFlat<Omit<Required<JsonNullableFilterBase<$PrismaModel>>, 'path'>>
+    | OptionalFlat<Omit<Required<JsonNullableWithAggregatesFilterBase<$PrismaModel>>, 'path'>>
 
-  export type JsonNullableFilterBase<$PrismaModel = never> = {
+  export type JsonNullableWithAggregatesFilterBase<$PrismaModel = never> = {
     equals?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
     path?: string[]
     mode?: QueryMode | EnumQueryModeFieldRefInput<$PrismaModel>
@@ -11022,6 +11068,9 @@ export namespace Prisma {
     gt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
     gte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
     not?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
+    _count?: NestedIntNullableFilter<$PrismaModel>
+    _min?: NestedJsonNullableFilter<$PrismaModel>
+    _max?: NestedJsonNullableFilter<$PrismaModel>
   }
 
   export type GameMapScalarRelationFilter = {
@@ -11081,32 +11130,6 @@ export namespace Prisma {
     bounceRate?: SortOrder
     medianPlaytime?: SortOrder
     completionRate?: SortOrder
-  }
-  export type JsonNullableWithAggregatesFilter<$PrismaModel = never> =
-    | PatchUndefined<
-        Either<Required<JsonNullableWithAggregatesFilterBase<$PrismaModel>>, Exclude<keyof Required<JsonNullableWithAggregatesFilterBase<$PrismaModel>>, 'path'>>,
-        Required<JsonNullableWithAggregatesFilterBase<$PrismaModel>>
-      >
-    | OptionalFlat<Omit<Required<JsonNullableWithAggregatesFilterBase<$PrismaModel>>, 'path'>>
-
-  export type JsonNullableWithAggregatesFilterBase<$PrismaModel = never> = {
-    equals?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
-    path?: string[]
-    mode?: QueryMode | EnumQueryModeFieldRefInput<$PrismaModel>
-    string_contains?: string | StringFieldRefInput<$PrismaModel>
-    string_starts_with?: string | StringFieldRefInput<$PrismaModel>
-    string_ends_with?: string | StringFieldRefInput<$PrismaModel>
-    array_starts_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
-    array_ends_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
-    array_contains?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
-    lt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
-    lte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
-    gt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
-    gte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
-    not?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
-    _count?: NestedIntNullableFilter<$PrismaModel>
-    _min?: NestedJsonNullableFilter<$PrismaModel>
-    _max?: NestedJsonNullableFilter<$PrismaModel>
   }
 
   export type SocialAffinityUserId1UserId2CompoundUniqueInput = {
@@ -11857,6 +11880,7 @@ export namespace Prisma {
     playerProfile?: string | null
     popularitySensitivity?: number | null
     returnIntent?: number | null
+    scheduleProfile?: NullableJsonNullValueInput | InputJsonValue
   }
 
   export type PlayerFeaturesUncheckedCreateWithoutUserInput = {
@@ -11868,6 +11892,7 @@ export namespace Prisma {
     playerProfile?: string | null
     popularitySensitivity?: number | null
     returnIntent?: number | null
+    scheduleProfile?: NullableJsonNullValueInput | InputJsonValue
   }
 
   export type PlayerFeaturesCreateOrConnectWithoutUserInput = {
@@ -11992,6 +12017,7 @@ export namespace Prisma {
     playerProfile?: NullableStringFieldUpdateOperationsInput | string | null
     popularitySensitivity?: NullableFloatFieldUpdateOperationsInput | number | null
     returnIntent?: NullableFloatFieldUpdateOperationsInput | number | null
+    scheduleProfile?: NullableJsonNullValueInput | InputJsonValue
   }
 
   export type PlayerFeaturesUncheckedUpdateWithoutUserInput = {
@@ -12003,6 +12029,7 @@ export namespace Prisma {
     playerProfile?: NullableStringFieldUpdateOperationsInput | string | null
     popularitySensitivity?: NullableFloatFieldUpdateOperationsInput | number | null
     returnIntent?: NullableFloatFieldUpdateOperationsInput | number | null
+    scheduleProfile?: NullableJsonNullValueInput | InputJsonValue
   }
 
   export type SocialAffinityUpsertWithWhereUniqueWithoutUser1Input = {

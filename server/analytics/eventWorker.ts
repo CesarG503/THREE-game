@@ -3,6 +3,7 @@ import { analyticsPrisma } from "../db/analyticsPrisma.js";
 import { logger } from "../utils/Logger.js";
 import type { TelemetryEvent } from "./eventBuffer.js";
 import { computeReturnIntentForUser } from "./features/return_intent.js";
+import { computeScheduleProfileForUser } from "./features/schedule_profile.js";
 
 export class EventWorker {
   private isRunning = false;
@@ -105,11 +106,22 @@ export class EventWorker {
       await this.processEventsIndividually(events);
     }
 
-    // Post-ingestion: Trigger IRI calculation for SessionEnd events
+    // Post-ingestion: Trigger calculations for SessionStart and SessionEnd events
+    const sessionStartUserIds = new Set<string>();
     const sessionEndUserIds = new Set<string>();
     for (const event of events) {
-      if (event.eventType === "SessionEnd" && event.userId) {
+      if (event.eventType === "SessionStart" && event.userId) {
+        sessionStartUserIds.add(event.userId);
+      } else if (event.eventType === "SessionEnd" && event.userId) {
         sessionEndUserIds.add(event.userId);
+      }
+    }
+
+    if (sessionStartUserIds.size > 0) {
+      for (const userId of sessionStartUserIds) {
+        computeScheduleProfileForUser(userId).catch((err) => {
+          logger.error("EventWorker", `Failed to run background schedule profiling for user ${userId}`, err);
+        });
       }
     }
 

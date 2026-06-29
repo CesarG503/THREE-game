@@ -156,7 +156,8 @@ exports.Prisma.PlayerFeaturesScalarFieldEnum = {
   explorerRatio: 'explorerRatio',
   playerProfile: 'playerProfile',
   popularitySensitivity: 'popularitySensitivity',
-  returnIntent: 'returnIntent'
+  returnIntent: 'returnIntent',
+  scheduleProfile: 'scheduleProfile'
 };
 
 exports.Prisma.MapFeaturesScalarFieldEnum = {

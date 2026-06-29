@@ -61,6 +61,7 @@ model PlayerFeatures {
   playerProfile         String?
   popularitySensitivity Float?
   returnIntent          Float?
+  scheduleProfile       Json?
   user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@schema("analytics")

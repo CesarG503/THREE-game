@@ -59,6 +59,11 @@ export async function handleHttpRequest(
   }
 
   if (req.method === "POST" && url.pathname === "/api/auth/register") {
+    const ip = req.socket.remoteAddress ?? "unknown"
+    if (await checkRateLimit(`register:${ip}`, 10, 60)) {
+      sendJson(res, 429, { error: "Demasiados intentos. Intenta de nuevo en un minuto." })
+      return
+    }
     return withJsonBody(req, res, async (body) => {
       const result = await registerUser(body as AuthInput)
       sendJson(res, 201, result)
@@ -66,6 +71,11 @@ export async function handleHttpRequest(
   }
 
   if (req.method === "POST" && url.pathname === "/api/auth/login") {
+    const ip = req.socket.remoteAddress ?? "unknown"
+    if (await checkRateLimit(`login:${ip}`, 5, 60)) {
+      sendJson(res, 429, { error: "Demasiados intentos. Intenta de nuevo en un minuto." })
+      return
+    }
     return withJsonBody(req, res, async (body) => {
       const result = await loginUser(body as AuthInput)
       sendJson(res, 200, result)

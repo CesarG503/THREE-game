@@ -20,19 +20,21 @@ model User {
   playerFeatures  PlayerFeatures?
   socialAffinity1 SocialAffinity[] @relation("AffinityUser1")
   socialAffinity2 SocialAffinity[] @relation("AffinityUser2")
+  fatiguedMaps    FatiguedMap[]
 
   @@schema("analytics")
 }
 
 model GameMap {
-  id          String       @id
-  slug        String
-  name        String
-  ownerId     String?
-  isPublished Boolean
-  createdAt   DateTime
-  updatedAt   DateTime
-  mapFeatures MapFeatures?
+  id              String        @id
+  slug            String
+  name            String
+  ownerId         String?
+  isPublished     Boolean
+  createdAt       DateTime
+  updatedAt       DateTime
+  mapFeatures     MapFeatures?
+  fatiguedPlayers FatiguedMap[]
 
   @@schema("analytics")
 }
@@ -88,5 +90,19 @@ model SocialAffinity {
   @@unique([userId1, userId2])
   @@index([userId1, affinity(sort: Desc)])
   @@index([userId2, affinity(sort: Desc)])
+  @@schema("analytics")
+}
+
+model FatiguedMap {
+  userId     String
+  mapId      String
+  fatiguedAt DateTime @default(now())
+  expiresAt  DateTime
+
+  user User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  map  GameMap @relation(fields: [mapId], references: [id], onDelete: Cascade)
+
+  @@id([userId, mapId])
+  @@index([expiresAt])
   @@schema("analytics")
 }

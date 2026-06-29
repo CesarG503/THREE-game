@@ -43,6 +43,11 @@ export type MapFeatures = $Result.DefaultSelection<Prisma.$MapFeaturesPayload>
  * 
  */
 export type SocialAffinity = $Result.DefaultSelection<Prisma.$SocialAffinityPayload>
+/**
+ * Model FatiguedMap
+ * 
+ */
+export type FatiguedMap = $Result.DefaultSelection<Prisma.$FatiguedMapPayload>
 
 /**
  * ##  Prisma Client ʲˢ
@@ -224,6 +229,16 @@ export class PrismaClient<
     * ```
     */
   get socialAffinity(): Prisma.SocialAffinityDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.fatiguedMap`: Exposes CRUD operations for the **FatiguedMap** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more FatiguedMaps
+    * const fatiguedMaps = await prisma.fatiguedMap.findMany()
+    * ```
+    */
+  get fatiguedMap(): Prisma.FatiguedMapDelegate<ExtArgs, ClientOptions>;
 }
 
 export namespace Prisma {
@@ -663,7 +678,8 @@ export namespace Prisma {
     RawEvent: 'RawEvent',
     PlayerFeatures: 'PlayerFeatures',
     MapFeatures: 'MapFeatures',
-    SocialAffinity: 'SocialAffinity'
+    SocialAffinity: 'SocialAffinity',
+    FatiguedMap: 'FatiguedMap'
   };
 
   export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -679,7 +695,7 @@ export namespace Prisma {
       omit: GlobalOmitOptions
     }
     meta: {
-      modelProps: "user" | "gameMap" | "rawEvent" | "playerFeatures" | "mapFeatures" | "socialAffinity"
+      modelProps: "user" | "gameMap" | "rawEvent" | "playerFeatures" | "mapFeatures" | "socialAffinity" | "fatiguedMap"
       txIsolationLevel: Prisma.TransactionIsolationLevel
     }
     model: {
@@ -1127,6 +1143,80 @@ export namespace Prisma {
           }
         }
       }
+      FatiguedMap: {
+        payload: Prisma.$FatiguedMapPayload<ExtArgs>
+        fields: Prisma.FatiguedMapFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.FatiguedMapFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$FatiguedMapPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.FatiguedMapFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$FatiguedMapPayload>
+          }
+          findFirst: {
+            args: Prisma.FatiguedMapFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$FatiguedMapPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.FatiguedMapFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$FatiguedMapPayload>
+          }
+          findMany: {
+            args: Prisma.FatiguedMapFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$FatiguedMapPayload>[]
+          }
+          create: {
+            args: Prisma.FatiguedMapCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$FatiguedMapPayload>
+          }
+          createMany: {
+            args: Prisma.FatiguedMapCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.FatiguedMapCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$FatiguedMapPayload>[]
+          }
+          delete: {
+            args: Prisma.FatiguedMapDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$FatiguedMapPayload>
+          }
+          update: {
+            args: Prisma.FatiguedMapUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$FatiguedMapPayload>
+          }
+          deleteMany: {
+            args: Prisma.FatiguedMapDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.FatiguedMapUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.FatiguedMapUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$FatiguedMapPayload>[]
+          }
+          upsert: {
+            args: Prisma.FatiguedMapUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$FatiguedMapPayload>
+          }
+          aggregate: {
+            args: Prisma.FatiguedMapAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateFatiguedMap>
+          }
+          groupBy: {
+            args: Prisma.FatiguedMapGroupByArgs<ExtArgs>
+            result: $Utils.Optional<FatiguedMapGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.FatiguedMapCountArgs<ExtArgs>
+            result: $Utils.Optional<FatiguedMapCountAggregateOutputType> | number
+          }
+        }
+      }
     }
   } & {
     other: {
@@ -1241,6 +1331,7 @@ export namespace Prisma {
     playerFeatures?: PlayerFeaturesOmit
     mapFeatures?: MapFeaturesOmit
     socialAffinity?: SocialAffinityOmit
+    fatiguedMap?: FatiguedMapOmit
   }
 
   /* Types for Logging */
@@ -1324,12 +1415,14 @@ export namespace Prisma {
     events: number
     socialAffinity1: number
     socialAffinity2: number
+    fatiguedMaps: number
   }
 
   export type UserCountOutputTypeSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     events?: boolean | UserCountOutputTypeCountEventsArgs
     socialAffinity1?: boolean | UserCountOutputTypeCountSocialAffinity1Args
     socialAffinity2?: boolean | UserCountOutputTypeCountSocialAffinity2Args
+    fatiguedMaps?: boolean | UserCountOutputTypeCountFatiguedMapsArgs
   }
 
   // Custom InputTypes
@@ -1362,6 +1455,44 @@ export namespace Prisma {
    */
   export type UserCountOutputTypeCountSocialAffinity2Args<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     where?: SocialAffinityWhereInput
+  }
+
+  /**
+   * UserCountOutputType without action
+   */
+  export type UserCountOutputTypeCountFatiguedMapsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: FatiguedMapWhereInput
+  }
+
+
+  /**
+   * Count Type GameMapCountOutputType
+   */
+
+  export type GameMapCountOutputType = {
+    fatiguedPlayers: number
+  }
+
+  export type GameMapCountOutputTypeSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    fatiguedPlayers?: boolean | GameMapCountOutputTypeCountFatiguedPlayersArgs
+  }
+
+  // Custom InputTypes
+  /**
+   * GameMapCountOutputType without action
+   */
+  export type GameMapCountOutputTypeDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the GameMapCountOutputType
+     */
+    select?: GameMapCountOutputTypeSelect<ExtArgs> | null
+  }
+
+  /**
+   * GameMapCountOutputType without action
+   */
+  export type GameMapCountOutputTypeCountFatiguedPlayersArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: FatiguedMapWhereInput
   }
 
 
@@ -1545,6 +1676,7 @@ export namespace Prisma {
     playerFeatures?: boolean | User$playerFeaturesArgs<ExtArgs>
     socialAffinity1?: boolean | User$socialAffinity1Args<ExtArgs>
     socialAffinity2?: boolean | User$socialAffinity2Args<ExtArgs>
+    fatiguedMaps?: boolean | User$fatiguedMapsArgs<ExtArgs>
     _count?: boolean | UserCountOutputTypeDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["user"]>
 
@@ -1581,6 +1713,7 @@ export namespace Prisma {
     playerFeatures?: boolean | User$playerFeaturesArgs<ExtArgs>
     socialAffinity1?: boolean | User$socialAffinity1Args<ExtArgs>
     socialAffinity2?: boolean | User$socialAffinity2Args<ExtArgs>
+    fatiguedMaps?: boolean | User$fatiguedMapsArgs<ExtArgs>
     _count?: boolean | UserCountOutputTypeDefaultArgs<ExtArgs>
   }
   export type UserIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {}
@@ -1593,6 +1726,7 @@ export namespace Prisma {
       playerFeatures: Prisma.$PlayerFeaturesPayload<ExtArgs> | null
       socialAffinity1: Prisma.$SocialAffinityPayload<ExtArgs>[]
       socialAffinity2: Prisma.$SocialAffinityPayload<ExtArgs>[]
+      fatiguedMaps: Prisma.$FatiguedMapPayload<ExtArgs>[]
     }
     scalars: $Extensions.GetPayloadResult<{
       id: string
@@ -1999,6 +2133,7 @@ export namespace Prisma {
     playerFeatures<T extends User$playerFeaturesArgs<ExtArgs> = {}>(args?: Subset<T, User$playerFeaturesArgs<ExtArgs>>): Prisma__PlayerFeaturesClient<$Result.GetResult<Prisma.$PlayerFeaturesPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
     socialAffinity1<T extends User$socialAffinity1Args<ExtArgs> = {}>(args?: Subset<T, User$socialAffinity1Args<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$SocialAffinityPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     socialAffinity2<T extends User$socialAffinity2Args<ExtArgs> = {}>(args?: Subset<T, User$socialAffinity2Args<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$SocialAffinityPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    fatiguedMaps<T extends User$fatiguedMapsArgs<ExtArgs> = {}>(args?: Subset<T, User$fatiguedMapsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$FatiguedMapPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     /**
      * Attaches callbacks for the resolution and/or rejection of the Promise.
      * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -2518,6 +2653,30 @@ export namespace Prisma {
   }
 
   /**
+   * User.fatiguedMaps
+   */
+  export type User$fatiguedMapsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the FatiguedMap
+     */
+    select?: FatiguedMapSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the FatiguedMap
+     */
+    omit?: FatiguedMapOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: FatiguedMapInclude<ExtArgs> | null
+    where?: FatiguedMapWhereInput
+    orderBy?: FatiguedMapOrderByWithRelationInput | FatiguedMapOrderByWithRelationInput[]
+    cursor?: FatiguedMapWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: FatiguedMapScalarFieldEnum | FatiguedMapScalarFieldEnum[]
+  }
+
+  /**
    * User without action
    */
   export type UserDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
@@ -2717,6 +2876,8 @@ export namespace Prisma {
     createdAt?: boolean
     updatedAt?: boolean
     mapFeatures?: boolean | GameMap$mapFeaturesArgs<ExtArgs>
+    fatiguedPlayers?: boolean | GameMap$fatiguedPlayersArgs<ExtArgs>
+    _count?: boolean | GameMapCountOutputTypeDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["gameMap"]>
 
   export type GameMapSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
@@ -2752,6 +2913,8 @@ export namespace Prisma {
   export type GameMapOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "slug" | "name" | "ownerId" | "isPublished" | "createdAt" | "updatedAt", ExtArgs["result"]["gameMap"]>
   export type GameMapInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     mapFeatures?: boolean | GameMap$mapFeaturesArgs<ExtArgs>
+    fatiguedPlayers?: boolean | GameMap$fatiguedPlayersArgs<ExtArgs>
+    _count?: boolean | GameMapCountOutputTypeDefaultArgs<ExtArgs>
   }
   export type GameMapIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {}
   export type GameMapIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {}
@@ -2760,6 +2923,7 @@ export namespace Prisma {
     name: "GameMap"
     objects: {
       mapFeatures: Prisma.$MapFeaturesPayload<ExtArgs> | null
+      fatiguedPlayers: Prisma.$FatiguedMapPayload<ExtArgs>[]
     }
     scalars: $Extensions.GetPayloadResult<{
       id: string
@@ -3164,6 +3328,7 @@ export namespace Prisma {
   export interface Prisma__GameMapClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
     readonly [Symbol.toStringTag]: "PrismaPromise"
     mapFeatures<T extends GameMap$mapFeaturesArgs<ExtArgs> = {}>(args?: Subset<T, GameMap$mapFeaturesArgs<ExtArgs>>): Prisma__MapFeaturesClient<$Result.GetResult<Prisma.$MapFeaturesPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+    fatiguedPlayers<T extends GameMap$fatiguedPlayersArgs<ExtArgs> = {}>(args?: Subset<T, GameMap$fatiguedPlayersArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$FatiguedMapPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     /**
      * Attaches callbacks for the resolution and/or rejection of the Promise.
      * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -3609,6 +3774,30 @@ export namespace Prisma {
      */
     include?: MapFeaturesInclude<ExtArgs> | null
     where?: MapFeaturesWhereInput
+  }
+
+  /**
+   * GameMap.fatiguedPlayers
+   */
+  export type GameMap$fatiguedPlayersArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the FatiguedMap
+     */
+    select?: FatiguedMapSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the FatiguedMap
+     */
+    omit?: FatiguedMapOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: FatiguedMapInclude<ExtArgs> | null
+    where?: FatiguedMapWhereInput
+    orderBy?: FatiguedMapOrderByWithRelationInput | FatiguedMapOrderByWithRelationInput[]
+    cursor?: FatiguedMapWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: FatiguedMapScalarFieldEnum | FatiguedMapScalarFieldEnum[]
   }
 
   /**
@@ -8088,6 +8277,1064 @@ export namespace Prisma {
 
 
   /**
+   * Model FatiguedMap
+   */
+
+  export type AggregateFatiguedMap = {
+    _count: FatiguedMapCountAggregateOutputType | null
+    _min: FatiguedMapMinAggregateOutputType | null
+    _max: FatiguedMapMaxAggregateOutputType | null
+  }
+
+  export type FatiguedMapMinAggregateOutputType = {
+    userId: string | null
+    mapId: string | null
+    fatiguedAt: Date | null
+    expiresAt: Date | null
+  }
+
+  export type FatiguedMapMaxAggregateOutputType = {
+    userId: string | null
+    mapId: string | null
+    fatiguedAt: Date | null
+    expiresAt: Date | null
+  }
+
+  export type FatiguedMapCountAggregateOutputType = {
+    userId: number
+    mapId: number
+    fatiguedAt: number
+    expiresAt: number
+    _all: number
+  }
+
+
+  export type FatiguedMapMinAggregateInputType = {
+    userId?: true
+    mapId?: true
+    fatiguedAt?: true
+    expiresAt?: true
+  }
+
+  export type FatiguedMapMaxAggregateInputType = {
+    userId?: true
+    mapId?: true
+    fatiguedAt?: true
+    expiresAt?: true
+  }
+
+  export type FatiguedMapCountAggregateInputType = {
+    userId?: true
+    mapId?: true
+    fatiguedAt?: true
+    expiresAt?: true
+    _all?: true
+  }
+
+  export type FatiguedMapAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which FatiguedMap to aggregate.
+     */
+    where?: FatiguedMapWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of FatiguedMaps to fetch.
+     */
+    orderBy?: FatiguedMapOrderByWithRelationInput | FatiguedMapOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: FatiguedMapWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` FatiguedMaps from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` FatiguedMaps.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned FatiguedMaps
+    **/
+    _count?: true | FatiguedMapCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: FatiguedMapMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: FatiguedMapMaxAggregateInputType
+  }
+
+  export type GetFatiguedMapAggregateType<T extends FatiguedMapAggregateArgs> = {
+        [P in keyof T & keyof AggregateFatiguedMap]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateFatiguedMap[P]>
+      : GetScalarType<T[P], AggregateFatiguedMap[P]>
+  }
+
+
+
+
+  export type FatiguedMapGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: FatiguedMapWhereInput
+    orderBy?: FatiguedMapOrderByWithAggregationInput | FatiguedMapOrderByWithAggregationInput[]
+    by: FatiguedMapScalarFieldEnum[] | FatiguedMapScalarFieldEnum
+    having?: FatiguedMapScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: FatiguedMapCountAggregateInputType | true
+    _min?: FatiguedMapMinAggregateInputType
+    _max?: FatiguedMapMaxAggregateInputType
+  }
+
+  export type FatiguedMapGroupByOutputType = {
+    userId: string
+    mapId: string
+    fatiguedAt: Date
+    expiresAt: Date
+    _count: FatiguedMapCountAggregateOutputType | null
+    _min: FatiguedMapMinAggregateOutputType | null
+    _max: FatiguedMapMaxAggregateOutputType | null
+  }
+
+  type GetFatiguedMapGroupByPayload<T extends FatiguedMapGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<FatiguedMapGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof FatiguedMapGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], FatiguedMapGroupByOutputType[P]>
+            : GetScalarType<T[P], FatiguedMapGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type FatiguedMapSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    userId?: boolean
+    mapId?: boolean
+    fatiguedAt?: boolean
+    expiresAt?: boolean
+    user?: boolean | UserDefaultArgs<ExtArgs>
+    map?: boolean | GameMapDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["fatiguedMap"]>
+
+  export type FatiguedMapSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    userId?: boolean
+    mapId?: boolean
+    fatiguedAt?: boolean
+    expiresAt?: boolean
+    user?: boolean | UserDefaultArgs<ExtArgs>
+    map?: boolean | GameMapDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["fatiguedMap"]>
+
+  export type FatiguedMapSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    userId?: boolean
+    mapId?: boolean
+    fatiguedAt?: boolean
+    expiresAt?: boolean
+    user?: boolean | UserDefaultArgs<ExtArgs>
+    map?: boolean | GameMapDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["fatiguedMap"]>
+
+  export type FatiguedMapSelectScalar = {
+    userId?: boolean
+    mapId?: boolean
+    fatiguedAt?: boolean
+    expiresAt?: boolean
+  }
+
+  export type FatiguedMapOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"userId" | "mapId" | "fatiguedAt" | "expiresAt", ExtArgs["result"]["fatiguedMap"]>
+  export type FatiguedMapInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    user?: boolean | UserDefaultArgs<ExtArgs>
+    map?: boolean | GameMapDefaultArgs<ExtArgs>
+  }
+  export type FatiguedMapIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    user?: boolean | UserDefaultArgs<ExtArgs>
+    map?: boolean | GameMapDefaultArgs<ExtArgs>
+  }
+  export type FatiguedMapIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    user?: boolean | UserDefaultArgs<ExtArgs>
+    map?: boolean | GameMapDefaultArgs<ExtArgs>
+  }
+
+  export type $FatiguedMapPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "FatiguedMap"
+    objects: {
+      user: Prisma.$UserPayload<ExtArgs>
+      map: Prisma.$GameMapPayload<ExtArgs>
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      userId: string
+      mapId: string
+      fatiguedAt: Date
+      expiresAt: Date
+    }, ExtArgs["result"]["fatiguedMap"]>
+    composites: {}
+  }
+
+  type FatiguedMapGetPayload<S extends boolean | null | undefined | FatiguedMapDefaultArgs> = $Result.GetResult<Prisma.$FatiguedMapPayload, S>
+
+  type FatiguedMapCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<FatiguedMapFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: FatiguedMapCountAggregateInputType | true
+    }
+
+  export interface FatiguedMapDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['FatiguedMap'], meta: { name: 'FatiguedMap' } }
+    /**
+     * Find zero or one FatiguedMap that matches the filter.
+     * @param {FatiguedMapFindUniqueArgs} args - Arguments to find a FatiguedMap
+     * @example
+     * // Get one FatiguedMap
+     * const fatiguedMap = await prisma.fatiguedMap.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends FatiguedMapFindUniqueArgs>(args: SelectSubset<T, FatiguedMapFindUniqueArgs<ExtArgs>>): Prisma__FatiguedMapClient<$Result.GetResult<Prisma.$FatiguedMapPayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one FatiguedMap that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {FatiguedMapFindUniqueOrThrowArgs} args - Arguments to find a FatiguedMap
+     * @example
+     * // Get one FatiguedMap
+     * const fatiguedMap = await prisma.fatiguedMap.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends FatiguedMapFindUniqueOrThrowArgs>(args: SelectSubset<T, FatiguedMapFindUniqueOrThrowArgs<ExtArgs>>): Prisma__FatiguedMapClient<$Result.GetResult<Prisma.$FatiguedMapPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first FatiguedMap that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {FatiguedMapFindFirstArgs} args - Arguments to find a FatiguedMap
+     * @example
+     * // Get one FatiguedMap
+     * const fatiguedMap = await prisma.fatiguedMap.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends FatiguedMapFindFirstArgs>(args?: SelectSubset<T, FatiguedMapFindFirstArgs<ExtArgs>>): Prisma__FatiguedMapClient<$Result.GetResult<Prisma.$FatiguedMapPayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first FatiguedMap that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {FatiguedMapFindFirstOrThrowArgs} args - Arguments to find a FatiguedMap
+     * @example
+     * // Get one FatiguedMap
+     * const fatiguedMap = await prisma.fatiguedMap.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends FatiguedMapFindFirstOrThrowArgs>(args?: SelectSubset<T, FatiguedMapFindFirstOrThrowArgs<ExtArgs>>): Prisma__FatiguedMapClient<$Result.GetResult<Prisma.$FatiguedMapPayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more FatiguedMaps that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {FatiguedMapFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all FatiguedMaps
+     * const fatiguedMaps = await prisma.fatiguedMap.findMany()
+     * 
+     * // Get first 10 FatiguedMaps
+     * const fatiguedMaps = await prisma.fatiguedMap.findMany({ take: 10 })
+     * 
+     * // Only select the `userId`
+     * const fatiguedMapWithUserIdOnly = await prisma.fatiguedMap.findMany({ select: { userId: true } })
+     * 
+     */
+    findMany<T extends FatiguedMapFindManyArgs>(args?: SelectSubset<T, FatiguedMapFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$FatiguedMapPayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a FatiguedMap.
+     * @param {FatiguedMapCreateArgs} args - Arguments to create a FatiguedMap.
+     * @example
+     * // Create one FatiguedMap
+     * const FatiguedMap = await prisma.fatiguedMap.create({
+     *   data: {
+     *     // ... data to create a FatiguedMap
+     *   }
+     * })
+     * 
+     */
+    create<T extends FatiguedMapCreateArgs>(args: SelectSubset<T, FatiguedMapCreateArgs<ExtArgs>>): Prisma__FatiguedMapClient<$Result.GetResult<Prisma.$FatiguedMapPayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many FatiguedMaps.
+     * @param {FatiguedMapCreateManyArgs} args - Arguments to create many FatiguedMaps.
+     * @example
+     * // Create many FatiguedMaps
+     * const fatiguedMap = await prisma.fatiguedMap.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends FatiguedMapCreateManyArgs>(args?: SelectSubset<T, FatiguedMapCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many FatiguedMaps and returns the data saved in the database.
+     * @param {FatiguedMapCreateManyAndReturnArgs} args - Arguments to create many FatiguedMaps.
+     * @example
+     * // Create many FatiguedMaps
+     * const fatiguedMap = await prisma.fatiguedMap.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many FatiguedMaps and only return the `userId`
+     * const fatiguedMapWithUserIdOnly = await prisma.fatiguedMap.createManyAndReturn({
+     *   select: { userId: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends FatiguedMapCreateManyAndReturnArgs>(args?: SelectSubset<T, FatiguedMapCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$FatiguedMapPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a FatiguedMap.
+     * @param {FatiguedMapDeleteArgs} args - Arguments to delete one FatiguedMap.
+     * @example
+     * // Delete one FatiguedMap
+     * const FatiguedMap = await prisma.fatiguedMap.delete({
+     *   where: {
+     *     // ... filter to delete one FatiguedMap
+     *   }
+     * })
+     * 
+     */
+    delete<T extends FatiguedMapDeleteArgs>(args: SelectSubset<T, FatiguedMapDeleteArgs<ExtArgs>>): Prisma__FatiguedMapClient<$Result.GetResult<Prisma.$FatiguedMapPayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one FatiguedMap.
+     * @param {FatiguedMapUpdateArgs} args - Arguments to update one FatiguedMap.
+     * @example
+     * // Update one FatiguedMap
+     * const fatiguedMap = await prisma.fatiguedMap.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends FatiguedMapUpdateArgs>(args: SelectSubset<T, FatiguedMapUpdateArgs<ExtArgs>>): Prisma__FatiguedMapClient<$Result.GetResult<Prisma.$FatiguedMapPayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more FatiguedMaps.
+     * @param {FatiguedMapDeleteManyArgs} args - Arguments to filter FatiguedMaps to delete.
+     * @example
+     * // Delete a few FatiguedMaps
+     * const { count } = await prisma.fatiguedMap.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends FatiguedMapDeleteManyArgs>(args?: SelectSubset<T, FatiguedMapDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more FatiguedMaps.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {FatiguedMapUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many FatiguedMaps
+     * const fatiguedMap = await prisma.fatiguedMap.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends FatiguedMapUpdateManyArgs>(args: SelectSubset<T, FatiguedMapUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more FatiguedMaps and returns the data updated in the database.
+     * @param {FatiguedMapUpdateManyAndReturnArgs} args - Arguments to update many FatiguedMaps.
+     * @example
+     * // Update many FatiguedMaps
+     * const fatiguedMap = await prisma.fatiguedMap.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more FatiguedMaps and only return the `userId`
+     * const fatiguedMapWithUserIdOnly = await prisma.fatiguedMap.updateManyAndReturn({
+     *   select: { userId: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends FatiguedMapUpdateManyAndReturnArgs>(args: SelectSubset<T, FatiguedMapUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$FatiguedMapPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one FatiguedMap.
+     * @param {FatiguedMapUpsertArgs} args - Arguments to update or create a FatiguedMap.
+     * @example
+     * // Update or create a FatiguedMap
+     * const fatiguedMap = await prisma.fatiguedMap.upsert({
+     *   create: {
+     *     // ... data to create a FatiguedMap
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the FatiguedMap we want to update
+     *   }
+     * })
+     */
+    upsert<T extends FatiguedMapUpsertArgs>(args: SelectSubset<T, FatiguedMapUpsertArgs<ExtArgs>>): Prisma__FatiguedMapClient<$Result.GetResult<Prisma.$FatiguedMapPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of FatiguedMaps.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {FatiguedMapCountArgs} args - Arguments to filter FatiguedMaps to count.
+     * @example
+     * // Count the number of FatiguedMaps
+     * const count = await prisma.fatiguedMap.count({
+     *   where: {
+     *     // ... the filter for the FatiguedMaps we want to count
+     *   }
+     * })
+    **/
+    count<T extends FatiguedMapCountArgs>(
+      args?: Subset<T, FatiguedMapCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], FatiguedMapCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a FatiguedMap.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {FatiguedMapAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends FatiguedMapAggregateArgs>(args: Subset<T, FatiguedMapAggregateArgs>): Prisma.PrismaPromise<GetFatiguedMapAggregateType<T>>
+
+    /**
+     * Group by FatiguedMap.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {FatiguedMapGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends FatiguedMapGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: FatiguedMapGroupByArgs['orderBy'] }
+        : { orderBy?: FatiguedMapGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, FatiguedMapGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetFatiguedMapGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the FatiguedMap model
+   */
+  readonly fields: FatiguedMapFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for FatiguedMap.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__FatiguedMapClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    user<T extends UserDefaultArgs<ExtArgs> = {}>(args?: Subset<T, UserDefaultArgs<ExtArgs>>): Prisma__UserClient<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+    map<T extends GameMapDefaultArgs<ExtArgs> = {}>(args?: Subset<T, GameMapDefaultArgs<ExtArgs>>): Prisma__GameMapClient<$Result.GetResult<Prisma.$GameMapPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the FatiguedMap model
+   */
+  interface FatiguedMapFieldRefs {
+    readonly userId: FieldRef<"FatiguedMap", 'String'>
+    readonly mapId: FieldRef<"FatiguedMap", 'String'>
+    readonly fatiguedAt: FieldRef<"FatiguedMap", 'DateTime'>
+    readonly expiresAt: FieldRef<"FatiguedMap", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * FatiguedMap findUnique
+   */
+  export type FatiguedMapFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the FatiguedMap
+     */
+    select?: FatiguedMapSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the FatiguedMap
+     */
+    omit?: FatiguedMapOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: FatiguedMapInclude<ExtArgs> | null
+    /**
+     * Filter, which FatiguedMap to fetch.
+     */
+    where: FatiguedMapWhereUniqueInput
+  }
+
+  /**
+   * FatiguedMap findUniqueOrThrow
+   */
+  export type FatiguedMapFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the FatiguedMap
+     */
+    select?: FatiguedMapSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the FatiguedMap
+     */
+    omit?: FatiguedMapOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: FatiguedMapInclude<ExtArgs> | null
+    /**
+     * Filter, which FatiguedMap to fetch.
+     */
+    where: FatiguedMapWhereUniqueInput
+  }
+
+  /**
+   * FatiguedMap findFirst
+   */
+  export type FatiguedMapFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the FatiguedMap
+     */
+    select?: FatiguedMapSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the FatiguedMap
+     */
+    omit?: FatiguedMapOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: FatiguedMapInclude<ExtArgs> | null
+    /**
+     * Filter, which FatiguedMap to fetch.
+     */
+    where?: FatiguedMapWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of FatiguedMaps to fetch.
+     */
+    orderBy?: FatiguedMapOrderByWithRelationInput | FatiguedMapOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for FatiguedMaps.
+     */
+    cursor?: FatiguedMapWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` FatiguedMaps from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` FatiguedMaps.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of FatiguedMaps.
+     */
+    distinct?: FatiguedMapScalarFieldEnum | FatiguedMapScalarFieldEnum[]
+  }
+
+  /**
+   * FatiguedMap findFirstOrThrow
+   */
+  export type FatiguedMapFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the FatiguedMap
+     */
+    select?: FatiguedMapSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the FatiguedMap
+     */
+    omit?: FatiguedMapOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: FatiguedMapInclude<ExtArgs> | null
+    /**
+     * Filter, which FatiguedMap to fetch.
+     */
+    where?: FatiguedMapWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of FatiguedMaps to fetch.
+     */
+    orderBy?: FatiguedMapOrderByWithRelationInput | FatiguedMapOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for FatiguedMaps.
+     */
+    cursor?: FatiguedMapWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` FatiguedMaps from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` FatiguedMaps.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of FatiguedMaps.
+     */
+    distinct?: FatiguedMapScalarFieldEnum | FatiguedMapScalarFieldEnum[]
+  }
+
+  /**
+   * FatiguedMap findMany
+   */
+  export type FatiguedMapFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the FatiguedMap
+     */
+    select?: FatiguedMapSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the FatiguedMap
+     */
+    omit?: FatiguedMapOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: FatiguedMapInclude<ExtArgs> | null
+    /**
+     * Filter, which FatiguedMaps to fetch.
+     */
+    where?: FatiguedMapWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of FatiguedMaps to fetch.
+     */
+    orderBy?: FatiguedMapOrderByWithRelationInput | FatiguedMapOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing FatiguedMaps.
+     */
+    cursor?: FatiguedMapWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` FatiguedMaps from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` FatiguedMaps.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of FatiguedMaps.
+     */
+    distinct?: FatiguedMapScalarFieldEnum | FatiguedMapScalarFieldEnum[]
+  }
+
+  /**
+   * FatiguedMap create
+   */
+  export type FatiguedMapCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the FatiguedMap
+     */
+    select?: FatiguedMapSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the FatiguedMap
+     */
+    omit?: FatiguedMapOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: FatiguedMapInclude<ExtArgs> | null
+    /**
+     * The data needed to create a FatiguedMap.
+     */
+    data: XOR<FatiguedMapCreateInput, FatiguedMapUncheckedCreateInput>
+  }
+
+  /**
+   * FatiguedMap createMany
+   */
+  export type FatiguedMapCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many FatiguedMaps.
+     */
+    data: FatiguedMapCreateManyInput | FatiguedMapCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * FatiguedMap createManyAndReturn
+   */
+  export type FatiguedMapCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the FatiguedMap
+     */
+    select?: FatiguedMapSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the FatiguedMap
+     */
+    omit?: FatiguedMapOmit<ExtArgs> | null
+    /**
+     * The data used to create many FatiguedMaps.
+     */
+    data: FatiguedMapCreateManyInput | FatiguedMapCreateManyInput[]
+    skipDuplicates?: boolean
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: FatiguedMapIncludeCreateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * FatiguedMap update
+   */
+  export type FatiguedMapUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the FatiguedMap
+     */
+    select?: FatiguedMapSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the FatiguedMap
+     */
+    omit?: FatiguedMapOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: FatiguedMapInclude<ExtArgs> | null
+    /**
+     * The data needed to update a FatiguedMap.
+     */
+    data: XOR<FatiguedMapUpdateInput, FatiguedMapUncheckedUpdateInput>
+    /**
+     * Choose, which FatiguedMap to update.
+     */
+    where: FatiguedMapWhereUniqueInput
+  }
+
+  /**
+   * FatiguedMap updateMany
+   */
+  export type FatiguedMapUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update FatiguedMaps.
+     */
+    data: XOR<FatiguedMapUpdateManyMutationInput, FatiguedMapUncheckedUpdateManyInput>
+    /**
+     * Filter which FatiguedMaps to update
+     */
+    where?: FatiguedMapWhereInput
+    /**
+     * Limit how many FatiguedMaps to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * FatiguedMap updateManyAndReturn
+   */
+  export type FatiguedMapUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the FatiguedMap
+     */
+    select?: FatiguedMapSelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the FatiguedMap
+     */
+    omit?: FatiguedMapOmit<ExtArgs> | null
+    /**
+     * The data used to update FatiguedMaps.
+     */
+    data: XOR<FatiguedMapUpdateManyMutationInput, FatiguedMapUncheckedUpdateManyInput>
+    /**
+     * Filter which FatiguedMaps to update
+     */
+    where?: FatiguedMapWhereInput
+    /**
+     * Limit how many FatiguedMaps to update.
+     */
+    limit?: number
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: FatiguedMapIncludeUpdateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * FatiguedMap upsert
+   */
+  export type FatiguedMapUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the FatiguedMap
+     */
+    select?: FatiguedMapSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the FatiguedMap
+     */
+    omit?: FatiguedMapOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: FatiguedMapInclude<ExtArgs> | null
+    /**
+     * The filter to search for the FatiguedMap to update in case it exists.
+     */
+    where: FatiguedMapWhereUniqueInput
+    /**
+     * In case the FatiguedMap found by the `where` argument doesn't exist, create a new FatiguedMap with this data.
+     */
+    create: XOR<FatiguedMapCreateInput, FatiguedMapUncheckedCreateInput>
+    /**
+     * In case the FatiguedMap was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<FatiguedMapUpdateInput, FatiguedMapUncheckedUpdateInput>
+  }
+
+  /**
+   * FatiguedMap delete
+   */
+  export type FatiguedMapDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the FatiguedMap
+     */
+    select?: FatiguedMapSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the FatiguedMap
+     */
+    omit?: FatiguedMapOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: FatiguedMapInclude<ExtArgs> | null
+    /**
+     * Filter which FatiguedMap to delete.
+     */
+    where: FatiguedMapWhereUniqueInput
+  }
+
+  /**
+   * FatiguedMap deleteMany
+   */
+  export type FatiguedMapDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which FatiguedMaps to delete
+     */
+    where?: FatiguedMapWhereInput
+    /**
+     * Limit how many FatiguedMaps to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * FatiguedMap without action
+   */
+  export type FatiguedMapDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the FatiguedMap
+     */
+    select?: FatiguedMapSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the FatiguedMap
+     */
+    omit?: FatiguedMapOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: FatiguedMapInclude<ExtArgs> | null
+  }
+
+
+  /**
    * Enums
    */
 
@@ -8172,6 +9419,16 @@ export namespace Prisma {
   };
 
   export type SocialAffinityScalarFieldEnum = (typeof SocialAffinityScalarFieldEnum)[keyof typeof SocialAffinityScalarFieldEnum]
+
+
+  export const FatiguedMapScalarFieldEnum: {
+    userId: 'userId',
+    mapId: 'mapId',
+    fatiguedAt: 'fatiguedAt',
+    expiresAt: 'expiresAt'
+  };
+
+  export type FatiguedMapScalarFieldEnum = (typeof FatiguedMapScalarFieldEnum)[keyof typeof FatiguedMapScalarFieldEnum]
 
 
   export const SortOrder: {
@@ -8313,6 +9570,7 @@ export namespace Prisma {
     playerFeatures?: XOR<PlayerFeaturesNullableScalarRelationFilter, PlayerFeaturesWhereInput> | null
     socialAffinity1?: SocialAffinityListRelationFilter
     socialAffinity2?: SocialAffinityListRelationFilter
+    fatiguedMaps?: FatiguedMapListRelationFilter
   }
 
   export type UserOrderByWithRelationInput = {
@@ -8326,6 +9584,7 @@ export namespace Prisma {
     playerFeatures?: PlayerFeaturesOrderByWithRelationInput
     socialAffinity1?: SocialAffinityOrderByRelationAggregateInput
     socialAffinity2?: SocialAffinityOrderByRelationAggregateInput
+    fatiguedMaps?: FatiguedMapOrderByRelationAggregateInput
   }
 
   export type UserWhereUniqueInput = Prisma.AtLeast<{
@@ -8342,6 +9601,7 @@ export namespace Prisma {
     playerFeatures?: XOR<PlayerFeaturesNullableScalarRelationFilter, PlayerFeaturesWhereInput> | null
     socialAffinity1?: SocialAffinityListRelationFilter
     socialAffinity2?: SocialAffinityListRelationFilter
+    fatiguedMaps?: FatiguedMapListRelationFilter
   }, "id">
 
   export type UserOrderByWithAggregationInput = {
@@ -8380,6 +9640,7 @@ export namespace Prisma {
     createdAt?: DateTimeFilter<"GameMap"> | Date | string
     updatedAt?: DateTimeFilter<"GameMap"> | Date | string
     mapFeatures?: XOR<MapFeaturesNullableScalarRelationFilter, MapFeaturesWhereInput> | null
+    fatiguedPlayers?: FatiguedMapListRelationFilter
   }
 
   export type GameMapOrderByWithRelationInput = {
@@ -8391,6 +9652,7 @@ export namespace Prisma {
     createdAt?: SortOrder
     updatedAt?: SortOrder
     mapFeatures?: MapFeaturesOrderByWithRelationInput
+    fatiguedPlayers?: FatiguedMapOrderByRelationAggregateInput
   }
 
   export type GameMapWhereUniqueInput = Prisma.AtLeast<{
@@ -8405,6 +9667,7 @@ export namespace Prisma {
     createdAt?: DateTimeFilter<"GameMap"> | Date | string
     updatedAt?: DateTimeFilter<"GameMap"> | Date | string
     mapFeatures?: XOR<MapFeaturesNullableScalarRelationFilter, MapFeaturesWhereInput> | null
+    fatiguedPlayers?: FatiguedMapListRelationFilter
   }, "id">
 
   export type GameMapOrderByWithAggregationInput = {
@@ -8684,6 +9947,60 @@ export namespace Prisma {
     updatedAt?: DateTimeWithAggregatesFilter<"SocialAffinity"> | Date | string
   }
 
+  export type FatiguedMapWhereInput = {
+    AND?: FatiguedMapWhereInput | FatiguedMapWhereInput[]
+    OR?: FatiguedMapWhereInput[]
+    NOT?: FatiguedMapWhereInput | FatiguedMapWhereInput[]
+    userId?: StringFilter<"FatiguedMap"> | string
+    mapId?: StringFilter<"FatiguedMap"> | string
+    fatiguedAt?: DateTimeFilter<"FatiguedMap"> | Date | string
+    expiresAt?: DateTimeFilter<"FatiguedMap"> | Date | string
+    user?: XOR<UserScalarRelationFilter, UserWhereInput>
+    map?: XOR<GameMapScalarRelationFilter, GameMapWhereInput>
+  }
+
+  export type FatiguedMapOrderByWithRelationInput = {
+    userId?: SortOrder
+    mapId?: SortOrder
+    fatiguedAt?: SortOrder
+    expiresAt?: SortOrder
+    user?: UserOrderByWithRelationInput
+    map?: GameMapOrderByWithRelationInput
+  }
+
+  export type FatiguedMapWhereUniqueInput = Prisma.AtLeast<{
+    userId_mapId?: FatiguedMapUserIdMapIdCompoundUniqueInput
+    AND?: FatiguedMapWhereInput | FatiguedMapWhereInput[]
+    OR?: FatiguedMapWhereInput[]
+    NOT?: FatiguedMapWhereInput | FatiguedMapWhereInput[]
+    userId?: StringFilter<"FatiguedMap"> | string
+    mapId?: StringFilter<"FatiguedMap"> | string
+    fatiguedAt?: DateTimeFilter<"FatiguedMap"> | Date | string
+    expiresAt?: DateTimeFilter<"FatiguedMap"> | Date | string
+    user?: XOR<UserScalarRelationFilter, UserWhereInput>
+    map?: XOR<GameMapScalarRelationFilter, GameMapWhereInput>
+  }, "userId_mapId">
+
+  export type FatiguedMapOrderByWithAggregationInput = {
+    userId?: SortOrder
+    mapId?: SortOrder
+    fatiguedAt?: SortOrder
+    expiresAt?: SortOrder
+    _count?: FatiguedMapCountOrderByAggregateInput
+    _max?: FatiguedMapMaxOrderByAggregateInput
+    _min?: FatiguedMapMinOrderByAggregateInput
+  }
+
+  export type FatiguedMapScalarWhereWithAggregatesInput = {
+    AND?: FatiguedMapScalarWhereWithAggregatesInput | FatiguedMapScalarWhereWithAggregatesInput[]
+    OR?: FatiguedMapScalarWhereWithAggregatesInput[]
+    NOT?: FatiguedMapScalarWhereWithAggregatesInput | FatiguedMapScalarWhereWithAggregatesInput[]
+    userId?: StringWithAggregatesFilter<"FatiguedMap"> | string
+    mapId?: StringWithAggregatesFilter<"FatiguedMap"> | string
+    fatiguedAt?: DateTimeWithAggregatesFilter<"FatiguedMap"> | Date | string
+    expiresAt?: DateTimeWithAggregatesFilter<"FatiguedMap"> | Date | string
+  }
+
   export type UserCreateInput = {
     id: string
     email: string
@@ -8695,6 +10012,7 @@ export namespace Prisma {
     playerFeatures?: PlayerFeaturesCreateNestedOneWithoutUserInput
     socialAffinity1?: SocialAffinityCreateNestedManyWithoutUser1Input
     socialAffinity2?: SocialAffinityCreateNestedManyWithoutUser2Input
+    fatiguedMaps?: FatiguedMapCreateNestedManyWithoutUserInput
   }
 
   export type UserUncheckedCreateInput = {
@@ -8708,6 +10026,7 @@ export namespace Prisma {
     playerFeatures?: PlayerFeaturesUncheckedCreateNestedOneWithoutUserInput
     socialAffinity1?: SocialAffinityUncheckedCreateNestedManyWithoutUser1Input
     socialAffinity2?: SocialAffinityUncheckedCreateNestedManyWithoutUser2Input
+    fatiguedMaps?: FatiguedMapUncheckedCreateNestedManyWithoutUserInput
   }
 
   export type UserUpdateInput = {
@@ -8721,6 +10040,7 @@ export namespace Prisma {
     playerFeatures?: PlayerFeaturesUpdateOneWithoutUserNestedInput
     socialAffinity1?: SocialAffinityUpdateManyWithoutUser1NestedInput
     socialAffinity2?: SocialAffinityUpdateManyWithoutUser2NestedInput
+    fatiguedMaps?: FatiguedMapUpdateManyWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateInput = {
@@ -8734,6 +10054,7 @@ export namespace Prisma {
     playerFeatures?: PlayerFeaturesUncheckedUpdateOneWithoutUserNestedInput
     socialAffinity1?: SocialAffinityUncheckedUpdateManyWithoutUser1NestedInput
     socialAffinity2?: SocialAffinityUncheckedUpdateManyWithoutUser2NestedInput
+    fatiguedMaps?: FatiguedMapUncheckedUpdateManyWithoutUserNestedInput
   }
 
   export type UserCreateManyInput = {
@@ -8772,6 +10093,7 @@ export namespace Prisma {
     createdAt: Date | string
     updatedAt: Date | string
     mapFeatures?: MapFeaturesCreateNestedOneWithoutMapInput
+    fatiguedPlayers?: FatiguedMapCreateNestedManyWithoutMapInput
   }
 
   export type GameMapUncheckedCreateInput = {
@@ -8783,6 +10105,7 @@ export namespace Prisma {
     createdAt: Date | string
     updatedAt: Date | string
     mapFeatures?: MapFeaturesUncheckedCreateNestedOneWithoutMapInput
+    fatiguedPlayers?: FatiguedMapUncheckedCreateNestedManyWithoutMapInput
   }
 
   export type GameMapUpdateInput = {
@@ -8794,6 +10117,7 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     mapFeatures?: MapFeaturesUpdateOneWithoutMapNestedInput
+    fatiguedPlayers?: FatiguedMapUpdateManyWithoutMapNestedInput
   }
 
   export type GameMapUncheckedUpdateInput = {
@@ -8805,6 +10129,7 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     mapFeatures?: MapFeaturesUncheckedUpdateOneWithoutMapNestedInput
+    fatiguedPlayers?: FatiguedMapUncheckedUpdateManyWithoutMapNestedInput
   }
 
   export type GameMapCreateManyInput = {
@@ -9084,6 +10409,53 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
+  export type FatiguedMapCreateInput = {
+    fatiguedAt?: Date | string
+    expiresAt: Date | string
+    user: UserCreateNestedOneWithoutFatiguedMapsInput
+    map: GameMapCreateNestedOneWithoutFatiguedPlayersInput
+  }
+
+  export type FatiguedMapUncheckedCreateInput = {
+    userId: string
+    mapId: string
+    fatiguedAt?: Date | string
+    expiresAt: Date | string
+  }
+
+  export type FatiguedMapUpdateInput = {
+    fatiguedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    expiresAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    user?: UserUpdateOneRequiredWithoutFatiguedMapsNestedInput
+    map?: GameMapUpdateOneRequiredWithoutFatiguedPlayersNestedInput
+  }
+
+  export type FatiguedMapUncheckedUpdateInput = {
+    userId?: StringFieldUpdateOperationsInput | string
+    mapId?: StringFieldUpdateOperationsInput | string
+    fatiguedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    expiresAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type FatiguedMapCreateManyInput = {
+    userId: string
+    mapId: string
+    fatiguedAt?: Date | string
+    expiresAt: Date | string
+  }
+
+  export type FatiguedMapUpdateManyMutationInput = {
+    fatiguedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    expiresAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type FatiguedMapUncheckedUpdateManyInput = {
+    userId?: StringFieldUpdateOperationsInput | string
+    mapId?: StringFieldUpdateOperationsInput | string
+    fatiguedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    expiresAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
   export type StringFilter<$PrismaModel = never> = {
     equals?: string | StringFieldRefInput<$PrismaModel>
     in?: string[] | ListStringFieldRefInput<$PrismaModel>
@@ -9142,6 +10514,12 @@ export namespace Prisma {
     none?: SocialAffinityWhereInput
   }
 
+  export type FatiguedMapListRelationFilter = {
+    every?: FatiguedMapWhereInput
+    some?: FatiguedMapWhereInput
+    none?: FatiguedMapWhereInput
+  }
+
   export type SortOrderInput = {
     sort: SortOrder
     nulls?: NullsOrder
@@ -9152,6 +10530,10 @@ export namespace Prisma {
   }
 
   export type SocialAffinityOrderByRelationAggregateInput = {
+    _count?: SortOrder
+  }
+
+  export type FatiguedMapOrderByRelationAggregateInput = {
     _count?: SortOrder
   }
 
@@ -9579,6 +10961,32 @@ export namespace Prisma {
     affinity?: SortOrder
   }
 
+  export type FatiguedMapUserIdMapIdCompoundUniqueInput = {
+    userId: string
+    mapId: string
+  }
+
+  export type FatiguedMapCountOrderByAggregateInput = {
+    userId?: SortOrder
+    mapId?: SortOrder
+    fatiguedAt?: SortOrder
+    expiresAt?: SortOrder
+  }
+
+  export type FatiguedMapMaxOrderByAggregateInput = {
+    userId?: SortOrder
+    mapId?: SortOrder
+    fatiguedAt?: SortOrder
+    expiresAt?: SortOrder
+  }
+
+  export type FatiguedMapMinOrderByAggregateInput = {
+    userId?: SortOrder
+    mapId?: SortOrder
+    fatiguedAt?: SortOrder
+    expiresAt?: SortOrder
+  }
+
   export type RawEventCreateNestedManyWithoutUserInput = {
     create?: XOR<RawEventCreateWithoutUserInput, RawEventUncheckedCreateWithoutUserInput> | RawEventCreateWithoutUserInput[] | RawEventUncheckedCreateWithoutUserInput[]
     connectOrCreate?: RawEventCreateOrConnectWithoutUserInput | RawEventCreateOrConnectWithoutUserInput[]
@@ -9606,6 +11014,13 @@ export namespace Prisma {
     connect?: SocialAffinityWhereUniqueInput | SocialAffinityWhereUniqueInput[]
   }
 
+  export type FatiguedMapCreateNestedManyWithoutUserInput = {
+    create?: XOR<FatiguedMapCreateWithoutUserInput, FatiguedMapUncheckedCreateWithoutUserInput> | FatiguedMapCreateWithoutUserInput[] | FatiguedMapUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: FatiguedMapCreateOrConnectWithoutUserInput | FatiguedMapCreateOrConnectWithoutUserInput[]
+    createMany?: FatiguedMapCreateManyUserInputEnvelope
+    connect?: FatiguedMapWhereUniqueInput | FatiguedMapWhereUniqueInput[]
+  }
+
   export type RawEventUncheckedCreateNestedManyWithoutUserInput = {
     create?: XOR<RawEventCreateWithoutUserInput, RawEventUncheckedCreateWithoutUserInput> | RawEventCreateWithoutUserInput[] | RawEventUncheckedCreateWithoutUserInput[]
     connectOrCreate?: RawEventCreateOrConnectWithoutUserInput | RawEventCreateOrConnectWithoutUserInput[]
@@ -9631,6 +11046,13 @@ export namespace Prisma {
     connectOrCreate?: SocialAffinityCreateOrConnectWithoutUser2Input | SocialAffinityCreateOrConnectWithoutUser2Input[]
     createMany?: SocialAffinityCreateManyUser2InputEnvelope
     connect?: SocialAffinityWhereUniqueInput | SocialAffinityWhereUniqueInput[]
+  }
+
+  export type FatiguedMapUncheckedCreateNestedManyWithoutUserInput = {
+    create?: XOR<FatiguedMapCreateWithoutUserInput, FatiguedMapUncheckedCreateWithoutUserInput> | FatiguedMapCreateWithoutUserInput[] | FatiguedMapUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: FatiguedMapCreateOrConnectWithoutUserInput | FatiguedMapCreateOrConnectWithoutUserInput[]
+    createMany?: FatiguedMapCreateManyUserInputEnvelope
+    connect?: FatiguedMapWhereUniqueInput | FatiguedMapWhereUniqueInput[]
   }
 
   export type StringFieldUpdateOperationsInput = {
@@ -9697,6 +11119,20 @@ export namespace Prisma {
     deleteMany?: SocialAffinityScalarWhereInput | SocialAffinityScalarWhereInput[]
   }
 
+  export type FatiguedMapUpdateManyWithoutUserNestedInput = {
+    create?: XOR<FatiguedMapCreateWithoutUserInput, FatiguedMapUncheckedCreateWithoutUserInput> | FatiguedMapCreateWithoutUserInput[] | FatiguedMapUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: FatiguedMapCreateOrConnectWithoutUserInput | FatiguedMapCreateOrConnectWithoutUserInput[]
+    upsert?: FatiguedMapUpsertWithWhereUniqueWithoutUserInput | FatiguedMapUpsertWithWhereUniqueWithoutUserInput[]
+    createMany?: FatiguedMapCreateManyUserInputEnvelope
+    set?: FatiguedMapWhereUniqueInput | FatiguedMapWhereUniqueInput[]
+    disconnect?: FatiguedMapWhereUniqueInput | FatiguedMapWhereUniqueInput[]
+    delete?: FatiguedMapWhereUniqueInput | FatiguedMapWhereUniqueInput[]
+    connect?: FatiguedMapWhereUniqueInput | FatiguedMapWhereUniqueInput[]
+    update?: FatiguedMapUpdateWithWhereUniqueWithoutUserInput | FatiguedMapUpdateWithWhereUniqueWithoutUserInput[]
+    updateMany?: FatiguedMapUpdateManyWithWhereWithoutUserInput | FatiguedMapUpdateManyWithWhereWithoutUserInput[]
+    deleteMany?: FatiguedMapScalarWhereInput | FatiguedMapScalarWhereInput[]
+  }
+
   export type RawEventUncheckedUpdateManyWithoutUserNestedInput = {
     create?: XOR<RawEventCreateWithoutUserInput, RawEventUncheckedCreateWithoutUserInput> | RawEventCreateWithoutUserInput[] | RawEventUncheckedCreateWithoutUserInput[]
     connectOrCreate?: RawEventCreateOrConnectWithoutUserInput | RawEventCreateOrConnectWithoutUserInput[]
@@ -9749,16 +11185,44 @@ export namespace Prisma {
     deleteMany?: SocialAffinityScalarWhereInput | SocialAffinityScalarWhereInput[]
   }
 
+  export type FatiguedMapUncheckedUpdateManyWithoutUserNestedInput = {
+    create?: XOR<FatiguedMapCreateWithoutUserInput, FatiguedMapUncheckedCreateWithoutUserInput> | FatiguedMapCreateWithoutUserInput[] | FatiguedMapUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: FatiguedMapCreateOrConnectWithoutUserInput | FatiguedMapCreateOrConnectWithoutUserInput[]
+    upsert?: FatiguedMapUpsertWithWhereUniqueWithoutUserInput | FatiguedMapUpsertWithWhereUniqueWithoutUserInput[]
+    createMany?: FatiguedMapCreateManyUserInputEnvelope
+    set?: FatiguedMapWhereUniqueInput | FatiguedMapWhereUniqueInput[]
+    disconnect?: FatiguedMapWhereUniqueInput | FatiguedMapWhereUniqueInput[]
+    delete?: FatiguedMapWhereUniqueInput | FatiguedMapWhereUniqueInput[]
+    connect?: FatiguedMapWhereUniqueInput | FatiguedMapWhereUniqueInput[]
+    update?: FatiguedMapUpdateWithWhereUniqueWithoutUserInput | FatiguedMapUpdateWithWhereUniqueWithoutUserInput[]
+    updateMany?: FatiguedMapUpdateManyWithWhereWithoutUserInput | FatiguedMapUpdateManyWithWhereWithoutUserInput[]
+    deleteMany?: FatiguedMapScalarWhereInput | FatiguedMapScalarWhereInput[]
+  }
+
   export type MapFeaturesCreateNestedOneWithoutMapInput = {
     create?: XOR<MapFeaturesCreateWithoutMapInput, MapFeaturesUncheckedCreateWithoutMapInput>
     connectOrCreate?: MapFeaturesCreateOrConnectWithoutMapInput
     connect?: MapFeaturesWhereUniqueInput
   }
 
+  export type FatiguedMapCreateNestedManyWithoutMapInput = {
+    create?: XOR<FatiguedMapCreateWithoutMapInput, FatiguedMapUncheckedCreateWithoutMapInput> | FatiguedMapCreateWithoutMapInput[] | FatiguedMapUncheckedCreateWithoutMapInput[]
+    connectOrCreate?: FatiguedMapCreateOrConnectWithoutMapInput | FatiguedMapCreateOrConnectWithoutMapInput[]
+    createMany?: FatiguedMapCreateManyMapInputEnvelope
+    connect?: FatiguedMapWhereUniqueInput | FatiguedMapWhereUniqueInput[]
+  }
+
   export type MapFeaturesUncheckedCreateNestedOneWithoutMapInput = {
     create?: XOR<MapFeaturesCreateWithoutMapInput, MapFeaturesUncheckedCreateWithoutMapInput>
     connectOrCreate?: MapFeaturesCreateOrConnectWithoutMapInput
     connect?: MapFeaturesWhereUniqueInput
+  }
+
+  export type FatiguedMapUncheckedCreateNestedManyWithoutMapInput = {
+    create?: XOR<FatiguedMapCreateWithoutMapInput, FatiguedMapUncheckedCreateWithoutMapInput> | FatiguedMapCreateWithoutMapInput[] | FatiguedMapUncheckedCreateWithoutMapInput[]
+    connectOrCreate?: FatiguedMapCreateOrConnectWithoutMapInput | FatiguedMapCreateOrConnectWithoutMapInput[]
+    createMany?: FatiguedMapCreateManyMapInputEnvelope
+    connect?: FatiguedMapWhereUniqueInput | FatiguedMapWhereUniqueInput[]
   }
 
   export type BoolFieldUpdateOperationsInput = {
@@ -9775,6 +11239,20 @@ export namespace Prisma {
     update?: XOR<XOR<MapFeaturesUpdateToOneWithWhereWithoutMapInput, MapFeaturesUpdateWithoutMapInput>, MapFeaturesUncheckedUpdateWithoutMapInput>
   }
 
+  export type FatiguedMapUpdateManyWithoutMapNestedInput = {
+    create?: XOR<FatiguedMapCreateWithoutMapInput, FatiguedMapUncheckedCreateWithoutMapInput> | FatiguedMapCreateWithoutMapInput[] | FatiguedMapUncheckedCreateWithoutMapInput[]
+    connectOrCreate?: FatiguedMapCreateOrConnectWithoutMapInput | FatiguedMapCreateOrConnectWithoutMapInput[]
+    upsert?: FatiguedMapUpsertWithWhereUniqueWithoutMapInput | FatiguedMapUpsertWithWhereUniqueWithoutMapInput[]
+    createMany?: FatiguedMapCreateManyMapInputEnvelope
+    set?: FatiguedMapWhereUniqueInput | FatiguedMapWhereUniqueInput[]
+    disconnect?: FatiguedMapWhereUniqueInput | FatiguedMapWhereUniqueInput[]
+    delete?: FatiguedMapWhereUniqueInput | FatiguedMapWhereUniqueInput[]
+    connect?: FatiguedMapWhereUniqueInput | FatiguedMapWhereUniqueInput[]
+    update?: FatiguedMapUpdateWithWhereUniqueWithoutMapInput | FatiguedMapUpdateWithWhereUniqueWithoutMapInput[]
+    updateMany?: FatiguedMapUpdateManyWithWhereWithoutMapInput | FatiguedMapUpdateManyWithWhereWithoutMapInput[]
+    deleteMany?: FatiguedMapScalarWhereInput | FatiguedMapScalarWhereInput[]
+  }
+
   export type MapFeaturesUncheckedUpdateOneWithoutMapNestedInput = {
     create?: XOR<MapFeaturesCreateWithoutMapInput, MapFeaturesUncheckedCreateWithoutMapInput>
     connectOrCreate?: MapFeaturesCreateOrConnectWithoutMapInput
@@ -9783,6 +11261,20 @@ export namespace Prisma {
     delete?: MapFeaturesWhereInput | boolean
     connect?: MapFeaturesWhereUniqueInput
     update?: XOR<XOR<MapFeaturesUpdateToOneWithWhereWithoutMapInput, MapFeaturesUpdateWithoutMapInput>, MapFeaturesUncheckedUpdateWithoutMapInput>
+  }
+
+  export type FatiguedMapUncheckedUpdateManyWithoutMapNestedInput = {
+    create?: XOR<FatiguedMapCreateWithoutMapInput, FatiguedMapUncheckedCreateWithoutMapInput> | FatiguedMapCreateWithoutMapInput[] | FatiguedMapUncheckedCreateWithoutMapInput[]
+    connectOrCreate?: FatiguedMapCreateOrConnectWithoutMapInput | FatiguedMapCreateOrConnectWithoutMapInput[]
+    upsert?: FatiguedMapUpsertWithWhereUniqueWithoutMapInput | FatiguedMapUpsertWithWhereUniqueWithoutMapInput[]
+    createMany?: FatiguedMapCreateManyMapInputEnvelope
+    set?: FatiguedMapWhereUniqueInput | FatiguedMapWhereUniqueInput[]
+    disconnect?: FatiguedMapWhereUniqueInput | FatiguedMapWhereUniqueInput[]
+    delete?: FatiguedMapWhereUniqueInput | FatiguedMapWhereUniqueInput[]
+    connect?: FatiguedMapWhereUniqueInput | FatiguedMapWhereUniqueInput[]
+    update?: FatiguedMapUpdateWithWhereUniqueWithoutMapInput | FatiguedMapUpdateWithWhereUniqueWithoutMapInput[]
+    updateMany?: FatiguedMapUpdateManyWithWhereWithoutMapInput | FatiguedMapUpdateManyWithWhereWithoutMapInput[]
+    deleteMany?: FatiguedMapScalarWhereInput | FatiguedMapScalarWhereInput[]
   }
 
   export type UserCreateNestedOneWithoutEventsInput = {
@@ -9879,6 +11371,34 @@ export namespace Prisma {
     upsert?: UserUpsertWithoutSocialAffinity2Input
     connect?: UserWhereUniqueInput
     update?: XOR<XOR<UserUpdateToOneWithWhereWithoutSocialAffinity2Input, UserUpdateWithoutSocialAffinity2Input>, UserUncheckedUpdateWithoutSocialAffinity2Input>
+  }
+
+  export type UserCreateNestedOneWithoutFatiguedMapsInput = {
+    create?: XOR<UserCreateWithoutFatiguedMapsInput, UserUncheckedCreateWithoutFatiguedMapsInput>
+    connectOrCreate?: UserCreateOrConnectWithoutFatiguedMapsInput
+    connect?: UserWhereUniqueInput
+  }
+
+  export type GameMapCreateNestedOneWithoutFatiguedPlayersInput = {
+    create?: XOR<GameMapCreateWithoutFatiguedPlayersInput, GameMapUncheckedCreateWithoutFatiguedPlayersInput>
+    connectOrCreate?: GameMapCreateOrConnectWithoutFatiguedPlayersInput
+    connect?: GameMapWhereUniqueInput
+  }
+
+  export type UserUpdateOneRequiredWithoutFatiguedMapsNestedInput = {
+    create?: XOR<UserCreateWithoutFatiguedMapsInput, UserUncheckedCreateWithoutFatiguedMapsInput>
+    connectOrCreate?: UserCreateOrConnectWithoutFatiguedMapsInput
+    upsert?: UserUpsertWithoutFatiguedMapsInput
+    connect?: UserWhereUniqueInput
+    update?: XOR<XOR<UserUpdateToOneWithWhereWithoutFatiguedMapsInput, UserUpdateWithoutFatiguedMapsInput>, UserUncheckedUpdateWithoutFatiguedMapsInput>
+  }
+
+  export type GameMapUpdateOneRequiredWithoutFatiguedPlayersNestedInput = {
+    create?: XOR<GameMapCreateWithoutFatiguedPlayersInput, GameMapUncheckedCreateWithoutFatiguedPlayersInput>
+    connectOrCreate?: GameMapCreateOrConnectWithoutFatiguedPlayersInput
+    upsert?: GameMapUpsertWithoutFatiguedPlayersInput
+    connect?: GameMapWhereUniqueInput
+    update?: XOR<XOR<GameMapUpdateToOneWithWhereWithoutFatiguedPlayersInput, GameMapUpdateWithoutFatiguedPlayersInput>, GameMapUncheckedUpdateWithoutFatiguedPlayersInput>
   }
 
   export type NestedStringFilter<$PrismaModel = never> = {
@@ -10193,6 +11713,28 @@ export namespace Prisma {
     skipDuplicates?: boolean
   }
 
+  export type FatiguedMapCreateWithoutUserInput = {
+    fatiguedAt?: Date | string
+    expiresAt: Date | string
+    map: GameMapCreateNestedOneWithoutFatiguedPlayersInput
+  }
+
+  export type FatiguedMapUncheckedCreateWithoutUserInput = {
+    mapId: string
+    fatiguedAt?: Date | string
+    expiresAt: Date | string
+  }
+
+  export type FatiguedMapCreateOrConnectWithoutUserInput = {
+    where: FatiguedMapWhereUniqueInput
+    create: XOR<FatiguedMapCreateWithoutUserInput, FatiguedMapUncheckedCreateWithoutUserInput>
+  }
+
+  export type FatiguedMapCreateManyUserInputEnvelope = {
+    data: FatiguedMapCreateManyUserInput | FatiguedMapCreateManyUserInput[]
+    skipDuplicates?: boolean
+  }
+
   export type RawEventUpsertWithWhereUniqueWithoutUserInput = {
     where: RawEventWhereUniqueInput
     update: XOR<RawEventUpdateWithoutUserInput, RawEventUncheckedUpdateWithoutUserInput>
@@ -10294,6 +11836,32 @@ export namespace Prisma {
     data: XOR<SocialAffinityUpdateManyMutationInput, SocialAffinityUncheckedUpdateManyWithoutUser2Input>
   }
 
+  export type FatiguedMapUpsertWithWhereUniqueWithoutUserInput = {
+    where: FatiguedMapWhereUniqueInput
+    update: XOR<FatiguedMapUpdateWithoutUserInput, FatiguedMapUncheckedUpdateWithoutUserInput>
+    create: XOR<FatiguedMapCreateWithoutUserInput, FatiguedMapUncheckedCreateWithoutUserInput>
+  }
+
+  export type FatiguedMapUpdateWithWhereUniqueWithoutUserInput = {
+    where: FatiguedMapWhereUniqueInput
+    data: XOR<FatiguedMapUpdateWithoutUserInput, FatiguedMapUncheckedUpdateWithoutUserInput>
+  }
+
+  export type FatiguedMapUpdateManyWithWhereWithoutUserInput = {
+    where: FatiguedMapScalarWhereInput
+    data: XOR<FatiguedMapUpdateManyMutationInput, FatiguedMapUncheckedUpdateManyWithoutUserInput>
+  }
+
+  export type FatiguedMapScalarWhereInput = {
+    AND?: FatiguedMapScalarWhereInput | FatiguedMapScalarWhereInput[]
+    OR?: FatiguedMapScalarWhereInput[]
+    NOT?: FatiguedMapScalarWhereInput | FatiguedMapScalarWhereInput[]
+    userId?: StringFilter<"FatiguedMap"> | string
+    mapId?: StringFilter<"FatiguedMap"> | string
+    fatiguedAt?: DateTimeFilter<"FatiguedMap"> | Date | string
+    expiresAt?: DateTimeFilter<"FatiguedMap"> | Date | string
+  }
+
   export type MapFeaturesCreateWithoutMapInput = {
     totalJoins?: number
     totalLeaves?: number
@@ -10313,6 +11881,28 @@ export namespace Prisma {
   export type MapFeaturesCreateOrConnectWithoutMapInput = {
     where: MapFeaturesWhereUniqueInput
     create: XOR<MapFeaturesCreateWithoutMapInput, MapFeaturesUncheckedCreateWithoutMapInput>
+  }
+
+  export type FatiguedMapCreateWithoutMapInput = {
+    fatiguedAt?: Date | string
+    expiresAt: Date | string
+    user: UserCreateNestedOneWithoutFatiguedMapsInput
+  }
+
+  export type FatiguedMapUncheckedCreateWithoutMapInput = {
+    userId: string
+    fatiguedAt?: Date | string
+    expiresAt: Date | string
+  }
+
+  export type FatiguedMapCreateOrConnectWithoutMapInput = {
+    where: FatiguedMapWhereUniqueInput
+    create: XOR<FatiguedMapCreateWithoutMapInput, FatiguedMapUncheckedCreateWithoutMapInput>
+  }
+
+  export type FatiguedMapCreateManyMapInputEnvelope = {
+    data: FatiguedMapCreateManyMapInput | FatiguedMapCreateManyMapInput[]
+    skipDuplicates?: boolean
   }
 
   export type MapFeaturesUpsertWithoutMapInput = {
@@ -10342,6 +11932,22 @@ export namespace Prisma {
     bounceRate?: FloatFieldUpdateOperationsInput | number
   }
 
+  export type FatiguedMapUpsertWithWhereUniqueWithoutMapInput = {
+    where: FatiguedMapWhereUniqueInput
+    update: XOR<FatiguedMapUpdateWithoutMapInput, FatiguedMapUncheckedUpdateWithoutMapInput>
+    create: XOR<FatiguedMapCreateWithoutMapInput, FatiguedMapUncheckedCreateWithoutMapInput>
+  }
+
+  export type FatiguedMapUpdateWithWhereUniqueWithoutMapInput = {
+    where: FatiguedMapWhereUniqueInput
+    data: XOR<FatiguedMapUpdateWithoutMapInput, FatiguedMapUncheckedUpdateWithoutMapInput>
+  }
+
+  export type FatiguedMapUpdateManyWithWhereWithoutMapInput = {
+    where: FatiguedMapScalarWhereInput
+    data: XOR<FatiguedMapUpdateManyMutationInput, FatiguedMapUncheckedUpdateManyWithoutMapInput>
+  }
+
   export type UserCreateWithoutEventsInput = {
     id: string
     email: string
@@ -10352,6 +11958,7 @@ export namespace Prisma {
     playerFeatures?: PlayerFeaturesCreateNestedOneWithoutUserInput
     socialAffinity1?: SocialAffinityCreateNestedManyWithoutUser1Input
     socialAffinity2?: SocialAffinityCreateNestedManyWithoutUser2Input
+    fatiguedMaps?: FatiguedMapCreateNestedManyWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutEventsInput = {
@@ -10364,6 +11971,7 @@ export namespace Prisma {
     playerFeatures?: PlayerFeaturesUncheckedCreateNestedOneWithoutUserInput
     socialAffinity1?: SocialAffinityUncheckedCreateNestedManyWithoutUser1Input
     socialAffinity2?: SocialAffinityUncheckedCreateNestedManyWithoutUser2Input
+    fatiguedMaps?: FatiguedMapUncheckedCreateNestedManyWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutEventsInput = {
@@ -10392,6 +12000,7 @@ export namespace Prisma {
     playerFeatures?: PlayerFeaturesUpdateOneWithoutUserNestedInput
     socialAffinity1?: SocialAffinityUpdateManyWithoutUser1NestedInput
     socialAffinity2?: SocialAffinityUpdateManyWithoutUser2NestedInput
+    fatiguedMaps?: FatiguedMapUpdateManyWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutEventsInput = {
@@ -10404,6 +12013,7 @@ export namespace Prisma {
     playerFeatures?: PlayerFeaturesUncheckedUpdateOneWithoutUserNestedInput
     socialAffinity1?: SocialAffinityUncheckedUpdateManyWithoutUser1NestedInput
     socialAffinity2?: SocialAffinityUncheckedUpdateManyWithoutUser2NestedInput
+    fatiguedMaps?: FatiguedMapUncheckedUpdateManyWithoutUserNestedInput
   }
 
   export type UserCreateWithoutPlayerFeaturesInput = {
@@ -10416,6 +12026,7 @@ export namespace Prisma {
     events?: RawEventCreateNestedManyWithoutUserInput
     socialAffinity1?: SocialAffinityCreateNestedManyWithoutUser1Input
     socialAffinity2?: SocialAffinityCreateNestedManyWithoutUser2Input
+    fatiguedMaps?: FatiguedMapCreateNestedManyWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutPlayerFeaturesInput = {
@@ -10428,6 +12039,7 @@ export namespace Prisma {
     events?: RawEventUncheckedCreateNestedManyWithoutUserInput
     socialAffinity1?: SocialAffinityUncheckedCreateNestedManyWithoutUser1Input
     socialAffinity2?: SocialAffinityUncheckedCreateNestedManyWithoutUser2Input
+    fatiguedMaps?: FatiguedMapUncheckedCreateNestedManyWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutPlayerFeaturesInput = {
@@ -10456,6 +12068,7 @@ export namespace Prisma {
     events?: RawEventUpdateManyWithoutUserNestedInput
     socialAffinity1?: SocialAffinityUpdateManyWithoutUser1NestedInput
     socialAffinity2?: SocialAffinityUpdateManyWithoutUser2NestedInput
+    fatiguedMaps?: FatiguedMapUpdateManyWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutPlayerFeaturesInput = {
@@ -10468,6 +12081,7 @@ export namespace Prisma {
     events?: RawEventUncheckedUpdateManyWithoutUserNestedInput
     socialAffinity1?: SocialAffinityUncheckedUpdateManyWithoutUser1NestedInput
     socialAffinity2?: SocialAffinityUncheckedUpdateManyWithoutUser2NestedInput
+    fatiguedMaps?: FatiguedMapUncheckedUpdateManyWithoutUserNestedInput
   }
 
   export type GameMapCreateWithoutMapFeaturesInput = {
@@ -10478,6 +12092,7 @@ export namespace Prisma {
     isPublished: boolean
     createdAt: Date | string
     updatedAt: Date | string
+    fatiguedPlayers?: FatiguedMapCreateNestedManyWithoutMapInput
   }
 
   export type GameMapUncheckedCreateWithoutMapFeaturesInput = {
@@ -10488,6 +12103,7 @@ export namespace Prisma {
     isPublished: boolean
     createdAt: Date | string
     updatedAt: Date | string
+    fatiguedPlayers?: FatiguedMapUncheckedCreateNestedManyWithoutMapInput
   }
 
   export type GameMapCreateOrConnectWithoutMapFeaturesInput = {
@@ -10514,6 +12130,7 @@ export namespace Prisma {
     isPublished?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    fatiguedPlayers?: FatiguedMapUpdateManyWithoutMapNestedInput
   }
 
   export type GameMapUncheckedUpdateWithoutMapFeaturesInput = {
@@ -10524,6 +12141,7 @@ export namespace Prisma {
     isPublished?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    fatiguedPlayers?: FatiguedMapUncheckedUpdateManyWithoutMapNestedInput
   }
 
   export type UserCreateWithoutSocialAffinity1Input = {
@@ -10536,6 +12154,7 @@ export namespace Prisma {
     events?: RawEventCreateNestedManyWithoutUserInput
     playerFeatures?: PlayerFeaturesCreateNestedOneWithoutUserInput
     socialAffinity2?: SocialAffinityCreateNestedManyWithoutUser2Input
+    fatiguedMaps?: FatiguedMapCreateNestedManyWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutSocialAffinity1Input = {
@@ -10548,6 +12167,7 @@ export namespace Prisma {
     events?: RawEventUncheckedCreateNestedManyWithoutUserInput
     playerFeatures?: PlayerFeaturesUncheckedCreateNestedOneWithoutUserInput
     socialAffinity2?: SocialAffinityUncheckedCreateNestedManyWithoutUser2Input
+    fatiguedMaps?: FatiguedMapUncheckedCreateNestedManyWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutSocialAffinity1Input = {
@@ -10565,6 +12185,7 @@ export namespace Prisma {
     events?: RawEventCreateNestedManyWithoutUserInput
     playerFeatures?: PlayerFeaturesCreateNestedOneWithoutUserInput
     socialAffinity1?: SocialAffinityCreateNestedManyWithoutUser1Input
+    fatiguedMaps?: FatiguedMapCreateNestedManyWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutSocialAffinity2Input = {
@@ -10577,6 +12198,7 @@ export namespace Prisma {
     events?: RawEventUncheckedCreateNestedManyWithoutUserInput
     playerFeatures?: PlayerFeaturesUncheckedCreateNestedOneWithoutUserInput
     socialAffinity1?: SocialAffinityUncheckedCreateNestedManyWithoutUser1Input
+    fatiguedMaps?: FatiguedMapUncheckedCreateNestedManyWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutSocialAffinity2Input = {
@@ -10605,6 +12227,7 @@ export namespace Prisma {
     events?: RawEventUpdateManyWithoutUserNestedInput
     playerFeatures?: PlayerFeaturesUpdateOneWithoutUserNestedInput
     socialAffinity2?: SocialAffinityUpdateManyWithoutUser2NestedInput
+    fatiguedMaps?: FatiguedMapUpdateManyWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutSocialAffinity1Input = {
@@ -10617,6 +12240,7 @@ export namespace Prisma {
     events?: RawEventUncheckedUpdateManyWithoutUserNestedInput
     playerFeatures?: PlayerFeaturesUncheckedUpdateOneWithoutUserNestedInput
     socialAffinity2?: SocialAffinityUncheckedUpdateManyWithoutUser2NestedInput
+    fatiguedMaps?: FatiguedMapUncheckedUpdateManyWithoutUserNestedInput
   }
 
   export type UserUpsertWithoutSocialAffinity2Input = {
@@ -10640,6 +12264,7 @@ export namespace Prisma {
     events?: RawEventUpdateManyWithoutUserNestedInput
     playerFeatures?: PlayerFeaturesUpdateOneWithoutUserNestedInput
     socialAffinity1?: SocialAffinityUpdateManyWithoutUser1NestedInput
+    fatiguedMaps?: FatiguedMapUpdateManyWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutSocialAffinity2Input = {
@@ -10652,6 +12277,135 @@ export namespace Prisma {
     events?: RawEventUncheckedUpdateManyWithoutUserNestedInput
     playerFeatures?: PlayerFeaturesUncheckedUpdateOneWithoutUserNestedInput
     socialAffinity1?: SocialAffinityUncheckedUpdateManyWithoutUser1NestedInput
+    fatiguedMaps?: FatiguedMapUncheckedUpdateManyWithoutUserNestedInput
+  }
+
+  export type UserCreateWithoutFatiguedMapsInput = {
+    id: string
+    email: string
+    username: string
+    displayName?: string | null
+    createdAt: Date | string
+    updatedAt: Date | string
+    events?: RawEventCreateNestedManyWithoutUserInput
+    playerFeatures?: PlayerFeaturesCreateNestedOneWithoutUserInput
+    socialAffinity1?: SocialAffinityCreateNestedManyWithoutUser1Input
+    socialAffinity2?: SocialAffinityCreateNestedManyWithoutUser2Input
+  }
+
+  export type UserUncheckedCreateWithoutFatiguedMapsInput = {
+    id: string
+    email: string
+    username: string
+    displayName?: string | null
+    createdAt: Date | string
+    updatedAt: Date | string
+    events?: RawEventUncheckedCreateNestedManyWithoutUserInput
+    playerFeatures?: PlayerFeaturesUncheckedCreateNestedOneWithoutUserInput
+    socialAffinity1?: SocialAffinityUncheckedCreateNestedManyWithoutUser1Input
+    socialAffinity2?: SocialAffinityUncheckedCreateNestedManyWithoutUser2Input
+  }
+
+  export type UserCreateOrConnectWithoutFatiguedMapsInput = {
+    where: UserWhereUniqueInput
+    create: XOR<UserCreateWithoutFatiguedMapsInput, UserUncheckedCreateWithoutFatiguedMapsInput>
+  }
+
+  export type GameMapCreateWithoutFatiguedPlayersInput = {
+    id: string
+    slug: string
+    name: string
+    ownerId?: string | null
+    isPublished: boolean
+    createdAt: Date | string
+    updatedAt: Date | string
+    mapFeatures?: MapFeaturesCreateNestedOneWithoutMapInput
+  }
+
+  export type GameMapUncheckedCreateWithoutFatiguedPlayersInput = {
+    id: string
+    slug: string
+    name: string
+    ownerId?: string | null
+    isPublished: boolean
+    createdAt: Date | string
+    updatedAt: Date | string
+    mapFeatures?: MapFeaturesUncheckedCreateNestedOneWithoutMapInput
+  }
+
+  export type GameMapCreateOrConnectWithoutFatiguedPlayersInput = {
+    where: GameMapWhereUniqueInput
+    create: XOR<GameMapCreateWithoutFatiguedPlayersInput, GameMapUncheckedCreateWithoutFatiguedPlayersInput>
+  }
+
+  export type UserUpsertWithoutFatiguedMapsInput = {
+    update: XOR<UserUpdateWithoutFatiguedMapsInput, UserUncheckedUpdateWithoutFatiguedMapsInput>
+    create: XOR<UserCreateWithoutFatiguedMapsInput, UserUncheckedCreateWithoutFatiguedMapsInput>
+    where?: UserWhereInput
+  }
+
+  export type UserUpdateToOneWithWhereWithoutFatiguedMapsInput = {
+    where?: UserWhereInput
+    data: XOR<UserUpdateWithoutFatiguedMapsInput, UserUncheckedUpdateWithoutFatiguedMapsInput>
+  }
+
+  export type UserUpdateWithoutFatiguedMapsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    username?: StringFieldUpdateOperationsInput | string
+    displayName?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    events?: RawEventUpdateManyWithoutUserNestedInput
+    playerFeatures?: PlayerFeaturesUpdateOneWithoutUserNestedInput
+    socialAffinity1?: SocialAffinityUpdateManyWithoutUser1NestedInput
+    socialAffinity2?: SocialAffinityUpdateManyWithoutUser2NestedInput
+  }
+
+  export type UserUncheckedUpdateWithoutFatiguedMapsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    username?: StringFieldUpdateOperationsInput | string
+    displayName?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    events?: RawEventUncheckedUpdateManyWithoutUserNestedInput
+    playerFeatures?: PlayerFeaturesUncheckedUpdateOneWithoutUserNestedInput
+    socialAffinity1?: SocialAffinityUncheckedUpdateManyWithoutUser1NestedInput
+    socialAffinity2?: SocialAffinityUncheckedUpdateManyWithoutUser2NestedInput
+  }
+
+  export type GameMapUpsertWithoutFatiguedPlayersInput = {
+    update: XOR<GameMapUpdateWithoutFatiguedPlayersInput, GameMapUncheckedUpdateWithoutFatiguedPlayersInput>
+    create: XOR<GameMapCreateWithoutFatiguedPlayersInput, GameMapUncheckedCreateWithoutFatiguedPlayersInput>
+    where?: GameMapWhereInput
+  }
+
+  export type GameMapUpdateToOneWithWhereWithoutFatiguedPlayersInput = {
+    where?: GameMapWhereInput
+    data: XOR<GameMapUpdateWithoutFatiguedPlayersInput, GameMapUncheckedUpdateWithoutFatiguedPlayersInput>
+  }
+
+  export type GameMapUpdateWithoutFatiguedPlayersInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    ownerId?: NullableStringFieldUpdateOperationsInput | string | null
+    isPublished?: BoolFieldUpdateOperationsInput | boolean
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    mapFeatures?: MapFeaturesUpdateOneWithoutMapNestedInput
+  }
+
+  export type GameMapUncheckedUpdateWithoutFatiguedPlayersInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    ownerId?: NullableStringFieldUpdateOperationsInput | string | null
+    isPublished?: BoolFieldUpdateOperationsInput | boolean
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    mapFeatures?: MapFeaturesUncheckedUpdateOneWithoutMapNestedInput
   }
 
   export type RawEventCreateManyUserInput = {
@@ -10673,6 +12427,12 @@ export namespace Prisma {
     userId1: string
     affinity?: number
     updatedAt?: Date | string
+  }
+
+  export type FatiguedMapCreateManyUserInput = {
+    mapId: string
+    fatiguedAt?: Date | string
+    expiresAt: Date | string
   }
 
   export type RawEventUpdateWithoutUserInput = {
@@ -10736,6 +12496,48 @@ export namespace Prisma {
     userId1?: StringFieldUpdateOperationsInput | string
     affinity?: FloatFieldUpdateOperationsInput | number
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type FatiguedMapUpdateWithoutUserInput = {
+    fatiguedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    expiresAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    map?: GameMapUpdateOneRequiredWithoutFatiguedPlayersNestedInput
+  }
+
+  export type FatiguedMapUncheckedUpdateWithoutUserInput = {
+    mapId?: StringFieldUpdateOperationsInput | string
+    fatiguedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    expiresAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type FatiguedMapUncheckedUpdateManyWithoutUserInput = {
+    mapId?: StringFieldUpdateOperationsInput | string
+    fatiguedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    expiresAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type FatiguedMapCreateManyMapInput = {
+    userId: string
+    fatiguedAt?: Date | string
+    expiresAt: Date | string
+  }
+
+  export type FatiguedMapUpdateWithoutMapInput = {
+    fatiguedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    expiresAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    user?: UserUpdateOneRequiredWithoutFatiguedMapsNestedInput
+  }
+
+  export type FatiguedMapUncheckedUpdateWithoutMapInput = {
+    userId?: StringFieldUpdateOperationsInput | string
+    fatiguedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    expiresAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type FatiguedMapUncheckedUpdateManyWithoutMapInput = {
+    userId?: StringFieldUpdateOperationsInput | string
+    fatiguedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    expiresAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
 

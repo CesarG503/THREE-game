@@ -175,6 +175,13 @@ exports.Prisma.SocialAffinityScalarFieldEnum = {
   updatedAt: 'updatedAt'
 };
 
+exports.Prisma.FatiguedMapScalarFieldEnum = {
+  userId: 'userId',
+  mapId: 'mapId',
+  fatiguedAt: 'fatiguedAt',
+  expiresAt: 'expiresAt'
+};
+
 exports.Prisma.SortOrder = {
   asc: 'asc',
   desc: 'desc'
@@ -207,7 +214,8 @@ exports.Prisma.ModelName = {
   RawEvent: 'RawEvent',
   PlayerFeatures: 'PlayerFeatures',
   MapFeatures: 'MapFeatures',
-  SocialAffinity: 'SocialAffinity'
+  SocialAffinity: 'SocialAffinity',
+  FatiguedMap: 'FatiguedMap'
 };
 
 /**

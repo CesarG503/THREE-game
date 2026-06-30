@@ -940,7 +940,8 @@ export class PlayerConfigPanel {
         const cameraOptions = [
             { v: 'third-person-collision', t: "3ra Persona: Choque con Objetos" },
             { v: 'third-person-free', t: "3ra Persona: Libre (Sin límites)" },
-            { v: 'first-person', t: "1ra Persona" }
+            { v: 'first-person', t: "1ra Persona" },
+            { v: 'free-fly', t: "Cámara Libre (Espectador)" }
         ];
 
         cameraOptions.forEach(opt => {

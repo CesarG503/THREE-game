@@ -10,6 +10,8 @@ export class CameraController {
   _character: any;
   collidableCache: THREE.Object3D[];
   lastCacheTime: number;
+  freeFlyPosition: THREE.Vector3;
+  freeFlySpeed: number;
   isFirstPerson: boolean;
   thirdPersonDistance: number;
   thirdPersonHeight: number;
@@ -61,6 +63,8 @@ export class CameraController {
     this._character = null;
     this.collidableCache = [];
     this.lastCacheTime = 0;
+    this.freeFlyPosition = new THREE.Vector3();
+    this.freeFlySpeed = 20.0;
 
     // Third person settings
     this.thirdPersonDistance = 1.5;
@@ -159,7 +163,7 @@ export class CameraController {
       if (this.isPaused) return;
 
       const isLocked = document.pointerLockElement === this.domElement;
-      const canRotate = this.isFirstPerson || this.isRightMouseDown || (this.alwaysRotateThirdPerson && isLocked);
+      const canRotate = this.isFirstPerson || this.isRightMouseDown || (this.alwaysRotateThirdPerson && isLocked) || (this.mode === 'free-fly' && isLocked);
 
       if (canRotate) {
         if (this.isFirstPerson) {
@@ -172,7 +176,11 @@ export class CameraController {
           const oldPhi = this.phi;
           this.theta -= e.movementX * this.rotationSpeed * (this.tpInvertAxisX ? -1 : 1);
           this.phi += e.movementY * this.rotationSpeed * (this.tpInvertAxisY ? -1 : 1);
-          this.phi = Math.max(this.minPhi, Math.min(this.maxPhi, this.phi));
+
+          const minP = this.mode === 'free-fly' ? (-Math.PI / 2 + 0.01) : this.minPhi;
+          const maxP = this.mode === 'free-fly' ? (Math.PI / 2 - 0.01) : this.maxPhi;
+          this.phi = Math.max(minP, Math.min(maxP, this.phi));
+
           this.manualPitchDelta -= this.phi - oldPhi;
         }
       }
@@ -297,7 +305,7 @@ export class CameraController {
 
   resume() {
     this.isPaused = false;
-    if (this.isFirstPerson || this.alwaysRotateThirdPerson) {
+    if (this.isFirstPerson || this.alwaysRotateThirdPerson || this.mode === 'free-fly') {
       this.domElement.requestPointerLock();
     }
   }
@@ -309,7 +317,12 @@ export class CameraController {
       this.lastThirdPersonMode = mode;
     }
 
-    if (this.isFirstPerson) {
+    if (mode === 'free-fly') {
+      this.freeFlyPosition.copy(this.camera.position);
+      if (requestLock && !this.isPaused && !this.isUIOpen) {
+        this.domElement.requestPointerLock();
+      }
+    } else if (this.isFirstPerson) {
       if (requestLock && !this.isPaused && !this.isUIOpen) {
         this.domElement.requestPointerLock();
       }
@@ -451,7 +464,8 @@ export class CameraController {
     characterRotation: number,
     dt: number,
     gravityUpOrQuaternion?: THREE.Vector3 | THREE.Quaternion | null,
-    scene?: THREE.Scene
+    scene?: THREE.Scene,
+    input?: any
   ) {
     if (!characterPosition) return;
     void characterRotation;
@@ -468,11 +482,50 @@ export class CameraController {
 
     this.target.copy(characterPosition);
 
-    if (this.isFirstPerson) {
+    if (this.mode === 'free-fly') {
+      this.updateFreeFly(dt, input);
+    } else if (this.isFirstPerson) {
       this.updateFirstPerson(characterPosition);
     } else {
       this.updateThirdPerson(characterPosition, dt, scene);
     }
+  }
+
+  updateFreeFly(dt: number, input?: any) {
+    const qYaw = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), this.theta);
+    const qPitch = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -this.phi);
+    const rotation = new THREE.Quaternion().multiplyQuaternions(qYaw, qPitch);
+    this.camera.quaternion.copy(rotation);
+
+    if (input && input.keys) {
+      const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(rotation).normalize();
+      const right = new THREE.Vector3(1, 0, 0).applyQuaternion(rotation).normalize();
+      const up = new THREE.Vector3(0, 1, 0).applyQuaternion(rotation).normalize();
+
+      const speed = this.freeFlySpeed || 20.0;
+
+      if (input.keys.forward) {
+        this.freeFlyPosition.addScaledVector(forward, speed * dt);
+      }
+      if (input.keys.backward) {
+        this.freeFlyPosition.addScaledVector(forward, -speed * dt);
+      }
+      if (input.keys.right) {
+        this.freeFlyPosition.addScaledVector(right, speed * dt);
+      }
+      if (input.keys.left) {
+        this.freeFlyPosition.addScaledVector(right, -speed * dt);
+      }
+      if (input.keys.jump) {
+        this.freeFlyPosition.addScaledVector(up, speed * dt);
+      }
+      if (input.keys.crouch) {
+        this.freeFlyPosition.addScaledVector(up, -speed * dt);
+      }
+    }
+
+    this.camera.position.copy(this.freeFlyPosition);
+    this.currentPosition.copy(this.freeFlyPosition);
   }
 
   updateFirstPerson(characterPosition: THREE.Vector3) {

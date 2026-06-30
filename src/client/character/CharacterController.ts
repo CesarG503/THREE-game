@@ -479,6 +479,15 @@ export class CharacterController {
   update(dt: number, input: InputManager, remotePlayers: any[]) {
     if (!this.rigidBody) return;
 
+    if (this.cameraController && this.cameraController.mode === 'free-fly') {
+      this.verticalVelocity = 0;
+      this.glbModel.update(dt, false);
+      this.polygonModel.update(dt, false);
+      this.polygonModelSkin.update(dt, false, false, false, true, 0, false, false);
+      this.updateModelVisuals();
+      return;
+    }
+
     this.updateGravityTransition(dt);
 
     this.isSuperman = false;

@@ -3,6 +3,7 @@ import { LogicToolbar } from "../ui/LogicToolbar";
 import { LogicSequenceEditor } from "../ui/LogicSequenceEditor";
 import { InteractiveCollisionLogic } from "../ui/logic_items/InteractiveCollisionLogic";
 import { TargetLogic } from "../ui/logic_items/TargetLogic";
+import { DianaLogic } from "../ui/logic_items/DianaLogic";
 import { PlayerConfigManager } from "./PlayerConfigManager";
 import { getActiveFarmingGroups } from "../ui/GameHUD";
 import { WaypointTransformGizmo } from "../editor/WaypointTransformGizmo";
@@ -37,6 +38,7 @@ export class LogicSystem {
 	configPanel: any;
 	interactiveCollisionLogic: any;
 	targetLogic: any;
+	dianaLogic: any;
 	waypointGizmo: any;
 	selectedWaypoint: any;
 	waypointPanel: HTMLElement | null;
@@ -51,6 +53,7 @@ export class LogicSystem {
 		this.sequenceEditor = new LogicSequenceEditor(game, this);
 		this.interactiveCollisionLogic = new InteractiveCollisionLogic(game, this);
 		this.targetLogic = new TargetLogic(game, this);
+		this.dianaLogic = new DianaLogic();
 		this.selectedWaypoint = null;
 		this.waypointPanel = null;
 		this.waypointNavIndex = -1;
@@ -797,8 +800,36 @@ export class LogicSystem {
 
 		// 5. Target Logic
 		if (object.userData.mapObjectType === "target") {
-			this.targetLogic.render(container, props, (key: string, value: any) => {
+			// Ensure default props for target are set
+			if (props.name === undefined) props.name = "Diana Interactiva";
+			if (props.rings === undefined) props.rings = 3;
+			if (props.baseDamage === undefined) props.baseDamage = 10;
+			if (props.radius === undefined) props.radius = 1.0;
+			if (props.useProjectileDamage === undefined) props.useProjectileDamage = false;
+
+			this.dianaLogic.render(container, props, (key: string, value: any) => {
 				props[key] = value;
+
+				// Recalculate multipliers if 'rings' changes
+				if (key === 'rings') {
+					const val = parseInt(value);
+					const newMults = [];
+					if (val === 1) {
+						newMults.push(1.0);
+					} else {
+						for (let i = 0; i < val; i++) {
+							const t = i / (val - 1);
+							const v = 0.1 + t * 0.9;
+							newMults.push(Number(v.toFixed(2)));
+						}
+					}
+					props.ringMultipliers = newMults;
+				}
+
+				if (typeof object.updateTargetVisuals === 'function') {
+					object.updateTargetVisuals();
+				}
+
 				if (refreshCallback) refreshCallback();
 			});
 		}

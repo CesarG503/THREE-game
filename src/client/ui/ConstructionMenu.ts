@@ -279,6 +279,7 @@ export class ConstructionMenu {
         );
         // Default Properties handled in MapObjectItem logic, but good to init here too if needed
         collision.logicProperties = {
+            name: "Colisión Interactiva",
             isTraversable: false,
             triggerOnTouch: false,
             triggerOnEnter: false
@@ -296,9 +297,12 @@ export class ConstructionMenu {
         );
         // Default Logic
         target.logicProperties = {
+            name: "Diana Interactiva",
             rings: 3,
             baseDamage: 10,
-            ringMultipliers: [1, 2, 3]
+            ringMultipliers: [1, 2, 3],
+            radius: 1.0,
+            useProjectileDamage: false
         };
         this.logicItems.push(target);
 
@@ -4444,11 +4448,18 @@ renderLogicLibraryGrid(container) {
             objs.forEach((obj, index) => {
                 const itemRow = document.createElement("div");
 
-                // Determine Name: Use signalName if available, otherwise name, otherwise default
-                let displayName = `Objeto #${index + 1}`;
+                // Determine Name: Use signalName if available, otherwise name, otherwise customName, otherwise type-based default
+                let displayName = "";
                 if (obj.userData.logicProperties) {
                     if (obj.userData.logicProperties.signalName) displayName = obj.userData.logicProperties.signalName;
                     else if (obj.userData.logicProperties.name) displayName = obj.userData.logicProperties.name;
+                }
+                if (!displayName && obj.userData.customName) {
+                    displayName = obj.userData.customName;
+                }
+                if (!displayName) {
+                    const baseName = this.getHumanReadableName(obj.userData.mapObjectType) || "Objeto";
+                    displayName = `${baseName} #${index + 1}`;
                 }
 
                 itemRow.textContent = displayName;
@@ -4514,7 +4525,10 @@ renderLogicLibraryGrid(container) {
 
                     const confirm = () => {
                         let newName = input.value.trim();
-                        if (!newName) newName = `Objeto #${index + 1}`;
+                        if (!newName) {
+                            const baseName = this.getHumanReadableName(obj.userData.mapObjectType) || "Objeto";
+                            newName = `${baseName} #${index + 1}`;
+                        }
 
                         // Update Logic Props
                         if (!obj.userData.logicProperties) obj.userData.logicProperties = {};

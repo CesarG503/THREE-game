@@ -7,6 +7,7 @@ import { HoldTimeLogic } from "./HoldTimeLogic"
 import { InteractiveCollisionLogic } from "./InteractiveCollisionLogic"
 import { TargetLogic } from "./TargetLogic"
 import { EventSubscriptionLogic } from "./EventSubscriptionLogic"
+import { DianaLogic } from "./DianaLogic"
 
 export class LogicItemsManager {
     constructor(game = null, logicSystem = null) {
@@ -21,6 +22,7 @@ export class LogicItemsManager {
             new HoldTimeLogic(),
             new InteractiveCollisionLogic(game, logicSystem),
             new TargetLogic(game, logicSystem),
+            new DianaLogic(),
             new EventSubscriptionLogic()
         ]
     }

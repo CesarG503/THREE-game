@@ -1193,6 +1193,27 @@ export class ObjectInspector {
                 this.selectedObject.userData.logicProperties[key] = value
                 console.log(`Updated Logic Prop [${key}]:`, value)
                 
+                // Recalculate multipliers if 'rings' changes
+                if (key === 'rings') {
+                    const val = parseInt(value);
+                    const newMults = [];
+                    if (val === 1) {
+                        newMults.push(1.0);
+                    } else {
+                        for (let i = 0; i < val; i++) {
+                            const t = i / (val - 1);
+                            const v = 0.1 + t * 0.9;
+                            newMults.push(Number(v.toFixed(2)));
+                        }
+                    }
+                    this.selectedObject.userData.logicProperties.ringMultipliers = newMults;
+                }
+
+                // If target visual update function exists, call it
+                if (typeof this.selectedObject.updateTargetVisuals === 'function') {
+                    this.selectedObject.updateTargetVisuals();
+                }
+
                 if (this.game && this.game.broadcastObjectUpdate) {
                     this.game.broadcastObjectUpdate(this.selectedObject);
                 }

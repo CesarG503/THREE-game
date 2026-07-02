@@ -1088,13 +1088,14 @@ export class PlacementManager {
 
             const gridSize = this.gridSize || 1;
             let targetPos = hit.point.clone();
+            const surfaceAlignedTypes = ["interaction_button", "target", "gravity_pad", "impulse_jump", "impulse_lateral", "farming_zone"];
 
             // --- Snapping Logic ---
             if (this.snapToGrid || this.aerialGridActive) {
                 const isAerialHit = (hit.object === this.aerialCollider);
                 const isMapObject = hit.object.userData && hit.object.userData.isMapObject;
 
-                if ((item.type === "interaction_button" || item.type === "target" || item.type === "gravity_pad") && hit.face) {
+                if (surfaceAlignedTypes.includes(item.type) && hit.face) {
                     // --- BUTTON/TARGET SURFACE LOGIC (GRID) ---
                     // Size is already set above
 
@@ -1181,7 +1182,7 @@ export class PlacementManager {
                     // --- GROUND / GLOBAL LOGIC (STATIC MAP & FALLBACK) ---
 
                     // Special Handling for Buttons, Targets and Gravity Pads on Static Geometry (Walls/Floors)
-                    if ((item.type === "interaction_button" || item.type === "target" || item.type === "gravity_pad") && hit.face) {
+                    if (surfaceAlignedTypes.includes(item.type) && hit.face) {
                         // Align to Normal
                         const normal = hit.face.normal.clone().transformDirection(hit.object.matrixWorld).normalize();
                         const quaternion = this.getSurfaceAlignedQuaternion(normal, rotationIndex);
@@ -1246,7 +1247,7 @@ export class PlacementManager {
                 // --- FREE PLACEMENT & SURFACE ALIGNMENT ---
 
                 // Special case: Interaction Buttons, Targets and Gravity Pads align to the hit surface normal.
-                if ((item.type === "interaction_button" || item.type === "target" || item.type === "gravity_pad") && hit.face) {
+                if (surfaceAlignedTypes.includes(item.type) && hit.face) {
                     // Custom Size override for free placement too for buttons
                     if (item.type === "interaction_button") {
                         realSize = new THREE.Vector3(0.6, 0.1, 0.6);
@@ -1276,7 +1277,7 @@ export class PlacementManager {
                 // We still want the object to sit ON the surface, not sink into it.
                 // Move center away from hit point by half extent along normal.
                 if (hit.face) {
-                    if (item.type !== "interaction_button" && item.type !== "target" && item.type !== "gravity_pad") {
+                    if (!surfaceAlignedTypes.includes(item.type)) {
                         // Generic surface offset logic
                         const normal = hit.face.normal.clone().transformDirection(hit.object.matrixWorld).normalize();
                         const yOffset = realSize.y / 2;

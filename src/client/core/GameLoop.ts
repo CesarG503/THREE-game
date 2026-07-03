@@ -103,12 +103,22 @@ function updateMapImpulsePads(game: any) {
 		const strength = Number(props.strength ?? (pad.userData.mapObjectType === "impulse_jump" ? 25 : 40));
 		let direction: THREE.Vector3;
 
+		const charUp = (typeof game.character.getGravityUpVector === "function") 
+			? game.character.getGravityUpVector() 
+			: new THREE.Vector3(0, 1, 0);
+
 		if (pad.userData.mapObjectType === "impulse_jump") {
-			direction = new THREE.Vector3(0, 1, 0);
+			direction = charUp.clone();
 		} else {
-			direction = new THREE.Vector3(0, 0, -1).applyQuaternion(pad.quaternion);
-			direction.y = 0;
-			if (direction.lengthSq() < 0.001) direction.set(0, 0, -1);
+			const padForward = new THREE.Vector3(0, 0, -1).applyQuaternion(pad.quaternion);
+			direction = padForward.clone().projectOnPlane(charUp);
+			if (direction.lengthSq() < 0.001) {
+				const padRight = new THREE.Vector3(1, 0, 0).applyQuaternion(pad.quaternion);
+				direction = padRight.projectOnPlane(charUp);
+				if (direction.lengthSq() < 0.001) {
+					direction.set(0, 0, -1).projectOnPlane(charUp);
+				}
+			}
 			direction.normalize();
 		}
 
@@ -197,8 +207,8 @@ function updateMapFarmingZones(game: any, dt: number) {
 			);
 			localOffset.applyQuaternion(zone.quaternion);
 
-			const spawnPos = zone.position.clone().add(localOffset);
-			game.itemDropManager.dropItem(item, spawnPos, new THREE.Vector3(0, 1, 0));
+			const zoneUp = new THREE.Vector3(0, 1, 0).applyQuaternion(zone.quaternion).normalize();
+			game.itemDropManager.dropItem(item, spawnPos, zoneUp);
 		}
 	});
 

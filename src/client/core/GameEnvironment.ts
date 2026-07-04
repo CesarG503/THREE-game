@@ -67,6 +67,28 @@ export function updateEnvironmentConfig(this: any, config: any) {
 		roughness: 0.8
 	});
 
+	const groundGroups = this.environmentConfig.groundGroups || [];
+	const defaultGroup = groundGroups.find((g: any) => g.id === "default");
+
+	const createGroundMaterialForGroup = (group: any) => {
+		const texPath = group ? group.texturePath : groundTexturePath;
+		const colorHex = (group && group.color) ? parseInt(group.color.replace("#", "0x")) : (groundTexturePath ? 0xffffff : 0x1a1a1a);
+		return new THREE.MeshStandardMaterial({
+			color: texPath ? 0xffffff : colorHex,
+			roughness: 0.8
+		});
+	};
+
+	const applyGroundTextureForGroup = (mesh: any, dimensions: any, group: any) => {
+		const texPath = group ? group.texturePath : groundTexturePath;
+		const texSettings = normalizeTextureSettings(group ? (group.textureSettings || { tileSize: 5 }) : groundTextureSettings);
+		if (!texPath) return;
+		const groupTextureLoader = new THREE.TextureLoader();
+		groupTextureLoader.load(texPath, (texture: any) => {
+			applyMapObjectTexture(mesh, texture, dimensions, texSettings);
+		});
+	};
+
 	if (shapeType === "rect") {
 		const geo = new THREE.BoxGeometry(sx, 1, sz);
 		const mesh = new THREE.Mesh(geo, createGroundMaterial());
@@ -89,18 +111,22 @@ export function updateEnvironmentConfig(this: any, config: any) {
 	} else if (shapeType === "custom") {
 		const cellSize = this.environmentConfig.customCellSize || 10;
 		const grid = this.environmentConfig.customGrid || [];
+		const customGridGroups = this.environmentConfig.customGridGroups || {};
 
 		grid.forEach((key: any) => {
 			const [gx, gz] = key.split(",").map(Number);
 			const x = gx * cellSize;
 			const z = gz * cellSize;
 
+			const groupId = customGridGroups[key] || "default";
+			const group = groundGroups.find((g: any) => g.id === groupId) || defaultGroup;
+
 			const geo = new THREE.BoxGeometry(cellSize, 1, cellSize);
-			const mesh = new THREE.Mesh(geo, createGroundMaterial());
+			const mesh = new THREE.Mesh(geo, createGroundMaterialForGroup(group));
 			mesh.position.set(x, 0, z);
 			mesh.receiveShadow = true;
 			this.groundGroup.add(mesh);
-			applyGroundTexture(mesh, { x: cellSize, y: 1, z: cellSize });
+			applyGroundTextureForGroup(mesh, { x: cellSize, y: 1, z: cellSize }, group);
 
 			const colDesc = RAPIER.ColliderDesc.cuboid(cellSize / 2, 0.5, cellSize / 2)
 				.setTranslation(x, 0, z);

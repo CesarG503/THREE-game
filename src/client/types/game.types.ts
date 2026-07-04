@@ -15,6 +15,11 @@ export interface EnvironmentConfig {
 	fallDeath?: boolean;
 	fallDeathY?: number;
 	skyType?: string;
+	groundTexturePath?: string | null;
+	groundTextureAssetId?: string | null;
+	groundTextureSettings?: any;
+	groundGroups?: any[];
+	customGridGroups?: { [key: string]: string };
 }
 
 export interface MainBootstrapOptions {

@@ -24,6 +24,11 @@ export interface SavedMapData {
 			rotation?: number;
 			patternVariation?: boolean;
 		};
+		shapeType?: "rect" | "circle" | "custom";
+		customGrid?: string[];
+		customCellSize?: number;
+		groundGroups?: any[];
+		customGridGroups?: Record<string, string>;
 	};
 	playerConfig: {
 		roles: unknown[];

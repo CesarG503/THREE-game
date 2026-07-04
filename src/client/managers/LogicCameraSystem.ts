@@ -369,8 +369,8 @@ export class LogicCameraSystem {
 
 			// Save and override HUD / Interaction block options on the active profile
 			const profileId = this.game?.character?.activeRoleId;
-			const profile = profileId 
-				? this.game.playerConfigManager.getProfile(profileId) 
+			const profile = profileId
+				? this.game.playerConfigManager.getProfile(profileId)
 				: this.game?.playerConfigManager?.getCurrentProfile?.();
 
 			if (profile) {
@@ -431,8 +431,8 @@ export class LogicCameraSystem {
 
 		// Restore HUD / Interaction block options on the active profile
 		const profileId = this.game?.character?.activeRoleId;
-		const profile = profileId 
-			? this.game.playerConfigManager.getProfile(profileId) 
+		const profile = profileId
+			? this.game.playerConfigManager.getProfile(profileId)
 			: null;
 
 		if (profile) {
@@ -491,12 +491,38 @@ export class LogicCameraSystem {
 	}
 
 	handleKeyDown(event: KeyboardEvent) {
-		if (event.key === "Escape") {
-			const isLocked = document.pointerLockElement === this.game?.sceneManager?.renderer?.domElement;
-			if (!isLocked) {
-				event.preventDefault();
-				this.closeCameraPanel();
-			}
+		const key = event.key.toLowerCase();
+
+		if (key === "escape") {
+			event.preventDefault();
+			this.closeCameraPanel();
+			return;
+		}
+
+		if (this.sidebarPreviews.length <= 1) return;
+
+		const currentIndex = this.sidebarPreviews.findIndex(
+			(item) => item.cameraObject.userData.uuid === this.activeCameraObject?.userData.uuid
+		);
+		if (currentIndex === -1) return;
+
+		let prev = false;
+		let next = false;
+
+		if (key === "a" || key === "w" || key === "arrowup" || key === "arrowleft" || (key === " " && event.shiftKey)) {
+			prev = true;
+		} else if (key === "d" || key === "s" || key === "arrowdown" || key === "arrowright" || (key === " " && !event.shiftKey)) {
+			next = true;
+		}
+
+		if (prev) {
+			event.preventDefault();
+			const prevIndex = (currentIndex - 1 + this.sidebarPreviews.length) % this.sidebarPreviews.length;
+			this.selectCamera(this.sidebarPreviews[prevIndex].cameraObject);
+		} else if (next) {
+			event.preventDefault();
+			const nextIndex = (currentIndex + 1) % this.sidebarPreviews.length;
+			this.selectCamera(this.sidebarPreviews[nextIndex].cameraObject);
 		}
 	}
 

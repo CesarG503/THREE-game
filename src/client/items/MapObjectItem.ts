@@ -137,6 +137,38 @@ export class MapObjectItem extends Item {
       ctx.font = "bold 16px Arial";
       ctx.textAlign = "center";
       ctx.fillText("F", 32, 38);
+    } else if (this.type === "logic_camera" || this.type === "camera_prop") {
+      ctx.fillStyle = "#1f2937";
+      ctx.fillRect(14, 24, 30, 18);
+      ctx.strokeRect(14, 24, 30, 18);
+
+      ctx.beginPath();
+      ctx.moveTo(44, 28);
+      ctx.lineTo(56, 22);
+      ctx.lineTo(56, 44);
+      ctx.lineTo(44, 38);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = "#93c5fd";
+      ctx.font = "bold 12px Arial";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("CAM", 30, 33);
+    } else if (this.type === "camera_panel") {
+      ctx.fillStyle = "#111827";
+      ctx.fillRect(12, 14, 40, 36);
+      ctx.strokeRect(12, 14, 40, 36);
+
+      ctx.fillStyle = "#38bdf8";
+      ctx.fillRect(17, 20, 30, 18);
+
+      ctx.fillStyle = "white";
+      ctx.font = "bold 14px Arial";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("F", 32, 46);
     } else if (this.type === "interactive_collision") {
       ctx.fillStyle = "rgba(0, 136, 255, 0.5)";
       ctx.strokeStyle = "#00FFFF";
@@ -590,6 +622,161 @@ export class MapObjectItem extends Item {
       if (this.logicProperties.holdTime === undefined) this.logicProperties.holdTime = 0;
       if (this.logicProperties.oneShot === undefined) this.logicProperties.oneShot = false;
       if (this.logicProperties.triggered === undefined) this.logicProperties.triggered = false;
+    } else if (this.type === "camera_prop") {
+      const group: any = new THREE.Group();
+      const bodyColor = this.color !== undefined ? this.color : 0x1f2937;
+      const bodyMat = new THREE.MeshStandardMaterial({
+        color: bodyColor,
+        roughness: 0.45,
+        metalness: 0.15
+      });
+      const lensMat = new THREE.MeshStandardMaterial({
+        color: 0x111827,
+        emissive: 0x0f172a,
+        emissiveIntensity: 0.4,
+        roughness: 0.3
+      });
+
+      const body = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.35, 0.35), bodyMat);
+      body.castShadow = true;
+      group.add(body);
+
+      const lens = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.2, 0.28, 24), lensMat);
+      lens.rotation.x = Math.PI / 2;
+      lens.position.z = -0.3;
+      lens.castShadow = true;
+      group.add(lens);
+
+      const mount = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.5, 12), bodyMat);
+      mount.position.y = -0.4;
+      group.add(mount);
+
+      const base = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.06, 24), bodyMat);
+      base.position.y = -0.66;
+      group.add(base);
+
+      object3D = group;
+
+      const col = RAPIER.ColliderDesc.cuboid(0.28, 0.45, 0.28);
+      collidersDesc.push(col);
+    } else if (this.type === "logic_camera") {
+      const group: any = new THREE.Group();
+      const isEditor = window.location.pathname.includes("/editor");
+
+      const helperMat = new THREE.MeshBasicMaterial({
+        color: 0x8bd3ff,
+        wireframe: true,
+        transparent: true,
+        opacity: 0.6
+      });
+      const helperMesh = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.25, 0.25), helperMat);
+      helperMesh.visible = isEditor;
+      group.add(helperMesh);
+
+      const frustumLineMat = new THREE.LineBasicMaterial({
+        color: 0x8bd3ff,
+        transparent: true,
+        opacity: 0.55
+      });
+
+      const makeFrustum = (fov = 60, far = 6, aspect = 16 / 9) => {
+        const near = 0.35;
+        const fovRad = THREE.MathUtils.degToRad(fov);
+        const nearH = Math.tan(fovRad / 2) * near;
+        const nearW = nearH * aspect;
+        const farH = Math.tan(fovRad / 2) * far;
+        const farW = farH * aspect;
+        const points = [
+          new THREE.Vector3(0, 0, 0), new THREE.Vector3(-farW, farH, -far),
+          new THREE.Vector3(0, 0, 0), new THREE.Vector3(farW, farH, -far),
+          new THREE.Vector3(0, 0, 0), new THREE.Vector3(farW, -farH, -far),
+          new THREE.Vector3(0, 0, 0), new THREE.Vector3(-farW, -farH, -far),
+          new THREE.Vector3(-nearW, nearH, -near), new THREE.Vector3(nearW, nearH, -near),
+          new THREE.Vector3(nearW, nearH, -near), new THREE.Vector3(nearW, -nearH, -near),
+          new THREE.Vector3(nearW, -nearH, -near), new THREE.Vector3(-nearW, -nearH, -near),
+          new THREE.Vector3(-nearW, -nearH, -near), new THREE.Vector3(-nearW, nearH, -near),
+          new THREE.Vector3(-farW, farH, -far), new THREE.Vector3(farW, farH, -far),
+          new THREE.Vector3(farW, farH, -far), new THREE.Vector3(farW, -farH, -far),
+          new THREE.Vector3(farW, -farH, -far), new THREE.Vector3(-farW, -farH, -far),
+          new THREE.Vector3(-farW, -farH, -far), new THREE.Vector3(-farW, farH, -far)
+        ];
+        const geometry = new THREE.BufferGeometry().setFromPoints(points);
+        return new THREE.LineSegments(geometry, frustumLineMat);
+      };
+
+      group.updateLogicCameraVisuals = () => {
+        if (group.userData.cameraFrustumLines) {
+          group.remove(group.userData.cameraFrustumLines);
+          group.userData.cameraFrustumLines.geometry?.dispose?.();
+        }
+        const props = group.userData.logicProperties || this.logicProperties || {};
+        const frustum = makeFrustum(Number(props.fov ?? 60), Number(props.far ?? 6), Number(props.aspect ?? 16 / 9));
+        frustum.userData.ignoreRaycast = true;
+        frustum.visible = window.location.pathname.includes("/editor");
+        group.userData.cameraFrustumLines = frustum;
+        group.add(frustum);
+
+        helperMesh.visible = window.location.pathname.includes("/editor");
+      };
+
+      object3D = group;
+
+      if (!this.logicProperties) this.logicProperties = {};
+      if (this.logicProperties.logicKind === undefined) this.logicProperties.logicKind = "logic_camera";
+      if (this.logicProperties.name === undefined) this.logicProperties.name = "Camara";
+      if (this.logicProperties.mode === undefined) this.logicProperties.mode = "fixed";
+      if (this.logicProperties.fov === undefined) this.logicProperties.fov = 60;
+      if (this.logicProperties.far === undefined) this.logicProperties.far = 6;
+      if (this.logicProperties.aspect === undefined) this.logicProperties.aspect = 16 / 9;
+      if (this.logicProperties.eyeHeightOffset === undefined) this.logicProperties.eyeHeightOffset = 0;
+
+      // Note: No collider for logic_camera to avoid physical interactions.
+    } else if (this.type === "camera_panel") {
+      const group = new THREE.Group();
+      const panelColor = this.color !== undefined ? this.color : 0x0f172a;
+      const frameMat = new THREE.MeshStandardMaterial({
+        color: panelColor,
+        roughness: 0.5,
+        metalness: 0.1
+      });
+      const screenMat = new THREE.MeshStandardMaterial({
+        color: 0x082f49,
+        emissive: 0x0284c7,
+        emissiveIntensity: 0.55,
+        roughness: 0.25
+      });
+
+      const frame = new THREE.Mesh(new THREE.BoxGeometry(this.scale.x, this.scale.y, this.scale.z), frameMat);
+      frame.castShadow = true;
+      frame.receiveShadow = true;
+      group.add(frame);
+
+      const screen = new THREE.Mesh(
+        new THREE.PlaneGeometry(this.scale.x * 0.72, this.scale.z * 0.58),
+        screenMat
+      );
+      screen.position.y = this.scale.y / 2 + 0.004;
+      screen.position.z = this.scale.z * 0.08;
+      screen.rotation.x = -Math.PI / 2;
+      group.add(screen);
+
+      const keyPlate = new THREE.Mesh(
+        new THREE.BoxGeometry(this.scale.x * 0.3, 0.02, this.scale.z * 0.13),
+        new THREE.MeshBasicMaterial({ color: 0xe5e7eb })
+      );
+      keyPlate.position.set(0, this.scale.y / 2 + 0.012, -this.scale.z * 0.33);
+      group.add(keyPlate);
+
+      object3D = group;
+
+      const col = RAPIER.ColliderDesc.cuboid(this.scale.x / 2, this.scale.y / 2, this.scale.z / 2);
+      collidersDesc.push(col);
+
+      if (!this.logicProperties) this.logicProperties = {};
+      if (this.logicProperties.logicKind === undefined) this.logicProperties.logicKind = "camera_panel";
+      if (this.logicProperties.name === undefined) this.logicProperties.name = "Panel de Camaras";
+      if (!Array.isArray(this.logicProperties.cameraIds)) this.logicProperties.cameraIds = [];
+      if (this.logicProperties.holdTime === undefined) this.logicProperties.holdTime = 0;
     } else if (this.type === "interactive_collision") {
       const shapeType = this.scale.shapeType || "box";
       const radius = this.scale.radius || 1.0;
@@ -882,6 +1069,10 @@ export class MapObjectItem extends Item {
 
     if (this.logicProperties) {
       object3D.userData.logicProperties = { ...this.logicProperties };
+    }
+
+    if (typeof object3D.updateLogicCameraVisuals === "function") {
+      object3D.updateLogicCameraVisuals();
     }
 
     scene.add(object3D);

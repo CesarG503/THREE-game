@@ -19,6 +19,13 @@ export function setupGameInput(this: Game) {
 			}
 		}
 
+		const profile = this.playerConfigManager?.getCurrentProfile?.();
+		if (profile?.disableInteraction) {
+			if (e.key.toLowerCase() !== "escape") {
+				return;
+			}
+		}
+
 		const key = e.key.toLowerCase();
 
 		if ((key === "e" || key === "escape") && this.gameMode === "editor" && this.constructionMenu) {
@@ -86,6 +93,19 @@ export function setupGameInput(this: Game) {
 
 		if (key === "f") {
 			const charPos = this.character.getPosition();
+
+			let openedCameraPanel = false;
+			this.sceneManager.scene.children.forEach((obj: THREE.Object3D) => {
+				if (!openedCameraPanel && obj.userData.mapObjectType === "camera_panel") {
+					const dSq = obj.position.distanceToSquared(charPos);
+					if (dSq < 9.0) {
+						this.logicCameraSystem?.showCameraPanel?.(obj);
+						openedCameraPanel = true;
+					}
+				}
+			});
+
+			if (openedCameraPanel) return;
 
 			let triggeredButton = false;
 			this.sceneManager.scene.children.forEach((obj: THREE.Object3D) => {
@@ -192,6 +212,9 @@ export function setupGameInput(this: Game) {
 	});
 
 	document.addEventListener("mousedown", (e: MouseEvent) => {
+		const profile = this.playerConfigManager?.getCurrentProfile?.();
+		if (profile?.disableInteraction) return;
+
 		if (this.inputManager && !this.inputManager.enabled) return;
 		if (e.target !== this.sceneManager.renderer.domElement) return;
 

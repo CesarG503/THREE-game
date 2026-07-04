@@ -180,6 +180,9 @@ export function loadMap(this: any, jsonData: any) {
 }
 
 export function useCurrentItem(this: any, isRightClickOrItem: any = false) {
+	const profile = this.playerConfigManager?.getCurrentProfile?.();
+	if (profile?.disableInteraction) return;
+
 	const item = this.inventoryManager.getCurrentItem();
 	if (!item) return;
 
@@ -431,7 +434,7 @@ export function updateButtonInteraction(this: any, dt: number) {
 	let minDistSq = 9.0;
 
 	this.sceneManager.scene.children.forEach((obj: any) => {
-		if (obj.userData.mapObjectType === "interaction_button" || obj.userData.mapObjectType === "gravity_sphere") {
+		if (obj.userData.mapObjectType === "interaction_button" || obj.userData.mapObjectType === "gravity_sphere" || obj.userData.mapObjectType === "camera_panel") {
 			const props = obj.userData.logicProperties;
 			if (props && props.oneShot && props.triggered) return;
 
@@ -500,6 +503,8 @@ export function updateButtonInteraction(this: any, dt: number) {
 					if (props._currentHoldTime >= holdTime) {
 						if (nearest.userData.mapObjectType === "gravity_sphere") {
 							this.triggerGravitySphere(nearest);
+						} else if (nearest.userData.mapObjectType === "camera_panel") {
+							this.logicCameraSystem?.showCameraPanel?.(nearest);
 						} else {
 							this.triggerButton(nearest);
 						}

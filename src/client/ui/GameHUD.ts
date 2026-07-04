@@ -26,6 +26,7 @@ export class GameHUD {
     lastJump: { current: number; max: number } | null;
     onViewportChange: () => void;
     isDestroyed: boolean;
+    game: any;
 
     constructor() {
         this.container = document.createElement('div')
@@ -67,6 +68,21 @@ export class GameHUD {
         if (this.isDestroyed) return
         this.settings = settings || {};
         const sharedInventory = document.getElementById('inventory-container')
+
+        // Hide HUD check based on player role profile
+        const profile = this.game?.playerConfigManager?.getCurrentProfile?.();
+        if (profile?.hideHUD) {
+            if (this.healthElement) { this.healthElement.remove(); this.healthElement = null; }
+            if (this.jumpElement) { this.jumpElement.remove(); this.jumpElement = null; }
+            if (this.inventoryElement && this.inventoryElement.id !== 'inventory-container') {
+                this.inventoryElement.remove();
+                this.inventoryElement = null;
+            }
+            if (sharedInventory) {
+                sharedInventory.style.display = 'none';
+            }
+            return;
+        }
 
         // Clear existing (except timer)
         if (this.healthElement) this.healthElement.remove();

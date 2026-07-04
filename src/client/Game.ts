@@ -22,6 +22,7 @@ import { TurretPad } from "./entities/TurretPad";
 import { PelotaItem } from "./items/PelotaItem";
 import { MapObjectItem } from "./items/MapObjectItem";
 import { PlayerConfigManager } from "./managers/PlayerConfigManager";
+import { LogicCameraSystem } from "./managers/LogicCameraSystem";
 import { FloatingTextManager } from "./ui/FloatingTextManager";
 import { Projectile } from "./weapons/Projectile";
 import { BlasterSystem } from "./fx/BlasterSystem";
@@ -53,7 +54,8 @@ export class Game {
 	playerConfigManager: any;
 	hud: any;
 	floatingTextManager: any;
-	cameraController: any;
+		cameraController: any;
+		logicCameraSystem: any;
 	scopeController: any;
 	networkManager: any;
 	chatManager: any;
@@ -196,15 +198,17 @@ export class Game {
 
 		this.playerConfigManager = new PlayerConfigManager(this);
 		this.hud = new GameHUD();
+		this.hud.game = this;
 
 		this.floatingTextManager = new FloatingTextManager(this.sceneManager);
 
-		this.cameraController = new CameraController(
-			this.sceneManager.camera,
-			this.sceneManager.renderer.domElement
-		);
-		this.cameraController.character = this.character;
-		this.scopeController = new ScopeController(this.sceneManager.camera, this);
+			this.cameraController = new CameraController(
+				this.sceneManager.camera,
+				this.sceneManager.renderer.domElement
+			);
+			this.cameraController.character = this.character;
+			this.logicCameraSystem = new LogicCameraSystem(this);
+			this.scopeController = new ScopeController(this.sceneManager.camera, this);
 		this.sceneManager.renderer.autoClear = false;
 		this.setupOrientationGizmo();
 
@@ -444,6 +448,7 @@ export class Game {
 		});
 
 		this.inventoryManager = new InventoryManager("inventory-container");
+		this.inventoryManager.game = this;
 		this.itemDropManager = new ItemDropManager(this.sceneManager.scene, this.world);
 
 		this.fuegoCount = 0;
@@ -766,9 +771,11 @@ export class Game {
 		this.itemDropManager?.droppedItems?.forEach((item: any) => item.dispose?.());
 		this.fxBlasterSystem?.Destroy?.();
 		this.character?.dispose?.();
-		this.hud?.destroy?.();
-		this.objectInspector?.destroy?.();
-		this.constructionMenu?.logicSystem?.dispose?.();
+			this.hud?.destroy?.();
+			this.objectInspector?.destroy?.();
+			this.constructionMenu?.logicSystem?.dispose?.();
+			this.logicCameraSystem?.closeCameraPanel?.();
+			this.logicCameraSystem?.closeCameraPreview?.();
 
 		if (document.pointerLockElement) {
 			document.exitPointerLock?.();

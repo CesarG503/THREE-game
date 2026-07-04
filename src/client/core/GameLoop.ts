@@ -411,15 +411,19 @@ export function animate(this: any) {
 		this.inventoryManager.updateFuelBars();
 	}
 
-	// Camera Update
-	this.cameraController.update(
-		this.character.getPosition(),
-		this.character.getRotation(),
-		dt,
-		this.character.getGravityQuaternion ? this.character.getGravityQuaternion() : (this.character.getGravityUpVector ? this.character.getGravityUpVector() : null),
-		this.sceneManager.scene,
-		this.inputManager
-	);
+		// Camera Update
+		if (this.logicCameraSystem?.isViewingLogicCamera) {
+			this.logicCameraSystem.update(dt);
+		} else {
+			this.cameraController.update(
+				this.character.getPosition(),
+				this.character.getRotation(),
+				dt,
+				this.character.getGravityQuaternion ? this.character.getGravityQuaternion() : (this.character.getGravityUpVector ? this.character.getGravityUpVector() : null),
+				this.sceneManager.scene,
+				this.inputManager
+			);
+		}
 
 	// Fall Death Logic
 	if (this.environmentConfig && this.environmentConfig.fallDeath && this.character.getPosition().y < this.environmentConfig.fallDeathY) {

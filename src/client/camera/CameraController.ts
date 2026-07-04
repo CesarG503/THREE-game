@@ -446,6 +446,8 @@ export class CameraController {
           "gravity_pad",
           "farming_zone",
           "target",
+          "logic_camera",
+          "camera_panel",
           "logic_node",
           "marker",
           "waypoint",

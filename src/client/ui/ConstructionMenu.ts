@@ -164,7 +164,8 @@ export class ConstructionMenu {
             { id_prefix: "ramp", name: "Rampa", type: "ramp", scale: { x: 4, y: 2, z: 4 } },
             { id_prefix: "stairs", name: "Gradas", type: "stairs", scale: { x: 4, y: 2, z: 4 } },
             { id_prefix: "ladder", name: "Escalera", type: "ladder", scale: { x: 1, y: 3, z: 0.5 } },
-            { id_prefix: "tall", name: "Torre", type: "pillar", scale: { x: 2, y: 10, z: 2 } }
+            { id_prefix: "tall", name: "Torre", type: "pillar", scale: { x: 2, y: 10, z: 2 } },
+            { id_prefix: "camera_prop", name: "Cámara (Decorativa)", type: "camera_prop", scale: { x: 0.7, y: 0.7, z: 0.7 } }
         ];
 
         // Single Color (White)
@@ -267,6 +268,41 @@ export class ConstructionMenu {
             targetUuid: null
         };
         this.logicItems.push(gravitySphere);
+
+        const logicCamera = new MapObjectItem(
+            "logic_camera",
+            "Camara",
+            "logic_camera",
+            "",
+            0x1F2937,
+            { x: 0.7, y: 0.7, z: 0.7 }
+        );
+        logicCamera.logicProperties = {
+            logicKind: "logic_camera",
+            name: "Camara",
+            mode: "fixed",
+            fov: 60,
+            far: 6,
+            aspect: 16 / 9,
+            eyeHeightOffset: 0
+        };
+        this.logicItems.push(logicCamera);
+
+        const cameraPanel = new MapObjectItem(
+            "camera_panel",
+            "Panel de Camaras",
+            "camera_panel",
+            "",
+            0x0F172A,
+            { x: 1.2, y: 0.12, z: 1.0 }
+        );
+        cameraPanel.logicProperties = {
+            logicKind: "camera_panel",
+            name: "Panel de Camaras",
+            cameraIds: [],
+            holdTime: 0
+        };
+        this.logicItems.push(cameraPanel);
 
         // Interactive Collision
         const collision = new MapObjectItem(
@@ -748,6 +784,7 @@ export class ConstructionMenu {
             this.tabLogic.style.fontWeight = "bold";
             this.tabLogic.style.color = "white";
             this.tabLogic.style.borderBottom = "2px solid white";
+            this.renderLogicLibraryGrid(this.logicGrid);
             this.refreshLogicList();
         } else if (tabName === "settings") {
             this.contentSettings.style.display = "flex";
@@ -2135,6 +2172,10 @@ renderLogicLibraryGrid(container) {
             {
                 title: "Bases y Señales",
                 types: ["spawn_point", "movement_controller", "interaction_button", "interactive_collision", "target", "gravity_sphere"]
+            },
+            {
+                title: "Camaras",
+                types: ["logic_camera", "camera_panel"]
             },
             {
                 title: "Pads y Zonas",
@@ -3848,7 +3889,7 @@ renderLogicLibraryGrid(container) {
     updateLogicControls(baseItem) {
         this.editorLogicControlsContainer.innerHTML = "";
 
-        const logicTypes = ["spawn_point", "movement_controller", "interaction_button", "interactive_collision", "target", "impulse_jump", "impulse_lateral", "gravity_pad", "farming_zone", "gravity_sphere"];
+        const logicTypes = ["spawn_point", "movement_controller", "interaction_button", "interactive_collision", "target", "impulse_jump", "impulse_lateral", "gravity_pad", "farming_zone", "gravity_sphere", "logic_camera", "camera_panel"];
         if (!logicTypes.includes(baseItem.type) && !baseItem.logicProperties) {
             this.editorLogicControlsContainer.style.display = "none";
             return;
@@ -3883,6 +3924,16 @@ renderLogicLibraryGrid(container) {
             this.createLogicDraftInput(this.editorLogicControlsContainer, "Tiempo Retener (s):", "holdTime", "number", 0.5);
             this.createLogicDraftInput(this.editorLogicControlsContainer, "Un Solo Uso:", "oneShot", "boolean", false);
             this.createLogicDraftInput(this.editorLogicControlsContainer, "Modo Pulsación:", "pulsationMode", "boolean", false);
+        } else if (type === "logic_camera") {
+            this.createLogicDraftInput(this.editorLogicControlsContainer, "Nombre:", "name", "text", "Camara");
+            this.createLogicDraftSelect(this.editorLogicControlsContainer, "Modo:", "mode", [
+                { value: "fixed", label: "Fija" },
+                { value: "free_rotation", label: "Libre solo rotacion" }
+            ], "fixed");
+            this.createLogicDraftInput(this.editorLogicControlsContainer, "FOV:", "fov", "number", 60);
+            this.createLogicDraftInput(this.editorLogicControlsContainer, "Distancia foco:", "far", "number", 6);
+        } else if (type === "camera_panel") {
+            this.createLogicDraftInput(this.editorLogicControlsContainer, "Nombre:", "name", "text", "Panel de Camaras");
         } else if (type === "interactive_collision") {
             this.createLogicDraftInput(this.editorLogicControlsContainer, "Travesable (Sin colisión):", "isTraversable", "boolean", false);
             this.createLogicDraftInput(this.editorLogicControlsContainer, "Disparar al Tocar:", "triggerOnTouch", "boolean", false);

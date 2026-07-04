@@ -462,6 +462,54 @@ export class PlayerConfigPanel {
         flightContainer.appendChild(flightLabel);
         statsCol.appendChild(flightContainer);
 
+        // Hide HUD Toggle
+        const hideHUDContainer = document.createElement('div');
+        hideHUDContainer.style.marginTop = "10px";
+        hideHUDContainer.style.display = "flex";
+        hideHUDContainer.style.alignItems = "center";
+        hideHUDContainer.style.gap = "10px";
+
+        const hideHUDCheck = document.createElement('input');
+        hideHUDCheck.type = "checkbox";
+        hideHUDCheck.checked = profile.hideHUD || false;
+        hideHUDCheck.style.transform = "scale(1.2)";
+        hideHUDCheck.onchange = (e) => {
+            this.manager.updateProfile(profile.id, { hideHUD: e.target.checked });
+        };
+
+        const hideHUDLabel = document.createElement('label');
+        hideHUDLabel.textContent = "Ocultar HUD del Jugador";
+        hideHUDLabel.style.color = "#ddd";
+        hideHUDLabel.onclick = () => hideHUDCheck.click();
+
+        hideHUDContainer.appendChild(hideHUDCheck);
+        hideHUDContainer.appendChild(hideHUDLabel);
+        statsCol.appendChild(hideHUDContainer);
+
+        // Disable Interaction Toggle
+        const disableInteractionContainer = document.createElement('div');
+        disableInteractionContainer.style.marginTop = "10px";
+        disableInteractionContainer.style.display = "flex";
+        disableInteractionContainer.style.alignItems = "center";
+        disableInteractionContainer.style.gap = "10px";
+
+        const disableInteractionCheck = document.createElement('input');
+        disableInteractionCheck.type = "checkbox";
+        disableInteractionCheck.checked = profile.disableInteraction || false;
+        disableInteractionCheck.style.transform = "scale(1.2)";
+        disableInteractionCheck.onchange = (e) => {
+            this.manager.updateProfile(profile.id, { disableInteraction: e.target.checked });
+        };
+
+        const disableInteractionLabel = document.createElement('label');
+        disableInteractionLabel.textContent = "Deshabilitar Construcción / Interacción";
+        disableInteractionLabel.style.color = "#ddd";
+        disableInteractionLabel.onclick = () => disableInteractionCheck.click();
+
+        disableInteractionContainer.appendChild(disableInteractionCheck);
+        disableInteractionContainer.appendChild(disableInteractionLabel);
+        statsCol.appendChild(disableInteractionContainer);
+
         const gravityContainer = document.createElement('div');
         gravityContainer.style.cssText = "margin-top:15px; display:flex; flex-direction:column; gap:6px;";
 

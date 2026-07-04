@@ -1088,7 +1088,7 @@ export class PlacementManager {
 
             const gridSize = this.gridSize || 1;
             let targetPos = hit.point.clone();
-            const surfaceAlignedTypes = ["interaction_button", "target", "gravity_pad", "impulse_jump", "impulse_lateral", "farming_zone"];
+	            const surfaceAlignedTypes = ["interaction_button", "target", "gravity_pad", "impulse_jump", "impulse_lateral", "farming_zone", "logic_camera", "camera_panel", "camera_prop"];
 
             // --- Snapping Logic ---
             if (this.snapToGrid || this.aerialGridActive) {
@@ -1341,18 +1341,70 @@ export class PlacementManager {
                     this.ghostStairsGroup.visible = true;
                     this.rebuildStairsGhost(item);
                 } else {
-                    // Standard Box
-                    this.ghostBoxMesh.visible = true;
-                    if (item.type === "interaction_button") {
-                        // Use correct visual size for ghost
-                        this.ghostBoxMesh.scale.set(realSize.x, realSize.y, realSize.z);
-                    } else if (item.type === "target") {
-                        this.ghostBoxMesh.scale.set(realSize.x, realSize.y, realSize.z);
+                    if (item.type === "logic_camera" || item.type === "camera_prop") {
+                        if (this.cameraGhostFrustum) {
+                            this.placementGhost.remove(this.cameraGhostFrustum);
+                            this.cameraGhostFrustum.geometry?.dispose?.();
+                            this.cameraGhostFrustum = null;
+                        }
+
+                        const makeFrustum = (fov = 60, far = 6, aspect = 16 / 9) => {
+                            const near = 0.35;
+                            const fovRad = THREE.MathUtils.degToRad(fov);
+                            const nearH = Math.tan(fovRad / 2) * near;
+                            const nearW = nearH * aspect;
+                            const farH = Math.tan(fovRad / 2) * far;
+                            const farW = farH * aspect;
+                            const points = [
+                                new THREE.Vector3(0, 0, 0), new THREE.Vector3(-farW, farH, -far),
+                                new THREE.Vector3(0, 0, 0), new THREE.Vector3(farW, farH, -far),
+                                new THREE.Vector3(0, 0, 0), new THREE.Vector3(farW, -farH, -far),
+                                new THREE.Vector3(0, 0, 0), new THREE.Vector3(-farW, -farH, -far),
+                                new THREE.Vector3(-nearW, nearH, -near), new THREE.Vector3(nearW, nearH, -near),
+                                new THREE.Vector3(nearW, nearH, -near), new THREE.Vector3(nearW, -nearH, -near),
+                                new THREE.Vector3(nearW, -nearH, -near), new THREE.Vector3(-nearW, -nearH, -near),
+                                new THREE.Vector3(-nearW, -nearH, -near), new THREE.Vector3(-nearW, nearH, -near),
+                                new THREE.Vector3(-farW, farH, -far), new THREE.Vector3(farW, farH, -far),
+                                new THREE.Vector3(farW, farH, -far), new THREE.Vector3(farW, -farH, -far),
+                                new THREE.Vector3(farW, -farH, -far), new THREE.Vector3(-farW, -farH, -far),
+                                new THREE.Vector3(-farW, -farH, -far), new THREE.Vector3(-farW, farH, -far)
+                            ];
+                            const geometry = new THREE.BufferGeometry().setFromPoints(points);
+                            const helperLineMat = new THREE.LineBasicMaterial({
+                                color: 0x38bdf8,
+                                transparent: true,
+                                opacity: 0.8
+                            });
+                            return new THREE.LineSegments(geometry, helperLineMat);
+                        };
+
+                        const props = item.logicProperties || {};
+                        this.cameraGhostFrustum = makeFrustum(Number(props.fov ?? 60), Number(props.far ?? 6), Number(props.aspect ?? 16 / 9));
+                        this.placementGhost.add(this.cameraGhostFrustum);
+
+                        this.ghostBoxMesh.visible = true;
+                        this.ghostBoxMesh.scale.set(0.35, 0.25, 0.25);
+                        this.ghostBoxMesh.position.y = 0;
                     } else {
-                        this.ghostBoxMesh.scale.set(item.scale.x, item.scale.y, item.scale.z);
+                        if (this.cameraGhostFrustum) {
+                            this.placementGhost.remove(this.cameraGhostFrustum);
+                            this.cameraGhostFrustum.geometry?.dispose?.();
+                            this.cameraGhostFrustum = null;
+                        }
+
+                        // Standard Box
+                        this.ghostBoxMesh.visible = true;
+                        if (item.type === "interaction_button") {
+                            // Use correct visual size for ghost
+                            this.ghostBoxMesh.scale.set(realSize.x, realSize.y, realSize.z);
+                        } else if (item.type === "target") {
+                            this.ghostBoxMesh.scale.set(realSize.x, realSize.y, realSize.z);
+                        } else {
+                            this.ghostBoxMesh.scale.set(item.scale.x, item.scale.y, item.scale.z);
+                        }
+                        // Reset Y because targetPos is Center now
+                        this.ghostBoxMesh.position.y = 0;
                     }
-                    // Reset Y because targetPos is Center now
-                    this.ghostBoxMesh.position.y = 0;
 
 
                     // --- INTERACTIVE COLLISION GHOST UPDATE ---

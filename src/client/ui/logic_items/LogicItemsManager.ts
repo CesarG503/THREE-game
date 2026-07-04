@@ -8,6 +8,8 @@ import { InteractiveCollisionLogic } from "./InteractiveCollisionLogic"
 import { TargetLogic } from "./TargetLogic"
 import { EventSubscriptionLogic } from "./EventSubscriptionLogic"
 import { DianaLogic } from "./DianaLogic"
+import { LogicCameraLogic } from "./LogicCameraLogic"
+import { CameraPanelLogic } from "./CameraPanelLogic"
 
 export class LogicItemsManager {
     constructor(game = null, logicSystem = null) {
@@ -23,6 +25,8 @@ export class LogicItemsManager {
             new InteractiveCollisionLogic(game, logicSystem),
             new TargetLogic(game, logicSystem),
             new DianaLogic(),
+            new LogicCameraLogic(),
+            new CameraPanelLogic(game, logicSystem),
             new EventSubscriptionLogic()
         ]
     }

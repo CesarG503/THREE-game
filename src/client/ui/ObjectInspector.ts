@@ -705,6 +705,8 @@ export class ObjectInspector {
             object.userData.mapObjectType === 'spawn_point' ||
             object.userData.mapObjectType === 'interaction_button' ||
             object.userData.mapObjectType === 'gravity_sphere' ||
+            object.userData.mapObjectType === 'logic_camera' ||
+            object.userData.mapObjectType === 'camera_panel' ||
             object.userData.mapObjectType === 'impulse_jump' ||
             object.userData.mapObjectType === 'impulse_lateral' ||
             object.userData.mapObjectType === 'gravity_pad' ||
@@ -739,6 +741,12 @@ export class ObjectInspector {
         if (this.game.cameraController) this.game.cameraController.setUIOpen(true)
 
         this.transformGizmo.attach(object)
+
+        if (object.userData.mapObjectType === "logic_camera") {
+            this.game?.logicCameraSystem?.showCameraPreview?.(object)
+        } else {
+            this.game?.logicCameraSystem?.closeCameraPreview?.()
+        }
     }
 
     hide() {
@@ -746,6 +754,7 @@ export class ObjectInspector {
         this.container.style.display = 'none'
 
         this.transformGizmo.detach()
+        this.game?.logicCameraSystem?.closeCameraPreview?.()
 
         this.selectedObject = null
         if (this.game.cameraController) this.game.cameraController.setUIOpen(false)
@@ -1185,7 +1194,7 @@ export class ObjectInspector {
 
     renderLogicProperties(props) {
         if (!this.logicItemsManager) {
-            this.logicItemsManager = new LogicItemsManager()
+            this.logicItemsManager = new LogicItemsManager(this.game, this.game?.constructionMenu?.logicSystem)
         }
 
         const updateProp = (key, value) => {
@@ -1212,6 +1221,10 @@ export class ObjectInspector {
                 // If target visual update function exists, call it
                 if (typeof this.selectedObject.updateTargetVisuals === 'function') {
                     this.selectedObject.updateTargetVisuals();
+                }
+
+                if (typeof this.selectedObject.updateLogicCameraVisuals === 'function') {
+                    this.selectedObject.updateLogicCameraVisuals();
                 }
 
                 if (this.game && this.game.broadcastObjectUpdate) {

@@ -8,6 +8,7 @@ export class InventoryManager {
   slots: Array<ItemLike | null>;
   currentSlotIndex: number;
   onItemChange: ((item: ItemLike | null) => void) | null;
+  game: any;
 
   constructor(containerId: string) {
     void containerId;
@@ -19,6 +20,7 @@ export class InventoryManager {
     this.currentSlotIndex = 0;
 
     this.onItemChange = null;
+    this.game = null;
 
     this.setupEventListeners();
     this.updateUI();
@@ -26,6 +28,9 @@ export class InventoryManager {
 
   setupEventListeners() {
     document.addEventListener("keydown", (e: KeyboardEvent) => {
+      const profile = this.game?.playerConfigManager?.getCurrentProfile?.();
+      if (profile?.disableInteraction) return;
+
       const key = parseInt(e.key, 10);
       if (!isNaN(key) && key >= 1 && key <= this.capacity) {
         this.selectSlot(key - 1);
@@ -33,6 +38,9 @@ export class InventoryManager {
     });
 
     document.addEventListener("wheel", (e: WheelEvent) => {
+      const profile = this.game?.playerConfigManager?.getCurrentProfile?.();
+      if (profile?.disableInteraction) return;
+
       if (!e.shiftKey) {
         if (e.deltaY > 0) {
           this.selectSlot((this.currentSlotIndex + 1) % this.capacity);
@@ -125,6 +133,9 @@ export class InventoryManager {
   }
 
   selectSlot(index: number) {
+    const profile = this.game?.playerConfigManager?.getCurrentProfile?.();
+    if (profile?.disableInteraction) return;
+
     if (index < 0) index = this.capacity - 1;
     if (index >= this.capacity) index = 0;
 

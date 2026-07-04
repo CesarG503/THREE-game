@@ -367,8 +367,12 @@ export class LogicCameraSystem {
 		if (!this.isViewingLogicCamera) {
 			this.previousCameraMode = this.game?.cameraController?.mode || null;
 
-			// Save and override HUD / Interaction block options
-			const profile = this.game?.playerConfigManager?.getCurrentProfile?.();
+			// Save and override HUD / Interaction block options on the active profile
+			const profileId = this.game?.character?.activeRoleId;
+			const profile = profileId 
+				? this.game.playerConfigManager.getProfile(profileId) 
+				: this.game?.playerConfigManager?.getCurrentProfile?.();
+
 			if (profile) {
 				this.originalHideHUD = !!profile.hideHUD;
 				this.originalDisableInteraction = !!profile.disableInteraction;
@@ -376,7 +380,7 @@ export class LogicCameraSystem {
 				profile.hideHUD = true;
 				profile.disableInteraction = true;
 
-				this.game.playerConfigManager.applyConfiguration();
+				this.game.playerConfigManager.applyToCharacter(this.game.character, profile);
 			}
 		}
 
@@ -425,13 +429,17 @@ export class LogicCameraSystem {
 		this.isViewingLogicCamera = false;
 		this.activeCameraObject = null;
 
-		// Restore HUD / Interaction block options
-		const profile = this.game?.playerConfigManager?.getCurrentProfile?.();
+		// Restore HUD / Interaction block options on the active profile
+		const profileId = this.game?.character?.activeRoleId;
+		const profile = profileId 
+			? this.game.playerConfigManager.getProfile(profileId) 
+			: null;
+
 		if (profile) {
 			profile.hideHUD = this.originalHideHUD;
 			profile.disableInteraction = this.originalDisableInteraction;
 
-			this.game.playerConfigManager.applyConfiguration();
+			this.game.playerConfigManager.applyToCharacter(this.game.character, profile);
 		}
 
 		if (this.game?.inputManager && this.previousInputEnabled !== null) {

@@ -380,7 +380,7 @@ export class PlayerConfigPanel {
             item.appendChild(nameSpan);
 
             // Delete Btn
-            if (p.id !== 'default') {
+            if (p.id !== 'default' && p.id !== 'admin_tester') {
                 const delBtn = document.createElement('button');
                 delBtn.textContent = "✕";
                 delBtn.style.cssText = "background:none; border:none; color:#f44; cursor:pointer;";
@@ -388,7 +388,7 @@ export class PlayerConfigPanel {
                     e.stopPropagation();
                     if (confirm(`¿Eliminar perfil "${p.name}"?`)) {
                         this.manager.removeProfile(p.id);
-                        if (this.selectedProfileId === p.id) this.selectedProfileId = 'default';
+                        if (this.selectedProfileId === p.id) this.selectedProfileId = 'admin_tester';
                         this.render();
                     }
                 };
@@ -1036,6 +1036,8 @@ export class PlayerConfigPanel {
         applyBtn.style.cssText = "background: #44f; color: white; border: none; padding: 10px; width: 100%; cursor: pointer; border-radius: 4px; margin-top: 5px;";
         applyBtn.onclick = () => {
             this.manager.assignments.defaultProfileId = profile.id;
+            const myId = this.game?.networkManager?.playerId || "local";
+            this.manager.setPlayerProfile(myId, profile.id);
             this.manager.applyConfiguration();
             alert(`Rol "${profile.name}" aplicado al jugador.`);
         };

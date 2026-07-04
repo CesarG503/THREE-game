@@ -18,14 +18,14 @@ export class PlayerConfigManager {
         this.game = game;
         this.profiles = [
             {
-                id: "default",
-                name: "Jugador Estándar",
-                maxHealth: 100,
-                speed: 10,
+                id: "admin_tester",
+                name: "ADMIN tester",
+                maxHealth: 1000,
+                speed: 20,
                 jumpForce: 10,
                 respawns: -1,
-                color: "#ffffff",
-                canFly: false,
+                color: "#ff0000",
+                canFly: true,
                 maxMultiJumps: 1,
                 jumpAnimationType: "none",
                 fallAnimationType: "none",
@@ -104,14 +104,14 @@ export class PlayerConfigManager {
                 }
             },
             {
-                id: "admin_tester",
-                name: "ADMIN tester",
-                maxHealth: 1000,
-                speed: 20,
+                id: "default",
+                name: "Jugador Estándar",
+                maxHealth: 100,
+                speed: 10,
                 jumpForce: 10,
                 respawns: -1,
-                color: "#ff0000",
-                canFly: true,
+                color: "#ffffff",
+                canFly: false,
                 maxMultiJumps: 1,
                 jumpAnimationType: "none",
                 fallAnimationType: "none",
@@ -308,12 +308,12 @@ export class PlayerConfigManager {
     }
 
     removeProfile(id: string) {
-        if (id === "default") return false;
+        if (id === "default" || id === "admin_tester") return false;
         const idx = this.profiles.findIndex(p => p.id === id);
         if (idx !== -1) {
             this.profiles.splice(idx, 1);
             if (this.assignments.defaultProfileId === id) {
-                this.assignments.defaultProfileId = "default";
+                this.assignments.defaultProfileId = "admin_tester";
             }
             this.broadcastUpdate();
             return true;
@@ -325,7 +325,13 @@ export class PlayerConfigManager {
         const profile = this.getProfile(id);
         if (profile) {
             Object.assign(profile, data);
-            this.applyConfiguration();
+            
+            // Only apply configuration if the modified profile is the currently active one
+            const currentActiveProfile = this.getCurrentProfile();
+            if (currentActiveProfile && currentActiveProfile.id === id) {
+                this.applyConfiguration();
+            }
+            
             this.broadcastUpdate();
         }
     }
@@ -354,7 +360,8 @@ export class PlayerConfigManager {
     }
 
     getCurrentProfile() {
-        let profileToApply = this.getProfile("default");
+        let defaultId = (this.game && this.game.gameMode === "editor") ? "admin_tester" : "default";
+        let profileToApply = this.getProfile(defaultId);
 
         if (this.assignments.mode === "all") {
             const p = this.getProfile(this.assignments.defaultProfileId);
@@ -369,6 +376,15 @@ export class PlayerConfigManager {
             if (explicitProfileId) {
                 const explicitP = this.getProfile(explicitProfileId);
                 if (explicitP) profileToApply = explicitP;
+            }
+        }
+
+        // If in editor, force admin_tester for the local player unless they explicitly set a test profile
+        if (this.game && this.game.gameMode === "editor") {
+            const myId = this.game.networkManager?.playerId || "local";
+            if (!this.assignments.playerProfiles?.[myId]) {
+                const adminP = this.getProfile("admin_tester");
+                if (adminP) profileToApply = adminP;
             }
         }
 
@@ -462,7 +478,22 @@ export class PlayerConfigManager {
                 ...profile
             }));
         }
-        if (data.assignments) this.assignments = data.assignments;
+        if (data.assignments) {
+            this.assignments = data.assignments;
+            if (!this.assignments.defaultProfileId) {
+                this.assignments.defaultProfileId = "admin_tester";
+            }
+        } else {
+            this.assignments = {
+                mode: "all",
+                defaultProfileId: "admin_tester",
+                teamProfiles: {},
+                playerProfiles: {}
+            };
+        }
+        if (this.game && this.game.character) {
+            this.applyConfiguration();
+        }
         console.log("Player Config Loaded", this.profiles);
     }
 

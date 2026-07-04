@@ -52,6 +52,11 @@ export class LogicCameraSystem {
 		this.previewSharedRenderer = null;
 		this.originalHideHUD = false;
 		this.originalDisableInteraction = false;
+		this.currentPreviewFar = 80;
+		this.currentPreviewInterval = 0;
+		this.lastPreviewRenderTime = 0;
+		this.originalCameraFov = 75;
+		this.originalCameraFar = 1000;
 	}
 
 	getLogicCameras() {
@@ -81,6 +86,11 @@ export class LogicCameraSystem {
 	showCameraPanel(panelObject: LogicCameraObject) {
 		const cameras = this.getCamerasForPanel(panelObject);
 		this.closeCameraPanel();
+
+		const panelProps = panelObject?.userData?.logicProperties || {};
+		this.currentPreviewFar = Number(panelProps.previewFar ?? 80);
+		this.currentPreviewInterval = Number(panelProps.previewInterval ?? 0);
+		this.lastPreviewRenderTime = 0;
 
 		if (cameras.length === 0) {
 			const panel = document.createElement("div");
@@ -291,23 +301,38 @@ export class LogicCameraSystem {
 		const scene = this.game?.sceneManager?.scene;
 		if (!scene) return;
 
-		if (!this.previewSharedRenderer) {
-			this.previewSharedRenderer = new THREE.WebGLRenderer({ antialias: true });
-			this.previewSharedRenderer.setPixelRatio(1);
+		const now = performance.now();
+		const interval = this.currentPreviewInterval ?? 0;
+		let shouldRender = true;
+
+		if (interval > 0) {
+			const elapsed = (now - this.lastPreviewRenderTime) / 1000;
+			if (elapsed < interval) {
+				shouldRender = false;
+			}
 		}
-		this.previewSharedRenderer.setSize(224, 126);
 
-		this.sidebarPreviews.forEach((item) => {
-			const { cameraObject, ctx, previewCamera } = item;
-			previewCamera.position.copy(cameraObject.getWorldPosition(new THREE.Vector3()));
-			previewCamera.quaternion.copy(cameraObject.getWorldQuaternion(new THREE.Quaternion()));
-			previewCamera.fov = Number(cameraObject.userData.logicProperties?.fov ?? 60);
-			previewCamera.far = Number(cameraObject.userData.logicProperties?.far ?? 80);
-			previewCamera.updateProjectionMatrix();
+		if (shouldRender) {
+			this.lastPreviewRenderTime = now;
 
-			this.previewSharedRenderer.render(scene, previewCamera);
-			ctx?.drawImage(this.previewSharedRenderer.domElement, 0, 0);
-		});
+			if (!this.previewSharedRenderer) {
+				this.previewSharedRenderer = new THREE.WebGLRenderer({ antialias: true });
+				this.previewSharedRenderer.setPixelRatio(1);
+			}
+			this.previewSharedRenderer.setSize(224, 126);
+
+			this.sidebarPreviews.forEach((item) => {
+				const { cameraObject, ctx, previewCamera } = item;
+				previewCamera.position.copy(cameraObject.getWorldPosition(new THREE.Vector3()));
+				previewCamera.quaternion.copy(cameraObject.getWorldQuaternion(new THREE.Quaternion()));
+				previewCamera.fov = Number(cameraObject.userData.logicProperties?.fov ?? 60);
+				previewCamera.far = this.currentPreviewFar;
+				previewCamera.updateProjectionMatrix();
+
+				this.previewSharedRenderer.render(scene, previewCamera);
+				ctx?.drawImage(this.previewSharedRenderer.domElement, 0, 0);
+			});
+		}
 
 		this.sidebarAnimationId = requestAnimationFrame(() => this.renderSidebarPreviews());
 	}
@@ -366,6 +391,13 @@ export class LogicCameraSystem {
 
 		if (!this.isViewingLogicCamera) {
 			this.previousCameraMode = this.game?.cameraController?.mode || null;
+
+			// Save original camera properties
+			const sceneCamera = this.game?.sceneManager?.camera;
+			if (sceneCamera) {
+				this.originalCameraFov = sceneCamera.fov;
+				this.originalCameraFar = sceneCamera.far;
+			}
 
 			// Save and override HUD / Interaction block options on the active profile
 			const profileId = this.game?.character?.activeRoleId;
@@ -442,6 +474,14 @@ export class LogicCameraSystem {
 			this.game.playerConfigManager.applyToCharacter(this.game.character, profile);
 		}
 
+		// Restore main camera fov and far properties
+		const sceneCamera = this.game?.sceneManager?.camera;
+		if (sceneCamera) {
+			sceneCamera.fov = this.originalCameraFov;
+			sceneCamera.far = this.originalCameraFar;
+			sceneCamera.updateProjectionMatrix();
+		}
+
 		if (this.game?.inputManager && this.previousInputEnabled !== null) {
 			this.game.inputManager.enabled = this.previousInputEnabled;
 			this.previousInputEnabled = null;
@@ -467,6 +507,10 @@ export class LogicCameraSystem {
 		const position = source.getWorldPosition(new THREE.Vector3());
 		if (offset) position.y += offset;
 		sceneCamera.position.copy(position);
+
+		sceneCamera.fov = Number(props.fov ?? 60);
+		sceneCamera.far = 1000; // Keep the main rendering camera distance large so the world is fully rendered
+		sceneCamera.updateProjectionMatrix();
 
 		if (props.mode === "free_rotation") {
 			const quat = new THREE.Quaternion().setFromEuler(new THREE.Euler(this.pitch, this.yaw, 0, "YXZ"));

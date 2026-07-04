@@ -3934,6 +3934,16 @@ renderLogicLibraryGrid(container) {
             this.createLogicDraftInput(this.editorLogicControlsContainer, "Distancia foco:", "far", "number", 6);
         } else if (type === "camera_panel") {
             this.createLogicDraftInput(this.editorLogicControlsContainer, "Nombre:", "name", "text", "Panel de Camaras");
+            this.createLogicDraftInput(this.editorLogicControlsContainer, "Distancia Render Preview (m):", "previewFar", "number", 80);
+            this.createLogicDraftSelect(this.editorLogicControlsContainer, "Intervalo Actualización Previews:", "previewInterval", [
+                { value: "0", label: "Tiempo Real (60 FPS)" },
+                { value: "0.1", label: "Cada 0.1s" },
+                { value: "0.2", label: "Cada 0.2s" },
+                { value: "0.5", label: "Cada 0.5s" },
+                { value: "1", label: "Cada 1s" },
+                { value: "2", label: "Cada 2s" },
+                { value: "5", label: "Cada 5s" }
+            ], "0");
         } else if (type === "interactive_collision") {
             this.createLogicDraftInput(this.editorLogicControlsContainer, "Travesable (Sin colisión):", "isTraversable", "boolean", false);
             this.createLogicDraftInput(this.editorLogicControlsContainer, "Disparar al Tocar:", "triggerOnTouch", "boolean", false);

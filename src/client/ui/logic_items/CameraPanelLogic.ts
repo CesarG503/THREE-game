@@ -32,6 +32,49 @@ export class CameraPanelLogic extends LogicItem {
         nameInput.onchange = (e) => updateCallback("name", e.target.value)
         createRow("Nombre", nameInput)
 
+        // Previsualización y Rendimiento Section
+        const subHeader = document.createElement("h5")
+        subHeader.textContent = "Previsualización y Rendimiento"
+        subHeader.style.cssText = "color:#bbb; margin-top:15px; border-bottom:1px solid #333; padding-bottom:3px; margin-bottom:5px; font-size:11px; font-weight:bold;"
+        container.appendChild(subHeader)
+
+        const farInput = document.createElement("input")
+        farInput.type = "number"
+        farInput.min = "10"
+        farInput.max = "1000"
+        farInput.step = "5"
+        farInput.value = props.previewFar ?? 80
+        farInput.style.cssText = "background:#222; border:1px solid #555; color:white; padding:4px;"
+        farInput.onchange = (e) => updateCallback("previewFar", Math.max(10, parseFloat(e.target.value) || 80))
+        createRow("Distancia Render Preview (m)", farInput)
+
+        const intervalSelect = document.createElement("select")
+        intervalSelect.style.cssText = "background:#222; border:1px solid #555; color:white; padding:4px;"
+        ;[
+            { value: "0", label: "Tiempo Real (60 FPS)" },
+            { value: "0.1", label: "Cada 0.1s" },
+            { value: "0.2", label: "Cada 0.2s" },
+            { value: "0.5", label: "Cada 0.5s" },
+            { value: "1", label: "Cada 1s" },
+            { value: "2", label: "Cada 2s" },
+            { value: "5", label: "Cada 5s" }
+        ].forEach(opt => {
+            const option = document.createElement("option")
+            option.value = opt.value
+            option.textContent = opt.label
+            const currentVal = props.previewInterval ?? 0
+            if (Math.abs(currentVal - parseFloat(opt.value)) < 0.01) option.selected = true
+            intervalSelect.appendChild(option)
+        })
+        intervalSelect.onchange = (e) => updateCallback("previewInterval", parseFloat(e.target.value))
+        createRow("Intervalo Actualización Previews", intervalSelect)
+
+        // Camaras visibles Section
+        const subHeaderCameras = document.createElement("h5")
+        subHeaderCameras.textContent = "Selección de Cámaras"
+        subHeaderCameras.style.cssText = "color:#bbb; margin-top:15px; border-bottom:1px solid #333; padding-bottom:3px; margin-bottom:5px; font-size:11px; font-weight:bold;"
+        container.appendChild(subHeaderCameras)
+
         const cameras = []
         this.game?.sceneManager?.scene?.children?.forEach(obj => {
             if (obj.userData?.mapObjectType === "logic_camera") cameras.push(obj)

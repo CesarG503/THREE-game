@@ -112,6 +112,54 @@ export class MapShapeEditor {
     }
 
     buildSidebar(sidebar) {
+        // Tab Header
+        const tabContainer = document.createElement('div');
+        tabContainer.style.cssText = `
+            display: flex; background: #111; border-radius: 6px; padding: 3px; margin-bottom: 5px;
+        `;
+        
+        const tabFloor = document.createElement('button');
+        tabFloor.textContent = "Suelo";
+        tabFloor.style.cssText = `
+            flex: 1; padding: 8px; border: none; border-radius: 4px; font-weight: bold; font-size: 13px; cursor: pointer; transition: all 0.2s;
+        `;
+        
+        const tabWalls = document.createElement('button');
+        tabWalls.textContent = "Paredes";
+        tabWalls.style.cssText = `
+            flex: 1; padding: 8px; border: none; border-radius: 4px; font-weight: bold; font-size: 13px; cursor: pointer; transition: all 0.2s;
+        `;
+        
+        tabFloor.onclick = () => {
+            this.activeTab = "floor";
+            this.syncTabs();
+            this.draw();
+        };
+        tabWalls.onclick = () => {
+            this.activeTab = "walls";
+            this.syncTabs();
+            this.draw();
+        };
+        
+        tabContainer.appendChild(tabFloor);
+        tabContainer.appendChild(tabWalls);
+        sidebar.appendChild(tabContainer);
+        
+        this.tabFloorBtn = tabFloor;
+        this.tabWallsBtn = tabWalls;
+
+        // Container for Floor Editor
+        const floorEditorContent = document.createElement('div');
+        this.floorEditorContent = floorEditorContent;
+        floorEditorContent.style.cssText = "display: flex; flex-direction: column; gap: 20px; flex: 1;";
+        sidebar.appendChild(floorEditorContent);
+
+        // Container for Walls Editor
+        const wallsEditorContent = document.createElement('div');
+        this.wallsEditorContent = wallsEditorContent;
+        wallsEditorContent.style.cssText = "display: none; flex-direction: column; gap: 20px; flex: 1;";
+        sidebar.appendChild(wallsEditorContent);
+
         // Shape Type
         const shapeGroup = document.createElement('div');
         shapeGroup.style.cssText = `display: flex; flex-direction: column; gap: 10px;`;
@@ -131,7 +179,7 @@ export class MapShapeEditor {
         };
         this.shapeSelect = shapeSelect;
         shapeGroup.appendChild(shapeSelect);
-        sidebar.appendChild(shapeGroup);
+        floorEditorContent.appendChild(shapeGroup);
 
         // Dimensions Group
         const dimGroup = document.createElement('div');
@@ -148,7 +196,7 @@ export class MapShapeEditor {
 
         dimGroup.appendChild(createInput("Ancho (X):", "mse-size-x"));
         dimGroup.appendChild(createInput("Largo (Z):", "mse-size-z"));
-        sidebar.appendChild(dimGroup);
+        floorEditorContent.appendChild(dimGroup);
 
         // Instructions for Custom Mode
         const customInfo = document.createElement('div');
@@ -186,7 +234,7 @@ export class MapShapeEditor {
             • Click Medio + Arrastrar: Mover cámara
         `;
         customInfo.appendChild(instructions);
-        sidebar.appendChild(customInfo);
+        floorEditorContent.appendChild(customInfo);
 
         // Ground Groups list section (only visible in custom mode)
         const groupsSection = document.createElement('div');
@@ -214,7 +262,7 @@ export class MapShapeEditor {
         `;
         this.groupsContainer = groupsContainer;
         groupsSection.appendChild(groupsContainer);
-        sidebar.appendChild(groupsSection);
+        floorEditorContent.appendChild(groupsSection);
 
         // Block Shape Selection Section (only visible in custom mode)
         const shapesSection = document.createElement('div');
@@ -252,13 +300,46 @@ export class MapShapeEditor {
             shapesGrid.appendChild(btn);
         });
         shapesSection.appendChild(shapesGrid);
-        sidebar.appendChild(shapesSection);
+        floorEditorContent.appendChild(shapesSection);
 
         // Group Properties Panel (Visible for currently selected group)
         const groupPropertiesSection = document.createElement('div');
         this.groupPropertiesSection = groupPropertiesSection;
         groupPropertiesSection.style.cssText = `display: flex; flex-direction: column; gap: 12px; border-top: 1px solid #333; padding-top: 15px;`;
-        sidebar.appendChild(groupPropertiesSection);
+        floorEditorContent.appendChild(groupPropertiesSection);
+
+        // Walls Advanced Editor controls
+        const wallGroupsSection = document.createElement('div');
+        this.wallGroupsSection = wallGroupsSection;
+        wallGroupsSection.style.cssText = `display: flex; flex-direction: column; gap: 10px; border-top: 1px solid #333; padding-top: 15px;`;
+        
+        const wallGroupsHeader = document.createElement('div');
+        wallGroupsHeader.style.cssText = `display: flex; justify-content: space-between; align-items: center;`;
+        wallGroupsHeader.innerHTML = `<label style="color:#aaa; font-size:14px; text-transform:uppercase;">Grupos de Pared</label>`;
+        
+        const addWallGroupBtn = document.createElement('button');
+        addWallGroupBtn.textContent = "+ Añadir";
+        addWallGroupBtn.style.cssText = `
+            padding: 3px 8px; background: #008CBA; color: white; border: none; border-radius: 4px;
+            font-size: 11px; cursor: pointer; font-weight: bold;
+        `;
+        addWallGroupBtn.onclick = () => this.addNewWallGroup();
+        wallGroupsHeader.appendChild(addWallGroupBtn);
+        wallGroupsSection.appendChild(wallGroupsHeader);
+
+        const wallGroupsContainer = document.createElement('div');
+        wallGroupsContainer.style.cssText = `
+            display: flex; flex-direction: column; gap: 6px; max-height: 120px; overflow-y: auto;
+            background: #111; padding: 6px; border-radius: 4px; border: 1px solid #333;
+        `;
+        this.wallGroupsContainer = wallGroupsContainer;
+        wallGroupsSection.appendChild(wallGroupsContainer);
+        wallsEditorContent.appendChild(wallGroupsSection);
+
+        const wallPropertiesSection = document.createElement('div');
+        this.wallPropertiesSection = wallPropertiesSection;
+        wallPropertiesSection.style.cssText = `display: flex; flex-direction: column; gap: 12px; border-top: 1px solid #333; padding-top: 15px;`;
+        wallsEditorContent.appendChild(wallPropertiesSection);
 
         // Apply Button
         const spacer = document.createElement('div');
@@ -372,6 +453,23 @@ export class MapShapeEditor {
 
         if (!this.config.customGridGroups) this.config.customGridGroups = {};
         if (!this.config.customGridShapes) this.config.customGridShapes = {};
+        if (!this.config.customGridWallGroups) this.config.customGridWallGroups = {};
+
+        if (this.activeTab === "walls") {
+            for (let x = minX; x <= maxX; x++) {
+                for (let z = minZ; z <= maxZ; z++) {
+                    const key = `${x},${z}`;
+                    if (this.config.customGrid.includes(key)) {
+                        if (this.selectionBox.mode) {
+                            this.config.customGridWallGroups[key] = this.activeWallGroupId;
+                        } else {
+                            delete this.config.customGridWallGroups[key];
+                        }
+                    }
+                }
+            }
+            return;
+        }
 
         for (let x = minX; x <= maxX; x++) {
             for (let z = minZ; z <= maxZ; z++) {
@@ -389,6 +487,7 @@ export class MapShapeEditor {
                     }
                     delete this.config.customGridGroups[key];
                     delete this.config.customGridShapes[key];
+                    delete this.config.customGridWallGroups[key];
                 }
             }
         }
@@ -401,6 +500,24 @@ export class MapShapeEditor {
         
         if (!this.config.customGridGroups) this.config.customGridGroups = {};
         if (!this.config.customGridShapes) this.config.customGridShapes = {};
+        if (!this.config.customGridWallGroups) this.config.customGridWallGroups = {};
+
+        if (this.activeTab === "walls") {
+            if (this.config.customGrid.includes(key)) {
+                if (this.drawMode) {
+                    if (this.config.customGridWallGroups[key] !== this.activeWallGroupId) {
+                        this.config.customGridWallGroups[key] = this.activeWallGroupId;
+                        this.draw();
+                    }
+                } else {
+                    if (this.config.customGridWallGroups[key]) {
+                        delete this.config.customGridWallGroups[key];
+                        this.draw();
+                    }
+                }
+            }
+            return;
+        }
 
         if (this.drawMode) {
             let changed = false;
@@ -425,12 +542,13 @@ export class MapShapeEditor {
                 this.config.customGrid.splice(idx, 1);
                 delete this.config.customGridGroups[key];
                 delete this.config.customGridShapes[key];
+                delete this.config.customGridWallGroups[key];
                 this.draw();
             }
         }
     }
 
-    open() {
+    open(tab = "floor") {
         this.isVisible = true;
         this.container.style.display = "flex";
         
@@ -457,11 +575,29 @@ export class MapShapeEditor {
         this.config.customGridGroups = env.customGridGroups ? { ...env.customGridGroups } : {};
         this.config.customGridShapes = env.customGridShapes ? { ...env.customGridShapes } : {};
 
-        // Force color on default group if missing
+        // Sync advanced walls
+        this.config.invisibleWallsAdvanced = !!env.invisibleWallsAdvanced;
+        this.config.customGridWallGroups = env.customGridWallGroups ? { ...env.customGridWallGroups } : {};
+        this.config.invisibleWallsGroups = env.invisibleWallsGroups ? JSON.parse(JSON.stringify(env.invisibleWallsGroups)) : [
+            {
+                id: "default",
+                name: "Pared 1",
+                color: "#FF5722",
+                texturePath: null,
+                textureAssetId: null,
+                textureSettings: normalizeTextureSettings({ tileSize: 5 }),
+                height: 10,
+                opacity: 1.0,
+                transparent: false
+            }
+        ];
+
+        // Force colors on default groups if missing
         const defaultG = this.config.groundGroups.find(g => g.id === "default");
-        if (defaultG && !defaultG.color) {
-            defaultG.color = "#FF9800";
-        }
+        if (defaultG && !defaultG.color) defaultG.color = "#FF9800";
+
+        const defaultW = this.config.invisibleWallsGroups.find(w => w.id === "default");
+        if (defaultW && !defaultW.color) defaultW.color = "#FF5722";
 
         // Backward compatibility: map existing cells
         this.config.customGrid.forEach(key => {
@@ -471,11 +607,18 @@ export class MapShapeEditor {
             if (!this.config.customGridShapes[key]) {
                 this.config.customGridShapes[key] = "full";
             }
+            if (!this.config.customGridWallGroups[key]) {
+                this.config.customGridWallGroups[key] = "default";
+            }
         });
 
         this.activeGroupId = "default";
         this.selectedGroupIdForEditing = "default";
         this.activeCellShape = "full";
+
+        this.activeWallGroupId = "default";
+        this.selectedWallGroupIdForEditing = "default";
+        this.activeTab = tab; // floor | walls
 
         // Load custom textures uploaded by player
         this.customTextureAssets = [];
@@ -497,6 +640,7 @@ export class MapShapeEditor {
 
         this.updateVisibility();
         this.syncShapeButtons();
+        this.syncTabs();
         this.resizeCanvas();
     }
 
@@ -518,6 +662,8 @@ export class MapShapeEditor {
             this.config.customGridGroups["0,0"] = "default";
             if (!this.config.customGridShapes) this.config.customGridShapes = {};
             this.config.customGridShapes["0,0"] = "full";
+            if (!this.config.customGridWallGroups) this.config.customGridWallGroups = {};
+            this.config.customGridWallGroups["0,0"] = "default";
         }
 
         // Sync default group to root for backward compatibility
@@ -526,6 +672,11 @@ export class MapShapeEditor {
             this.config.groundTexturePath = defaultGroup.texturePath;
             this.config.groundTextureAssetId = defaultGroup.textureAssetId;
             this.config.groundTextureSettings = normalizeTextureSettings(defaultGroup.textureSettings);
+        }
+
+        // Force advanced walls option to true if they edited walls
+        if (this.activeTab === "walls") {
+            this.config.invisibleWallsAdvanced = true;
         }
 
         const newConfig = {
@@ -539,7 +690,10 @@ export class MapShapeEditor {
             groundTextureSettings: normalizeTextureSettings(this.config.groundTextureSettings),
             groundGroups: this.config.groundGroups,
             customGridGroups: this.config.customGridGroups,
-            customGridShapes: this.config.customGridShapes
+            customGridShapes: this.config.customGridShapes,
+            invisibleWallsAdvanced: this.config.invisibleWallsAdvanced,
+            invisibleWallsGroups: this.config.invisibleWallsGroups,
+            customGridWallGroups: this.config.customGridWallGroups
         };
 
         this.game.updateEnvironmentConfig(newConfig);
@@ -906,6 +1060,431 @@ export class MapShapeEditor {
         this.syncSelectedGroupTextureControls();
     }
 
+    addNewWallGroup() {
+        const id = "wall_group_" + Date.now();
+        const colors = ["#FF5722", "#E91E63", "#9C27B0", "#2196F3", "#00BCD4", "#4CAF50", "#FFEB3B", "#FF9800", "#795548", "#607D8B"];
+        const color = colors[this.config.invisibleWallsGroups.length % colors.length];
+        const name = "Pared " + (this.config.invisibleWallsGroups.length + 1);
+        
+        const newGroup = {
+            id,
+            name,
+            color,
+            texturePath: null,
+            textureAssetId: null,
+            textureSettings: { fitMode: "auto", tileSize: 5, repeatX: 1, repeatY: 1, offsetX: 0, offsetY: 0, rotation: 0, patternVariation: false },
+            height: 10,
+            opacity: 1.0,
+            transparent: false
+        };
+
+        this.config.invisibleWallsGroups.push(newGroup);
+        this.activeWallGroupId = id;
+        this.selectedWallGroupIdForEditing = id;
+
+        this.renderWallGroups();
+        this.renderSelectedWallGroupSettings();
+        this.draw();
+    }
+
+    deleteWallGroup(groupId) {
+        if (groupId === "default") return;
+
+        this.config.invisibleWallsGroups = this.config.invisibleWallsGroups.filter(g => g.id !== groupId);
+
+        // Reassign walls
+        if (this.config.customGridWallGroups) {
+            Object.keys(this.config.customGridWallGroups).forEach((key) => {
+                if (this.config.customGridWallGroups[key] === groupId) {
+                    this.config.customGridWallGroups[key] = "default";
+                }
+            });
+        }
+
+        if (this.activeWallGroupId === groupId) {
+            this.activeWallGroupId = "default";
+        }
+        if (this.selectedWallGroupIdForEditing === groupId) {
+            this.selectedWallGroupIdForEditing = "default";
+        }
+
+        this.renderWallGroups();
+        this.renderSelectedWallGroupSettings();
+        this.draw();
+    }
+
+    renderWallGroups() {
+        if (!this.wallGroupsContainer) return;
+        this.wallGroupsContainer.innerHTML = "";
+
+        const groups = this.config.invisibleWallsGroups || [];
+        groups.forEach((group) => {
+            const card = document.createElement('div');
+            card.style.cssText = `
+                display: flex; align-items: center; justify-content: space-between;
+                padding: 6px 10px; background: ${this.activeWallGroupId === group.id ? '#2a2a2a' : '#1e1e1e'};
+                border: 1px solid ${this.activeWallGroupId === group.id ? '#FF9800' : '#333'};
+                border-radius: 4px; cursor: pointer; transition: background 0.2s;
+            `;
+            
+            card.onclick = (e) => {
+                if (e.target.classList.contains('mse-delete-wall-group-btn')) return;
+                this.activeWallGroupId = group.id;
+                this.selectedWallGroupIdForEditing = group.id;
+                this.renderWallGroups();
+                this.renderSelectedWallGroupSettings();
+            };
+
+            const left = document.createElement('div');
+            left.style.cssText = `display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0;`;
+
+            const colorIndicator = document.createElement('span');
+            colorIndicator.style.cssText = `
+                display: inline-block; width: 14px; height: 14px; border-radius: 3px;
+                background-color: ${group.color}; flex-shrink: 0; border: 1px solid #555;
+            `;
+            left.appendChild(colorIndicator);
+
+            const nameSpan = document.createElement('span');
+            nameSpan.textContent = group.name;
+            nameSpan.style.cssText = `
+                color: #fff; font-size: 13px; font-weight: ${this.activeWallGroupId === group.id ? 'bold' : 'normal'};
+                white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+            `;
+            left.appendChild(nameSpan);
+            card.appendChild(left);
+
+            const right = document.createElement('div');
+            right.style.cssText = `display: flex; align-items: center; gap: 6px;`;
+
+            if (this.activeWallGroupId === group.id) {
+                const check = document.createElement('span');
+                check.textContent = "✓";
+                check.style.cssText = `color: #4CAF50; font-weight: bold; font-size: 13px;`;
+                right.appendChild(check);
+            }
+
+            if (group.id !== "default") {
+                const delBtn = document.createElement('button');
+                delBtn.textContent = "✖";
+                delBtn.className = "mse-delete-wall-group-btn";
+                delBtn.style.cssText = `
+                    background: none; border: none; color: #f44336; cursor: pointer;
+                    font-size: 12px; padding: 2px 4px; border-radius: 3px; transition: background 0.2s;
+                `;
+                delBtn.onmouseover = () => delBtn.style.background = "rgba(244,67,54,0.15)";
+                delBtn.onmouseout = () => delBtn.style.background = "none";
+                delBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    this.deleteWallGroup(group.id);
+                };
+                right.appendChild(delBtn);
+            }
+
+            card.appendChild(right);
+            this.wallGroupsContainer.appendChild(card);
+        });
+    }
+
+    renderSelectedWallGroupSettings() {
+        if (!this.wallPropertiesSection) return;
+        this.wallPropertiesSection.innerHTML = "";
+
+        const group = this.config.invisibleWallsGroups.find(g => g.id === this.selectedWallGroupIdForEditing);
+        if (!group) return;
+
+        const sectionTitle = document.createElement('label');
+        sectionTitle.style.cssText = `color:#aaa; font-size:14px; text-transform:uppercase; margin-bottom: 4px;`;
+        sectionTitle.textContent = `Propiedades: ${group.name}`;
+        this.wallPropertiesSection.appendChild(sectionTitle);
+
+        // Name
+        const nameRow = document.createElement('div');
+        nameRow.style.cssText = `display: flex; flex-direction: column; gap: 4px;`;
+        nameRow.innerHTML = `<span style="font-size:12px; color:#ccc;">Nombre:</span>`;
+        const nameInput = document.createElement('input');
+        nameInput.type = "text";
+        nameInput.value = group.name;
+        nameInput.style.cssText = `padding: 6px; background: #333; color: white; border: 1px solid #555; border-radius: 4px;`;
+        nameInput.oninput = (e) => {
+            group.name = e.target.value || "Pared";
+            this.renderWallGroups();
+            sectionTitle.textContent = `Propiedades: ${group.name}`;
+        };
+        nameRow.appendChild(nameInput);
+        this.wallPropertiesSection.appendChild(nameRow);
+
+        // Color Picker
+        const colorRow = document.createElement('div');
+        colorRow.style.cssText = `display: flex; justify-content: space-between; align-items: center;`;
+        colorRow.innerHTML = `<span style="font-size:12px; color:#ccc;">Color de Pared:</span>`;
+        const colorInput = document.createElement('input');
+        colorInput.type = "color";
+        colorInput.value = group.color || "#FF5722";
+        colorInput.style.cssText = `width: 40px; height: 26px; border: 1px solid #555; border-radius: 4px; background: none; cursor: pointer; padding: 0;`;
+        colorInput.oninput = (e) => {
+            group.color = e.target.value;
+            this.renderWallGroups();
+            this.draw();
+        };
+        colorRow.appendChild(colorInput);
+        this.wallPropertiesSection.appendChild(colorRow);
+
+        // Height Input / Slider
+        const heightRow = document.createElement('div');
+        heightRow.style.cssText = `display: flex; flex-direction: column; gap: 4px;`;
+        heightRow.innerHTML = `<div style="display:flex; justify-content:space-between;"><span style="font-size:12px; color:#ccc;">Altura (metros):</span><span id="mse-wall-height-val" style="font-size:12px; color:#FF9800; font-weight:bold;">${group.height}</span></div>`;
+        const heightSlider = document.createElement('input');
+        heightSlider.type = "range";
+        heightSlider.min = "1";
+        heightSlider.max = "100";
+        heightSlider.value = group.height || 10;
+        heightSlider.style.cssText = `width: 100%; cursor: pointer;`;
+        heightSlider.oninput = (e) => {
+            const val = parseInt(e.target.value);
+            group.height = val;
+            document.getElementById("mse-wall-height-val").textContent = String(val);
+        };
+        heightRow.appendChild(heightSlider);
+        this.wallPropertiesSection.appendChild(heightRow);
+
+        // Opacity Slider and Transparent checkbox
+        const opacityRow = document.createElement('div');
+        opacityRow.style.cssText = `display: flex; flex-direction: column; gap: 4px;`;
+        opacityRow.innerHTML = `<div style="display:flex; justify-content:space-between;"><span style="font-size:12px; color:#ccc;">Opacidad (0 a 1):</span><span id="mse-wall-opacity-val" style="font-size:12px; color:#FF9800; font-weight:bold;">${group.opacity.toFixed(1)}</span></div>`;
+        const opacitySlider = document.createElement('input');
+        opacitySlider.type = "range";
+        opacitySlider.min = "0";
+        opacitySlider.max = "1";
+        opacitySlider.step = "0.1";
+        opacitySlider.value = String(group.opacity === undefined ? 1 : group.opacity);
+        opacitySlider.style.cssText = `width: 100%; cursor: pointer;`;
+        opacitySlider.oninput = (e) => {
+            const val = parseFloat(e.target.value);
+            group.opacity = val;
+            group.transparent = val < 1.0;
+            document.getElementById("mse-wall-opacity-val").textContent = val.toFixed(1);
+            transCheck.checked = val === 0;
+        };
+        opacityRow.appendChild(opacitySlider);
+        this.wallPropertiesSection.appendChild(opacityRow);
+
+        const transRow = document.createElement('label');
+        transRow.style.cssText = `display:flex; justify-content:space-between; align-items:center; gap:8px; font-size:12px; color:#ddd; cursor:pointer;`;
+        transRow.innerHTML = `<span>Completamente Transparente (Invis.)</span>`;
+        const transCheck = document.createElement('input');
+        transCheck.type = "checkbox";
+        transCheck.checked = group.opacity === 0;
+        transCheck.onchange = (e) => {
+            const checked = e.target.checked;
+            group.opacity = checked ? 0 : 1;
+            group.transparent = checked;
+            opacitySlider.value = checked ? "0" : "1";
+            document.getElementById("mse-wall-opacity-val").textContent = checked ? "0.0" : "1.0";
+        };
+        transRow.appendChild(transCheck);
+        this.wallPropertiesSection.appendChild(transRow);
+
+        // Texture Manager for Walls
+        const textureSubGroup = document.createElement('div');
+        textureSubGroup.style.cssText = `display: flex; flex-direction: column; gap: 8px; margin-top: 5px;`;
+        
+        const textureHeader = document.createElement('span');
+        textureHeader.textContent = "Texturas Predeterminadas";
+        textureHeader.style.cssText = `font-size:12px; color:#ccc;`;
+        textureSubGroup.appendChild(textureHeader);
+
+        const groundTextureGrid = document.createElement('div');
+        groundTextureGrid.style.cssText = `display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px;`;
+        
+        const groundTextures = [
+            { name: "Ninguna", path: null, color: "#333" },
+            { name: "Ladrillo", path: "/assets/textures/obj/brick.png" },
+            { name: "Concreto", path: "/assets/textures/obj/concrete.png" },
+            { name: "Madera", path: "/assets/textures/obj/wood.png" },
+            { name: "Hierro", path: "/assets/textures/obj/hierro.png" }
+        ];
+
+        groundTextures.forEach((tex) => {
+            const btn = document.createElement('button');
+            btn.type = "button";
+            btn.className = "mse-wall-texture-btn";
+            btn.title = tex.name;
+            btn.dataset.texturePath = tex.path || "";
+            btn.style.cssText = `
+                aspect-ratio: 1; border: 1px solid #555; border-radius: 4px; cursor: pointer;
+                background-color: ${tex.color || "transparent"};
+                background-image: ${tex.path ? `url(${tex.path})` : "none"};
+                background-size: cover; background-position: center;
+            `;
+            btn.onclick = () => {
+                group.texturePath = tex.path;
+                group.textureAssetId = null;
+                this.syncSelectedWallGroupTextureButtons(group);
+            };
+            groundTextureGrid.appendChild(btn);
+        });
+        textureSubGroup.appendChild(groundTextureGrid);
+
+        const customTextureHeader = document.createElement('span');
+        customTextureHeader.textContent = "Tus Texturas Subidas";
+        customTextureHeader.style.cssText = `font-size:12px; color:#ccc; margin-top: 8px;`;
+        textureSubGroup.appendChild(customTextureHeader);
+
+        const customTextureGrid = document.createElement('div');
+        customTextureGrid.style.cssText = `display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; min-height: 35px;`;
+
+        const assets = this.customTextureAssets || [];
+        if (assets.length === 0) {
+            const empty = document.createElement("div");
+            empty.textContent = "Sin texturas subidas.";
+            empty.style.cssText = "grid-column: 1 / -1; color: #777; font-size: 11px; padding: 4px 0;";
+            customTextureGrid.appendChild(empty);
+        } else {
+            assets.forEach((asset) => {
+                const btn = document.createElement("div");
+                btn.className = "mse-wall-texture-btn mse-wall-custom-texture-btn";
+                btn.title = asset.name;
+                btn.dataset.texturePath = asset.fileUrl || "";
+                btn.style.cssText = `
+                    aspect-ratio: 1; border: 1px solid #555; border-radius: 4px; cursor: pointer;
+                    background-image: url(${asset.fileUrl});
+                    background-size: cover; background-position: center; image-rendering: pixelated;
+                `;
+                btn.onclick = () => {
+                    group.texturePath = asset.fileUrl;
+                    group.textureAssetId = asset.id;
+                    this.syncSelectedWallGroupTextureButtons(group);
+                };
+                customTextureGrid.appendChild(btn);
+            });
+        }
+        textureSubGroup.appendChild(customTextureGrid);
+        this.wallPropertiesSection.appendChild(textureSubGroup);
+
+        // Wall Texture fit settings
+        const groundModeRow = document.createElement('div');
+        groundModeRow.style.cssText = `display:flex; justify-content:space-between; align-items:center; gap:8px; margin-top: 5px;`;
+        const groundModeLabel = document.createElement('span');
+        groundModeLabel.textContent = "Modo Textura";
+        groundModeLabel.style.cssText = `font-size:12px; color:#ccc;`;
+        this.wallFitModeSelect = document.createElement('select');
+        this.wallFitModeSelect.style.cssText = `width: 135px; padding: 6px; background:#333; color:white; border:1px solid #555; border-radius:4px; font-size:12px;`;
+        this.wallFitModeSelect.innerHTML = `
+            <option value="auto">Repetir por tamaño</option>
+            <option value="stretch">Estirar por pieza</option>
+        `;
+        this.wallFitModeSelect.onchange = (e) => this.updateSelectedWallGroupTextureSetting("fitMode", e.target.value);
+        groundModeRow.appendChild(groundModeLabel);
+        groundModeRow.appendChild(this.wallFitModeSelect);
+        this.wallPropertiesSection.appendChild(groundModeRow);
+
+        const groundSettingsGrid = document.createElement('div');
+        groundSettingsGrid.style.cssText = `display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin-top: 5px;`;
+        
+        const makeGroundInput = (key, label, step, min = null) => {
+            const wrap = document.createElement('label');
+            wrap.style.cssText = `display:flex; flex-direction:column; gap:3px; font-size:11px; color:#aaa;`;
+            const input = document.createElement('input');
+            input.type = "number";
+            input.step = String(step);
+            if (min !== null) input.min = String(min);
+            input.style.cssText = `width:100%; box-sizing:border-box; padding:5px; background:#333; color:white; border:1px solid #555; border-radius:4px; font-size:11px;`;
+            input.onchange = (e) => {
+                const value = parseFloat(e.target.value);
+                if (!isNaN(value)) this.updateSelectedWallGroupTextureSetting(key, value);
+            };
+            wrap.textContent = label;
+            wrap.appendChild(input);
+            this[`wallTextureInput_${key}`] = input;
+            return wrap;
+        };
+
+        groundSettingsGrid.appendChild(makeGroundInput("tileSize", "Baldosa", 0.25, 0.1));
+        groundSettingsGrid.appendChild(makeGroundInput("repeatX", "Repetir U", 0.25, 0.05));
+        groundSettingsGrid.appendChild(makeGroundInput("repeatY", "Repetir V", 0.25, 0.05));
+        groundSettingsGrid.appendChild(makeGroundInput("rotation", "Rotación", 5));
+        groundSettingsGrid.appendChild(makeGroundInput("offsetX", "Mover U", 0.05));
+        groundSettingsGrid.appendChild(makeGroundInput("offsetY", "Mover V", 0.05));
+        this.wallPropertiesSection.appendChild(groundSettingsGrid);
+
+        const groundPatternRow = document.createElement('label');
+        groundPatternRow.style.cssText = `display:flex; justify-content:space-between; align-items:center; gap:8px; font-size:12px; color:#ddd; cursor:pointer; margin-top: 5px;`;
+        const groundPatternText = document.createElement('span');
+        groundPatternText.textContent = "Variar patrón por bloque";
+        const groundPatternInput = document.createElement('input');
+        groundPatternInput.type = "checkbox";
+        groundPatternInput.onchange = (e) => this.updateSelectedWallGroupTextureSetting("patternVariation", e.target.checked);
+        this.wallTextureInput_patternVariation = groundPatternInput;
+        groundPatternRow.appendChild(groundPatternText);
+        groundPatternRow.appendChild(groundPatternInput);
+        this.wallPropertiesSection.appendChild(groundPatternRow);
+
+        this.syncSelectedWallGroupTextureControls();
+    }
+
+    syncSelectedWallGroupTextureButtons(group) {
+        if (!this.container) return;
+        const buttons = this.container.querySelectorAll(".mse-wall-texture-btn");
+        buttons.forEach((btn) => {
+            const path = btn.dataset.texturePath || "";
+            const selected = (group.texturePath || "") === path;
+            btn.style.borderColor = selected ? "#00FF00" : "#555";
+            btn.style.borderWidth = selected ? "2px" : "1px";
+        });
+    }
+
+    syncSelectedWallGroupTextureControls() {
+        const group = this.config.invisibleWallsGroups.find(g => g.id === this.selectedWallGroupIdForEditing);
+        if (!group) return;
+
+        const settings = normalizeTextureSettings(group.textureSettings || { tileSize: 5 });
+        group.textureSettings = settings;
+
+        if (this.wallFitModeSelect) this.wallFitModeSelect.value = settings.fitMode;
+        ["tileSize", "repeatX", "repeatY", "offsetX", "offsetY", "rotation"].forEach((key) => {
+            const input = this[`wallTextureInput_${key}`];
+            if (input) input.value = String(settings[key]);
+        });
+        if (this.wallTextureInput_patternVariation) {
+            this.wallTextureInput_patternVariation.checked = settings.patternVariation;
+        }
+        this.syncSelectedWallGroupTextureButtons(group);
+    }
+
+    updateSelectedWallGroupTextureSetting(key, value) {
+        const group = this.config.invisibleWallsGroups.find(g => g.id === this.selectedWallGroupIdForEditing);
+        if (!group) return;
+
+        group.textureSettings = normalizeTextureSettings({
+            ...(group.textureSettings || {}),
+            [key]: value
+        });
+        this.syncSelectedWallGroupTextureControls();
+    }
+
+    syncTabs() {
+        const isFloor = this.activeTab === "floor";
+        
+        // Highlight active tab button
+        this.tabFloorBtn.style.background = isFloor ? "#FF9800" : "transparent";
+        this.tabFloorBtn.style.color = isFloor ? "#000" : "#aaa";
+        this.tabWallsBtn.style.background = !isFloor ? "#FF9800" : "transparent";
+        this.tabWallsBtn.style.color = !isFloor ? "#000" : "#aaa";
+
+        // Show/hide sections
+        this.floorEditorContent.style.display = isFloor ? "flex" : "none";
+        this.wallsEditorContent.style.display = !isFloor ? "flex" : "none";
+
+        if (!isFloor) {
+            this.renderWallGroups();
+            this.renderSelectedWallGroupSettings();
+        } else {
+            this.renderGroups();
+            this.renderSelectedGroupSettings();
+        }
+    }
+
     async loadCustomTextures() {
         try {
             this.customTextureAssets = await listAssets("mine", "TEXTURE");
@@ -914,6 +1493,7 @@ export class MapShapeEditor {
             this.customTextureAssets = [];
         }
         this.renderSelectedGroupSettings();
+        this.renderSelectedWallGroupSettings();
     }
 
     hexToRgba(hex, opacity) {
@@ -1054,8 +1634,8 @@ export class MapShapeEditor {
                 const group = groundGroups.find(g => g.id === groupId) || groundGroups[0] || { color: "#FF9800" };
                 const baseColor = group.color || "#FF9800";
                 
-                this.ctx.fillStyle = this.hexToRgba(baseColor, 0.6);
-                this.ctx.strokeStyle = baseColor;
+                this.ctx.fillStyle = this.hexToRgba(baseColor, this.activeTab === "walls" ? 0.15 : 0.6);
+                this.ctx.strokeStyle = this.activeTab === "walls" ? this.hexToRgba(baseColor, 0.25) : baseColor;
                 this.ctx.lineWidth = 2 / this.zoom;
                 
                 const shape = customGridShapes[key] || "full";
@@ -1087,6 +1667,102 @@ export class MapShapeEditor {
                     this.ctx.stroke();
                 }
             });
+
+            // Draw Wall boundaries if in Walls tab
+            if (this.activeTab === "walls") {
+                const customGridWallGroups = this.config.customGridWallGroups || {};
+                const wallGroups = this.config.invisibleWallsGroups || [];
+                const customGridSet = new Set(this.config.customGrid);
+
+                const hasNorthFace = (sh) => sh === "full" || sh === "nw" || sh === "ne";
+                const hasSouthFace = (sh) => sh === "full" || sh === "se" || sh === "sw";
+                const hasWestFace = (sh) => sh === "full" || sh === "nw" || sh === "sw";
+                const hasEastFace = (sh) => sh === "full" || sh === "ne" || sh === "se";
+
+                this.config.customGrid.forEach(key => {
+                    const [gx, gz] = key.split(',').map(Number);
+                    const x = gx * cs;
+                    const z = gz * cs;
+                    const shape = customGridShapes[key] || "full";
+                    const wallGroupId = customGridWallGroups[key] || "default";
+                    const wallGroup = wallGroups.find(g => g.id === wallGroupId) || wallGroups[0] || { color: "#FF5722" };
+                    const wallColor = wallGroup.color || "#FF5722";
+
+                    this.ctx.strokeStyle = wallColor;
+                    this.ctx.lineWidth = 4 / this.zoom;
+
+                    // 1. North face
+                    if (hasNorthFace(shape)) {
+                        const nKey = `${gx},${gz - 1}`;
+                        const nShape = customGridShapes[nKey] || "full";
+                        const nExists = customGridSet.has(nKey);
+                        if (!nExists || !hasSouthFace(nShape)) {
+                            this.ctx.beginPath();
+                            this.ctx.moveTo(x, z);
+                            this.ctx.lineTo(x + cs, z);
+                            this.ctx.stroke();
+                        }
+                    }
+
+                    // 2. South face
+                    if (hasSouthFace(shape)) {
+                        const nKey = `${gx},${gz + 1}`;
+                        const nShape = customGridShapes[nKey] || "full";
+                        const nExists = customGridSet.has(nKey);
+                        if (!nExists || !hasNorthFace(nShape)) {
+                            this.ctx.beginPath();
+                            this.ctx.moveTo(x, z + cs);
+                            this.ctx.lineTo(x + cs, z + cs);
+                            this.ctx.stroke();
+                        }
+                    }
+
+                    // 3. West face
+                    if (hasWestFace(shape)) {
+                        const nKey = `${gx - 1},${gz}`;
+                        const nShape = customGridShapes[nKey] || "full";
+                        const nExists = customGridSet.has(nKey);
+                        if (!nExists || !hasEastFace(nShape)) {
+                            this.ctx.beginPath();
+                            this.ctx.moveTo(x, z);
+                            this.ctx.lineTo(x, z + cs);
+                            this.ctx.stroke();
+                        }
+                    }
+
+                    // 4. East face
+                    if (hasEastFace(shape)) {
+                        const nKey = `${gx + 1},${gz}`;
+                        const nShape = customGridShapes[nKey] || "full";
+                        const nExists = customGridSet.has(nKey);
+                        if (!nExists || !hasWestFace(nShape)) {
+                            this.ctx.beginPath();
+                            this.ctx.moveTo(x + cs, z);
+                            this.ctx.lineTo(x + cs, z + cs);
+                            this.ctx.stroke();
+                        }
+                    }
+
+                    // 5. Diagonal face
+                    if (shape !== "full") {
+                        this.ctx.beginPath();
+                        if (shape === "nw") {
+                            this.ctx.moveTo(x, z + cs);
+                            this.ctx.lineTo(x + cs, z);
+                        } else if (shape === "ne") {
+                            this.ctx.moveTo(x, z);
+                            this.ctx.lineTo(x + cs, z + cs);
+                        } else if (shape === "se") {
+                            this.ctx.moveTo(x + cs, z);
+                            this.ctx.lineTo(x, z + cs);
+                        } else if (shape === "sw") {
+                            this.ctx.moveTo(x, z);
+                            this.ctx.lineTo(x + cs, z + cs);
+                        }
+                        this.ctx.stroke();
+                    }
+                });
+            }
 
             // Draw Selection Box preview
             if (this.selectionBox) {

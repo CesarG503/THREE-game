@@ -1324,12 +1324,18 @@ export class ConstructionMenu {
         };
         rowMap.appendChild(btnOpenEditor);
 
+        let checkInvisibleWalls: HTMLInputElement;
+        let checkWallsAdvanced: HTMLInputElement;
+        let rowWallsAdvanced: HTMLDivElement;
+        let rowWallsConfigure: HTMLDivElement;
+
         const configChangeHandler = () => {
             if (this.game && this.game.environmentConfig) {
                 const newConfig = {
                     mapSizeX: parseFloat(inputSizeX.value) || 100,
                     mapSizeZ: parseFloat(inputSizeZ.value) || 100,
                     invisibleWalls: checkInvisibleWalls.checked,
+                    invisibleWallsAdvanced: checkWallsAdvanced.checked,
                     fallDeath: checkFallDeath.checked,
                     fallDeathY: parseFloat(inputFallY.value) || -20,
                     skyType: this.game.environmentConfig?.skyType || "day"
@@ -1384,15 +1390,63 @@ export class ConstructionMenu {
         const rowWalls = document.createElement("div");
         rowWalls.style.cssText = "display: flex; align-items: center; justify-content: space-between;";
         const labelWalls = document.createElement("label");
-        labelWalls.textContent = "Paredes Invisibles en Límites:";
-        const checkInvisibleWalls = document.createElement("input");
+        labelWalls.textContent = "Paredes en Límites:";
+        checkInvisibleWalls = document.createElement("input");
         checkInvisibleWalls.type = "checkbox";
         checkInvisibleWalls.style.transform = "scale(1.5)";
         checkInvisibleWalls.checked = this.game.environmentConfig ? this.game.environmentConfig.invisibleWalls : false;
-        checkInvisibleWalls.addEventListener("change", configChangeHandler);
         rowWalls.appendChild(labelWalls);
         rowWalls.appendChild(checkInvisibleWalls);
         rowMap.appendChild(rowWalls);
+
+        // Advanced Walls Toggle Row
+        rowWallsAdvanced = document.createElement("div");
+        rowWallsAdvanced.style.cssText = "display: none; align-items: center; justify-content: space-between; margin-left: 15px; border-left: 2px solid #555; padding-left: 10px;";
+        const labelWallsAdvanced = document.createElement("label");
+        labelWallsAdvanced.textContent = "Personalización Avanzada:";
+        checkWallsAdvanced = document.createElement("input");
+        checkWallsAdvanced.type = "checkbox";
+        checkWallsAdvanced.style.transform = "scale(1.3)";
+        checkWallsAdvanced.checked = this.game.environmentConfig ? !!this.game.environmentConfig.invisibleWallsAdvanced : false;
+        rowWallsAdvanced.appendChild(labelWallsAdvanced);
+        rowWallsAdvanced.appendChild(checkWallsAdvanced);
+        rowMap.appendChild(rowWallsAdvanced);
+
+        // Advanced Walls Configure Row
+        rowWallsConfigure = document.createElement("div");
+        rowWallsConfigure.style.cssText = "display: none; align-items: center; justify-content: flex-end; margin-left: 15px; border-left: 2px solid #555; padding-left: 10px; margin-top: 5px; margin-bottom: 5px;";
+        const btnConfigureWalls = document.createElement("button");
+        btnConfigureWalls.textContent = "🛠 Configurar Paredes";
+        btnConfigureWalls.style.cssText = `
+            padding: 6px 12px; background: #FF9800; color: white; border: none; border-radius: 4px;
+            font-size: 13px; font-weight: bold; cursor: pointer; transition: background 0.2s;
+        `;
+        btnConfigureWalls.onmouseover = () => btnConfigureWalls.style.background = "#e68a00";
+        btnConfigureWalls.onmouseout = () => btnConfigureWalls.style.background = "#FF9800";
+        btnConfigureWalls.onclick = () => {
+            this.mapShapeEditor.open("walls");
+        };
+        rowWallsConfigure.appendChild(btnConfigureWalls);
+        rowMap.appendChild(rowWallsConfigure);
+
+        const syncWallsVisibility = () => {
+            const hasWalls = checkInvisibleWalls.checked;
+            rowWallsAdvanced.style.display = hasWalls ? "flex" : "none";
+            const advanced = hasWalls && checkWallsAdvanced.checked;
+            rowWallsConfigure.style.display = advanced ? "flex" : "none";
+        };
+
+        checkInvisibleWalls.addEventListener("change", () => {
+            syncWallsVisibility();
+            configChangeHandler();
+        });
+
+        checkWallsAdvanced.addEventListener("change", () => {
+            syncWallsVisibility();
+            configChangeHandler();
+        });
+
+        setTimeout(syncWallsVisibility, 0);
 
         // Fall Death Toggle
         const rowFall = document.createElement("div");

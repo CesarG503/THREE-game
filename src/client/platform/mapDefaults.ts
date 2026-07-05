@@ -30,6 +30,9 @@ export interface SavedMapData {
 		groundGroups?: any[];
 		customGridGroups?: Record<string, string>;
 		customGridShapes?: Record<string, string>;
+		invisibleWallsAdvanced?: boolean;
+		invisibleWallsGroups?: any[];
+		customGridWallGroups?: Record<string, string>;
 	};
 	playerConfig: {
 		roles: unknown[];
@@ -60,6 +63,9 @@ export function createEmptyMapData(): SavedMapData {
 			groundGroups: [],
 			customGridGroups: {},
 			customGridShapes: {},
+			invisibleWallsAdvanced: false,
+			invisibleWallsGroups: [],
+			customGridWallGroups: {},
 		},
 		playerConfig: {
 			roles: [],

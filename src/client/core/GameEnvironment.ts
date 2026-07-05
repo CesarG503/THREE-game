@@ -348,10 +348,10 @@ export function updateEnvironmentConfig(this: any, config: any) {
 
 		if (shapeType === "rect") {
 			wallDefs = [
-				{ width: sx, depth: wallThickness, pos: { x: 0, y: wallHeight / 2 - 0.5, z: -hZ - wallThickness / 2 } },
-				{ width: sx, depth: wallThickness, pos: { x: 0, y: wallHeight / 2 - 0.5, z: hZ + wallThickness / 2 } },
-				{ width: wallThickness, depth: sz, pos: { x: -hX - wallThickness / 2, y: wallHeight / 2 - 0.5, z: 0 } },
-				{ width: wallThickness, depth: sz, pos: { x: hX + wallThickness / 2, y: wallHeight / 2 - 0.5, z: 0 } }
+				{ width: sx, depth: wallThickness, pos: { x: 0, y: 0, z: -hZ - wallThickness / 2 } },
+				{ width: sx, depth: wallThickness, pos: { x: 0, y: 0, z: hZ + wallThickness / 2 } },
+				{ width: wallThickness, depth: sz, pos: { x: -hX - wallThickness / 2, y: 0, z: 0 } },
+				{ width: wallThickness, depth: sz, pos: { x: hX + wallThickness / 2, y: 0, z: 0 } }
 			];
 		} else if (shapeType === "circle") {
 			const segments = 16;
@@ -369,7 +369,7 @@ export function updateEnvironmentConfig(this: any, config: any) {
 				wallDefs.push({
 					width: width,
 					depth: wallThickness,
-					pos: { x: x, y: wallHeight / 2 - 0.5, z: z },
+					pos: { x: x, y: 0, z: z },
 					rotY: -midAngle
 				});
 			}
@@ -399,7 +399,8 @@ export function updateEnvironmentConfig(this: any, config: any) {
 						wallDefs.push({
 							width: cellSize,
 							depth: wallThickness,
-							pos: { x: x, y: wallHeight / 2 - 0.5, z: z - cellSize / 2 - wallThickness / 2 }
+							pos: { x: x, y: 0, z: z - cellSize / 2 - wallThickness / 2 },
+							cellKey: key
 						});
 					}
 				}
@@ -413,7 +414,8 @@ export function updateEnvironmentConfig(this: any, config: any) {
 						wallDefs.push({
 							width: cellSize,
 							depth: wallThickness,
-							pos: { x: x, y: wallHeight / 2 - 0.5, z: z + cellSize / 2 + wallThickness / 2 }
+							pos: { x: x, y: 0, z: z + cellSize / 2 + wallThickness / 2 },
+							cellKey: key
 						});
 					}
 				}
@@ -427,7 +429,8 @@ export function updateEnvironmentConfig(this: any, config: any) {
 						wallDefs.push({
 							width: wallThickness,
 							depth: cellSize,
-							pos: { x: x - cellSize / 2 - wallThickness / 2, y: wallHeight / 2 - 0.5, z: z }
+							pos: { x: x - cellSize / 2 - wallThickness / 2, y: 0, z: z },
+							cellKey: key
 						});
 					}
 				}
@@ -441,7 +444,8 @@ export function updateEnvironmentConfig(this: any, config: any) {
 						wallDefs.push({
 							width: wallThickness,
 							depth: cellSize,
-							pos: { x: x + cellSize / 2 + wallThickness / 2, y: wallHeight / 2 - 0.5, z: z }
+							pos: { x: x + cellSize / 2 + wallThickness / 2, y: 0, z: z },
+							cellKey: key
 						});
 					}
 				}
@@ -476,18 +480,64 @@ export function updateEnvironmentConfig(this: any, config: any) {
 					wallDefs.push({
 						width: len,
 						depth: wallThickness,
-						pos: { x: x + ox, y: wallHeight / 2 - 0.5, z: z + oz },
-						rotY: rotY
+						pos: { x: x + ox, y: 0, z: z + oz },
+						rotY: rotY,
+						cellKey: key
 					});
 				}
 			});
 		}
 
+		const isAdvanced = !!this.environmentConfig.invisibleWallsAdvanced;
+		const wallGroups = this.environmentConfig.invisibleWallsGroups || [];
+		const customGridWallGroups = this.environmentConfig.customGridWallGroups || {};
+
 		wallDefs.forEach((def) => {
-			const geo = new THREE.BoxGeometry(def.width, wallHeight, def.depth);
-			const mat = new THREE.MeshBasicMaterial({ color: 0xff0000, wireframe: true, transparent: true, opacity: 0 });
+			let finalHeight = 100;
+			let colorStr = "#FF5722";
+			let opacity = 0.0;
+			let transparent = true;
+			let texturePath: string | null = null;
+			let textureSettings: any = null;
+
+			let group: any = null;
+			if (isAdvanced && def.cellKey) {
+				const wallGroupId = customGridWallGroups[def.cellKey];
+				if (wallGroupId) {
+					group = wallGroups.find((g: any) => g.id === wallGroupId);
+				}
+			}
+			
+			if (!group && isAdvanced) {
+				group = wallGroups.find((g: any) => g.id === "default") || wallGroups[0];
+			}
+
+			if (group) {
+				finalHeight = group.height !== undefined ? group.height : 10;
+				colorStr = group.color || "#FF5722";
+				opacity = group.opacity !== undefined ? group.opacity : 1.0;
+				transparent = group.transparent !== undefined ? group.transparent : (opacity < 1.0);
+				texturePath = group.texturePath || null;
+				textureSettings = group.textureSettings || null;
+			}
+
+			let mat: THREE.Material;
+			if (opacity === 0) {
+				mat = new THREE.MeshBasicMaterial({ color: 0xff0000, wireframe: true, transparent: true, opacity: 0 });
+			} else {
+				mat = new THREE.MeshStandardMaterial({ 
+					color: new THREE.Color(colorStr), 
+					transparent: transparent, 
+					opacity: opacity,
+					roughness: 0.8,
+					metalness: 0.2
+				});
+			}
+
+			const geo = new THREE.BoxGeometry(def.width, finalHeight, def.depth);
 			const mesh = new THREE.Mesh(geo, mat);
-			mesh.position.set(def.pos.x, def.pos.y, def.pos.z);
+			const posY = finalHeight / 2 - 0.5;
+			mesh.position.set(def.pos.x, posY, def.pos.z);
 			
 			const quat = new THREE.Quaternion();
 			if (def.rotY) {
@@ -495,15 +545,31 @@ export function updateEnvironmentConfig(this: any, config: any) {
 				mesh.quaternion.copy(quat);
 			}
 
+			if (opacity > 0 && texturePath) {
+				const loader = new THREE.TextureLoader();
+				loader.load(texturePath, (texture: any) => {
+					texture.wrapS = THREE.RepeatWrapping;
+					texture.wrapT = THREE.RepeatWrapping;
+					
+					const settings = normalizeTextureSettings(textureSettings || { tileSize: 5 });
+					const dimensions = new THREE.Vector3(def.width, finalHeight, def.depth);
+					applyMapObjectTexture(mesh, texture, dimensions, settings);
+					
+					if (mesh.material) {
+						(mesh.material as any).needsUpdate = true;
+					}
+				});
+			}
+
 			this.sceneManager.scene.add(mesh);
 			this.invisibleWallMeshes.push(mesh);
 
-			const bodyDesc = RAPIER.RigidBodyDesc.fixed().setTranslation(def.pos.x, def.pos.y, def.pos.z);
+			const bodyDesc = RAPIER.RigidBodyDesc.fixed().setTranslation(def.pos.x, posY, def.pos.z);
 			if (def.rotY) {
 				bodyDesc.setRotation(quat);
 			}
 			const body = this.world.createRigidBody(bodyDesc);
-			const colliderDesc = RAPIER.ColliderDesc.cuboid(def.width / 2, wallHeight / 2, def.depth / 2);
+			const colliderDesc = RAPIER.ColliderDesc.cuboid(def.width / 2, finalHeight / 2, def.depth / 2);
 			this.world.createCollider(colliderDesc, body);
 			this.invisibleWallBodies.push(body);
 		});

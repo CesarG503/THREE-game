@@ -6,6 +6,7 @@ import { createAsset, getAsset, getAssetObject, listAssets, type UploadedAssetFi
 import { createMap, deleteMap, getMap, listMaps, updateMap, type MapWriteInput } from "../services/MapService.js"
 import { logger } from "../utils/Logger.js"
 import { validateTelemetryEvent } from "../analytics/middleware.js"
+import { evaluateEventReputation } from "../analytics/security/bot_filter.js"
 import { eventBuffer } from "../analytics/eventBuffer.js"
 import { getRedis } from "../cache/redis.js"
 import { metricsCollector } from "../analytics/monitoring/metricsCollector.js"
@@ -39,9 +40,9 @@ export async function handleHttpRequest(
   }
 
   if (req.method === "POST" && url.pathname === "/api/analytics/event") {
-    // Rate limiting: max 100 events per IP per minute (fail-open: analytics are not safety-critical)
+    // Rate limiting: max 1000 events per IP per minute (fail-open: analytics are not safety-critical)
     const ip = getClientIp(req)
-    const rateLimited = await checkRateLimit(ip, 100, 60)
+    const rateLimited = await checkRateLimit(ip, 1000, 60)
     if (rateLimited) {
       sendJson(res, 429, { error: "Rate limit exceeded" })
       return
@@ -61,6 +62,23 @@ export async function handleHttpRequest(
         })
         return
       }
+
+      // Evaluar reputación de bot / ruido antes de encolar (Fase 25)
+      const reputation = await evaluateEventReputation(body, ip)
+      if (reputation.isSuspicious) {
+        if (body && typeof body === "object") {
+          const castedBody = body as any;
+          castedBody.payload = {
+            ...(castedBody.payload || {}),
+            metadata: {
+              ...(castedBody.payload?.metadata || {}),
+              isSuspicious: true,
+              suspicionReason: reputation.reason
+            }
+          };
+        }
+      }
+
       const success = eventBuffer.push(body as any)
       if (!success) {
         metricsCollector.recordFailed(eventType)

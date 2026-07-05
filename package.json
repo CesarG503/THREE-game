@@ -32,7 +32,8 @@
     "db:analytics:test-monitoring": "npx tsx scripts/test-telemetry-monitoring.ts",
     "db:analytics:test-alerts": "npx tsx scripts/test-telemetry-alerts.ts",
     "db:analytics:gdpr-delete": "npx tsx scripts/gdpr-delete-user.ts",
-    "db:analytics:test-privacy": "npx tsx scripts/test-data-privacy.ts"
+    "db:analytics:test-privacy": "npx tsx scripts/test-data-privacy.ts",
+    "db:analytics:test-bots": "npx tsx scripts/test-bot-filter.ts"
   },
   "devDependencies": {
     "@types/busboy": "^1.5.4",

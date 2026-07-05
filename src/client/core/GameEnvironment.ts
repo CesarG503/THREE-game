@@ -2,7 +2,7 @@ import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
 import { LevelBuilder } from "../environment/LevelBuilder";
 import { LevelLoader } from "../environment/LevelLoader";
-import { applyMapObjectTexture, normalizeTextureSettings } from "../utils/TextureMapping";
+import { applyMapObjectTexture, normalizeTextureSettings, applyWorldSpaceUVs } from "../utils/TextureMapping";
 import { MapAssetManager } from "../map/MapAssetManager";
 import { MapMaterialCache } from "../map/MapMaterialCache";
 import { MapGeometryBuilder, createPrismGeometryForShape } from "../map/MapGeometryBuilder";
@@ -35,7 +35,56 @@ export async function loadLevelFromFile(this: any, url: string, position: any, s
 }
 
 export function updateEnvironmentConfig(this: any, config: any) {
-	this.environmentConfig = Object.assign(this.environmentConfig, config);
+	this.environmentConfig = Object.assign(this.environmentConfig || {}, config);
+	this.environmentConfig.invisibleWallsAdvanced = !!this.environmentConfig.invisibleWalls;
+	this.environmentConfig.ceilingsAdvanced = !!this.environmentConfig.ceilingsEnabled;
+
+	// Ensure default groups are always populated if missing or empty
+	if (!this.environmentConfig.groundGroups || this.environmentConfig.groundGroups.length === 0) {
+		this.environmentConfig.groundGroups = [
+			{
+				id: "default",
+				name: "Suelo 1",
+				color: "#FF9800",
+				color3D: "#FF9800",
+				texturePath: null,
+				textureAssetId: null,
+				textureSettings: { fitMode: "auto", tileSize: 5, repeatX: 1, repeatY: 1, offsetX: 0, offsetY: 0, rotation: 0, patternVariation: false }
+			}
+		];
+	}
+
+	if (!this.environmentConfig.invisibleWallsGroups || this.environmentConfig.invisibleWallsGroups.length === 0) {
+		this.environmentConfig.invisibleWallsGroups = [
+			{
+				id: "default",
+				name: "Pared 1",
+				color: "#FF5722",
+				color3D: "#FF5722",
+				texturePath: null,
+				textureAssetId: null,
+				textureSettings: { fitMode: "auto", tileSize: 5, repeatX: 1, repeatY: 1, offsetX: 0, offsetY: 0, rotation: 0, patternVariation: false },
+				height: 10,
+				opacity: 1.0,
+				transparent: false
+			}
+		];
+	}
+
+	if (!this.environmentConfig.ceilingGroups || this.environmentConfig.ceilingGroups.length === 0) {
+		this.environmentConfig.ceilingGroups = [
+			{
+				id: "default",
+				name: "Techo 1",
+				color: "#E040FB",
+				color3D: "#E040FB",
+				texturePath: null,
+				textureAssetId: null,
+				textureSettings: { fitMode: "auto", tileSize: 5, repeatX: 1, repeatY: 1, offsetX: 0, offsetY: 0, rotation: 0, patternVariation: false }
+			}
+		];
+	}
+
 	if (this.sceneManager && this.sceneManager.setSky) {
 		this.sceneManager.setSky(this.environmentConfig.skyType || "day");
 	}
@@ -86,6 +135,12 @@ export function updateEnvironmentConfig(this: any, config: any) {
 		const geo = new THREE.BoxGeometry(sx, 1, sz);
 		const mesh = new THREE.Mesh(geo, createGroundMaterial());
 		mesh.receiveShadow = true;
+		mesh.userData = {
+			isEditableMapObject: true,
+			mapObjectType: "environment_ground",
+			groupId: "default",
+			customName: "Suelo Base"
+		};
 		this.groundGroup.add(mesh);
 		applyGroundTexture(mesh, { x: sx, y: 1, z: sz });
 
@@ -96,6 +151,12 @@ export function updateEnvironmentConfig(this: any, config: any) {
 		const geo = new THREE.CylinderGeometry(radius, radius, 1, 64);
 		const mesh = new THREE.Mesh(geo, createGroundMaterial());
 		mesh.receiveShadow = true;
+		mesh.userData = {
+			isEditableMapObject: true,
+			mapObjectType: "environment_ground",
+			groupId: "default",
+			customName: "Suelo Base Círculo"
+		};
 		this.groundGroup.add(mesh);
 		applyGroundTexture(mesh, { x: sx, y: 1, z: sx });
 
@@ -130,10 +191,17 @@ export function updateEnvironmentConfig(this: any, config: any) {
 
 			const mesh = new THREE.Mesh(geo, material);
 			mesh.receiveShadow = true;
+			mesh.userData = {
+				isEditableMapObject: true,
+				mapObjectType: "environment_ground",
+				groupId: groupId,
+				customName: group ? `Suelo: ${group.name}` : `Suelo: Suelo 1`
+			};
 			this.groundGroup.add(mesh);
 
 			if (texPath) {
 				const texSettings = normalizeTextureSettings(group ? (group.textureSettings || { tileSize: 5 }) : groundTextureSettings);
+				applyWorldSpaceUVs(mesh.geometry, texSettings);
 				MapAssetManager.loadTexture(texPath).then((texture) => {
 					applyMapObjectTexture(mesh, texture, { x: cellSize, y: 1, z: cellSize }, texSettings);
 				}).catch(err => console.error("Failed to load ground texture:", texPath, err));
@@ -180,109 +248,118 @@ export function updateEnvironmentConfig(this: any, config: any) {
 			this.groundColliders.push(this.world.createCollider(colDesc, this.groundBody));
 		});
 
-		// 3. Build Merged Ceiling Meshes
-		const customGridCeilingGroups = this.environmentConfig.customGridCeilingGroups || {};
-		const customGridCeilingShapes = this.environmentConfig.customGridCeilingShapes || {};
-		const customGridWallGroups = this.environmentConfig.customGridWallGroups || {};
-		const invisibleWallsGroups = this.environmentConfig.invisibleWallsGroups || [];
+		if (this.environmentConfig.ceilingsEnabled) {
+			// 3. Build Merged Ceiling Meshes
+			const customGridCeilingGroups = this.environmentConfig.customGridCeilingGroups || {};
+			const customGridCeilingShapes = this.environmentConfig.customGridCeilingShapes || {};
+			const customGridWallGroups = this.environmentConfig.customGridWallGroups || {};
+			const invisibleWallsGroups = this.environmentConfig.invisibleWallsGroups || [];
 
-		const mergedCeilingGeos = MapGeometryBuilder.buildMergedCeilings(
-			customGridCeilingGroups,
-			cellSize,
-			ceilingGroups,
-			defaultCeilingGroup,
-			customGridCeilingShapes,
-			customGridWallGroups,
-			invisibleWallsGroups
-		);
+			const mergedCeilingGeos = MapGeometryBuilder.buildMergedCeilings(
+				customGridCeilingGroups,
+				cellSize,
+				ceilingGroups,
+				defaultCeilingGroup,
+				customGridCeilingShapes,
+				customGridWallGroups,
+				invisibleWallsGroups
+			);
 
-		mergedCeilingGeos.forEach((geoData) => {
-			const group = ceilingGroups.find((g: any) => g.id === geoData.ceilingGroupId) || defaultCeilingGroup;
-			const texPath = group ? group.texturePath : null;
-			const colorHex = (group && (group.color3D || group.color)) ? parseInt((group.color3D || group.color).replace("#", "0x")) : 0xe040fb;
-			const matKey = `ceiling_${geoData.ceilingGroupId}_${texPath || ""}_${colorHex}`;
-			const material = MapMaterialCache.getMaterial(matKey, () => new THREE.MeshStandardMaterial({
-				color: texPath ? 0xffffff : colorHex,
-				roughness: 0.8,
-				side: THREE.DoubleSide
-			}));
+			mergedCeilingGeos.forEach((geoData) => {
+				const group = ceilingGroups.find((g: any) => g.id === geoData.ceilingGroupId) || defaultCeilingGroup;
+				const texPath = group ? group.texturePath : null;
+				const colorHex = (group && (group.color3D || group.color)) ? parseInt((group.color3D || group.color).replace("#", "0x")) : 0xe040fb;
+				const matKey = `ceiling_${geoData.ceilingGroupId}_${texPath || ""}_${colorHex}`;
+				const material = MapMaterialCache.getMaterial(matKey, () => new THREE.MeshStandardMaterial({
+					color: texPath ? 0xffffff : colorHex,
+					roughness: 0.8,
+					side: THREE.DoubleSide
+				}));
 
-			const mesh = new THREE.Mesh(geoData.geometry, material);
-			mesh.castShadow = true;
-			mesh.receiveShadow = true;
-			this.groundGroup.add(mesh);
+				const mesh = new THREE.Mesh(geoData.geometry, material);
+				mesh.castShadow = true;
+				mesh.receiveShadow = true;
+				mesh.userData = {
+					isEditableMapObject: true,
+					mapObjectType: "environment_ceiling",
+					groupId: geoData.ceilingGroupId,
+					customName: group ? `Techo: ${group.name}` : `Techo: Techo 1`
+				};
+				this.groundGroup.add(mesh);
 
-			if (texPath) {
-				const texSettings = normalizeTextureSettings(group ? (group.textureSettings || { tileSize: 5 }) : { tileSize: 5 });
-				MapAssetManager.loadTexture(texPath).then((texture) => {
-					applyMapObjectTexture(mesh, texture, { x: cellSize, y: 1, z: cellSize }, texSettings);
-				}).catch(err => console.error("Failed to load ceiling texture:", texPath, err));
-			}
-		});
-
-		// 4. Build Ceiling Colliders
-		// A. Slopes/Prisms
-		const ceilingPrismKeys = Object.keys(customGridCeilingGroups).filter(key => (customGridCeilingShapes[key] || "full") !== "full");
-		ceilingPrismKeys.forEach(key => {
-			const ceilingGroupId = customGridCeilingGroups[key];
-			if (!ceilingGroupId) return;
-			const group = ceilingGroups.find((g: any) => g.id === ceilingGroupId) || defaultCeilingGroup;
-			const shape = customGridCeilingShapes[key];
-			const wallGroupId = customGridWallGroups[key] || "default";
-			const wallGroup = invisibleWallsGroups.find((wg: any) => wg.id === wallGroupId);
-			const wallHeight = (wallGroup && wallGroup.height !== undefined) ? wallGroup.height : 10;
-			const posY = wallHeight - 1.0;
-			const [gx, gz] = key.split(",").map(Number);
-			const x = gx * cellSize;
-			const z = gz * cellSize;
-
-			const geo = createPrismGeometryForShape(shape, cellSize, 1, group, { tileSize: 5 });
-			let colDesc;
-			try {
-				const vertices = geo.attributes.position.array;
-				colDesc = RAPIER.ColliderDesc.convexHull(vertices as any);
-			} catch (e) {
-				console.warn("convexHull failed for ceiling prism, falling back to cuboid", e);
-			}
-			if (!colDesc) {
-				colDesc = RAPIER.ColliderDesc.cuboid(cellSize / 2, 0.5, cellSize / 2);
-			}
-			colDesc.setTranslation(x, posY, z);
-			this.groundColliders.push(this.world.createCollider(colDesc, this.groundBody));
-			geo.dispose();
-		});
-
-		// B. Greedy Merged Cuboids (grouped by height)
-		const ceilingFullKeysByPosY = new Map<number, string[]>();
-		Object.keys(customGridCeilingGroups).forEach(key => {
-			if ((customGridCeilingShapes[key] || "full") !== "full") return;
-			const ceilingGroupId = customGridCeilingGroups[key];
-			if (!ceilingGroupId) return;
-
-			const wallGroupId = customGridWallGroups[key] || "default";
-			const wallGroup = invisibleWallsGroups.find((wg: any) => wg.id === wallGroupId);
-			const wallHeight = (wallGroup && wallGroup.height !== undefined) ? wallGroup.height : 10;
-			const posY = wallHeight - 1.0;
-
-			if (!ceilingFullKeysByPosY.has(posY)) {
-				ceilingFullKeysByPosY.set(posY, []);
-			}
-			ceilingFullKeysByPosY.get(posY)!.push(key);
-		});
-
-		ceilingFullKeysByPosY.forEach((keys, posY) => {
-			const mergedRects = MapPhysicsBuilder.greedyMerge2D(keys);
-			mergedRects.forEach(rect => {
-				const width = rect.w * cellSize;
-				const depth = rect.h * cellSize;
-				const centerX = (rect.gx + (rect.w - 1) / 2) * cellSize;
-				const centerZ = (rect.gz + (rect.h - 1) / 2) * cellSize;
-
-				const colDesc = RAPIER.ColliderDesc.cuboid(width / 2, 0.5, depth / 2);
-				colDesc.setTranslation(centerX, posY, centerZ);
-				this.groundColliders.push(this.world.createCollider(colDesc, this.groundBody));
+				if (texPath) {
+					const texSettings = normalizeTextureSettings(group ? (group.textureSettings || { tileSize: 5 }) : { tileSize: 5 });
+					applyWorldSpaceUVs(mesh.geometry, texSettings);
+					MapAssetManager.loadTexture(texPath).then((texture) => {
+						applyMapObjectTexture(mesh, texture, { x: cellSize, y: 1, z: cellSize }, texSettings);
+					}).catch(err => console.error("Failed to load ceiling texture:", texPath, err));
+				}
 			});
-		});
+
+			// 4. Build Ceiling Colliders
+			// A. Slopes/Prisms
+			const ceilingPrismKeys = Object.keys(customGridCeilingGroups).filter(key => (customGridCeilingShapes[key] || "full") !== "full");
+			ceilingPrismKeys.forEach(key => {
+				const ceilingGroupId = customGridCeilingGroups[key];
+				if (!ceilingGroupId) return;
+				const group = ceilingGroups.find((g: any) => g.id === ceilingGroupId) || defaultCeilingGroup;
+				const shape = customGridCeilingShapes[key];
+				const wallGroupId = customGridWallGroups[key] || "default";
+				const wallGroup = invisibleWallsGroups.find((wg: any) => wg.id === wallGroupId);
+				const wallHeight = (wallGroup && wallGroup.height !== undefined) ? wallGroup.height : 10;
+				const posY = wallHeight - 1.0;
+				const [gx, gz] = key.split(",").map(Number);
+				const x = gx * cellSize;
+				const z = gz * cellSize;
+
+				const geo = createPrismGeometryForShape(shape, cellSize, 1, group, { tileSize: 5 });
+				let colDesc;
+				try {
+					const vertices = geo.attributes.position.array;
+					colDesc = RAPIER.ColliderDesc.convexHull(vertices as any);
+				} catch (e) {
+					console.warn("convexHull failed for ceiling prism, falling back to cuboid", e);
+				}
+				if (!colDesc) {
+					colDesc = RAPIER.ColliderDesc.cuboid(cellSize / 2, 0.5, cellSize / 2);
+				}
+				colDesc.setTranslation(x, posY, z);
+				this.groundColliders.push(this.world.createCollider(colDesc, this.groundBody));
+				geo.dispose();
+			});
+
+			// B. Greedy Merged Cuboids (grouped by height)
+			const ceilingFullKeysByPosY = new Map<number, string[]>();
+			Object.keys(customGridCeilingGroups).forEach(key => {
+				if ((customGridCeilingShapes[key] || "full") !== "full") return;
+				const ceilingGroupId = customGridCeilingGroups[key];
+				if (!ceilingGroupId) return;
+
+				const wallGroupId = customGridWallGroups[key] || "default";
+				const wallGroup = invisibleWallsGroups.find((wg: any) => wg.id === wallGroupId);
+				const wallHeight = (wallGroup && wallGroup.height !== undefined) ? wallGroup.height : 10;
+				const posY = wallHeight - 1.0;
+
+				if (!ceilingFullKeysByPosY.has(posY)) {
+					ceilingFullKeysByPosY.set(posY, []);
+				}
+				ceilingFullKeysByPosY.get(posY)!.push(key);
+			});
+
+			ceilingFullKeysByPosY.forEach((keys, posY) => {
+				const mergedRects = MapPhysicsBuilder.greedyMerge2D(keys);
+				mergedRects.forEach(rect => {
+					const width = rect.w * cellSize;
+					const depth = rect.h * cellSize;
+					const centerX = (rect.gx + (rect.w - 1) / 2) * cellSize;
+					const centerZ = (rect.gz + (rect.h - 1) / 2) * cellSize;
+
+					const colDesc = RAPIER.ColliderDesc.cuboid(width / 2, 0.5, depth / 2);
+					colDesc.setTranslation(centerX, posY, centerZ);
+					this.groundColliders.push(this.world.createCollider(colDesc, this.groundBody));
+				});
+			});
+		}
 	}
 
 	const oldGrids = this.sceneManager.scene.children.filter((c: any) => c.name === "mapGrid");
@@ -571,12 +648,19 @@ export function updateEnvironmentConfig(this: any, config: any) {
 			}
 
 			const mesh = new THREE.Mesh(meta.geometry, mat);
+			mesh.userData = {
+				isEditableMapObject: true,
+				mapObjectType: "environment_wall",
+				groupId: groupId,
+				customName: `Pared: ${meta.isWireframeOnly ? "Solo Colisión" : (groupId === "default" ? "Pared 1" : groupId)}`
+			};
 			this.sceneManager.scene.add(mesh);
 			this.invisibleWallMeshes.push(mesh);
 
 			if (meta.opacity > 0 && meta.texturePath) {
+				const settings = normalizeTextureSettings(meta.textureSettings || { tileSize: 5 });
+				applyWorldSpaceUVs(mesh.geometry, settings);
 				MapAssetManager.loadTexture(meta.texturePath).then((texture) => {
-					const settings = normalizeTextureSettings(meta.textureSettings || { tileSize: 5 });
 					applyMapObjectTexture(mesh, texture, null, settings);
 				}).catch(err => console.error("Failed to load wall texture:", meta.texturePath, err));
 			}

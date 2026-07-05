@@ -100,7 +100,7 @@ export class ObjectInspector {
         this.container.appendChild(this.content)
 
         // 1. Position Controls
-        this.createSection("Posición", (section) => {
+        this.positionSection = this.createSection("Posición", (section) => {
             const row = document.createElement('div')
             row.style.cssText = `display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 5px;`
 
@@ -153,7 +153,7 @@ export class ObjectInspector {
         })
 
         // 1.5 Rotation Controls
-        this.createSection("Rotación (Grados)", (section) => {
+        this.rotationSection = this.createSection("Rotación (Grados)", (section) => {
             const row = document.createElement('div')
             row.style.cssText = `display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 5px;`
 
@@ -203,7 +203,7 @@ export class ObjectInspector {
         })
 
         // 2. Dimensions/Scale Controls
-        this.createSection("Dimensiones", (section) => {
+        this.dimensionsSection = this.createSection("Dimensiones", (section) => {
             const row = document.createElement('div')
             row.style.cssText = `display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 5px;`
 
@@ -224,7 +224,7 @@ export class ObjectInspector {
 
 
         // 3. Color Controls
-        this.createSection("Color", (section) => {
+        this.colorSection = this.createSection("Color", (section) => {
             const row = document.createElement('div')
             row.style.display = "flex"
             row.style.alignItems = "center"
@@ -310,7 +310,7 @@ export class ObjectInspector {
         })
 
         // 4. Texture Controls
-        this.createSection("Textura", (section) => {
+        this.textureSection = this.createSection("Textura", (section) => {
             this.textureGrid = document.createElement('div')
             this.textureGrid.style.cssText = `display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; margin-bottom: 10px;`
             this.renderTextures(this.textureGrid)
@@ -413,6 +413,7 @@ export class ObjectInspector {
             settingsGrid.appendChild(makeTextureInput("repeatX", "Repetir U", 0.25, 0.05))
             settingsGrid.appendChild(makeTextureInput("repeatY", "Repetir V", 0.25, 0.05))
             settingsGrid.appendChild(makeTextureInput("rotation", "Rotación", 5))
+            settingsGrid.appendChild(makeTextureInput("globalRotation", "Rotación Global", 5))
             settingsGrid.appendChild(makeTextureInput("offsetX", "Mover U", 0.05))
             settingsGrid.appendChild(makeTextureInput("offsetY", "Mover V", 0.05))
             settingsPanel.appendChild(settingsGrid)
@@ -433,7 +434,7 @@ export class ObjectInspector {
         })
 
         // 4.5 Visibility Controls (Invisible but Collidable)
-        this.createSection("Visibilidad", (section) => {
+        this.visibilitySection = this.createSection("Visibilidad", (section) => {
             const row = document.createElement('div')
             row.style.cssText = `display: flex; align-items: center; gap: 10px;`
 
@@ -466,7 +467,7 @@ export class ObjectInspector {
         this.logicSectionWrapper.style.display = 'none'
 
         // Preferencia de Cambio Rápido
-        this.createSection("Preferencia", (section) => {
+        this.preferenceSection = this.createSection("Preferencia", (section) => {
             const row = document.createElement('div')
             row.style.cssText = `display: flex; align-items: center; gap: 8px;`
 
@@ -492,7 +493,7 @@ export class ObjectInspector {
         })
 
         // Nombre Personalizado / Identificación
-        this.createSection("Identificación", (section) => {
+        this.identificationSection = this.createSection("Identificación", (section) => {
             this.inputCustomName = document.createElement('input')
             this.inputCustomName.type = "text"
             this.inputCustomName.placeholder = "Nombre del objeto"
@@ -511,7 +512,7 @@ export class ObjectInspector {
         })
 
         // 4.6 Danger Zone
-        this.createSection("Acciones", (section) => {
+        this.actionsSection = this.createSection("Acciones", (section) => {
             const btnDelete = document.createElement('button')
             btnDelete.textContent = "Eliminar Objeto"
             btnDelete.style.cssText = `width: 100%; padding: 8px; cursor: pointer; background: #cc3333; color: white; border: none; border-radius: 4px; font-weight: bold;`
@@ -639,11 +640,78 @@ export class ObjectInspector {
         })
     }
 
+    getEnvironmentGroup(mapObjectType, groupId) {
+        if (!this.game || !this.game.environmentConfig) return null;
+        let list = [];
+        if (mapObjectType === "environment_ground") {
+            list = this.game.environmentConfig.groundGroups || [];
+        } else if (mapObjectType === "environment_ceiling") {
+            list = this.game.environmentConfig.ceilingGroups || [];
+        } else if (mapObjectType === "environment_wall") {
+            list = this.game.environmentConfig.invisibleWallsGroups || [];
+        }
+        return list.find(g => g.id === groupId);
+    }
+
+    findEnvironmentMesh(mapObjectType, groupId) {
+        if (!this.game) return null;
+        let found = null;
+        if (mapObjectType === "environment_ground" || mapObjectType === "environment_ceiling") {
+            if (this.game.groundGroup) {
+                this.game.groundGroup.traverse((child) => {
+                    if (child.userData && child.userData.mapObjectType === mapObjectType && child.userData.groupId === groupId) {
+                        found = child;
+                    }
+                });
+            }
+        } else if (mapObjectType === "environment_wall") {
+            if (Array.isArray(this.game.invisibleWallMeshes)) {
+                this.game.invisibleWallMeshes.forEach((mesh) => {
+                    if (mesh.userData && mesh.userData.mapObjectType === mapObjectType && mesh.userData.groupId === groupId) {
+                        found = mesh;
+                    }
+                });
+            }
+        }
+        return found;
+    }
+
+    rebuildEnvironment(mapObjectType, groupId) {
+        if (!this.game) return;
+        this.game.updateEnvironmentConfig(this.game.environmentConfig);
+        const newMesh = this.findEnvironmentMesh(mapObjectType, groupId);
+        if (newMesh) {
+            this.selectedObject = newMesh;
+        }
+    }
+
     show(object) {
         if (!object) return
         this.selectedObject = object
         this.isVisible = true
         this.container.style.display = 'flex'
+
+        const isEnv = object.userData.mapObjectType?.startsWith("environment_");
+        
+        if (isEnv) {
+            if (this.positionSection) this.positionSection.style.display = "none";
+            if (this.rotationSection) this.rotationSection.style.display = "none";
+            if (this.dimensionsSection) this.dimensionsSection.style.display = "none";
+            if (this.visibilitySection) this.visibilitySection.style.display = "none";
+            if (this.logicSectionWrapper) this.logicSectionWrapper.style.display = "none";
+            if (this.preferenceSection) this.preferenceSection.style.display = "none";
+            if (this.identificationSection) this.identificationSection.style.display = "none";
+            if (this.actionsSection) this.actionsSection.style.display = "none";
+            if (this.transformGizmo) this.transformGizmo.detach();
+        } else {
+            if (this.positionSection) this.positionSection.style.display = "block";
+            if (this.rotationSection) this.rotationSection.style.display = "block";
+            if (this.dimensionsSection) this.dimensionsSection.style.display = "block";
+            if (this.visibilitySection) this.visibilitySection.style.display = "block";
+            if (this.preferenceSection) this.preferenceSection.style.display = "block";
+            if (this.identificationSection) this.identificationSection.style.display = "block";
+            if (this.actionsSection) this.actionsSection.style.display = "block";
+        }
 
         // Populate Data
         const objName = object.userData.customName || object.userData.mapObjectType || "Objeto"
@@ -664,17 +732,34 @@ export class ObjectInspector {
             this.container.style.maxHeight = "90vh"
         }
 
-        this.syncTransformInputs()
+        if (!isEnv) {
+            this.syncTransformInputs()
+        }
+
+        let groupColor = null;
+        let op = 1.0;
+        let texSettings = object.userData.textureSettings;
+
+        if (isEnv) {
+            const group = this.getEnvironmentGroup(object.userData.mapObjectType, object.userData.groupId);
+            if (group) {
+                groupColor = group.color || group.color3D;
+                op = (group.opacity !== undefined) ? group.opacity : 1.0;
+                texSettings = group.textureSettings;
+            }
+        } else {
+            op = (object.userData.opacity !== undefined) ? object.userData.opacity : 1.0;
+        }
 
         // Color
-        if (object.material && object.material.color) {
+        if (groupColor) {
+            this.colorPicker.value = groupColor.startsWith("#") ? groupColor : '#' + groupColor;
+        } else if (object.material && object.material.color) {
             this.colorPicker.value = '#' + object.material.color.getHexString()
         }
 
         // Opacity
         if (this.opacitySlider) {
-            // Default to 1.0 if not set
-            const op = (object.userData.opacity !== undefined) ? object.userData.opacity : 1.0
             this.opacitySlider.value = op
             if (this.opacityNumber) this.opacityNumber.value = Math.round(op * 100)
         }
@@ -686,10 +771,10 @@ export class ObjectInspector {
             this.chkInvisible.checked = false
         }
 
-        this.syncTextureSettingsInputs(object.userData.textureSettings)
+        this.syncTextureSettingsInputs(texSettings)
 
         // Logic Properties
-        if (object.userData.logicProperties) {
+        if (!isEnv && object.userData.logicProperties) {
             this.logicSectionWrapper.style.display = 'block'
             this.renderLogicProperties(object.userData.logicProperties)
         } else {
@@ -698,7 +783,7 @@ export class ObjectInspector {
 
         // 6. Link to Logic Panel (New)
         // Check if object has modifiers that should be edited in Logic Panel
-        const hasLogicParams = object.userData.logicProperties && (
+        const hasLogicParams = !isEnv && object.userData.logicProperties && (
             object.userData.logicProperties.waypoints ||
             (Array.isArray(object.userData.logicProperties.sequences) && object.userData.logicProperties.sequences.length > 0) ||
             object.userData.mapObjectType === 'movement_controller' ||
@@ -1016,6 +1101,19 @@ export class ObjectInspector {
     updateColor(hex) {
         if (!this.selectedObject) return
 
+        const isEnv = this.selectedObject.userData.mapObjectType?.startsWith("environment_");
+        if (isEnv) {
+            const mapObjectType = this.selectedObject.userData.mapObjectType;
+            const groupId = this.selectedObject.userData.groupId;
+            const group = this.getEnvironmentGroup(mapObjectType, groupId);
+            if (group) {
+                group.color = hex;
+                group.color3D = hex;
+                this.rebuildEnvironment(mapObjectType, groupId);
+            }
+            return;
+        }
+
         this.selectedObject.userData.color = parseInt(hex.replace('#', '0x'))
 
         if (this.selectedObject.material) {
@@ -1035,6 +1133,22 @@ export class ObjectInspector {
 
     updateTexture(pathOrDataUrl, assetId = null) {
         if (!this.selectedObject) return
+
+        const isEnv = this.selectedObject.userData.mapObjectType?.startsWith("environment_");
+        if (isEnv) {
+            const mapObjectType = this.selectedObject.userData.mapObjectType;
+            const groupId = this.selectedObject.userData.groupId;
+            const group = this.getEnvironmentGroup(mapObjectType, groupId);
+            if (group) {
+                group.texturePath = pathOrDataUrl;
+                group.textureAssetId = assetId;
+                if (!group.textureSettings) {
+                    group.textureSettings = normalizeTextureSettings(null);
+                }
+                this.rebuildEnvironment(mapObjectType, groupId);
+            }
+            return;
+        }
 
         this.selectedObject.userData.texturePath = pathOrDataUrl
         this.selectedObject.userData.textureAssetId = assetId
@@ -1068,7 +1182,7 @@ export class ObjectInspector {
             this.selectedObject.userData.textureSettings = { ...normalized }
         }
         if (this.textureFitModeSelect) this.textureFitModeSelect.value = normalized.fitMode
-        ;["tileSize", "repeatX", "repeatY", "offsetX", "offsetY", "rotation"].forEach((key) => {
+        ;["tileSize", "repeatX", "repeatY", "offsetX", "offsetY", "rotation", "globalRotation"].forEach((key) => {
             const input = this[`textureSettingInput_${key}`]
             if (input) input.value = String(normalized[key])
         })
@@ -1079,6 +1193,22 @@ export class ObjectInspector {
 
     updateTextureSetting(key, value) {
         if (!this.selectedObject) return
+
+        const isEnv = this.selectedObject.userData.mapObjectType?.startsWith("environment_");
+        if (isEnv) {
+            const mapObjectType = this.selectedObject.userData.mapObjectType;
+            const groupId = this.selectedObject.userData.groupId;
+            const group = this.getEnvironmentGroup(mapObjectType, groupId);
+            if (group) {
+                if (!group.textureSettings) {
+                    group.textureSettings = normalizeTextureSettings(null);
+                }
+                group.textureSettings[key] = value;
+                this.rebuildEnvironment(mapObjectType, groupId);
+            }
+            return;
+        }
+
         this.selectedObject.userData.textureSettings = normalizeTextureSettings({
             ...(this.selectedObject.userData.textureSettings || {}),
             [key]: value
@@ -1108,6 +1238,19 @@ export class ObjectInspector {
 
     updateTransparency(opacity) {
         if (!this.selectedObject) return
+
+        const isEnv = this.selectedObject.userData.mapObjectType?.startsWith("environment_");
+        if (isEnv) {
+            const mapObjectType = this.selectedObject.userData.mapObjectType;
+            const groupId = this.selectedObject.userData.groupId;
+            const group = this.getEnvironmentGroup(mapObjectType, groupId);
+            if (group) {
+                group.opacity = opacity;
+                group.transparent = opacity < 1.0;
+                this.rebuildEnvironment(mapObjectType, groupId);
+            }
+            return;
+        }
 
         this.selectedObject.userData.opacity = opacity
 

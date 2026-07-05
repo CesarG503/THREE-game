@@ -747,6 +747,8 @@ export class MapShapeEditor {
         ];
 
         // Sync ceilings
+        this.config.ceilingsEnabled = !!env.ceilingsEnabled;
+        this.config.ceilingsAdvanced = !!env.ceilingsAdvanced;
         this.config.ceilingGroups = (env.ceilingGroups && env.ceilingGroups.length > 0) ? JSON.parse(JSON.stringify(env.ceilingGroups)) : [
             {
                 id: "default",
@@ -875,6 +877,11 @@ export class MapShapeEditor {
         // Force advanced walls option to true if they edited walls
         if (this.activeTab === "walls") {
             this.config.invisibleWallsAdvanced = true;
+            this.config.invisibleWalls = true;
+        }
+        if (this.activeTab === "ceilings") {
+            this.config.ceilingsAdvanced = true;
+            this.config.ceilingsEnabled = true;
         }
 
         const newConfig = {
@@ -889,9 +896,12 @@ export class MapShapeEditor {
             groundGroups: this.config.groundGroups,
             customGridGroups: this.config.customGridGroups,
             customGridShapes: this.config.customGridShapes,
+            invisibleWalls: this.config.invisibleWalls ?? (this.game.environmentConfig?.invisibleWalls ?? false),
             invisibleWallsAdvanced: this.config.invisibleWallsAdvanced,
             invisibleWallsGroups: this.config.invisibleWallsGroups,
             customGridWallGroups: this.config.customGridWallGroups,
+            ceilingsEnabled: this.config.ceilingsEnabled ?? (this.game.environmentConfig?.ceilingsEnabled ?? false),
+            ceilingsAdvanced: this.config.ceilingsAdvanced ?? (this.game.environmentConfig?.ceilingsAdvanced ?? false),
             ceilingGroups: this.config.ceilingGroups,
             customGridCeilingGroups: this.config.customGridCeilingGroups,
             customGridCeilingShapes: this.config.customGridCeilingShapes

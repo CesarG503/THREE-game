@@ -33,6 +33,8 @@ export interface SavedMapData {
 		invisibleWallsAdvanced?: boolean;
 		invisibleWallsGroups?: any[];
 		customGridWallGroups?: Record<string, string>;
+		ceilingsEnabled?: boolean;
+		ceilingsAdvanced?: boolean;
 		ceilingGroups?: any[];
 		customGridCeilingGroups?: Record<string, string>;
 		customGridCeilingShapes?: Record<string, string>;
@@ -57,6 +59,8 @@ export function createEmptyMapData(): SavedMapData {
 			mapSizeX: 100,
 			mapSizeZ: 100,
 			invisibleWalls: false,
+			ceilingsEnabled: false,
+			ceilingsAdvanced: false,
 			fallDeath: true,
 			fallDeathY: -20,
 			skyType: DEFAULT_SKYBOX_TYPE,

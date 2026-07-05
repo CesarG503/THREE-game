@@ -791,6 +791,7 @@ export class ConstructionMenu {
             this.tabSettings.style.fontWeight = "bold";
             this.tabSettings.style.color = "white";
             this.tabSettings.style.borderBottom = "2px solid white";
+            this.refreshSettings();
         } else if (tabName === "gameConfig") {
             this.contentGameConfig.style.display = "flex";
             this.tabGameConfig.style.fontWeight = "bold";
@@ -812,6 +813,12 @@ export class ConstructionMenu {
     }
 
     renderSettings(container) {
+        let skyboxPreviewToken = 0;
+        let skyboxPreviewScene = null;
+        let skyboxPreviewCamera = null;
+        let skyboxPreviewRenderer = null;
+        let renderSkyboxPreview = () => {};
+
         if (this.skyboxPreviewCleanup) {
             this.skyboxPreviewCleanup();
             this.skyboxPreviewCleanup = null;
@@ -936,8 +943,8 @@ export class ConstructionMenu {
         labelSky.style.fontSize = "18px";
         labelSky.style.color = "#aaa";
 
-        const selectSky = document.createElement("select");
-        selectSky.style.cssText = `
+        this.selectSky = document.createElement("select");
+        this.selectSky.style.cssText = `
             padding: 8px;
             background: #333;
             color: white;
@@ -1008,78 +1015,8 @@ export class ConstructionMenu {
             font-size: 13px;
             font-weight: bold;
             text-shadow: 0 1px 2px #000;
-            pointer-events: none;
         `;
         previewFrame.appendChild(previewLabel);
-
-        const skyboxPreviewScene = new THREE.Scene();
-        const skyboxPreviewCamera = new THREE.PerspectiveCamera(70, 1, 0.1, 10);
-        const skyboxPreviewRenderer = new THREE.WebGLRenderer({ antialias: true });
-        skyboxPreviewRenderer.outputColorSpace = THREE.SRGBColorSpace;
-        skyboxPreviewRenderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-        skyboxPreviewRenderer.domElement.style.width = "100%";
-        skyboxPreviewRenderer.domElement.style.height = "100%";
-        skyboxPreviewRenderer.domElement.style.display = "block";
-        skyboxPreviewViewport.appendChild(skyboxPreviewRenderer.domElement);
-
-        let previewYaw = -25;
-        let previewPitch = 0;
-        let previewDragging = false;
-        let previewDragX = 0;
-        let previewDragY = 0;
-        let skyboxPreviewToken = 0;
-        const renderSkyboxPreview = () => {
-            const width = Math.max(1, previewFrame.clientWidth || 320);
-            const height = Math.max(1, previewFrame.clientHeight || 220);
-            skyboxPreviewCamera.aspect = width / height;
-            skyboxPreviewCamera.rotation.order = "YXZ";
-            skyboxPreviewCamera.rotation.y = THREE.MathUtils.degToRad(previewYaw);
-            skyboxPreviewCamera.rotation.x = THREE.MathUtils.degToRad(previewPitch);
-            skyboxPreviewCamera.updateProjectionMatrix();
-            skyboxPreviewRenderer.setSize(width, height, false);
-            skyboxPreviewRenderer.render(skyboxPreviewScene, skyboxPreviewCamera);
-        };
-        const previewResizeObserver = new ResizeObserver(renderSkyboxPreview);
-        previewResizeObserver.observe(previewFrame);
-
-        skyboxPreviewViewport.addEventListener("pointerdown", (e) => {
-            previewDragging = true;
-            previewDragX = e.clientX;
-            previewDragY = e.clientY;
-            skyboxPreviewViewport.style.cursor = "grabbing";
-            skyboxPreviewViewport.setPointerCapture(e.pointerId);
-        });
-
-        skyboxPreviewViewport.addEventListener("pointermove", (e) => {
-            if (!previewDragging) return;
-            const dx = e.clientX - previewDragX;
-            const dy = e.clientY - previewDragY;
-            previewDragX = e.clientX;
-            previewDragY = e.clientY;
-            previewYaw -= dx * 0.22;
-            previewPitch = Math.max(-82, Math.min(82, previewPitch - dy * 0.18));
-            renderSkyboxPreview();
-        });
-
-        const stopSkyboxPreviewDrag = (e) => {
-            previewDragging = false;
-            skyboxPreviewViewport.style.cursor = "grab";
-            if (e && skyboxPreviewViewport.hasPointerCapture(e.pointerId)) {
-                skyboxPreviewViewport.releasePointerCapture(e.pointerId);
-            }
-        };
-        skyboxPreviewViewport.addEventListener("pointerup", stopSkyboxPreviewDrag);
-        skyboxPreviewViewport.addEventListener("pointercancel", stopSkyboxPreviewDrag);
-        skyboxPreviewViewport.addEventListener("pointerleave", () => {
-            if (!previewDragging) skyboxPreviewViewport.style.cursor = "grab";
-        });
-
-        this.skyboxPreviewCleanup = () => {
-            previewResizeObserver.disconnect();
-            skyboxPreviewScene.background = null;
-            skyboxPreviewRenderer.dispose();
-            skyboxPreviewRenderer.domElement.remove();
-        };
 
         const skyboxGrid = document.createElement("div");
         skyboxGrid.style.cssText = `
@@ -1115,7 +1052,7 @@ export class ConstructionMenu {
         const previewStatus = document.createElement("span");
         previewStatus.style.cssText = "color: #9ca3af; font-size: 13px;";
 
-        actionsRow.appendChild(selectSky);
+        actionsRow.appendChild(this.selectSky);
         actionsRow.appendChild(applySkyBtn);
         actionsRow.appendChild(previewStatus);
 
@@ -1132,9 +1069,9 @@ export class ConstructionMenu {
                 });
         };
 
-        const setPendingSky = (value) => {
+        this.setPendingSky = (value) => {
             pendingSkyType = value || "day";
-            selectSky.value = pendingSkyType;
+            this.selectSky.value = pendingSkyType;
             const skyboxUrl = getSkyboxUrlFromValue(pendingSkyType);
             const label = skyOptionLabels.get(pendingSkyType) || "Skybox guardado";
             previewLabel.textContent = label;
@@ -1154,7 +1091,7 @@ export class ConstructionMenu {
                 previewImage.style.backgroundPosition = "center";
             }
 
-            Array.from(skyboxGrid.children).forEach((child) => {
+            Array.from(skyboxGrid.children).forEach((child: any) => {
                 const isActive = child.dataset.skyValue === pendingSkyType;
                 child.style.borderColor = isActive ? "#60a5fa" : "#555";
                 child.style.boxShadow = isActive ? "0 0 0 2px rgba(96,165,250,0.35)" : "none";
@@ -1182,7 +1119,7 @@ export class ConstructionMenu {
             const el = document.createElement("option");
             el.value = opt.value;
             el.textContent = opt.text;
-            selectSky.appendChild(el);
+            this.selectSky.appendChild(el);
             return el;
         };
 
@@ -1237,7 +1174,7 @@ export class ConstructionMenu {
             `;
             card.appendChild(name);
 
-            card.onclick = () => setPendingSky(opt.value);
+            card.onclick = () => this.setPendingSky(opt.value);
             return card;
         };
 
@@ -1252,7 +1189,7 @@ export class ConstructionMenu {
         loadingSkyboxes.disabled = true;
         loadingSkyboxes.textContent = "Buscando skyboxes...";
         skyboxGroup.appendChild(loadingSkyboxes);
-        selectSky.appendChild(skyboxGroup);
+        this.selectSky.appendChild(skyboxGroup);
 
         let savedSkyOption = null;
         if (selectedSkyType.startsWith(SKYBOX_VALUE_PREFIX)) {
@@ -1285,18 +1222,88 @@ export class ConstructionMenu {
                     skyboxGrid.appendChild(createSkyCard(opt));
                 }
             });
-            setPendingSky(skyboxes.some(opt => opt.value === selectedSkyType) ? selectedSkyType : pendingSkyType);
+            this.setPendingSky(skyboxes.some(opt => opt.value === selectedSkyType) ? selectedSkyType : pendingSkyType);
         });
 
-        selectSky.addEventListener("change", (e) => {
-            setPendingSky(e.target.value);
+        this.selectSky.addEventListener("change", (e: any) => {
+            this.setPendingSky(e.target.value);
         });
         applySkyBtn.addEventListener("click", applyPendingSky);
 
         rowSky.appendChild(labelSky);
         rowSky.appendChild(actionsRow);
         rowSky.appendChild(previewWrap);
-        setPendingSky(selectedSkyType);
+
+        skyboxPreviewScene = new THREE.Scene();
+        skyboxPreviewCamera = new THREE.PerspectiveCamera(70, 1, 0.1, 10);
+        skyboxPreviewRenderer = new THREE.WebGLRenderer({ antialias: true });
+        skyboxPreviewRenderer.outputColorSpace = THREE.SRGBColorSpace;
+        skyboxPreviewRenderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+        skyboxPreviewRenderer.domElement.style.width = "100%";
+        skyboxPreviewRenderer.domElement.style.height = "100%";
+        skyboxPreviewRenderer.domElement.style.display = "block";
+        skyboxPreviewViewport.appendChild(skyboxPreviewRenderer.domElement);
+
+        let previewYaw = -25;
+        let previewPitch = 0;
+        let previewDragging = false;
+        let previewDragX = 0;
+        let previewDragY = 0;
+        
+        renderSkyboxPreview = () => {
+            const width = Math.max(1, previewFrame.clientWidth || 320);
+            const height = Math.max(1, previewFrame.clientHeight || 220);
+            skyboxPreviewCamera.aspect = width / height;
+            skyboxPreviewCamera.rotation.order = "YXZ";
+            skyboxPreviewCamera.rotation.y = THREE.MathUtils.degToRad(previewYaw);
+            skyboxPreviewCamera.rotation.x = THREE.MathUtils.degToRad(previewPitch);
+            skyboxPreviewCamera.updateProjectionMatrix();
+            skyboxPreviewRenderer.setSize(width, height, false);
+            skyboxPreviewRenderer.render(skyboxPreviewScene, skyboxPreviewCamera);
+        };
+        const previewResizeObserver = new ResizeObserver(renderSkyboxPreview);
+        previewResizeObserver.observe(previewFrame);
+
+        skyboxPreviewViewport.addEventListener("pointerdown", (e) => {
+            previewDragging = true;
+            previewDragX = e.clientX;
+            previewDragY = e.clientY;
+            skyboxPreviewViewport.style.cursor = "grabbing";
+            skyboxPreviewViewport.setPointerCapture(e.pointerId);
+        });
+
+        skyboxPreviewViewport.addEventListener("pointermove", (e) => {
+            if (!previewDragging) return;
+            const dx = e.clientX - previewDragX;
+            const dy = e.clientY - previewDragY;
+            previewDragX = e.clientX;
+            previewDragY = e.clientY;
+            previewYaw -= dx * 0.22;
+            previewPitch = Math.max(-82, Math.min(82, previewPitch - dy * 0.18));
+            renderSkyboxPreview();
+        });
+
+        const stopSkyboxPreviewDrag = (e) => {
+            previewDragging = false;
+            skyboxPreviewViewport.style.cursor = "grab";
+            if (e && skyboxPreviewViewport.hasPointerCapture(e.pointerId)) {
+                skyboxPreviewViewport.releasePointerCapture(e.pointerId);
+            }
+        };
+        skyboxPreviewViewport.addEventListener("pointerup", stopSkyboxPreviewDrag);
+        skyboxPreviewViewport.addEventListener("pointercancel", stopSkyboxPreviewDrag);
+        skyboxPreviewViewport.addEventListener("pointerleave", () => {
+            if (!previewDragging) skyboxPreviewViewport.style.cursor = "grab";
+        });
+
+        this.skyboxPreviewCleanup = () => {
+            previewResizeObserver.disconnect();
+            skyboxPreviewScene.background = null;
+            skyboxPreviewRenderer.dispose();
+            skyboxPreviewRenderer.domElement.remove();
+        };
+
+        this.setPendingSky(selectedSkyType);
         container.appendChild(rowSky);
 
         // Map Boundaries and Rules Config
@@ -1324,20 +1331,26 @@ export class ConstructionMenu {
         };
         rowMap.appendChild(btnOpenEditor);
 
-        let checkInvisibleWalls: HTMLInputElement;
-        let checkWallsAdvanced: HTMLInputElement;
-        let rowWallsAdvanced: HTMLDivElement;
-        let rowWallsConfigure: HTMLDivElement;
+        this.checkInvisibleWalls = null as any;
+        this.checkWallsAdvanced = null as any;
+        this.rowWallsAdvanced = null as any;
+        this.rowWallsConfigure = null as any;
+        this.checkInvisibleCeilings = null as any;
+        this.checkCeilingsAdvanced = null as any;
+        this.rowCeilingsAdvanced = null as any;
+        this.rowCeilingsConfigure = null as any;
 
         const configChangeHandler = () => {
             if (this.game && this.game.environmentConfig) {
                 const newConfig = {
-                    mapSizeX: parseFloat(inputSizeX.value) || 100,
-                    mapSizeZ: parseFloat(inputSizeZ.value) || 100,
-                    invisibleWalls: checkInvisibleWalls.checked,
-                    invisibleWallsAdvanced: checkWallsAdvanced.checked,
-                    fallDeath: checkFallDeath.checked,
-                    fallDeathY: parseFloat(inputFallY.value) || -20,
+                    mapSizeX: parseFloat(this.inputSizeX.value) || 100,
+                    mapSizeZ: parseFloat(this.inputSizeZ.value) || 100,
+                    invisibleWalls: this.checkInvisibleWalls.checked,
+                    invisibleWallsAdvanced: this.checkInvisibleWalls.checked,
+                    ceilingsEnabled: this.checkInvisibleCeilings.checked,
+                    ceilingsAdvanced: this.checkInvisibleCeilings.checked,
+                    fallDeath: this.checkFallDeath.checked,
+                    fallDeathY: parseFloat(this.inputFallY.value) || -20,
                     skyType: this.game.environmentConfig?.skyType || "day"
                 };
                 this.game.updateEnvironmentConfig(newConfig);
@@ -1349,72 +1362,65 @@ export class ConstructionMenu {
         };
 
         // Size X
-        const rowSizeX = document.createElement("div");
-        rowSizeX.style.cssText = "display: flex; align-items: center; justify-content: space-between;";
+        this.rowSizeX = document.createElement("div");
+        this.rowSizeX.style.cssText = "display: flex; align-items: center; justify-content: space-between;";
         const labelSizeX = document.createElement("label");
         labelSizeX.textContent = "Ancho del Mapa (X):";
-        const inputSizeX = document.createElement("input");
-        inputSizeX.type = "number";
-        inputSizeX.min = "10";
-        inputSizeX.step = "10";
-        inputSizeX.style.cssText = "padding: 5px; background: #333; color: white; border: 1px solid #555; border-radius: 4px; width: 80px; text-align: center;";
-        inputSizeX.value = this.game.environmentConfig ? this.game.environmentConfig.mapSizeX : 100;
+        this.inputSizeX = document.createElement("input");
+        this.inputSizeX.type = "number";
+        this.inputSizeX.min = "10";
+        this.inputSizeX.step = "10";
+        this.inputSizeX.style.cssText = "padding: 5px; background: #333; color: white; border: 1px solid #555; border-radius: 4px; width: 80px; text-align: center;";
+        this.inputSizeX.value = String(this.game.environmentConfig ? this.game.environmentConfig.mapSizeX : 100);
         if (this.game.environmentConfig && this.game.environmentConfig.shapeType === "custom") {
-            inputSizeX.disabled = true;
+            this.inputSizeX.disabled = true;
         }
-        inputSizeX.addEventListener("change", configChangeHandler);
-        rowSizeX.appendChild(labelSizeX);
-        rowSizeX.appendChild(inputSizeX);
-        rowMap.appendChild(rowSizeX);
+        this.inputSizeX.addEventListener("change", configChangeHandler);
+        this.rowSizeX.appendChild(labelSizeX);
+        this.rowSizeX.appendChild(this.inputSizeX);
+        rowMap.appendChild(this.rowSizeX);
 
         // Size Z
-        const rowSizeZ = document.createElement("div");
-        rowSizeZ.style.cssText = "display: flex; align-items: center; justify-content: space-between;";
+        this.rowSizeZ = document.createElement("div");
+        this.rowSizeZ.style.cssText = "display: flex; align-items: center; justify-content: space-between;";
         const labelSizeZ = document.createElement("label");
         labelSizeZ.textContent = "Largo del Mapa (Z):";
-        const inputSizeZ = document.createElement("input");
-        inputSizeZ.type = "number";
-        inputSizeZ.min = "10";
-        inputSizeZ.step = "10";
-        inputSizeZ.style.cssText = "padding: 5px; background: #333; color: white; border: 1px solid #555; border-radius: 4px; width: 80px; text-align: center;";
-        inputSizeZ.value = this.game.environmentConfig ? this.game.environmentConfig.mapSizeZ : 100;
+        this.inputSizeZ = document.createElement("input");
+        this.inputSizeZ.type = "number";
+        this.inputSizeZ.min = "10";
+        this.inputSizeZ.step = "10";
+        this.inputSizeZ.style.cssText = "padding: 5px; background: #333; color: white; border: 1px solid #555; border-radius: 4px; width: 80px; text-align: center;";
+        this.inputSizeZ.value = String(this.game.environmentConfig ? this.game.environmentConfig.mapSizeZ : 100);
         if (this.game.environmentConfig && (this.game.environmentConfig.shapeType === "custom" || this.game.environmentConfig.shapeType === "circle")) {
-            inputSizeZ.disabled = true;
+            this.inputSizeZ.disabled = true;
         }
-        inputSizeZ.addEventListener("change", configChangeHandler);
-        rowSizeZ.appendChild(labelSizeZ);
-        rowSizeZ.appendChild(inputSizeZ);
-        rowMap.appendChild(rowSizeZ);
+        this.inputSizeZ.addEventListener("change", configChangeHandler);
+        this.rowSizeZ.appendChild(labelSizeZ);
+        this.rowSizeZ.appendChild(this.inputSizeZ);
+        rowMap.appendChild(this.rowSizeZ);
 
         // Invisible Walls
         const rowWalls = document.createElement("div");
         rowWalls.style.cssText = "display: flex; align-items: center; justify-content: space-between;";
         const labelWalls = document.createElement("label");
         labelWalls.textContent = "Paredes en Límites:";
-        checkInvisibleWalls = document.createElement("input");
-        checkInvisibleWalls.type = "checkbox";
-        checkInvisibleWalls.style.transform = "scale(1.5)";
-        checkInvisibleWalls.checked = this.game.environmentConfig ? this.game.environmentConfig.invisibleWalls : false;
+        this.checkInvisibleWalls = document.createElement("input");
+        this.checkInvisibleWalls.type = "checkbox";
+        this.checkInvisibleWalls.style.transform = "scale(1.5)";
+        this.checkInvisibleWalls.checked = this.game.environmentConfig ? this.game.environmentConfig.invisibleWalls : false;
         rowWalls.appendChild(labelWalls);
-        rowWalls.appendChild(checkInvisibleWalls);
+        rowWalls.appendChild(this.checkInvisibleWalls);
         rowMap.appendChild(rowWalls);
 
-        // Advanced Walls Toggle Row
-        rowWallsAdvanced = document.createElement("div");
-        rowWallsAdvanced.style.cssText = "display: none; align-items: center; justify-content: space-between; margin-left: 15px; border-left: 2px solid #555; padding-left: 10px;";
-        const labelWallsAdvanced = document.createElement("label");
-        labelWallsAdvanced.textContent = "Personalización Avanzada:";
-        checkWallsAdvanced = document.createElement("input");
-        checkWallsAdvanced.type = "checkbox";
-        checkWallsAdvanced.style.transform = "scale(1.3)";
-        checkWallsAdvanced.checked = this.game.environmentConfig ? !!this.game.environmentConfig.invisibleWallsAdvanced : false;
-        rowWallsAdvanced.appendChild(labelWallsAdvanced);
-        rowWallsAdvanced.appendChild(checkWallsAdvanced);
-        rowMap.appendChild(rowWallsAdvanced);
+        // Advanced Walls Toggle Row (Hidden, implicitly handled)
+        this.rowWallsAdvanced = document.createElement("div");
+        this.rowWallsAdvanced.style.display = "none";
+        this.checkWallsAdvanced = document.createElement("input");
+        this.checkWallsAdvanced.type = "checkbox";
 
         // Advanced Walls Configure Row
-        rowWallsConfigure = document.createElement("div");
-        rowWallsConfigure.style.cssText = "display: none; align-items: center; justify-content: flex-end; margin-left: 15px; border-left: 2px solid #555; padding-left: 10px; margin-top: 5px; margin-bottom: 5px;";
+        this.rowWallsConfigure = document.createElement("div");
+        this.rowWallsConfigure.style.cssText = "display: none; align-items: center; justify-content: flex-end; margin-left: 15px; border-left: 2px solid #555; padding-left: 10px; margin-top: 5px; margin-bottom: 5px;";
         const btnConfigureWalls = document.createElement("button");
         btnConfigureWalls.textContent = "🛠 Configurar Paredes";
         btnConfigureWalls.style.cssText = `
@@ -1426,40 +1432,81 @@ export class ConstructionMenu {
         btnConfigureWalls.onclick = () => {
             this.mapShapeEditor.open("walls");
         };
-        rowWallsConfigure.appendChild(btnConfigureWalls);
-        rowMap.appendChild(rowWallsConfigure);
+        this.rowWallsConfigure.appendChild(btnConfigureWalls);
+        rowMap.appendChild(this.rowWallsConfigure);
 
-        const syncWallsVisibility = () => {
-            const hasWalls = checkInvisibleWalls.checked;
-            rowWallsAdvanced.style.display = hasWalls ? "flex" : "none";
-            const advanced = hasWalls && checkWallsAdvanced.checked;
-            rowWallsConfigure.style.display = advanced ? "flex" : "none";
+        this.syncWallsVisibility = () => {
+            const hasWalls = this.checkInvisibleWalls.checked;
+            this.rowWallsConfigure.style.display = hasWalls ? "flex" : "none";
         };
 
-        checkInvisibleWalls.addEventListener("change", () => {
-            syncWallsVisibility();
+        this.checkInvisibleWalls.addEventListener("change", () => {
+            this.syncWallsVisibility();
             configChangeHandler();
         });
 
-        checkWallsAdvanced.addEventListener("change", () => {
-            syncWallsVisibility();
+        setTimeout(this.syncWallsVisibility, 0);
+
+        // Ceilings (Techos)
+        const rowCeilings = document.createElement("div");
+        rowCeilings.style.cssText = "display: flex; align-items: center; justify-content: space-between; margin-top: 5px;";
+        const labelCeilings = document.createElement("label");
+        labelCeilings.textContent = "Techos:";
+        this.checkInvisibleCeilings = document.createElement("input");
+        this.checkInvisibleCeilings.type = "checkbox";
+        this.checkInvisibleCeilings.style.transform = "scale(1.5)";
+        this.checkInvisibleCeilings.checked = this.game.environmentConfig ? !!this.game.environmentConfig.ceilingsEnabled : false;
+        rowCeilings.appendChild(labelCeilings);
+        rowCeilings.appendChild(this.checkInvisibleCeilings);
+        rowMap.appendChild(rowCeilings);
+
+        // Advanced Ceilings Toggle Row (Hidden, implicitly handled)
+        this.rowCeilingsAdvanced = document.createElement("div");
+        this.rowCeilingsAdvanced.style.display = "none";
+        this.checkCeilingsAdvanced = document.createElement("input");
+        this.checkCeilingsAdvanced.type = "checkbox";
+
+        // Advanced Ceilings Configure Row
+        this.rowCeilingsConfigure = document.createElement("div");
+        this.rowCeilingsConfigure.style.cssText = "display: none; align-items: center; justify-content: flex-end; margin-left: 15px; border-left: 2px solid #555; padding-left: 10px; margin-top: 5px; margin-bottom: 5px;";
+        const btnConfigureCeilings = document.createElement("button");
+        btnConfigureCeilings.textContent = "🛠 Configurar Techos";
+        btnConfigureCeilings.style.cssText = `
+            padding: 6px 12px; background: #FF9800; color: white; border: none; border-radius: 4px;
+            font-size: 13px; font-weight: bold; cursor: pointer; transition: background 0.2s;
+        `;
+        btnConfigureCeilings.onmouseover = () => btnConfigureCeilings.style.background = "#e68a00";
+        btnConfigureCeilings.onmouseout = () => btnConfigureCeilings.style.background = "#FF9800";
+        btnConfigureCeilings.onclick = () => {
+            this.mapShapeEditor.open("ceilings");
+        };
+        this.rowCeilingsConfigure.appendChild(btnConfigureCeilings);
+        rowMap.appendChild(this.rowCeilingsConfigure);
+
+        this.syncCeilingsVisibility = () => {
+            const hasCeilings = this.checkInvisibleCeilings.checked;
+            this.rowCeilingsConfigure.style.display = hasCeilings ? "flex" : "none";
+        };
+
+        this.checkInvisibleCeilings.addEventListener("change", () => {
+            this.syncCeilingsVisibility();
             configChangeHandler();
         });
 
-        setTimeout(syncWallsVisibility, 0);
+        setTimeout(this.syncCeilingsVisibility, 0);
 
         // Fall Death Toggle
         const rowFall = document.createElement("div");
         rowFall.style.cssText = "display: flex; align-items: center; justify-content: space-between;";
         const labelFall = document.createElement("label");
         labelFall.textContent = "Muerte Instantánea por Caída:";
-        const checkFallDeath = document.createElement("input");
-        checkFallDeath.type = "checkbox";
-        checkFallDeath.style.transform = "scale(1.5)";
-        checkFallDeath.checked = this.game.environmentConfig ? this.game.environmentConfig.fallDeath : true;
-        checkFallDeath.addEventListener("change", configChangeHandler);
+        this.checkFallDeath = document.createElement("input");
+        this.checkFallDeath.type = "checkbox";
+        this.checkFallDeath.style.transform = "scale(1.5)";
+        this.checkFallDeath.checked = this.game.environmentConfig ? this.game.environmentConfig.fallDeath : true;
+        this.checkFallDeath.addEventListener("change", configChangeHandler);
         rowFall.appendChild(labelFall);
-        rowFall.appendChild(checkFallDeath);
+        rowFall.appendChild(this.checkFallDeath);
         rowMap.appendChild(rowFall);
 
         // Fall Death Y Limit
@@ -1467,17 +1514,55 @@ export class ConstructionMenu {
         rowFallY.style.cssText = "display: flex; align-items: center; justify-content: space-between;";
         const labelFallY = document.createElement("label");
         labelFallY.textContent = "Límite Y de Caída (Muerte):";
-        const inputFallY = document.createElement("input");
-        inputFallY.type = "number";
-        inputFallY.step = "5";
-        inputFallY.style.cssText = "padding: 5px; background: #333; color: white; border: 1px solid #555; border-radius: 4px; width: 80px; text-align: center;";
-        inputFallY.value = this.game.environmentConfig ? this.game.environmentConfig.fallDeathY : -20;
-        inputFallY.addEventListener("change", configChangeHandler);
+        this.inputFallY = document.createElement("input");
+        this.inputFallY.type = "number";
+        this.inputFallY.step = "5";
+        this.inputFallY.style.cssText = "padding: 5px; background: #333; color: white; border: 1px solid #555; border-radius: 4px; width: 80px; text-align: center;";
+        this.inputFallY.value = String(this.game.environmentConfig ? this.game.environmentConfig.fallDeathY : -20);
+        this.inputFallY.addEventListener("change", configChangeHandler);
         rowFallY.appendChild(labelFallY);
-        rowFallY.appendChild(inputFallY);
+        rowFallY.appendChild(this.inputFallY);
         rowMap.appendChild(rowFallY);
 
         container.appendChild(rowMap);
+    }
+
+    refreshSettings() {
+        if (!this.game || !this.game.environmentConfig) return;
+        const config = this.game.environmentConfig;
+
+        // Size Inputs and Row Visibilities
+        const isCustom = config.shapeType === "custom";
+        if (this.rowSizeX) this.rowSizeX.style.display = isCustom ? "none" : "flex";
+        if (this.rowSizeZ) this.rowSizeZ.style.display = isCustom ? "none" : "flex";
+
+        if (this.inputSizeX) this.inputSizeX.value = String(config.mapSizeX || 100);
+        if (this.inputSizeZ) this.inputSizeZ.value = String(config.mapSizeZ || 100);
+
+        // Disable input based on custom shape
+        if (this.inputSizeX) this.inputSizeX.disabled = isCustom;
+        if (this.inputSizeZ) this.inputSizeZ.disabled = isCustom || config.shapeType === "circle";
+
+        // Walls Config
+        if (this.checkInvisibleWalls) this.checkInvisibleWalls.checked = !!config.invisibleWalls;
+        if (this.checkWallsAdvanced) this.checkWallsAdvanced.checked = !!config.invisibleWallsAdvanced;
+
+        // Ceilings Config
+        if (this.checkInvisibleCeilings) this.checkInvisibleCeilings.checked = !!config.ceilingsEnabled;
+        if (this.checkCeilingsAdvanced) this.checkCeilingsAdvanced.checked = !!config.ceilingsAdvanced;
+
+        // Fall Death
+        if (this.checkFallDeath) this.checkFallDeath.checked = config.fallDeath !== false;
+        if (this.inputFallY) this.inputFallY.value = String(config.fallDeathY !== undefined ? config.fallDeathY : -20);
+
+        // Sync helper for UI rows visibility
+        if (this.syncWallsVisibility) this.syncWallsVisibility();
+        if (this.syncCeilingsVisibility) this.syncCeilingsVisibility();
+
+        // Skybox preview
+        if (config.skyType) {
+            if (this.setPendingSky) this.setPendingSky(config.skyType);
+        }
     }
 
     renderSaveLoad(container) {

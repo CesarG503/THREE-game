@@ -91,10 +91,6 @@ export function loadMap(this: any, jsonData: any) {
 		}
 	}
 
-	if (jsonData.hasOwnProperty("environmentConfig")) {
-		this.updateEnvironmentConfig(jsonData.environmentConfig);
-	}
-
 	for (let i = this.sceneManager.scene.children.length - 1; i >= 0; i--) {
 		const obj = this.sceneManager.scene.children[i];
 		if (obj.userData.isEditableMapObject) {
@@ -102,6 +98,13 @@ export function loadMap(this: any, jsonData: any) {
 				try { this.world.removeRigidBody(obj.userData.rigidBody); } catch (e) { }
 			}
 			this.sceneManager.scene.remove(obj);
+		}
+	}
+
+	if (jsonData.hasOwnProperty("environmentConfig")) {
+		this.updateEnvironmentConfig(jsonData.environmentConfig);
+		if (this.constructionMenu && typeof this.constructionMenu.refreshSettings === "function") {
+			this.constructionMenu.refreshSettings();
 		}
 	}
 

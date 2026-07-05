@@ -6,6 +6,7 @@ import { RampUtils } from "../utils/RampUtils";
 import { applyMapObjectTexture, normalizeTextureSettings, type MapTextureSettings } from "../utils/TextureMapping";
 import type { ItemContext } from "../types";
 import { normalizeGravityOrientation } from "../utils/GravityOrientation";
+import { MapAssetManager } from "../map/MapAssetManager";
 
 type MapObjectScale = {
   x: number;
@@ -889,15 +890,18 @@ export class MapObjectItem extends Item {
       object3D = new THREE.Mesh(geometry, material);
       object3D.receiveShadow = true;
 
-      const textureLoader = new THREE.TextureLoader();
       const texturePath = isJump ? "/assets/textures/salto.png" : "/assets/textures/impulso.png";
-      const texture = textureLoader.load(texturePath);
       const arrowGeometry = new THREE.PlaneGeometry(this.scale.x * 0.8, this.scale.z * 0.8);
       const arrowMaterial = new THREE.MeshBasicMaterial({
-        map: texture,
         transparent: true,
         opacity: 0.85,
         side: THREE.DoubleSide
+      });
+      MapAssetManager.loadTexture(texturePath).then((texture) => {
+        arrowMaterial.map = texture;
+        arrowMaterial.needsUpdate = true;
+      }).catch((err) => {
+        console.error("Failed to load pad texture:", texturePath, err);
       });
       const arrowMesh = new THREE.Mesh(arrowGeometry, arrowMaterial);
       arrowMesh.position.y = this.scale.y / 2 + 0.01;
@@ -1047,10 +1051,13 @@ export class MapObjectItem extends Item {
     object3D.scale.set(1, 1, 1);
 
     if (this.texturePath) {
-      const textureLoader = new THREE.TextureLoader();
-      textureLoader.load(this.texturePath, (texture: any) => {
-        applyMapObjectTexture(object3D, texture, this.scale, this.textureSettings);
-      });
+      MapAssetManager.loadTexture(this.texturePath)
+        .then((texture) => {
+          applyMapObjectTexture(object3D, texture, this.scale, this.textureSettings);
+        })
+        .catch((err) => {
+          console.error("Failed to load map object texture:", this.texturePath, err);
+        });
     }
 
     object3D.userData.isEditableMapObject = true;

@@ -71,6 +71,7 @@ export function loadMap(this: any, jsonData: any) {
 		console.error("Invalid map format");
 		return;
 	}
+	this.editableMapObjects = [];
 
 	if (jsonData.hasOwnProperty("playerConfig") && this.playerConfigManager) {
 		this.playerConfigManager.loadData(jsonData.playerConfig || { roles: [], assignments: {} });
@@ -176,6 +177,7 @@ export function loadMap(this: any, jsonData: any) {
 			}
 		}
 	});
+	this.editableMapObjects = this.sceneManager.scene.children.filter((obj: any) => obj.userData?.isEditableMapObject);
 	console.log("Map Loaded:", jsonData.objects.length, "objects");
 }
 
@@ -263,6 +265,16 @@ export function useCurrentItem(this: any, isRightClickOrItem: any = false) {
 
 	const consumed = item.use(context);
 
+	if (consumed) {
+		const newObject = this.sceneManager.scene.children[this.sceneManager.scene.children.length - 1];
+		if (newObject && newObject.userData?.isEditableMapObject) {
+			if (!this.editableMapObjects) this.editableMapObjects = [];
+			if (!this.editableMapObjects.includes(newObject)) {
+				this.editableMapObjects.push(newObject);
+			}
+		}
+	}
+
 	if (consumed && this.constructionMenu) {
 		this.constructionMenu.refreshLogicList();
 	}
@@ -340,8 +352,14 @@ export function _loadSingleMapObject(this: any, data: any) {
 
 	const lastObj = this.sceneManager.scene.children[this.sceneManager.scene.children.length - 1];
 
-	if (lastObj && data.authorId) {
-		lastObj.userData.authorId = data.authorId;
+	if (lastObj) {
+		if (!this.editableMapObjects) this.editableMapObjects = [];
+		if (!this.editableMapObjects.includes(lastObj)) {
+			this.editableMapObjects.push(lastObj);
+		}
+		if (data.authorId) {
+			lastObj.userData.authorId = data.authorId;
+		}
 	}
 
 	if (data.opacity !== undefined && lastObj) {
@@ -374,6 +392,9 @@ export function deleteObjectByUuid(this: any, uuid: string) {
 		try { this.world.removeRigidBody(obj.userData.rigidBody); } catch (e) { }
 	}
 	this.sceneManager.scene.remove(obj);
+	if (this.editableMapObjects) {
+		this.editableMapObjects = this.editableMapObjects.filter((o: any) => o.userData?.uuid !== uuid);
+	}
 	if (this.objectInspector && this.objectInspector.selectedObject === obj) {
 		this.objectInspector.hide();
 	}

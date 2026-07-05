@@ -97,6 +97,7 @@ export class Game {
 	_routeMapLoadStarted: boolean;
 	isDisposed: boolean;
 	animationFrameId: number | null;
+	editableMapObjects: any[];
 
 	animate: any;
 	setupDebugRender: any;
@@ -173,6 +174,7 @@ export class Game {
 
 	initGame() {
 		if (this.isDisposed) return;
+		this.editableMapObjects = [];
 		this.sceneManager = new SceneManager("game-container");
 		this.inputManager = new InputManager();
 		this.clock = new THREE.Clock();

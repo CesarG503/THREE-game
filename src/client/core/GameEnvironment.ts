@@ -3,6 +3,10 @@ import RAPIER from "@dimforge/rapier3d-compat";
 import { LevelBuilder } from "../environment/LevelBuilder";
 import { LevelLoader } from "../environment/LevelLoader";
 import { applyMapObjectTexture, normalizeTextureSettings } from "../utils/TextureMapping";
+import { MapAssetManager } from "../map/MapAssetManager";
+import { MapMaterialCache } from "../map/MapMaterialCache";
+import { MapGeometryBuilder, createPrismGeometryForShape } from "../map/MapGeometryBuilder";
+import { MapPhysicsBuilder } from "../map/MapPhysicsBuilder";
 
 export function buildEnvironment(this: any) {
 	this.levelBuilder = new LevelBuilder(this.sceneManager.scene, this.world);
@@ -39,12 +43,15 @@ export function updateEnvironmentConfig(this: any, config: any) {
 	const sx = this.environmentConfig.mapSizeX || 100;
 	const sz = this.environmentConfig.mapSizeZ || 100;
 
+	// Clear asset and material caches on update
+	MapAssetManager.clearCache();
+	MapMaterialCache.clearCache();
+
 	if (this.groundGroup) {
 		while (this.groundGroup.children.length > 0) {
 			const child = this.groundGroup.children[0];
 			this.groundGroup.remove(child);
 			if (child.geometry) child.geometry.dispose();
-			if (child.material) child.material.dispose();
 		}
 	}
 
@@ -55,152 +62,25 @@ export function updateEnvironmentConfig(this: any, config: any) {
 
 	const groundTextureSettings = normalizeTextureSettings(this.environmentConfig.groundTextureSettings || { tileSize: 5 });
 	const groundTexturePath = this.environmentConfig.groundTexturePath || null;
-	const groundTextureLoader = groundTexturePath ? new THREE.TextureLoader() : null;
 	const applyGroundTexture = (mesh: any, dimensions: any) => {
-		if (!groundTextureLoader || !groundTexturePath) return;
-		groundTextureLoader.load(groundTexturePath, (texture: any) => {
+		if (!groundTexturePath) return;
+		MapAssetManager.loadTexture(groundTexturePath).then((texture) => {
 			applyMapObjectTexture(mesh, texture, dimensions, groundTextureSettings);
-		});
+		}).catch(err => console.error("Failed to load ground texture:", groundTexturePath, err));
 	};
-	const createGroundMaterial = () => new THREE.MeshStandardMaterial({
-		color: groundTexturePath ? 0xffffff : 0x1a1a1a,
-		roughness: 0.8
-	});
+	const createGroundMaterial = () => {
+		const matKey = `ground_rect_${groundTexturePath || ""}`;
+		return MapMaterialCache.getMaterial(matKey, () => new THREE.MeshStandardMaterial({
+			color: groundTexturePath ? 0xffffff : 0x1a1a1a,
+			roughness: 0.8
+		}));
+	};
 
 	const groundGroups = this.environmentConfig.groundGroups || [];
 	const defaultGroup = groundGroups.find((g: any) => g.id === "default");
 
-	const createGroundMaterialForGroup = (group: any) => {
-		const texPath = group ? group.texturePath : groundTexturePath;
-		const colorHex = (group && (group.color3D || group.color)) ? parseInt((group.color3D || group.color).replace("#", "0x")) : (groundTexturePath ? 0xffffff : 0x1a1a1a);
-		return new THREE.MeshStandardMaterial({
-			color: texPath ? 0xffffff : colorHex,
-			roughness: 0.8
-		});
-	};
-
-	const applyGroundTextureForGroup = (mesh: any, dimensions: any, group: any) => {
-		const texPath = group ? group.texturePath : groundTexturePath;
-		const texSettings = normalizeTextureSettings(group ? (group.textureSettings || { tileSize: 5 }) : groundTextureSettings);
-		if (!texPath) return;
-		const groupTextureLoader = new THREE.TextureLoader();
-		groupTextureLoader.load(texPath, (texture: any) => {
-			applyMapObjectTexture(mesh, texture, dimensions, texSettings);
-		});
-	};
-
 	const ceilingGroups = this.environmentConfig.ceilingGroups || [];
 	const defaultCeilingGroup = ceilingGroups.find((g: any) => g.id === "default") || { id: "default", name: "Techo 1", color: "#E040FB" };
-
-	const createCeilingMaterialForGroup = (group: any) => {
-		const texPath = group ? group.texturePath : null;
-		const colorHex = (group && (group.color3D || group.color)) ? parseInt((group.color3D || group.color).replace("#", "0x")) : 0xe040fb;
-		return new THREE.MeshStandardMaterial({
-			color: texPath ? 0xffffff : colorHex,
-			roughness: 0.8,
-			side: THREE.DoubleSide
-		});
-	};
-
-	const applyCeilingTextureForGroup = (mesh: any, dimensions: any, group: any) => {
-		const texPath = group ? group.texturePath : null;
-		if (!texPath) return;
-		const texSettings = normalizeTextureSettings(group ? (group.textureSettings || { tileSize: 5 }) : { tileSize: 5 });
-		const groupTextureLoader = new THREE.TextureLoader();
-		groupTextureLoader.load(texPath, (texture: any) => {
-			applyMapObjectTexture(mesh, texture, dimensions, texSettings);
-		});
-	};
-
-	const createPrismGeometryForShape = (shape: string, cs: number, height: number, group: any) => {
-		const h2 = height / 2;
-		const texSettings = normalizeTextureSettings(group ? (group.textureSettings || { tileSize: 5 }) : groundTextureSettings);
-		const tile = texSettings.fitMode === "stretch" ? cs : texSettings.tileSize;
-
-		let v1 = new THREE.Vector2(-cs/2, -cs/2);
-		let v2 = new THREE.Vector2(-cs/2, cs/2);
-		let v3 = new THREE.Vector2(cs/2, -cs/2);
-
-		if (shape === "ne") {
-			v1 = new THREE.Vector2(-cs/2, -cs/2);
-			v2 = new THREE.Vector2(cs/2, -cs/2);
-			v3 = new THREE.Vector2(cs/2, cs/2);
-		} else if (shape === "se") {
-			v1 = new THREE.Vector2(cs/2, -cs/2);
-			v2 = new THREE.Vector2(cs/2, cs/2);
-			v3 = new THREE.Vector2(-cs/2, cs/2);
-		} else if (shape === "sw") {
-			v1 = new THREE.Vector2(-cs/2, -cs/2);
-			v2 = new THREE.Vector2(-cs/2, cs/2);
-			v3 = new THREE.Vector2(cs/2, cs/2);
-		}
-
-		// Ensure counter-clockwise winding order for 2D vertices (looking down in X/Z)
-		const cross = (v2.x - v1.x) * (v3.y - v1.y) - (v2.y - v1.y) * (v3.x - v1.x);
-		if (cross > 0) {
-			const tmp = v2;
-			v2 = v3;
-			v3 = tmp;
-		}
-
-		const geometry = new THREE.BufferGeometry();
-		const vertices: number[] = [];
-		const normals: number[] = [];
-		const uvs: number[] = [];
-
-		const addTriangle = (
-			p1: THREE.Vector3, p2: THREE.Vector3, p3: THREE.Vector3,
-			u1: THREE.Vector2, u2: THREE.Vector2, u3: THREE.Vector2
-		) => {
-			vertices.push(p1.x, p1.y, p1.z, p2.x, p2.y, p2.z, p3.x, p3.y, p3.z);
-			const cb = new THREE.Vector3().subVectors(p3, p2);
-			const ab = new THREE.Vector3().subVectors(p1, p2);
-			cb.cross(ab).normalize();
-			normals.push(cb.x, cb.y, cb.z, cb.x, cb.y, cb.z, cb.x, cb.y, cb.z);
-			uvs.push(u1.x, u1.y, u2.x, u2.y, u3.x, u3.y);
-		};
-
-		const B1 = new THREE.Vector3(v1.x, -h2, v1.y);
-		const B2 = new THREE.Vector3(v2.x, -h2, v2.y);
-		const B3 = new THREE.Vector3(v3.x, -h2, v3.y);
-
-		const T1 = new THREE.Vector3(v1.x, h2, v1.y);
-		const T2 = new THREE.Vector3(v2.x, h2, v2.y);
-		const T3 = new THREE.Vector3(v3.x, h2, v3.y);
-
-		const getUV = (v: THREE.Vector2) => {
-			return new THREE.Vector2((v.x + cs/2) / tile, (v.y + cs/2) / tile);
-		};
-
-		const uv1 = getUV(v1);
-		const uv2 = getUV(v2);
-		const uv3 = getUV(v3);
-
-		// Top
-		addTriangle(T1, T2, T3, uv1, uv2, uv3);
-		// Bottom
-		addTriangle(B1, B3, B2, uv1, uv3, uv2);
-
-		const L1 = v1.distanceTo(v2);
-		const L2 = v2.distanceTo(v3);
-		const L3 = v3.distanceTo(v1);
-
-		// Sides
-		addTriangle(B1, B2, T2, new THREE.Vector2(0, 0), new THREE.Vector2(L1 / tile, 0), new THREE.Vector2(L1 / tile, height / tile));
-		addTriangle(B1, T2, T1, new THREE.Vector2(0, 0), new THREE.Vector2(L1 / tile, height / tile), new THREE.Vector2(0, height / tile));
-
-		addTriangle(B2, B3, T3, new THREE.Vector2(0, 0), new THREE.Vector2(L2 / tile, 0), new THREE.Vector2(L2 / tile, height / tile));
-		addTriangle(B2, T3, T2, new THREE.Vector2(0, 0), new THREE.Vector2(L2 / tile, height / tile), new THREE.Vector2(0, height / tile));
-
-		addTriangle(B3, B1, T1, new THREE.Vector2(0, 0), new THREE.Vector2(L3 / tile, 0), new THREE.Vector2(L3 / tile, height / tile));
-		addTriangle(B3, T1, T3, new THREE.Vector2(0, 0), new THREE.Vector2(L3 / tile, height / tile), new THREE.Vector2(0, height / tile));
-
-		geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
-		geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
-		geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
-
-		return geometry;
-	};
 
 	if (shapeType === "rect") {
 		const geo = new THREE.BoxGeometry(sx, 1, sz);
@@ -227,99 +107,181 @@ export function updateEnvironmentConfig(this: any, config: any) {
 		const customGridGroups = this.environmentConfig.customGridGroups || {};
 		const customGridShapes = this.environmentConfig.customGridShapes || {};
 
-		grid.forEach((key: any) => {
+		// 1. Build Merged Ground Meshes
+		const mergedGroundGeos = MapGeometryBuilder.buildMergedGround(
+			grid,
+			cellSize,
+			customGridGroups,
+			groundGroups,
+			defaultGroup,
+			customGridShapes,
+			groundTextureSettings
+		);
+
+		mergedGroundGeos.forEach((geo, groupId) => {
+			const group = groundGroups.find((g: any) => g.id === groupId) || defaultGroup;
+			const texPath = group ? group.texturePath : groundTexturePath;
+			const colorHex = (group && (group.color3D || group.color)) ? parseInt((group.color3D || group.color).replace("#", "0x")) : (groundTexturePath ? 0xffffff : 0x1a1a1a);
+			const matKey = `ground_${groupId}_${texPath || ""}_${colorHex}`;
+			const material = MapMaterialCache.getMaterial(matKey, () => new THREE.MeshStandardMaterial({
+				color: texPath ? 0xffffff : colorHex,
+				roughness: 0.8
+			}));
+
+			const mesh = new THREE.Mesh(geo, material);
+			mesh.receiveShadow = true;
+			this.groundGroup.add(mesh);
+
+			if (texPath) {
+				const texSettings = normalizeTextureSettings(group ? (group.textureSettings || { tileSize: 5 }) : groundTextureSettings);
+				MapAssetManager.loadTexture(texPath).then((texture) => {
+					applyMapObjectTexture(mesh, texture, { x: cellSize, y: 1, z: cellSize }, texSettings);
+				}).catch(err => console.error("Failed to load ground texture:", texPath, err));
+			}
+		});
+
+		// 2. Build Ground Colliders
+		// A. Slopes/Prisms
+		const prismKeys = grid.filter(key => (customGridShapes[key] || "full") !== "full");
+		prismKeys.forEach(key => {
+			const shape = customGridShapes[key];
 			const [gx, gz] = key.split(",").map(Number);
 			const x = gx * cellSize;
 			const z = gz * cellSize;
-
 			const groupId = customGridGroups[key] || "default";
 			const group = groundGroups.find((g: any) => g.id === groupId) || defaultGroup;
-			const shape = customGridShapes[key] || "full";
-
-			let geo;
-			if (shape === "full") {
-				geo = new THREE.BoxGeometry(cellSize, 1, cellSize);
-			} else {
-				geo = createPrismGeometryForShape(shape, cellSize, 1, group);
-			}
-
-			const mesh = new THREE.Mesh(geo, createGroundMaterialForGroup(group));
-			mesh.position.set(x, 0, z);
-			mesh.receiveShadow = true;
-			this.groundGroup.add(mesh);
-			applyGroundTextureForGroup(mesh, { x: cellSize, y: 1, z: cellSize }, group);
-
+			const geo = createPrismGeometryForShape(shape, cellSize, 1, group, groundTextureSettings);
 			let colDesc;
-			if (shape === "full") {
+			try {
+				const vertices = geo.attributes.position.array;
+				colDesc = RAPIER.ColliderDesc.convexHull(vertices as any);
+			} catch (e) {
+				console.warn("convexHull failed for prism slope, falling back to cuboid", e);
+			}
+			if (!colDesc) {
 				colDesc = RAPIER.ColliderDesc.cuboid(cellSize / 2, 0.5, cellSize / 2);
-			} else {
-				try {
-					const vertices = geo.attributes.position.array;
-					colDesc = RAPIER.ColliderDesc.convexHull(vertices as any);
-				} catch (e) {
-					console.warn("convexHull failed for prism, falling back to cuboid", e);
-				}
-				if (!colDesc) {
-					colDesc = RAPIER.ColliderDesc.cuboid(cellSize / 2, 0.5, cellSize / 2);
-				}
 			}
 			colDesc.setTranslation(x, 0, z);
 			this.groundColliders.push(this.world.createCollider(colDesc, this.groundBody));
+			geo.dispose();
 		});
 
-		// BUILD CEILINGS
+		// B. Greedy Merged Cuboids
+		const fullCellKeys = grid.filter(key => (customGridShapes[key] || "full") === "full");
+		const mergedRects = MapPhysicsBuilder.greedyMerge2D(fullCellKeys);
+		mergedRects.forEach(rect => {
+			const width = rect.w * cellSize;
+			const depth = rect.h * cellSize;
+			const centerX = (rect.gx + (rect.w - 1) / 2) * cellSize;
+			const centerZ = (rect.gz + (rect.h - 1) / 2) * cellSize;
+
+			const colDesc = RAPIER.ColliderDesc.cuboid(width / 2, 0.5, depth / 2);
+			colDesc.setTranslation(centerX, 0, centerZ);
+			this.groundColliders.push(this.world.createCollider(colDesc, this.groundBody));
+		});
+
+		// 3. Build Merged Ceiling Meshes
 		const customGridCeilingGroups = this.environmentConfig.customGridCeilingGroups || {};
 		const customGridCeilingShapes = this.environmentConfig.customGridCeilingShapes || {};
 		const customGridWallGroups = this.environmentConfig.customGridWallGroups || {};
 		const invisibleWallsGroups = this.environmentConfig.invisibleWallsGroups || [];
 
-		Object.keys(customGridCeilingGroups).forEach((key: any) => {
+		const mergedCeilingGeos = MapGeometryBuilder.buildMergedCeilings(
+			customGridCeilingGroups,
+			cellSize,
+			ceilingGroups,
+			defaultCeilingGroup,
+			customGridCeilingShapes,
+			customGridWallGroups,
+			invisibleWallsGroups
+		);
+
+		mergedCeilingGeos.forEach((geoData) => {
+			const group = ceilingGroups.find((g: any) => g.id === geoData.ceilingGroupId) || defaultCeilingGroup;
+			const texPath = group ? group.texturePath : null;
+			const colorHex = (group && (group.color3D || group.color)) ? parseInt((group.color3D || group.color).replace("#", "0x")) : 0xe040fb;
+			const matKey = `ceiling_${geoData.ceilingGroupId}_${texPath || ""}_${colorHex}`;
+			const material = MapMaterialCache.getMaterial(matKey, () => new THREE.MeshStandardMaterial({
+				color: texPath ? 0xffffff : colorHex,
+				roughness: 0.8,
+				side: THREE.DoubleSide
+			}));
+
+			const mesh = new THREE.Mesh(geoData.geometry, material);
+			mesh.castShadow = true;
+			mesh.receiveShadow = true;
+			this.groundGroup.add(mesh);
+
+			if (texPath) {
+				const texSettings = normalizeTextureSettings(group ? (group.textureSettings || { tileSize: 5 }) : { tileSize: 5 });
+				MapAssetManager.loadTexture(texPath).then((texture) => {
+					applyMapObjectTexture(mesh, texture, { x: cellSize, y: 1, z: cellSize }, texSettings);
+				}).catch(err => console.error("Failed to load ceiling texture:", texPath, err));
+			}
+		});
+
+		// 4. Build Ceiling Colliders
+		// A. Slopes/Prisms
+		const ceilingPrismKeys = Object.keys(customGridCeilingGroups).filter(key => (customGridCeilingShapes[key] || "full") !== "full");
+		ceilingPrismKeys.forEach(key => {
+			const ceilingGroupId = customGridCeilingGroups[key];
+			if (!ceilingGroupId) return;
+			const group = ceilingGroups.find((g: any) => g.id === ceilingGroupId) || defaultCeilingGroup;
+			const shape = customGridCeilingShapes[key];
+			const wallGroupId = customGridWallGroups[key] || "default";
+			const wallGroup = invisibleWallsGroups.find((wg: any) => wg.id === wallGroupId);
+			const wallHeight = (wallGroup && wallGroup.height !== undefined) ? wallGroup.height : 10;
+			const posY = wallHeight - 1.0;
 			const [gx, gz] = key.split(",").map(Number);
 			const x = gx * cellSize;
 			const z = gz * cellSize;
 
-			const ceilingGroupId = customGridCeilingGroups[key];
-			if (!ceilingGroupId) return;
-
-			const group = ceilingGroups.find((g: any) => g.id === ceilingGroupId) || defaultCeilingGroup;
-			const shape = customGridCeilingShapes[key] || "full";
-
-			const wallGroupId = customGridWallGroups[key] || "default";
-			const wallGroup = invisibleWallsGroups.find((wg: any) => wg.id === wallGroupId);
-			const wallHeight = (this.environmentConfig.invisibleWallsAdvanced && wallGroup) ? (wallGroup.height !== undefined ? wallGroup.height : 10) : 10;
-
-			let geo;
-			if (shape === "full") {
-				geo = new THREE.BoxGeometry(cellSize, 1, cellSize);
-			} else {
-				geo = createPrismGeometryForShape(shape, cellSize, 1, group);
-			}
-
-			const posY = wallHeight - 1.0;
-
-			const mesh = new THREE.Mesh(geo, createCeilingMaterialForGroup(group));
-			mesh.position.set(x, posY, z);
-			mesh.castShadow = true;
-			mesh.receiveShadow = true;
-			this.groundGroup.add(mesh);
-			applyCeilingTextureForGroup(mesh, { x: cellSize, y: 1, z: cellSize }, group);
-
+			const geo = createPrismGeometryForShape(shape, cellSize, 1, group, { tileSize: 5 });
 			let colDesc;
-			if (shape === "full") {
+			try {
+				const vertices = geo.attributes.position.array;
+				colDesc = RAPIER.ColliderDesc.convexHull(vertices as any);
+			} catch (e) {
+				console.warn("convexHull failed for ceiling prism, falling back to cuboid", e);
+			}
+			if (!colDesc) {
 				colDesc = RAPIER.ColliderDesc.cuboid(cellSize / 2, 0.5, cellSize / 2);
-			} else {
-				try {
-					const vertices = geo.attributes.position.array;
-					colDesc = RAPIER.ColliderDesc.convexHull(vertices as any);
-				} catch (e) {
-					console.warn("convexHull failed for ceiling prism, falling back to cuboid", e);
-				}
-				if (!colDesc) {
-					colDesc = RAPIER.ColliderDesc.cuboid(cellSize / 2, 0.5, cellSize / 2);
-				}
 			}
 			colDesc.setTranslation(x, posY, z);
 			this.groundColliders.push(this.world.createCollider(colDesc, this.groundBody));
+			geo.dispose();
+		});
+
+		// B. Greedy Merged Cuboids (grouped by height)
+		const ceilingFullKeysByPosY = new Map<number, string[]>();
+		Object.keys(customGridCeilingGroups).forEach(key => {
+			if ((customGridCeilingShapes[key] || "full") !== "full") return;
+			const ceilingGroupId = customGridCeilingGroups[key];
+			if (!ceilingGroupId) return;
+
+			const wallGroupId = customGridWallGroups[key] || "default";
+			const wallGroup = invisibleWallsGroups.find((wg: any) => wg.id === wallGroupId);
+			const wallHeight = (wallGroup && wallGroup.height !== undefined) ? wallGroup.height : 10;
+			const posY = wallHeight - 1.0;
+
+			if (!ceilingFullKeysByPosY.has(posY)) {
+				ceilingFullKeysByPosY.set(posY, []);
+			}
+			ceilingFullKeysByPosY.get(posY)!.push(key);
+		});
+
+		ceilingFullKeysByPosY.forEach((keys, posY) => {
+			const mergedRects = MapPhysicsBuilder.greedyMerge2D(keys);
+			mergedRects.forEach(rect => {
+				const width = rect.w * cellSize;
+				const depth = rect.h * cellSize;
+				const centerX = (rect.gx + (rect.w - 1) / 2) * cellSize;
+				const centerZ = (rect.gz + (rect.h - 1) / 2) * cellSize;
+
+				const colDesc = RAPIER.ColliderDesc.cuboid(width / 2, 0.5, depth / 2);
+				colDesc.setTranslation(centerX, posY, centerZ);
+				this.groundColliders.push(this.world.createCollider(colDesc, this.groundBody));
+			});
 		});
 	}
 
@@ -569,15 +531,60 @@ export function updateEnvironmentConfig(this: any, config: any) {
 		const isAdvanced = !!this.environmentConfig.invisibleWallsAdvanced;
 		const wallGroups = this.environmentConfig.invisibleWallsGroups || [];
 		const customGridWallGroups = this.environmentConfig.customGridWallGroups || {};
+		const cellSize = this.environmentConfig.customCellSize || 10;
 
-		wallDefs.forEach((def) => {
+		// Merge wall definitions collinear segments (1D wall merging)
+		const mergedWallDefs = MapPhysicsBuilder.mergeWallSegments(
+			wallDefs,
+			cellSize,
+			wallThickness,
+			customGridWallGroups
+		);
+
+		// Build merged geometries for rendering
+		const mergedWallGeos = MapGeometryBuilder.buildMergedWalls(
+			mergedWallDefs,
+			customGridWallGroups,
+			wallGroups,
+			isAdvanced
+		);
+
+		mergedWallGeos.forEach((meta, groupId) => {
+			let mat: THREE.Material;
+			const matKey = `wall_${groupId}_${meta.texturePath || ""}_${meta.colorStr}_${meta.opacity}`;
+
+			if (meta.isWireframeOnly) {
+				mat = MapMaterialCache.getMaterial(matKey, () => new THREE.MeshBasicMaterial({
+					color: 0xff0000,
+					wireframe: true,
+					transparent: true,
+					opacity: 0
+				}));
+			} else {
+				mat = MapMaterialCache.getMaterial(matKey, () => new THREE.MeshStandardMaterial({
+					color: new THREE.Color(meta.colorStr),
+					transparent: meta.opacity < 1.0,
+					opacity: meta.opacity,
+					roughness: 0.8,
+					metalness: 0.2
+				}));
+			}
+
+			const mesh = new THREE.Mesh(meta.geometry, mat);
+			this.sceneManager.scene.add(mesh);
+			this.invisibleWallMeshes.push(mesh);
+
+			if (meta.opacity > 0 && meta.texturePath) {
+				MapAssetManager.loadTexture(meta.texturePath).then((texture) => {
+					const settings = normalizeTextureSettings(meta.textureSettings || { tileSize: 5 });
+					applyMapObjectTexture(mesh, texture, null, settings);
+				}).catch(err => console.error("Failed to load wall texture:", meta.texturePath, err));
+			}
+		});
+
+		// Build physics colliders for each merged wall segment
+		mergedWallDefs.forEach((def) => {
 			let finalHeight = 100;
-			let colorStr = "#FF5722";
-			let opacity = 0.0;
-			let transparent = true;
-			let texturePath: string | null = null;
-			let textureSettings: any = null;
-
 			let group: any = null;
 			if (isAdvanced && def.cellKey) {
 				const wallGroupId = customGridWallGroups[def.cellKey];
@@ -585,65 +592,18 @@ export function updateEnvironmentConfig(this: any, config: any) {
 					group = wallGroups.find((g: any) => g.id === wallGroupId);
 				}
 			}
-			
 			if (!group && isAdvanced) {
 				group = wallGroups.find((g: any) => g.id === "default") || wallGroups[0];
 			}
-
 			if (group) {
 				finalHeight = group.height !== undefined ? group.height : 10;
-				colorStr = group.color3D || group.color || "#FF5722";
-				opacity = group.opacity !== undefined ? group.opacity : 1.0;
-				transparent = group.transparent !== undefined ? group.transparent : (opacity < 1.0);
-				texturePath = group.texturePath || null;
-				textureSettings = group.textureSettings || null;
 			}
 
-			let mat: THREE.Material;
-			if (opacity === 0) {
-				mat = new THREE.MeshBasicMaterial({ color: 0xff0000, wireframe: true, transparent: true, opacity: 0 });
-			} else {
-				mat = new THREE.MeshStandardMaterial({ 
-					color: new THREE.Color(colorStr), 
-					transparent: transparent, 
-					opacity: opacity,
-					roughness: 0.8,
-					metalness: 0.2
-				});
-			}
-
-			const geo = new THREE.BoxGeometry(def.width, finalHeight, def.depth);
-			const mesh = new THREE.Mesh(geo, mat);
 			const posY = finalHeight / 2 - 0.5;
-			mesh.position.set(def.pos.x, posY, def.pos.z);
-			
+			const bodyDesc = RAPIER.RigidBodyDesc.fixed().setTranslation(def.pos.x, posY, def.pos.z);
 			const quat = new THREE.Quaternion();
 			if (def.rotY) {
 				quat.setFromEuler(new THREE.Euler(0, def.rotY, 0));
-				mesh.quaternion.copy(quat);
-			}
-
-			if (opacity > 0 && texturePath) {
-				const loader = new THREE.TextureLoader();
-				loader.load(texturePath, (texture: any) => {
-					texture.wrapS = THREE.RepeatWrapping;
-					texture.wrapT = THREE.RepeatWrapping;
-					
-					const settings = normalizeTextureSettings(textureSettings || { tileSize: 5 });
-					const dimensions = new THREE.Vector3(def.width, finalHeight, def.depth);
-					applyMapObjectTexture(mesh, texture, dimensions, settings);
-					
-					if (mesh.material) {
-						(mesh.material as any).needsUpdate = true;
-					}
-				});
-			}
-
-			this.sceneManager.scene.add(mesh);
-			this.invisibleWallMeshes.push(mesh);
-
-			const bodyDesc = RAPIER.RigidBodyDesc.fixed().setTranslation(def.pos.x, posY, def.pos.z);
-			if (def.rotY) {
 				bodyDesc.setRotation(quat);
 			}
 			const body = this.world.createRigidBody(bodyDesc);

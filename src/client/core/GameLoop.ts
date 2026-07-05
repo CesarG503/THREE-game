@@ -60,14 +60,11 @@ export function renderOrientationGizmo(this: any) {
 	renderer.setViewport(0, 0, width, height);
 }
 
-function getEditableMapObjects(scene: THREE.Scene, types: string[]) {
-	const objects: any[] = [];
-	scene.children.forEach((obj: any) => {
-		if (obj.userData?.isEditableMapObject && types.includes(obj.userData.mapObjectType)) {
-			objects.push(obj);
-		}
-	});
-	return objects;
+function getEditableMapObjects(game: any, types: string[]) {
+	if (!game.editableMapObjects) {
+		game.editableMapObjects = game.sceneManager.scene.children.filter((obj: any) => obj.userData?.isEditableMapObject);
+	}
+	return game.editableMapObjects.filter((obj: any) => types.includes(obj.userData.mapObjectType));
 }
 
 function updateMapImpulsePads(game: any) {
@@ -75,7 +72,7 @@ function updateMapImpulsePads(game: any) {
 
 	const charPos = game.character.getPosition();
 	const now = game.clock ? game.clock.getElapsedTime() : performance.now() / 1000;
-	const pads = getEditableMapObjects(game.sceneManager.scene, ["impulse_jump", "impulse_lateral"]);
+	const pads = getEditableMapObjects(game, ["impulse_jump", "impulse_lateral"]);
 
 	pads.forEach((pad: any) => {
 		if (!pad.userData.logicProperties) pad.userData.logicProperties = {};
@@ -133,7 +130,7 @@ function updateMapGravityPads(game: any) {
 
 	const charPos = game.character.getPosition();
 	const now = game.clock ? game.clock.getElapsedTime() : performance.now() / 1000;
-	const pads = getEditableMapObjects(game.sceneManager.scene, ["gravity_pad"]);
+	const pads = getEditableMapObjects(game, ["gravity_pad"]);
 
 	pads.forEach((pad: any) => {
 		if (!pad.userData.logicProperties) pad.userData.logicProperties = {};
@@ -178,7 +175,7 @@ function updateMapGravityPads(game: any) {
 function updateMapFarmingZones(game: any, dt: number) {
 	if (!game.itemDropManager || !game.sceneManager?.scene) return;
 
-	const zones = getEditableMapObjects(game.sceneManager.scene, ["farming_zone"]);
+	const zones = getEditableMapObjects(game, ["farming_zone"]);
 	zones.forEach((zone: any) => {
 		if (!zone.userData.logicProperties) zone.userData.logicProperties = {};
 		const props = zone.userData.logicProperties;

@@ -56,7 +56,7 @@ function getMeshDimensions(mesh: any, fallbackDimensions: any) {
   };
 }
 
-function remapBoxUVs(geometry: THREE.BufferGeometry, dimensions: any, settings: Required<MapTextureSettings>) {
+export function remapBoxUVs(geometry: THREE.BufferGeometry, dimensions: any, settings: Required<MapTextureSettings>) {
   const uv = geometry.getAttribute("uv") as THREE.BufferAttribute | undefined;
   const position = geometry.getAttribute("position") as THREE.BufferAttribute | undefined;
   const normal = geometry.getAttribute("normal") as THREE.BufferAttribute | undefined;

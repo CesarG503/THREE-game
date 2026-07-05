@@ -129,6 +129,12 @@ export class MapShapeEditor {
         tabWalls.style.cssText = `
             flex: 1; padding: 8px; border: none; border-radius: 4px; font-weight: bold; font-size: 13px; cursor: pointer; transition: all 0.2s;
         `;
+
+        const tabCeiling = document.createElement('button');
+        tabCeiling.textContent = "Techo";
+        tabCeiling.style.cssText = `
+            flex: 1; padding: 8px; border: none; border-radius: 4px; font-weight: bold; font-size: 13px; cursor: pointer; transition: all 0.2s;
+        `;
         
         tabFloor.onclick = () => {
             this.activeTab = "floor";
@@ -140,25 +146,35 @@ export class MapShapeEditor {
             this.syncTabs();
             this.draw();
         };
+        tabCeiling.onclick = () => {
+            this.activeTab = "ceiling";
+            this.syncTabs();
+            this.draw();
+        };
         
         tabContainer.appendChild(tabFloor);
         tabContainer.appendChild(tabWalls);
+        tabContainer.appendChild(tabCeiling);
         sidebar.appendChild(tabContainer);
         
         this.tabFloorBtn = tabFloor;
         this.tabWallsBtn = tabWalls;
+        this.tabCeilingBtn = tabCeiling;
 
         // Container for Floor Editor
         const floorEditorContent = document.createElement('div');
         this.floorEditorContent = floorEditorContent;
         floorEditorContent.style.cssText = "display: flex; flex-direction: column; gap: 20px; flex: 1;";
-        sidebar.appendChild(floorEditorContent);
 
         // Container for Walls Editor
         const wallsEditorContent = document.createElement('div');
         this.wallsEditorContent = wallsEditorContent;
         wallsEditorContent.style.cssText = "display: none; flex-direction: column; gap: 20px; flex: 1;";
-        sidebar.appendChild(wallsEditorContent);
+
+        // Container for Ceiling Editor
+        const ceilingEditorContent = document.createElement('div');
+        this.ceilingEditorContent = ceilingEditorContent;
+        ceilingEditorContent.style.cssText = "display: none; flex-direction: column; gap: 20px; flex: 1;";
 
         // Shape Type
         const shapeGroup = document.createElement('div');
@@ -179,7 +195,6 @@ export class MapShapeEditor {
         };
         this.shapeSelect = shapeSelect;
         shapeGroup.appendChild(shapeSelect);
-        floorEditorContent.appendChild(shapeGroup);
 
         // Dimensions Group
         const dimGroup = document.createElement('div');
@@ -196,7 +211,6 @@ export class MapShapeEditor {
 
         dimGroup.appendChild(createInput("Ancho (X):", "mse-size-x"));
         dimGroup.appendChild(createInput("Largo (Z):", "mse-size-z"));
-        floorEditorContent.appendChild(dimGroup);
 
         // Instructions for Custom Mode
         const customInfo = document.createElement('div');
@@ -234,7 +248,6 @@ export class MapShapeEditor {
             • Click Medio + Arrastrar: Mover cámara
         `;
         customInfo.appendChild(instructions);
-        floorEditorContent.appendChild(customInfo);
 
         // Ground Groups list section (only visible in custom mode)
         const groupsSection = document.createElement('div');
@@ -308,6 +321,9 @@ export class MapShapeEditor {
         groupPropertiesSection.style.cssText = `display: flex; flex-direction: column; gap: 12px; border-top: 1px solid #333; padding-top: 15px;`;
         floorEditorContent.appendChild(groupPropertiesSection);
 
+        // Copy Groups Panel (Floor)
+        this.createCopyPanel(floorEditorContent, "floor");
+
         // Walls Advanced Editor controls
         const wallGroupsSection = document.createElement('div');
         this.wallGroupsSection = wallGroupsSection;
@@ -340,6 +356,92 @@ export class MapShapeEditor {
         this.wallPropertiesSection = wallPropertiesSection;
         wallPropertiesSection.style.cssText = `display: flex; flex-direction: column; gap: 12px; border-top: 1px solid #333; padding-top: 15px;`;
         wallsEditorContent.appendChild(wallPropertiesSection);
+
+        // Copy Groups Panel (Walls)
+        this.createCopyPanel(wallsEditorContent, "walls");
+
+        // Ceilings Editor Controls
+        const ceilingShapesSection = document.createElement('div');
+        this.ceilingShapesSection = ceilingShapesSection;
+        ceilingShapesSection.style.cssText = `display: flex; flex-direction: column; gap: 10px; border-top: 1px solid #333; padding-top: 15px;`;
+        ceilingShapesSection.innerHTML = `<label style="color:#aaa; font-size:14px; text-transform:uppercase;">Forma del Techo</label>`;
+
+        const ceilingShapesGrid = document.createElement('div');
+        ceilingShapesGrid.style.cssText = `display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px;`;
+        
+        const ceilingShapesList = [
+            { id: "full", char: "█", title: "Completo" },
+            { id: "nw", char: "◤", title: "Diagonal Sup-Izq" },
+            { id: "ne", char: "◥", title: "Diagonal Sup-Der" },
+            { id: "se", char: "◢", title: "Diagonal Inf-Der" },
+            { id: "sw", char: "◣", title: "Diagonal Inf-Izq" }
+        ];
+
+        ceilingShapesList.forEach((sh) => {
+            const btn = document.createElement('button');
+            btn.type = "button";
+            btn.className = "mse-ceiling-shape-select-btn";
+            btn.title = sh.title;
+            btn.dataset.shapeId = sh.id;
+            btn.textContent = sh.char;
+            btn.style.cssText = `
+                aspect-ratio: 1; border: 1px solid #555; border-radius: 4px; cursor: pointer;
+                background-color: #333; color: white; font-size: 16px; font-weight: bold;
+                display: flex; align-items: center; justify-content: center; transition: all 0.2s;
+            `;
+            btn.onclick = () => {
+                this.activeCeilingShape = sh.id;
+                this.syncCeilingShapeButtons();
+            };
+            ceilingShapesGrid.appendChild(btn);
+        });
+        ceilingShapesSection.appendChild(ceilingShapesGrid);
+        ceilingEditorContent.appendChild(ceilingShapesSection);
+
+        const ceilingGroupsSection = document.createElement('div');
+        this.ceilingGroupsSection = ceilingGroupsSection;
+        ceilingGroupsSection.style.cssText = `display: flex; flex-direction: column; gap: 10px; border-top: 1px solid #333; padding-top: 15px;`;
+        
+        const ceilingGroupsHeader = document.createElement('div');
+        ceilingGroupsHeader.style.cssText = `display: flex; justify-content: space-between; align-items: center;`;
+        ceilingGroupsHeader.innerHTML = `<label style="color:#aaa; font-size:14px; text-transform:uppercase;">Grupos de Techo</label>`;
+        
+        const addCeilingGroupBtn = document.createElement('button');
+        addCeilingGroupBtn.textContent = "+ Añadir";
+        addCeilingGroupBtn.style.cssText = `
+            padding: 3px 8px; background: #008CBA; color: white; border: none; border-radius: 4px;
+            font-size: 11px; cursor: pointer; font-weight: bold;
+        `;
+        addCeilingGroupBtn.onclick = () => this.addNewCeilingGroup();
+        ceilingGroupsHeader.appendChild(addCeilingGroupBtn);
+        ceilingGroupsSection.appendChild(ceilingGroupsHeader);
+
+        const ceilingGroupsContainer = document.createElement('div');
+        ceilingGroupsContainer.style.cssText = `
+            display: flex; flex-direction: column; gap: 6px; max-height: 120px; overflow-y: auto;
+            background: #111; padding: 6px; border-radius: 4px; border: 1px solid #333;
+        `;
+        this.ceilingGroupsContainer = ceilingGroupsContainer;
+        ceilingGroupsSection.appendChild(ceilingGroupsContainer);
+        ceilingEditorContent.appendChild(ceilingGroupsSection);
+
+        const ceilingPropertiesSection = document.createElement('div');
+        this.ceilingPropertiesSection = ceilingPropertiesSection;
+        ceilingPropertiesSection.style.cssText = `display: flex; flex-direction: column; gap: 12px; border-top: 1px solid #333; padding-top: 15px;`;
+        ceilingEditorContent.appendChild(ceilingPropertiesSection);
+
+        // Copy Groups Panel (Ceiling)
+        this.createCopyPanel(ceilingEditorContent, "ceiling");
+
+        // Append global sections to sidebar first
+        sidebar.appendChild(shapeGroup);
+        sidebar.appendChild(dimGroup);
+        sidebar.appendChild(customInfo);
+
+        // Append tab editors
+        sidebar.appendChild(floorEditorContent);
+        sidebar.appendChild(wallsEditorContent);
+        sidebar.appendChild(ceilingEditorContent);
 
         // Apply Button
         const spacer = document.createElement('div');
@@ -454,6 +556,8 @@ export class MapShapeEditor {
         if (!this.config.customGridGroups) this.config.customGridGroups = {};
         if (!this.config.customGridShapes) this.config.customGridShapes = {};
         if (!this.config.customGridWallGroups) this.config.customGridWallGroups = {};
+        if (!this.config.customGridCeilingGroups) this.config.customGridCeilingGroups = {};
+        if (!this.config.customGridCeilingShapes) this.config.customGridCeilingShapes = {};
 
         if (this.activeTab === "walls") {
             for (let x = minX; x <= maxX; x++) {
@@ -471,12 +575,33 @@ export class MapShapeEditor {
             return;
         }
 
+        if (this.activeTab === "ceiling") {
+            for (let x = minX; x <= maxX; x++) {
+                for (let z = minZ; z <= maxZ; z++) {
+                    const key = `${x},${z}`;
+                    if (this.selectionBox.mode) {
+                        this.config.customGridCeilingGroups[key] = this.activeCeilingGroupId;
+                        this.config.customGridCeilingShapes[key] = this.activeCeilingShape || "full";
+                    } else {
+                        delete this.config.customGridCeilingGroups[key];
+                        delete this.config.customGridCeilingShapes[key];
+                    }
+                }
+            }
+            return;
+        }
+
         for (let x = minX; x <= maxX; x++) {
             for (let z = minZ; z <= maxZ; z++) {
                 const key = `${x},${z}`;
                 if (this.selectionBox.mode) {
                     if (!this.config.customGrid.includes(key)) {
                         this.config.customGrid.push(key);
+                        // Auto-generate ceiling if not already present
+                        if (!this.config.customGridCeilingGroups[key]) {
+                            this.config.customGridCeilingGroups[key] = "default";
+                            this.config.customGridCeilingShapes[key] = "full";
+                        }
                     }
                     this.config.customGridGroups[key] = this.activeGroupId;
                     this.config.customGridShapes[key] = this.activeCellShape || "full";
@@ -487,7 +612,6 @@ export class MapShapeEditor {
                     }
                     delete this.config.customGridGroups[key];
                     delete this.config.customGridShapes[key];
-                    delete this.config.customGridWallGroups[key];
                 }
             }
         }
@@ -501,6 +625,8 @@ export class MapShapeEditor {
         if (!this.config.customGridGroups) this.config.customGridGroups = {};
         if (!this.config.customGridShapes) this.config.customGridShapes = {};
         if (!this.config.customGridWallGroups) this.config.customGridWallGroups = {};
+        if (!this.config.customGridCeilingGroups) this.config.customGridCeilingGroups = {};
+        if (!this.config.customGridCeilingShapes) this.config.customGridCeilingShapes = {};
 
         if (this.activeTab === "walls") {
             if (this.config.customGrid.includes(key)) {
@@ -519,11 +645,40 @@ export class MapShapeEditor {
             return;
         }
 
+        if (this.activeTab === "ceiling") {
+            if (this.drawMode) {
+                let changed = false;
+                if (this.config.customGridCeilingGroups[key] !== this.activeCeilingGroupId) {
+                    this.config.customGridCeilingGroups[key] = this.activeCeilingGroupId;
+                    changed = true;
+                }
+                if (this.config.customGridCeilingShapes[key] !== this.activeCeilingShape) {
+                    this.config.customGridCeilingShapes[key] = this.activeCeilingShape;
+                    changed = true;
+                }
+                if (changed) {
+                    this.draw();
+                }
+            } else {
+                if (this.config.customGridCeilingGroups[key] || this.config.customGridCeilingShapes[key]) {
+                    delete this.config.customGridCeilingGroups[key];
+                    delete this.config.customGridCeilingShapes[key];
+                    this.draw();
+                }
+            }
+            return;
+        }
+
         if (this.drawMode) {
             let changed = false;
             if (!this.config.customGrid.includes(key)) {
                 this.config.customGrid.push(key);
                 changed = true;
+                // Auto-generate ceiling if not already present
+                if (!this.config.customGridCeilingGroups[key]) {
+                    this.config.customGridCeilingGroups[key] = "default";
+                    this.config.customGridCeilingShapes[key] = "full";
+                }
             }
             if (this.config.customGridGroups[key] !== this.activeGroupId) {
                 this.config.customGridGroups[key] = this.activeGroupId;
@@ -542,7 +697,6 @@ export class MapShapeEditor {
                 this.config.customGrid.splice(idx, 1);
                 delete this.config.customGridGroups[key];
                 delete this.config.customGridShapes[key];
-                delete this.config.customGridWallGroups[key];
                 this.draw();
             }
         }
@@ -592,6 +746,20 @@ export class MapShapeEditor {
             }
         ];
 
+        // Sync ceilings
+        this.config.ceilingGroups = env.ceilingGroups ? JSON.parse(JSON.stringify(env.ceilingGroups)) : [
+            {
+                id: "default",
+                name: "Techo 1",
+                color: "#E040FB",
+                texturePath: null,
+                textureAssetId: null,
+                textureSettings: normalizeTextureSettings({ tileSize: 5 })
+            }
+        ];
+        this.config.customGridCeilingGroups = env.customGridCeilingGroups ? { ...env.customGridCeilingGroups } : {};
+        this.config.customGridCeilingShapes = env.customGridCeilingShapes ? { ...env.customGridCeilingShapes } : {};
+
         // Force colors on default groups if missing
         const defaultG = this.config.groundGroups.find(g => g.id === "default");
         if (defaultG && !defaultG.color) defaultG.color = "#FF9800";
@@ -599,12 +767,18 @@ export class MapShapeEditor {
         const defaultW = this.config.invisibleWallsGroups.find(w => w.id === "default");
         if (defaultW && !defaultW.color) defaultW.color = "#FF5722";
 
+        const defaultC = this.config.ceilingGroups.find(c => c.id === "default");
+        if (defaultC && !defaultC.color) defaultC.color = "#E040FB";
+
         // Ensure color3D exists for backward compatibility
         this.config.groundGroups.forEach((g: any) => {
             if (!g.color3D) g.color3D = g.color || "#FF9800";
         });
         this.config.invisibleWallsGroups.forEach((w: any) => {
             if (!w.color3D) w.color3D = w.color || "#FF5722";
+        });
+        this.config.ceilingGroups.forEach((c: any) => {
+            if (!c.color3D) c.color3D = c.color || "#E040FB";
         });
 
         // Backward compatibility: map existing cells
@@ -618,6 +792,12 @@ export class MapShapeEditor {
             if (!this.config.customGridWallGroups[key]) {
                 this.config.customGridWallGroups[key] = "default";
             }
+            if (!this.config.customGridCeilingGroups[key]) {
+                this.config.customGridCeilingGroups[key] = "default";
+            }
+            if (!this.config.customGridCeilingShapes[key]) {
+                this.config.customGridCeilingShapes[key] = "full";
+            }
         });
 
         this.activeGroupId = "default";
@@ -626,7 +806,12 @@ export class MapShapeEditor {
 
         this.activeWallGroupId = "default";
         this.selectedWallGroupIdForEditing = "default";
-        this.activeTab = tab; // floor | walls
+
+        this.activeCeilingGroupId = "default";
+        this.selectedCeilingGroupIdForEditing = "default";
+        this.activeCeilingShape = "full";
+
+        this.activeTab = tab; // floor | walls | ceiling
 
         // Load custom textures uploaded by player
         this.customTextureAssets = [];
@@ -648,6 +833,7 @@ export class MapShapeEditor {
 
         this.updateVisibility();
         this.syncShapeButtons();
+        this.syncCeilingShapeButtons();
         this.syncTabs();
         this.resizeCanvas();
     }
@@ -672,6 +858,10 @@ export class MapShapeEditor {
             this.config.customGridShapes["0,0"] = "full";
             if (!this.config.customGridWallGroups) this.config.customGridWallGroups = {};
             this.config.customGridWallGroups["0,0"] = "default";
+            if (!this.config.customGridCeilingGroups) this.config.customGridCeilingGroups = {};
+            this.config.customGridCeilingGroups["0,0"] = "default";
+            if (!this.config.customGridCeilingShapes) this.config.customGridCeilingShapes = {};
+            this.config.customGridCeilingShapes["0,0"] = "full";
         }
 
         // Sync default group to root for backward compatibility
@@ -701,7 +891,10 @@ export class MapShapeEditor {
             customGridShapes: this.config.customGridShapes,
             invisibleWallsAdvanced: this.config.invisibleWallsAdvanced,
             invisibleWallsGroups: this.config.invisibleWallsGroups,
-            customGridWallGroups: this.config.customGridWallGroups
+            customGridWallGroups: this.config.customGridWallGroups,
+            ceilingGroups: this.config.ceilingGroups,
+            customGridCeilingGroups: this.config.customGridCeilingGroups,
+            customGridCeilingShapes: this.config.customGridCeilingShapes
         };
 
         this.game.updateEnvironmentConfig(newConfig);
@@ -1508,23 +1701,31 @@ export class MapShapeEditor {
 
     syncTabs() {
         const isFloor = this.activeTab === "floor";
+        const isWalls = this.activeTab === "walls";
+        const isCeiling = this.activeTab === "ceiling";
         
         // Highlight active tab button
         this.tabFloorBtn.style.background = isFloor ? "#FF9800" : "transparent";
         this.tabFloorBtn.style.color = isFloor ? "#000" : "#aaa";
-        this.tabWallsBtn.style.background = !isFloor ? "#FF9800" : "transparent";
-        this.tabWallsBtn.style.color = !isFloor ? "#000" : "#aaa";
+        this.tabWallsBtn.style.background = isWalls ? "#FF9800" : "transparent";
+        this.tabWallsBtn.style.color = isWalls ? "#000" : "#aaa";
+        this.tabCeilingBtn.style.background = isCeiling ? "#FF9800" : "transparent";
+        this.tabCeilingBtn.style.color = isCeiling ? "#000" : "#aaa";
 
         // Show/hide sections
         this.floorEditorContent.style.display = isFloor ? "flex" : "none";
-        this.wallsEditorContent.style.display = !isFloor ? "flex" : "none";
+        this.wallsEditorContent.style.display = isWalls ? "flex" : "none";
+        this.ceilingEditorContent.style.display = isCeiling ? "flex" : "none";
 
-        if (!isFloor) {
-            this.renderWallGroups();
-            this.renderSelectedWallGroupSettings();
-        } else {
+        if (isFloor) {
             this.renderGroups();
             this.renderSelectedGroupSettings();
+        } else if (isWalls) {
+            this.renderWallGroups();
+            this.renderSelectedWallGroupSettings();
+        } else if (isCeiling) {
+            this.renderCeilingGroups();
+            this.renderSelectedCeilingGroupSettings();
         }
     }
 
@@ -1537,6 +1738,7 @@ export class MapShapeEditor {
         }
         this.renderSelectedGroupSettings();
         this.renderSelectedWallGroupSettings();
+        this.renderSelectedCeilingGroupSettings();
     }
 
     hexToRgba(hex, opacity) {
@@ -1548,6 +1750,21 @@ export class MapShapeEditor {
         const g = parseInt(c.substring(2, 4), 16);
         const b = parseInt(c.substring(4, 6), 16);
         return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+    }
+
+    syncToolButtons() {
+        if (!this.container) return;
+        const paintBtn = this.paintToolBtn;
+        const eraseBtn = this.eraseToolBtn;
+        if (!paintBtn || !eraseBtn) return;
+
+        const isPaint = this.selectedTool === "paint";
+        
+        paintBtn.style.background = isPaint ? "#FF9800" : "transparent";
+        paintBtn.style.color = isPaint ? "#000" : "#aaa";
+
+        eraseBtn.style.background = !isPaint ? "#f44336" : "transparent";
+        eraseBtn.style.color = !isPaint ? "#fff" : "#aaa";
     }
 
     updateVisibility() {
@@ -1677,8 +1894,9 @@ export class MapShapeEditor {
                 const group = groundGroups.find(g => g.id === groupId) || groundGroups[0] || { color: "#FF9800" };
                 const baseColor = group.color || "#FF9800";
                 
-                this.ctx.fillStyle = this.hexToRgba(baseColor, this.activeTab === "walls" ? 0.15 : 0.6);
-                this.ctx.strokeStyle = this.activeTab === "walls" ? this.hexToRgba(baseColor, 0.25) : baseColor;
+                const isFaded = this.activeTab === "walls" || this.activeTab === "ceiling";
+                this.ctx.fillStyle = this.hexToRgba(baseColor, isFaded ? 0.15 : 0.6);
+                this.ctx.strokeStyle = isFaded ? this.hexToRgba(baseColor, 0.25) : baseColor;
                 this.ctx.lineWidth = 2 / this.zoom;
                 
                 const shape = customGridShapes[key] || "full";
@@ -1710,6 +1928,57 @@ export class MapShapeEditor {
                     this.ctx.stroke();
                 }
             });
+
+            // Draw Ceiling cells if in Ceiling tab
+            if (this.activeTab === "ceiling") {
+                const customGridCeilingGroups = this.config.customGridCeilingGroups || {};
+                const ceilingGroups = this.config.ceilingGroups || [];
+                const customGridCeilingShapes = this.config.customGridCeilingShapes || {};
+
+                Object.keys(customGridCeilingGroups).forEach(key => {
+                    const [gx, gz] = key.split(',').map(Number);
+                    const x = gx * cs;
+                    const z = gz * cs;
+
+                    const groupId = customGridCeilingGroups[key];
+                    if (!groupId) return;
+                    const group = ceilingGroups.find(g => g.id === groupId) || ceilingGroups[0] || { color: "#E040FB" };
+                    const baseColor = group.color || "#E040FB";
+                    
+                    this.ctx.fillStyle = this.hexToRgba(baseColor, 0.6);
+                    this.ctx.strokeStyle = baseColor;
+                    this.ctx.lineWidth = 2 / this.zoom;
+                    
+                    const shape = customGridCeilingShapes[key] || "full";
+                    
+                    if (shape === "full") {
+                        this.ctx.fillRect(x, z, cs, cs);
+                        this.ctx.strokeRect(x, z, cs, cs);
+                    } else {
+                        this.ctx.beginPath();
+                        if (shape === "nw") {
+                            this.ctx.moveTo(x, z);
+                            this.ctx.lineTo(x, z + cs);
+                            this.ctx.lineTo(x + cs, z);
+                        } else if (shape === "ne") {
+                            this.ctx.moveTo(x, z);
+                            this.ctx.lineTo(x + cs, z);
+                            this.ctx.lineTo(x + cs, z + cs);
+                        } else if (shape === "se") {
+                            this.ctx.moveTo(x + cs, z);
+                            this.ctx.lineTo(x + cs, z + cs);
+                            this.ctx.lineTo(x, z + cs);
+                        } else if (shape === "sw") {
+                            this.ctx.moveTo(x, z);
+                            this.ctx.lineTo(x, z + cs);
+                            this.ctx.lineTo(x + cs, z + cs);
+                        }
+                        this.ctx.closePath();
+                        this.ctx.fill();
+                        this.ctx.stroke();
+                    }
+                });
+            }
 
             // Draw Wall boundaries if in Walls tab
             if (this.activeTab === "walls") {
@@ -1844,5 +2113,544 @@ export class MapShapeEditor {
             btn.style.backgroundColor = selected ? "#444" : "#333";
             btn.style.color = selected ? "#FF9800" : "white";
         });
+    }
+
+    addNewCeilingGroup() {
+        const id = "ceiling_group_" + Date.now();
+        const colors = ["#E040FB", "#00E676", "#FF5722", "#4CAF50", "#2196F3", "#9C27B0", "#E91E63", "#00BCD4", "#8BC34A", "#FFEB3B"];
+        const color = colors[this.config.ceilingGroups.length % colors.length];
+        const name = "Techo " + (this.config.ceilingGroups.length + 1);
+        
+        const newGroup = {
+            id,
+            name,
+            color,
+            color3D: color,
+            texturePath: null,
+            textureAssetId: null,
+            textureSettings: { fitMode: "auto", tileSize: 5, repeatX: 1, repeatY: 1, offsetX: 0, offsetY: 0, rotation: 0, patternVariation: false }
+        };
+
+        this.config.ceilingGroups.push(newGroup);
+        this.activeCeilingGroupId = id;
+        this.selectedCeilingGroupIdForEditing = id;
+
+        this.renderCeilingGroups();
+        this.renderSelectedCeilingGroupSettings();
+        this.draw();
+    }
+
+    deleteCeilingGroup(groupId) {
+        if (groupId === "default") return;
+
+        this.config.ceilingGroups = this.config.ceilingGroups.filter((g: any) => g.id !== groupId);
+
+        // Reassign cells
+        if (this.config.customGridCeilingGroups) {
+            Object.keys(this.config.customGridCeilingGroups).forEach((key) => {
+                if (this.config.customGridCeilingGroups[key] === groupId) {
+                    this.config.customGridCeilingGroups[key] = "default";
+                }
+            });
+        }
+
+        if (this.activeCeilingGroupId === groupId) {
+            this.activeCeilingGroupId = "default";
+        }
+        if (this.selectedCeilingGroupIdForEditing === groupId) {
+            this.selectedCeilingGroupIdForEditing = "default";
+        }
+
+        this.renderCeilingGroups();
+        this.renderSelectedCeilingGroupSettings();
+        this.draw();
+    }
+
+    renderCeilingGroups() {
+        if (!this.ceilingGroupsContainer) return;
+        this.ceilingGroupsContainer.innerHTML = "";
+
+        const groups = this.config.ceilingGroups || [];
+        groups.forEach((group: any) => {
+            const card = document.createElement('div');
+            card.style.cssText = `
+                display: flex; align-items: center; justify-content: space-between;
+                padding: 6px 10px; background: ${this.activeCeilingGroupId === group.id ? '#2a2a2a' : '#1e1e1e'};
+                border: 1px solid ${this.activeCeilingGroupId === group.id ? '#FF9800' : '#333'};
+                border-radius: 4px; cursor: pointer; transition: background 0.2s;
+            `;
+            
+            card.onclick = (e: any) => {
+                if (e.target.classList.contains('mse-delete-ceiling-group-btn')) return;
+                this.activeCeilingGroupId = group.id;
+                this.selectedCeilingGroupIdForEditing = group.id;
+                this.renderCeilingGroups();
+                this.renderSelectedCeilingGroupSettings();
+            };
+
+            const left = document.createElement('div');
+            left.style.cssText = `display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0;`;
+
+            const colorIndicator = document.createElement('span');
+            colorIndicator.style.cssText = `
+                display: inline-block; width: 14px; height: 14px; border-radius: 3px;
+                background-color: ${group.color}; flex-shrink: 0; border: 1px solid #555;
+            `;
+            left.appendChild(colorIndicator);
+
+            const nameSpan = document.createElement('span');
+            nameSpan.textContent = group.name;
+            nameSpan.style.cssText = `
+                color: #fff; font-size: 13px; font-weight: ${this.activeCeilingGroupId === group.id ? 'bold' : 'normal'};
+                white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+            `;
+            left.appendChild(nameSpan);
+            card.appendChild(left);
+
+            const right = document.createElement('div');
+            right.style.cssText = `display: flex; align-items: center; gap: 6px;`;
+
+            if (this.activeCeilingGroupId === group.id) {
+                const check = document.createElement('span');
+                check.textContent = "✓";
+                check.style.cssText = `color: #4CAF50; font-weight: bold; font-size: 13px;`;
+                right.appendChild(check);
+            }
+
+            if (group.id !== "default") {
+                const delBtn = document.createElement('button');
+                delBtn.textContent = "✖";
+                delBtn.className = "mse-delete-ceiling-group-btn";
+                delBtn.style.cssText = `
+                    background: none; border: none; color: #f44336; cursor: pointer;
+                    font-size: 12px; padding: 2px 4px; border-radius: 3px; transition: background 0.2s;
+                `;
+                delBtn.onmouseover = () => delBtn.style.background = "rgba(244,67,54,0.15)";
+                delBtn.onmouseout = () => delBtn.style.background = "none";
+                delBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    this.deleteCeilingGroup(group.id);
+                };
+                right.appendChild(delBtn);
+            }
+
+            card.appendChild(right);
+            this.ceilingGroupsContainer.appendChild(card);
+        });
+    }
+
+    renderSelectedCeilingGroupSettings() {
+        if (!this.ceilingPropertiesSection) return;
+        this.ceilingPropertiesSection.innerHTML = "";
+
+        const group = this.config.ceilingGroups.find((g: any) => g.id === this.selectedCeilingGroupIdForEditing);
+        if (!group) return;
+
+        const sectionTitle = document.createElement('label');
+        sectionTitle.style.cssText = `color:#aaa; font-size:14px; text-transform:uppercase; margin-bottom: 4px;`;
+        sectionTitle.textContent = this.config.shapeType === 'custom' ? `Propiedades: ${group.name}` : "Techo predeterminado";
+        this.ceilingPropertiesSection.appendChild(sectionTitle);
+
+        if (this.config.shapeType === 'custom') {
+            const nameRow = document.createElement('div');
+            nameRow.style.cssText = `display: flex; flex-direction: column; gap: 4px;`;
+            nameRow.innerHTML = `<span style="font-size:12px; color:#ccc;">Nombre:</span>`;
+            
+            const nameInput = document.createElement('input');
+            nameInput.type = "text";
+            nameInput.value = group.name;
+            nameInput.style.cssText = `padding: 6px; background: #333; color: white; border: 1px solid #555; border-radius: 4px;`;
+            nameInput.oninput = (e: any) => {
+                group.name = e.target.value || "Techo";
+                this.renderCeilingGroups();
+                sectionTitle.textContent = `Propiedades: ${group.name}`;
+            };
+            nameRow.appendChild(nameInput);
+            this.ceilingPropertiesSection.appendChild(nameRow);
+
+            const colorRow = document.createElement('div');
+            colorRow.style.cssText = `display: flex; justify-content: space-between; align-items: center;`;
+            colorRow.innerHTML = `<span style="font-size:12px; color:#ccc;">Color en Editor:</span>`;
+            
+            const colorInput = document.createElement('input');
+            colorInput.type = "color";
+            colorInput.value = group.color || "#E040FB";
+            colorInput.style.cssText = `
+                width: 40px; height: 26px; border: 1px solid #555; border-radius: 4px;
+                background: none; cursor: pointer; padding: 0;
+            `;
+            colorInput.oninput = (e: any) => {
+                group.color = e.target.value;
+                this.renderCeilingGroups();
+                this.draw();
+            };
+            colorRow.appendChild(colorInput);
+            this.ceilingPropertiesSection.appendChild(colorRow);
+
+            const color3DRow = document.createElement('div');
+            color3DRow.style.cssText = `display: flex; justify-content: space-between; align-items: center; margin-top: 5px;`;
+            color3DRow.innerHTML = `<span style="font-size:12px; color:#ccc;">Color 3D (techo):</span>`;
+            
+            const color3DInput = document.createElement('input');
+            color3DInput.type = "color";
+            color3DInput.value = group.color3D || group.color || "#E040FB";
+            color3DInput.style.cssText = `
+                width: 40px; height: 26px; border: 1px solid #555; border-radius: 4px;
+                background: none; cursor: pointer; padding: 0;
+            `;
+            color3DInput.oninput = (e: any) => {
+                group.color3D = e.target.value;
+                this.draw();
+            };
+            color3DRow.appendChild(color3DInput);
+            this.ceilingPropertiesSection.appendChild(color3DRow);
+        }
+
+        const textureSubGroup = document.createElement('div');
+        textureSubGroup.style.cssText = `display: flex; flex-direction: column; gap: 8px; margin-top: 5px;`;
+        
+        const textureHeader = document.createElement('span');
+        textureHeader.textContent = "Texturas Predeterminadas";
+        textureHeader.style.cssText = `font-size:12px; color:#ccc;`;
+        textureSubGroup.appendChild(textureHeader);
+
+        const ceilingTextureGrid = document.createElement('div');
+        ceilingTextureGrid.style.cssText = `display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px;`;
+        
+        const defaultTextures = [
+            { name: "Ninguna", path: null, color: "#333" },
+            { name: "Ladrillo", path: "/assets/textures/obj/brick.png" },
+            { name: "Concreto", path: "/assets/textures/obj/concrete.png" },
+            { name: "Madera", path: "/assets/textures/obj/wood.png" },
+            { name: "Hierro", path: "/assets/textures/obj/hierro.png" }
+        ];
+
+        defaultTextures.forEach((tex) => {
+            const btn = document.createElement('button');
+            btn.type = "button";
+            btn.className = "mse-ceiling-texture-btn";
+            btn.title = tex.name;
+            btn.dataset.texturePath = tex.path || "";
+            btn.style.cssText = `
+                aspect-ratio: 1; border: 1px solid #555; border-radius: 4px; cursor: pointer;
+                background-color: ${tex.color || "transparent"};
+                background-image: ${tex.path ? `url(${tex.path})` : "none"};
+                background-size: cover; background-position: center;
+            `;
+            btn.onclick = () => {
+                group.texturePath = tex.path;
+                group.textureAssetId = null;
+                this.syncSelectedCeilingGroupTextureButtons(group);
+            };
+            ceilingTextureGrid.appendChild(btn);
+        });
+        textureSubGroup.appendChild(ceilingTextureGrid);
+
+        const customTextureHeader = document.createElement('span');
+        customTextureHeader.textContent = "Tus Texturas Subidas";
+        customTextureHeader.style.cssText = `font-size:12px; color:#ccc; margin-top: 8px;`;
+        textureSubGroup.appendChild(customTextureHeader);
+
+        const customTextureGrid = document.createElement('div');
+        customTextureGrid.style.cssText = `display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; min-height: 35px;`;
+        this.ceilingCustomTextureGrid = customTextureGrid;
+
+        const assets = this.customTextureAssets || [];
+        if (assets.length === 0) {
+            const empty = document.createElement("div");
+            empty.textContent = "Sin texturas subidas.";
+            empty.style.cssText = "grid-column: 1 / -1; color: #777; font-size: 11px; padding: 4px 0;";
+            customTextureGrid.appendChild(empty);
+        } else {
+            assets.forEach((asset: any) => {
+                const btn = document.createElement("div");
+                btn.className = "mse-ceiling-texture-btn mse-ceiling-custom-texture-btn";
+                btn.title = asset.name;
+                btn.dataset.texturePath = asset.fileUrl || "";
+                btn.style.cssText = `
+                    aspect-ratio: 1; border: 1px solid #555; border-radius: 4px; cursor: pointer;
+                    background-image: url(${asset.fileUrl});
+                    background-size: cover; background-position: center; image-rendering: pixelated;
+                `;
+                btn.onclick = () => {
+                    group.texturePath = asset.fileUrl;
+                    group.textureAssetId = asset.id;
+                    this.syncSelectedCeilingGroupTextureButtons(group);
+                };
+                customTextureGrid.appendChild(btn);
+            });
+        }
+        textureSubGroup.appendChild(customTextureGrid);
+        this.ceilingPropertiesSection.appendChild(textureSubGroup);
+
+        const fitModeRow = document.createElement('div');
+        fitModeRow.style.cssText = `display:flex; justify-content:space-between; align-items:center; gap:8px; margin-top: 5px;`;
+        const fitModeLabel = document.createElement('span');
+        fitModeLabel.textContent = "Modo Textura";
+        fitModeLabel.style.cssText = `font-size:12px; color:#ccc;`;
+        this.ceilingFitModeSelect = document.createElement('select');
+        this.ceilingFitModeSelect.style.cssText = `width: 135px; padding: 6px; background:#333; color:white; border:1px solid #555; border-radius:4px; font-size:12px;`;
+        this.ceilingFitModeSelect.innerHTML = `
+            <option value="auto">Repetir por tamaño</option>
+            <option value="stretch">Estirar por pieza</option>
+        `;
+        this.ceilingFitModeSelect.onchange = (e: any) => this.updateSelectedCeilingGroupTextureSetting("fitMode", e.target.value);
+        fitModeRow.appendChild(fitModeLabel);
+        fitModeRow.appendChild(this.ceilingFitModeSelect);
+        this.ceilingPropertiesSection.appendChild(fitModeRow);
+
+        const settingsGrid = document.createElement('div');
+        settingsGrid.style.cssText = `display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin-top: 5px;`;
+        
+        const makeInput = (key: string, label: string, step: number, min: number | null = null) => {
+            const wrap = document.createElement('label');
+            wrap.style.cssText = `display:flex; flex-direction:column; gap:3px; font-size:11px; color:#aaa;`;
+            const input = document.createElement('input');
+            input.type = "number";
+            input.step = String(step);
+            if (min !== null) input.min = String(min);
+            input.style.cssText = `width:100%; box-sizing:border-box; padding:5px; background:#333; color:white; border:1px solid #555; border-radius:4px; font-size:11px;`;
+            input.onchange = (e: any) => {
+                const value = parseFloat(e.target.value);
+                if (!isNaN(value)) this.updateSelectedCeilingGroupTextureSetting(key, value);
+            };
+            wrap.textContent = label;
+            wrap.appendChild(input);
+            this[`ceilingTextureInput_${key}`] = input;
+            return wrap;
+        };
+
+        settingsGrid.appendChild(makeInput("tileSize", "Baldosa", 0.25, 0.1));
+        settingsGrid.appendChild(makeInput("repeatX", "Repetir U", 0.25, 0.05));
+        settingsGrid.appendChild(makeInput("repeatY", "Repetir V", 0.25, 0.05));
+        settingsGrid.appendChild(makeInput("rotation", "Rotación", 5));
+        settingsGrid.appendChild(makeInput("offsetX", "Mover U", 0.05));
+        settingsGrid.appendChild(makeInput("offsetY", "Mover V", 0.05));
+        this.ceilingPropertiesSection.appendChild(settingsGrid);
+
+        const patternRow = document.createElement('label');
+        patternRow.style.cssText = `display:flex; justify-content:space-between; align-items:center; gap:8px; font-size:12px; color:#ddd; cursor:pointer; margin-top: 5px;`;
+        const patternText = document.createElement('span');
+        patternText.textContent = "Variar patrón por bloque";
+        const patternInput = document.createElement('input');
+        patternInput.type = "checkbox";
+        patternInput.onchange = (e: any) => this.updateSelectedCeilingGroupTextureSetting("patternVariation", e.target.checked);
+        this.ceilingTextureInput_patternVariation = patternInput;
+        patternRow.appendChild(patternText);
+        patternRow.appendChild(patternInput);
+        this.ceilingPropertiesSection.appendChild(patternRow);
+
+        this.syncSelectedCeilingGroupTextureControls();
+    }
+
+    syncSelectedCeilingGroupTextureButtons(group: any) {
+        if (!this.container) return;
+        const buttons = this.container.querySelectorAll(".mse-ceiling-texture-btn");
+        buttons.forEach((btn: any) => {
+            const path = btn.dataset.texturePath || "";
+            const selected = (group.texturePath || "") === path;
+            btn.style.borderColor = selected ? "#00FF00" : "#555";
+            btn.style.borderWidth = selected ? "2px" : "1px";
+        });
+    }
+
+    syncSelectedCeilingGroupTextureControls() {
+        const group = this.config.ceilingGroups.find((g: any) => g.id === this.selectedCeilingGroupIdForEditing);
+        if (!group) return;
+
+        const settings = normalizeTextureSettings(group.textureSettings || { tileSize: 5 });
+        group.textureSettings = settings;
+
+        if (this.ceilingFitModeSelect) this.ceilingFitModeSelect.value = settings.fitMode;
+        ["tileSize", "repeatX", "repeatY", "offsetX", "offsetY", "rotation"].forEach((key) => {
+            const input = this[`ceilingTextureInput_${key}`];
+            if (input) input.value = String(settings[key]);
+        });
+        if (this.ceilingTextureInput_patternVariation) {
+            this.ceilingTextureInput_patternVariation.checked = settings.patternVariation;
+        }
+        this.syncSelectedCeilingGroupTextureButtons(group);
+    }
+
+    updateSelectedCeilingGroupTextureSetting(key: string, value: any) {
+        const group = this.config.ceilingGroups.find((g: any) => g.id === this.selectedCeilingGroupIdForEditing);
+        if (!group) return;
+
+        group.textureSettings = normalizeTextureSettings({
+            ...(group.textureSettings || {}),
+            [key]: value
+        });
+        this.syncSelectedCeilingGroupTextureControls();
+    }
+
+    syncCeilingShapeButtons() {
+        if (!this.container) return;
+        const buttons = this.container.querySelectorAll(".mse-ceiling-shape-select-btn");
+        buttons.forEach((btn: any) => {
+            const selected = btn.dataset.shapeId === this.activeCeilingShape;
+            btn.style.borderColor = selected ? "#FF9800" : "#555";
+            btn.style.backgroundColor = selected ? "#444" : "#333";
+            btn.style.color = selected ? "#FF9800" : "white";
+        });
+    }
+
+    createCopyPanel(parentEl: HTMLElement, currentTab: string) {
+        const copySection = document.createElement('div');
+        copySection.style.cssText = `display: flex; flex-direction: column; gap: 8px; border-top: 1px solid #333; padding-top: 12px; margin-top: 10px;`;
+        
+        const title = document.createElement('span');
+        title.textContent = "Copiar Grupos de:";
+        title.style.cssText = `color: #aaa; font-size: 11px; text-transform: uppercase; font-weight: bold;`;
+        copySection.appendChild(title);
+
+        const btnContainer = document.createElement('div');
+        btnContainer.style.cssText = `display: flex; gap: 6px;`;
+
+        const tabs = [
+            { id: "floor", name: "Suelo" },
+            { id: "walls", name: "Paredes" },
+            { id: "ceiling", name: "Techo" }
+        ];
+
+        tabs.forEach((t) => {
+            if (t.id === currentTab) return; // don't copy to itself
+            
+            const btn = document.createElement('button');
+            btn.type = "button";
+            btn.textContent = t.name;
+            btn.style.cssText = `
+                flex: 1; padding: 4px 8px; background: #333; color: #ccc; border: 1px solid #555;
+                border-radius: 4px; font-size: 11px; cursor: pointer; transition: all 0.2s;
+            `;
+            btn.onmouseover = () => { btn.style.background = "#444"; btn.style.color = "#fff"; };
+            btn.onmouseout = () => { btn.style.background = "#333"; btn.style.color = "#ccc"; };
+            btn.onclick = () => {
+                if (confirm(`¿Copiar todos los grupos de '${t.name}' a esta pestaña?`)) {
+                    this.copyGroupsFrom(t.id);
+                }
+            };
+            btnContainer.appendChild(btn);
+        });
+
+        copySection.appendChild(btnContainer);
+
+        // Auto-assign groups logically
+        const applyLogicBtn = document.createElement('button');
+        applyLogicBtn.type = "button";
+        applyLogicBtn.textContent = "⚡ Mapear Grupos Lógicamente";
+        applyLogicBtn.style.cssText = `
+            width: 100%; padding: 6px; background: #008CBA; color: white; border: none;
+            border-radius: 4px; font-size: 11px; cursor: pointer; font-weight: bold; margin-top: 8px; transition: background 0.2s;
+        `;
+        applyLogicBtn.onmouseover = () => { applyLogicBtn.style.background = "#007ea7"; };
+        applyLogicBtn.onmouseout = () => { applyLogicBtn.style.background = "#008CBA"; };
+        applyLogicBtn.onclick = () => {
+            if (confirm("¿Sincronizar automáticamente grupos y formas del techo y paredes según los grupos del suelo?")) {
+                this.applyGroupsLogically();
+            }
+        };
+        copySection.appendChild(applyLogicBtn);
+
+        parentEl.appendChild(copySection);
+    }
+
+    copyGroupsFrom(sourceTab: string) {
+        let sourceGroups: any[] = [];
+        if (sourceTab === "floor") {
+            sourceGroups = this.config.groundGroups || [];
+        } else if (sourceTab === "walls") {
+            sourceGroups = this.config.invisibleWallsGroups || [];
+        } else if (sourceTab === "ceiling") {
+            sourceGroups = this.config.ceilingGroups || [];
+        }
+
+        const activeTab = this.activeTab;
+        let destGroups: any[] = [];
+        if (activeTab === "floor") {
+            destGroups = this.config.groundGroups;
+        } else if (activeTab === "walls") {
+            destGroups = this.config.invisibleWallsGroups;
+        } else if (activeTab === "ceiling") {
+            destGroups = this.config.ceilingGroups;
+        }
+
+        sourceGroups.forEach((src) => {
+            const suffix = "_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
+            const id = (activeTab === "walls" ? "wall_group_" : (activeTab === "ceiling" ? "ceiling_group_" : "group_")) + suffix;
+            
+            const copiedGroup = {
+                ...JSON.parse(JSON.stringify(src)),
+                id: id,
+                // Assign sensible defaults if copying to walls
+                height: src.height !== undefined ? src.height : 10,
+                opacity: src.opacity !== undefined ? src.opacity : 1.0,
+                transparent: src.transparent !== undefined ? src.transparent : false
+            };
+
+            if (src.id === "default") {
+                copiedGroup.name = src.name + " (Copia)";
+            }
+
+            destGroups.push(copiedGroup);
+        });
+
+        if (activeTab === "floor") {
+            this.renderGroups();
+            this.renderSelectedGroupSettings();
+        } else if (activeTab === "walls") {
+            this.renderWallGroups();
+            this.renderSelectedWallGroupSettings();
+        } else if (activeTab === "ceiling") {
+            this.renderCeilingGroups();
+            this.renderSelectedCeilingGroupSettings();
+        }
+        this.draw();
+    }
+
+    applyGroupsLogically() {
+        const customGrid = this.config.customGrid || [];
+        const customGridGroups = this.config.customGridGroups || {};
+        const customGridShapes = this.config.customGridShapes || {};
+        
+        const groundGroups = this.config.groundGroups || [];
+        const wallGroups = this.config.invisibleWallsGroups || [];
+        const ceilingGroups = this.config.ceilingGroups || [];
+
+        let wallMatchedCount = 0;
+        let ceilingMatchedCount = 0;
+
+        customGrid.forEach((key) => {
+            const floorGroupId = customGridGroups[key] || "default";
+            const floorGroup = groundGroups.find((g: any) => g.id === floorGroupId);
+            if (!floorGroup) return;
+
+            // 1. Mirror Ceiling group & shape
+            const matchingCeiling = ceilingGroups.find((cg: any) => 
+                cg.name.toLowerCase() === floorGroup.name.toLowerCase() || 
+                cg.name.toLowerCase() === (floorGroup.name.toLowerCase() + " (copia)") ||
+                floorGroup.name.toLowerCase() === (cg.name.toLowerCase() + " (copia)")
+            ) || ceilingGroups.find((cg: any) => cg.id === "default") || ceilingGroups[0];
+
+            if (matchingCeiling) {
+                this.config.customGridCeilingGroups[key] = matchingCeiling.id;
+                this.config.customGridCeilingShapes[key] = customGridShapes[key] || "full";
+                ceilingMatchedCount++;
+            }
+
+            // 2. Wall group matching
+            const matchingWall = wallGroups.find((wg: any) => 
+                wg.name.toLowerCase() === floorGroup.name.toLowerCase() || 
+                wg.name.toLowerCase() === (floorGroup.name.toLowerCase() + " (copia)") ||
+                floorGroup.name.toLowerCase() === (wg.name.toLowerCase() + " (copia)")
+            ) || wallGroups.find((wg: any) => wg.id === "default") || wallGroups[0];
+
+            if (matchingWall) {
+                this.config.customGridWallGroups[key] = matchingWall.id;
+                wallMatchedCount++;
+            }
+        });
+
+        alert(`Sincronización lógica completada:\n• ${ceilingMatchedCount} techos espejados con el suelo (grupos y formas).\n• ${wallMatchedCount} paredes mapeadas al grupo correspondiente.`);
+        this.draw();
     }
 }

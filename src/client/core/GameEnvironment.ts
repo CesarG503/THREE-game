@@ -89,6 +89,29 @@ export function updateEnvironmentConfig(this: any, config: any) {
 		});
 	};
 
+	const ceilingGroups = this.environmentConfig.ceilingGroups || [];
+	const defaultCeilingGroup = ceilingGroups.find((g: any) => g.id === "default") || { id: "default", name: "Techo 1", color: "#E040FB" };
+
+	const createCeilingMaterialForGroup = (group: any) => {
+		const texPath = group ? group.texturePath : null;
+		const colorHex = (group && (group.color3D || group.color)) ? parseInt((group.color3D || group.color).replace("#", "0x")) : 0xe040fb;
+		return new THREE.MeshStandardMaterial({
+			color: texPath ? 0xffffff : colorHex,
+			roughness: 0.8,
+			side: THREE.DoubleSide
+		});
+	};
+
+	const applyCeilingTextureForGroup = (mesh: any, dimensions: any, group: any) => {
+		const texPath = group ? group.texturePath : null;
+		if (!texPath) return;
+		const texSettings = normalizeTextureSettings(group ? (group.textureSettings || { tileSize: 5 }) : { tileSize: 5 });
+		const groupTextureLoader = new THREE.TextureLoader();
+		groupTextureLoader.load(texPath, (texture: any) => {
+			applyMapObjectTexture(mesh, texture, dimensions, texSettings);
+		});
+	};
+
 	const createPrismGeometryForShape = (shape: string, cs: number, height: number, group: any) => {
 		const h2 = height / 2;
 		const texSettings = normalizeTextureSettings(group ? (group.textureSettings || { tileSize: 5 }) : groundTextureSettings);
@@ -241,6 +264,61 @@ export function updateEnvironmentConfig(this: any, config: any) {
 				}
 			}
 			colDesc.setTranslation(x, 0, z);
+			this.groundColliders.push(this.world.createCollider(colDesc, this.groundBody));
+		});
+
+		// BUILD CEILINGS
+		const customGridCeilingGroups = this.environmentConfig.customGridCeilingGroups || {};
+		const customGridCeilingShapes = this.environmentConfig.customGridCeilingShapes || {};
+		const customGridWallGroups = this.environmentConfig.customGridWallGroups || {};
+		const invisibleWallsGroups = this.environmentConfig.invisibleWallsGroups || [];
+
+		Object.keys(customGridCeilingGroups).forEach((key: any) => {
+			const [gx, gz] = key.split(",").map(Number);
+			const x = gx * cellSize;
+			const z = gz * cellSize;
+
+			const ceilingGroupId = customGridCeilingGroups[key];
+			if (!ceilingGroupId) return;
+
+			const group = ceilingGroups.find((g: any) => g.id === ceilingGroupId) || defaultCeilingGroup;
+			const shape = customGridCeilingShapes[key] || "full";
+
+			const wallGroupId = customGridWallGroups[key] || "default";
+			const wallGroup = invisibleWallsGroups.find((wg: any) => wg.id === wallGroupId);
+			const wallHeight = (this.environmentConfig.invisibleWallsAdvanced && wallGroup) ? (wallGroup.height !== undefined ? wallGroup.height : 10) : 10;
+
+			let geo;
+			if (shape === "full") {
+				geo = new THREE.BoxGeometry(cellSize, 1, cellSize);
+			} else {
+				geo = createPrismGeometryForShape(shape, cellSize, 1, group);
+			}
+
+			const posY = wallHeight - 1.0;
+
+			const mesh = new THREE.Mesh(geo, createCeilingMaterialForGroup(group));
+			mesh.position.set(x, posY, z);
+			mesh.castShadow = true;
+			mesh.receiveShadow = true;
+			this.groundGroup.add(mesh);
+			applyCeilingTextureForGroup(mesh, { x: cellSize, y: 1, z: cellSize }, group);
+
+			let colDesc;
+			if (shape === "full") {
+				colDesc = RAPIER.ColliderDesc.cuboid(cellSize / 2, 0.5, cellSize / 2);
+			} else {
+				try {
+					const vertices = geo.attributes.position.array;
+					colDesc = RAPIER.ColliderDesc.convexHull(vertices as any);
+				} catch (e) {
+					console.warn("convexHull failed for ceiling prism, falling back to cuboid", e);
+				}
+				if (!colDesc) {
+					colDesc = RAPIER.ColliderDesc.cuboid(cellSize / 2, 0.5, cellSize / 2);
+				}
+			}
+			colDesc.setTranslation(x, posY, z);
 			this.groundColliders.push(this.world.createCollider(colDesc, this.groundBody));
 		});
 	}

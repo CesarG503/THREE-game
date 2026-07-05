@@ -33,6 +33,9 @@ export interface SavedMapData {
 		invisibleWallsAdvanced?: boolean;
 		invisibleWallsGroups?: any[];
 		customGridWallGroups?: Record<string, string>;
+		ceilingGroups?: any[];
+		customGridCeilingGroups?: Record<string, string>;
+		customGridCeilingShapes?: Record<string, string>;
 	};
 	playerConfig: {
 		roles: unknown[];
@@ -66,6 +69,9 @@ export function createEmptyMapData(): SavedMapData {
 			invisibleWallsAdvanced: false,
 			invisibleWallsGroups: [],
 			customGridWallGroups: {},
+			ceilingGroups: [],
+			customGridCeilingGroups: {},
+			customGridCeilingShapes: {},
 		},
 		playerConfig: {
 			roles: [],

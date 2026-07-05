@@ -24,6 +24,9 @@ export interface EnvironmentConfig {
 	invisibleWallsAdvanced?: boolean;
 	invisibleWallsGroups?: any[];
 	customGridWallGroups?: { [key: string]: string };
+	ceilingGroups?: any[];
+	customGridCeilingGroups?: { [key: string]: string };
+	customGridCeilingShapes?: { [key: string]: string };
 }
 
 export interface MainBootstrapOptions {

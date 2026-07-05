@@ -29,6 +29,7 @@ export interface SavedMapData {
 		customCellSize?: number;
 		groundGroups?: any[];
 		customGridGroups?: Record<string, string>;
+		customGridShapes?: Record<string, string>;
 	};
 	playerConfig: {
 		roles: unknown[];
@@ -56,6 +57,9 @@ export function createEmptyMapData(): SavedMapData {
 			groundTexturePath: null,
 			groundTextureAssetId: null,
 			groundTextureSettings: { fitMode: "auto", tileSize: 5, repeatX: 1, repeatY: 1, offsetX: 0, offsetY: 0, rotation: 0, patternVariation: false },
+			groundGroups: [],
+			customGridGroups: {},
+			customGridShapes: {},
 		},
 		playerConfig: {
 			roles: [],

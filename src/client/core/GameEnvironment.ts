@@ -89,6 +89,96 @@ export function updateEnvironmentConfig(this: any, config: any) {
 		});
 	};
 
+	const createPrismGeometryForShape = (shape: string, cs: number, height: number, group: any) => {
+		const h2 = height / 2;
+		const texSettings = normalizeTextureSettings(group ? (group.textureSettings || { tileSize: 5 }) : groundTextureSettings);
+		const tile = texSettings.fitMode === "stretch" ? cs : texSettings.tileSize;
+
+		let v1 = new THREE.Vector2(-cs/2, -cs/2);
+		let v2 = new THREE.Vector2(-cs/2, cs/2);
+		let v3 = new THREE.Vector2(cs/2, -cs/2);
+
+		if (shape === "ne") {
+			v1 = new THREE.Vector2(-cs/2, -cs/2);
+			v2 = new THREE.Vector2(cs/2, -cs/2);
+			v3 = new THREE.Vector2(cs/2, cs/2);
+		} else if (shape === "se") {
+			v1 = new THREE.Vector2(cs/2, -cs/2);
+			v2 = new THREE.Vector2(cs/2, cs/2);
+			v3 = new THREE.Vector2(-cs/2, cs/2);
+		} else if (shape === "sw") {
+			v1 = new THREE.Vector2(-cs/2, -cs/2);
+			v2 = new THREE.Vector2(-cs/2, cs/2);
+			v3 = new THREE.Vector2(cs/2, cs/2);
+		}
+
+		// Ensure counter-clockwise winding order for 2D vertices (looking down in X/Z)
+		const cross = (v2.x - v1.x) * (v3.y - v1.y) - (v2.y - v1.y) * (v3.x - v1.x);
+		if (cross > 0) {
+			const tmp = v2;
+			v2 = v3;
+			v3 = tmp;
+		}
+
+		const geometry = new THREE.BufferGeometry();
+		const vertices: number[] = [];
+		const normals: number[] = [];
+		const uvs: number[] = [];
+
+		const addTriangle = (
+			p1: THREE.Vector3, p2: THREE.Vector3, p3: THREE.Vector3,
+			u1: THREE.Vector2, u2: THREE.Vector2, u3: THREE.Vector2
+		) => {
+			vertices.push(p1.x, p1.y, p1.z, p2.x, p2.y, p2.z, p3.x, p3.y, p3.z);
+			const cb = new THREE.Vector3().subVectors(p3, p2);
+			const ab = new THREE.Vector3().subVectors(p1, p2);
+			cb.cross(ab).normalize();
+			normals.push(cb.x, cb.y, cb.z, cb.x, cb.y, cb.z, cb.x, cb.y, cb.z);
+			uvs.push(u1.x, u1.y, u2.x, u2.y, u3.x, u3.y);
+		};
+
+		const B1 = new THREE.Vector3(v1.x, -h2, v1.y);
+		const B2 = new THREE.Vector3(v2.x, -h2, v2.y);
+		const B3 = new THREE.Vector3(v3.x, -h2, v3.y);
+
+		const T1 = new THREE.Vector3(v1.x, h2, v1.y);
+		const T2 = new THREE.Vector3(v2.x, h2, v2.y);
+		const T3 = new THREE.Vector3(v3.x, h2, v3.y);
+
+		const getUV = (v: THREE.Vector2) => {
+			return new THREE.Vector2((v.x + cs/2) / tile, (v.y + cs/2) / tile);
+		};
+
+		const uv1 = getUV(v1);
+		const uv2 = getUV(v2);
+		const uv3 = getUV(v3);
+
+		// Top
+		addTriangle(T1, T2, T3, uv1, uv2, uv3);
+		// Bottom
+		addTriangle(B1, B3, B2, uv1, uv3, uv2);
+
+		const L1 = v1.distanceTo(v2);
+		const L2 = v2.distanceTo(v3);
+		const L3 = v3.distanceTo(v1);
+
+		// Sides
+		addTriangle(B1, B2, T2, new THREE.Vector2(0, 0), new THREE.Vector2(L1 / tile, 0), new THREE.Vector2(L1 / tile, height / tile));
+		addTriangle(B1, T2, T1, new THREE.Vector2(0, 0), new THREE.Vector2(L1 / tile, height / tile), new THREE.Vector2(0, height / tile));
+
+		addTriangle(B2, B3, T3, new THREE.Vector2(0, 0), new THREE.Vector2(L2 / tile, 0), new THREE.Vector2(L2 / tile, height / tile));
+		addTriangle(B2, T3, T2, new THREE.Vector2(0, 0), new THREE.Vector2(L2 / tile, height / tile), new THREE.Vector2(0, height / tile));
+
+		addTriangle(B3, B1, T1, new THREE.Vector2(0, 0), new THREE.Vector2(L3 / tile, 0), new THREE.Vector2(L3 / tile, height / tile));
+		addTriangle(B3, T1, T3, new THREE.Vector2(0, 0), new THREE.Vector2(L3 / tile, height / tile), new THREE.Vector2(0, height / tile));
+
+		geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+		geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+		geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+
+		return geometry;
+	};
+
 	if (shapeType === "rect") {
 		const geo = new THREE.BoxGeometry(sx, 1, sz);
 		const mesh = new THREE.Mesh(geo, createGroundMaterial());
@@ -112,6 +202,7 @@ export function updateEnvironmentConfig(this: any, config: any) {
 		const cellSize = this.environmentConfig.customCellSize || 10;
 		const grid = this.environmentConfig.customGrid || [];
 		const customGridGroups = this.environmentConfig.customGridGroups || {};
+		const customGridShapes = this.environmentConfig.customGridShapes || {};
 
 		grid.forEach((key: any) => {
 			const [gx, gz] = key.split(",").map(Number);
@@ -120,16 +211,36 @@ export function updateEnvironmentConfig(this: any, config: any) {
 
 			const groupId = customGridGroups[key] || "default";
 			const group = groundGroups.find((g: any) => g.id === groupId) || defaultGroup;
+			const shape = customGridShapes[key] || "full";
 
-			const geo = new THREE.BoxGeometry(cellSize, 1, cellSize);
+			let geo;
+			if (shape === "full") {
+				geo = new THREE.BoxGeometry(cellSize, 1, cellSize);
+			} else {
+				geo = createPrismGeometryForShape(shape, cellSize, 1, group);
+			}
+
 			const mesh = new THREE.Mesh(geo, createGroundMaterialForGroup(group));
 			mesh.position.set(x, 0, z);
 			mesh.receiveShadow = true;
 			this.groundGroup.add(mesh);
 			applyGroundTextureForGroup(mesh, { x: cellSize, y: 1, z: cellSize }, group);
 
-			const colDesc = RAPIER.ColliderDesc.cuboid(cellSize / 2, 0.5, cellSize / 2)
-				.setTranslation(x, 0, z);
+			let colDesc;
+			if (shape === "full") {
+				colDesc = RAPIER.ColliderDesc.cuboid(cellSize / 2, 0.5, cellSize / 2);
+			} else {
+				try {
+					const vertices = geo.attributes.position.array;
+					colDesc = RAPIER.ColliderDesc.convexHull(vertices as any);
+				} catch (e) {
+					console.warn("convexHull failed for prism, falling back to cuboid", e);
+				}
+				if (!colDesc) {
+					colDesc = RAPIER.ColliderDesc.cuboid(cellSize / 2, 0.5, cellSize / 2);
+				}
+			}
+			colDesc.setTranslation(x, 0, z);
 			this.groundColliders.push(this.world.createCollider(colDesc, this.groundBody));
 		});
 	}
@@ -264,26 +375,111 @@ export function updateEnvironmentConfig(this: any, config: any) {
 			}
 		} else if (shapeType === "custom") {
 			const cellSize = this.environmentConfig.customCellSize || 10;
-			const gridSet = new Set(this.environmentConfig.customGrid || []);
+			const grid = this.environmentConfig.customGrid || [];
+			const gridSet = new Set(grid);
+			const customGridShapes = this.environmentConfig.customGridShapes || {};
+
+			const hasNorthFace = (sh: string) => sh === "full" || sh === "nw" || sh === "ne";
+			const hasSouthFace = (sh: string) => sh === "full" || sh === "se" || sh === "sw";
+			const hasWestFace = (sh: string) => sh === "full" || sh === "nw" || sh === "sw";
+			const hasEastFace = (sh: string) => sh === "full" || sh === "ne" || sh === "se";
 
 			gridSet.forEach((key: any) => {
 				const [gx, gz] = key.split(",").map(Number);
 				const x = gx * cellSize;
 				const z = gz * cellSize;
+				const shape = customGridShapes[key] || "full";
 
-				const neighbors = [
-					{ dx: 0, dz: -1, pos: { x: x, y: wallHeight / 2 - 0.5, z: z - cellSize / 2 - wallThickness / 2 }, w: cellSize, d: wallThickness },
-					{ dx: 0, dz: 1, pos: { x: x, y: wallHeight / 2 - 0.5, z: z + cellSize / 2 + wallThickness / 2 }, w: cellSize, d: wallThickness },
-					{ dx: -1, dz: 0, pos: { x: x - cellSize / 2 - wallThickness / 2, y: wallHeight / 2 - 0.5, z: z }, w: wallThickness, d: cellSize },
-					{ dx: 1, dz: 0, pos: { x: x + cellSize / 2 + wallThickness / 2, y: wallHeight / 2 - 0.5, z: z }, w: wallThickness, d: cellSize }
-				];
-
-				neighbors.forEach((n) => {
-					const nKey = `${gx + n.dx},${gz + n.dz}`;
-					if (!gridSet.has(nKey)) {
-						wallDefs.push({ width: n.w, depth: n.d, pos: n.pos });
+				// 1. North face
+				if (hasNorthFace(shape)) {
+					const nKey = `${gx},${gz - 1}`;
+					const nShape = customGridShapes[nKey] || "full";
+					const nExists = gridSet.has(nKey);
+					if (!nExists || !hasSouthFace(nShape)) {
+						wallDefs.push({
+							width: cellSize,
+							depth: wallThickness,
+							pos: { x: x, y: wallHeight / 2 - 0.5, z: z - cellSize / 2 - wallThickness / 2 }
+						});
 					}
-				});
+				}
+
+				// 2. South face
+				if (hasSouthFace(shape)) {
+					const nKey = `${gx},${gz + 1}`;
+					const nShape = customGridShapes[nKey] || "full";
+					const nExists = gridSet.has(nKey);
+					if (!nExists || !hasNorthFace(nShape)) {
+						wallDefs.push({
+							width: cellSize,
+							depth: wallThickness,
+							pos: { x: x, y: wallHeight / 2 - 0.5, z: z + cellSize / 2 + wallThickness / 2 }
+						});
+					}
+				}
+
+				// 3. West face
+				if (hasWestFace(shape)) {
+					const nKey = `${gx - 1},${gz}`;
+					const nShape = customGridShapes[nKey] || "full";
+					const nExists = gridSet.has(nKey);
+					if (!nExists || !hasEastFace(nShape)) {
+						wallDefs.push({
+							width: wallThickness,
+							depth: cellSize,
+							pos: { x: x - cellSize / 2 - wallThickness / 2, y: wallHeight / 2 - 0.5, z: z }
+						});
+					}
+				}
+
+				// 4. East face
+				if (hasEastFace(shape)) {
+					const nKey = `${gx + 1},${gz}`;
+					const nShape = customGridShapes[nKey] || "full";
+					const nExists = gridSet.has(nKey);
+					if (!nExists || !hasWestFace(nShape)) {
+						wallDefs.push({
+							width: wallThickness,
+							depth: cellSize,
+							pos: { x: x + cellSize / 2 + wallThickness / 2, y: wallHeight / 2 - 0.5, z: z }
+						});
+					}
+				}
+
+				// 5. Diagonal face (Hypotenuse)
+				if (shape !== "full") {
+					const len = cellSize * Math.sqrt(2);
+					const offset = wallThickness / 2;
+					const invSqrt2 = 1 / Math.sqrt(2);
+					let rotY = 0;
+					let ox = 0;
+					let oz = 0;
+
+					if (shape === "nw") {
+						rotY = Math.PI / 4;
+						ox = invSqrt2 * offset;
+						oz = invSqrt2 * offset;
+					} else if (shape === "ne") {
+						rotY = -Math.PI / 4;
+						ox = -invSqrt2 * offset;
+						oz = invSqrt2 * offset;
+					} else if (shape === "se") {
+						rotY = Math.PI / 4;
+						ox = -invSqrt2 * offset;
+						oz = -invSqrt2 * offset;
+					} else if (shape === "sw") {
+						rotY = -Math.PI / 4;
+						ox = invSqrt2 * offset;
+						oz = -invSqrt2 * offset;
+					}
+
+					wallDefs.push({
+						width: len,
+						depth: wallThickness,
+						pos: { x: x + ox, y: wallHeight / 2 - 0.5, z: z + oz },
+						rotY: rotY
+					});
+				}
 			});
 		}
 
@@ -292,12 +488,20 @@ export function updateEnvironmentConfig(this: any, config: any) {
 			const mat = new THREE.MeshBasicMaterial({ color: 0xff0000, wireframe: true, transparent: true, opacity: 0 });
 			const mesh = new THREE.Mesh(geo, mat);
 			mesh.position.set(def.pos.x, def.pos.y, def.pos.z);
-			if (def.rotY) mesh.rotation.y = def.rotY;
+			
+			const quat = new THREE.Quaternion();
+			if (def.rotY) {
+				quat.setFromEuler(new THREE.Euler(0, def.rotY, 0));
+				mesh.quaternion.copy(quat);
+			}
+
 			this.sceneManager.scene.add(mesh);
 			this.invisibleWallMeshes.push(mesh);
 
 			const bodyDesc = RAPIER.RigidBodyDesc.fixed().setTranslation(def.pos.x, def.pos.y, def.pos.z);
-			if (def.rotY) bodyDesc.setRotation({ x: 0, y: Math.sin(def.rotY / 2), z: 0, w: Math.cos(def.rotY / 2) });
+			if (def.rotY) {
+				bodyDesc.setRotation(quat);
+			}
 			const body = this.world.createRigidBody(bodyDesc);
 			const colliderDesc = RAPIER.ColliderDesc.cuboid(def.width / 2, wallHeight / 2, def.depth / 2);
 			this.world.createCollider(colliderDesc, body);

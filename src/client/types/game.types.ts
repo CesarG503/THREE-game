@@ -20,6 +20,7 @@ export interface EnvironmentConfig {
 	groundTextureSettings?: any;
 	groundGroups?: any[];
 	customGridGroups?: { [key: string]: string };
+	customGridShapes?: { [key: string]: string };
 }
 
 export interface MainBootstrapOptions {

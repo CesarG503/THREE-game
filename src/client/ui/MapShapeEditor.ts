@@ -28,12 +28,14 @@ export class MapShapeEditor {
             groundTextureAssetId: null,
             groundTextureSettings: { fitMode: "auto", tileSize: 5, repeatX: 1, repeatY: 1, offsetX: 0, offsetY: 0, rotation: 0, patternVariation: false },
             groundGroups: [],
-            customGridGroups: {}
+            customGridGroups: {},
+            customGridShapes: {}
         };
 
         this.customTextureAssets = [];
         this.activeGroupId = "default";
         this.selectedGroupIdForEditing = "default";
+        this.activeCellShape = "full";
 
         this.selectionBox = null; // { startX, startZ, endX, endZ, mode }
         this.useAreaSelection = false;
@@ -214,6 +216,44 @@ export class MapShapeEditor {
         groupsSection.appendChild(groupsContainer);
         sidebar.appendChild(groupsSection);
 
+        // Block Shape Selection Section (only visible in custom mode)
+        const shapesSection = document.createElement('div');
+        this.shapesSection = shapesSection;
+        shapesSection.style.cssText = `display: flex; flex-direction: column; gap: 10px; border-top: 1px solid #333; padding-top: 15px;`;
+        shapesSection.innerHTML = `<label style="color:#aaa; font-size:14px; text-transform:uppercase;">Forma del Suelo</label>`;
+
+        const shapesGrid = document.createElement('div');
+        shapesGrid.style.cssText = `display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px;`;
+        
+        const shapes = [
+            { id: "full", char: "█", title: "Completo" },
+            { id: "nw", char: "◤", title: "Diagonal Sup-Izq" },
+            { id: "ne", char: "◥", title: "Diagonal Sup-Der" },
+            { id: "se", char: "◢", title: "Diagonal Inf-Der" },
+            { id: "sw", char: "◣", title: "Diagonal Inf-Izq" }
+        ];
+
+        shapes.forEach((sh) => {
+            const btn = document.createElement('button');
+            btn.type = "button";
+            btn.className = "mse-shape-select-btn";
+            btn.title = sh.title;
+            btn.dataset.shapeId = sh.id;
+            btn.textContent = sh.char;
+            btn.style.cssText = `
+                aspect-ratio: 1; border: 1px solid #555; border-radius: 4px; cursor: pointer;
+                background-color: #333; color: white; font-size: 16px; font-weight: bold;
+                display: flex; align-items: center; justify-content: center; transition: all 0.2s;
+            `;
+            btn.onclick = () => {
+                this.activeCellShape = sh.id;
+                this.syncShapeButtons();
+            };
+            shapesGrid.appendChild(btn);
+        });
+        shapesSection.appendChild(shapesGrid);
+        sidebar.appendChild(shapesSection);
+
         // Group Properties Panel (Visible for currently selected group)
         const groupPropertiesSection = document.createElement('div');
         this.groupPropertiesSection = groupPropertiesSection;
@@ -331,6 +371,7 @@ export class MapShapeEditor {
         const maxZ = Math.max(this.selectionBox.startZ, this.selectionBox.endZ);
 
         if (!this.config.customGridGroups) this.config.customGridGroups = {};
+        if (!this.config.customGridShapes) this.config.customGridShapes = {};
 
         for (let x = minX; x <= maxX; x++) {
             for (let z = minZ; z <= maxZ; z++) {
@@ -340,12 +381,14 @@ export class MapShapeEditor {
                         this.config.customGrid.push(key);
                     }
                     this.config.customGridGroups[key] = this.activeGroupId;
+                    this.config.customGridShapes[key] = this.activeCellShape || "full";
                 } else {
                     const idx = this.config.customGrid.indexOf(key);
                     if (idx > -1) {
                         this.config.customGrid.splice(idx, 1);
                     }
                     delete this.config.customGridGroups[key];
+                    delete this.config.customGridShapes[key];
                 }
             }
         }
@@ -357,6 +400,7 @@ export class MapShapeEditor {
         const key = `${gridCoords.x},${gridCoords.z}`;
         
         if (!this.config.customGridGroups) this.config.customGridGroups = {};
+        if (!this.config.customGridShapes) this.config.customGridShapes = {};
 
         if (this.drawMode) {
             let changed = false;
@@ -368,6 +412,10 @@ export class MapShapeEditor {
                 this.config.customGridGroups[key] = this.activeGroupId;
                 changed = true;
             }
+            if (this.config.customGridShapes[key] !== this.activeCellShape) {
+                this.config.customGridShapes[key] = this.activeCellShape;
+                changed = true;
+            }
             if (changed) {
                 this.draw();
             }
@@ -376,6 +424,7 @@ export class MapShapeEditor {
             if (idx > -1) {
                 this.config.customGrid.splice(idx, 1);
                 delete this.config.customGridGroups[key];
+                delete this.config.customGridShapes[key];
                 this.draw();
             }
         }
@@ -406,6 +455,7 @@ export class MapShapeEditor {
         ];
         
         this.config.customGridGroups = env.customGridGroups ? { ...env.customGridGroups } : {};
+        this.config.customGridShapes = env.customGridShapes ? { ...env.customGridShapes } : {};
 
         // Force color on default group if missing
         const defaultG = this.config.groundGroups.find(g => g.id === "default");
@@ -418,10 +468,14 @@ export class MapShapeEditor {
             if (!this.config.customGridGroups[key]) {
                 this.config.customGridGroups[key] = "default";
             }
+            if (!this.config.customGridShapes[key]) {
+                this.config.customGridShapes[key] = "full";
+            }
         });
 
         this.activeGroupId = "default";
         this.selectedGroupIdForEditing = "default";
+        this.activeCellShape = "full";
 
         // Load custom textures uploaded by player
         this.customTextureAssets = [];
@@ -442,6 +496,7 @@ export class MapShapeEditor {
         this.offsetZ = 0;
 
         this.updateVisibility();
+        this.syncShapeButtons();
         this.resizeCanvas();
     }
 
@@ -461,6 +516,8 @@ export class MapShapeEditor {
             this.config.customGrid.push("0,0");
             if (!this.config.customGridGroups) this.config.customGridGroups = {};
             this.config.customGridGroups["0,0"] = "default";
+            if (!this.config.customGridShapes) this.config.customGridShapes = {};
+            this.config.customGridShapes["0,0"] = "full";
         }
 
         // Sync default group to root for backward compatibility
@@ -481,7 +538,8 @@ export class MapShapeEditor {
             groundTextureAssetId: this.config.groundTextureAssetId,
             groundTextureSettings: normalizeTextureSettings(this.config.groundTextureSettings),
             groundGroups: this.config.groundGroups,
-            customGridGroups: this.config.customGridGroups
+            customGridGroups: this.config.customGridGroups,
+            customGridShapes: this.config.customGridShapes
         };
 
         this.game.updateEnvironmentConfig(newConfig);
@@ -874,6 +932,7 @@ export class MapShapeEditor {
         this.dimGroup.style.display = isCustom ? 'none' : 'flex';
         this.customInfo.style.display = isCustom ? 'flex' : 'none';
         this.groupsSection.style.display = isCustom ? 'flex' : 'none';
+        this.shapesSection.style.display = isCustom ? 'flex' : 'none';
 
         if (!isCustom) {
             document.getElementById("mse-size-x").disabled = this.config.shapeType === 'circle';
@@ -890,6 +949,7 @@ export class MapShapeEditor {
 
         this.renderGroups();
         this.renderSelectedGroupSettings();
+        this.syncShapeButtons();
     }
 
     resizeCanvas() {
@@ -983,6 +1043,7 @@ export class MapShapeEditor {
             // Draw filled cells
             const customGridGroups = this.config.customGridGroups || {};
             const groundGroups = this.config.groundGroups || [];
+            const customGridShapes = this.config.customGridShapes || {};
 
             this.config.customGrid.forEach(key => {
                 const [gx, gz] = key.split(',').map(Number);
@@ -997,8 +1058,34 @@ export class MapShapeEditor {
                 this.ctx.strokeStyle = baseColor;
                 this.ctx.lineWidth = 2 / this.zoom;
                 
-                this.ctx.fillRect(x, z, cs, cs);
-                this.ctx.strokeRect(x, z, cs, cs);
+                const shape = customGridShapes[key] || "full";
+                
+                if (shape === "full") {
+                    this.ctx.fillRect(x, z, cs, cs);
+                    this.ctx.strokeRect(x, z, cs, cs);
+                } else {
+                    this.ctx.beginPath();
+                    if (shape === "nw") {
+                        this.ctx.moveTo(x, z);
+                        this.ctx.lineTo(x, z + cs);
+                        this.ctx.lineTo(x + cs, z);
+                    } else if (shape === "ne") {
+                        this.ctx.moveTo(x, z);
+                        this.ctx.lineTo(x + cs, z);
+                        this.ctx.lineTo(x + cs, z + cs);
+                    } else if (shape === "se") {
+                        this.ctx.moveTo(x + cs, z);
+                        this.ctx.lineTo(x + cs, z + cs);
+                        this.ctx.lineTo(x, z + cs);
+                    } else if (shape === "sw") {
+                        this.ctx.moveTo(x, z);
+                        this.ctx.lineTo(x, z + cs);
+                        this.ctx.lineTo(x + cs, z + cs);
+                    }
+                    this.ctx.closePath();
+                    this.ctx.fill();
+                    this.ctx.stroke();
+                }
             });
 
             // Draw Selection Box preview
@@ -1027,5 +1114,16 @@ export class MapShapeEditor {
         }
 
         this.ctx.restore();
+    }
+
+    syncShapeButtons() {
+        if (!this.container) return;
+        const buttons = this.container.querySelectorAll(".mse-shape-select-btn");
+        buttons.forEach((btn) => {
+            const selected = btn.dataset.shapeId === this.activeCellShape;
+            btn.style.borderColor = selected ? "#FF9800" : "#555";
+            btn.style.backgroundColor = selected ? "#444" : "#333";
+            btn.style.color = selected ? "#FF9800" : "white";
+        });
     }
 }

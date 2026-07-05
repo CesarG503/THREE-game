@@ -120,7 +120,9 @@ export class MapGeometryBuilder {
 
       let geo: THREE.BufferGeometry;
       if (shape === "full") {
-        geo = new THREE.BoxGeometry(cellSize, 1, cellSize);
+        const box = new THREE.BoxGeometry(cellSize, 1, cellSize);
+        geo = box.toNonIndexed();
+        box.dispose();
         const texSettings = normalizeTextureSettings(group ? (group.textureSettings || { tileSize: 5 }) : groundTextureSettings);
         remapBoxUVs(geo, { x: cellSize, y: 1, z: cellSize }, texSettings);
       } else {
@@ -138,7 +140,7 @@ export class MapGeometryBuilder {
     const mergedMap = new Map<string, THREE.BufferGeometry>();
     geometriesByGroup.forEach((geos, groupId) => {
       if (geos.length > 0) {
-        const merged = BufferGeometryUtils.mergeGeometries(geos, true);
+        const merged = BufferGeometryUtils.mergeGeometries(geos, false);
         if (merged) {
           mergedMap.set(groupId, merged);
         }
@@ -181,7 +183,9 @@ export class MapGeometryBuilder {
 
       let geo: THREE.BufferGeometry;
       if (shape === "full") {
-        geo = new THREE.BoxGeometry(cellSize, 1, cellSize);
+        const box = new THREE.BoxGeometry(cellSize, 1, cellSize);
+        geo = box.toNonIndexed();
+        box.dispose();
         const texSettings = normalizeTextureSettings(group ? (group.textureSettings || { tileSize: 5 }) : { tileSize: 5 });
         remapBoxUVs(geo, { x: cellSize, y: 1, z: cellSize }, texSettings);
       } else {
@@ -201,7 +205,7 @@ export class MapGeometryBuilder {
     const mergedMap = new Map<string, { geometry: THREE.BufferGeometry; posY: number; ceilingGroupId: string }>();
     geometriesByKey.forEach((geos, compositeKey) => {
       if (geos.length > 0) {
-        const merged = BufferGeometryUtils.mergeGeometries(geos, true);
+        const merged = BufferGeometryUtils.mergeGeometries(geos, false);
         if (merged) {
           const meta = keyMetadata.get(compositeKey)!;
           mergedMap.set(compositeKey, {
@@ -288,7 +292,7 @@ export class MapGeometryBuilder {
     const mergedMap = new Map<string, any>();
     geometriesByGroup.forEach((geos, groupId) => {
       if (geos.length > 0) {
-        const merged = BufferGeometryUtils.mergeGeometries(geos, true);
+        const merged = BufferGeometryUtils.mergeGeometries(geos, false);
         if (merged) {
           const meta = groupMetadata.get(groupId)!;
           mergedMap.set(groupId, {

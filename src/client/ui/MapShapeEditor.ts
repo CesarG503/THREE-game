@@ -715,7 +715,7 @@ export class MapShapeEditor {
         this.config.customCellSize = env.customCellSize || 10;
         
         // Sync ground groups
-        this.config.groundGroups = env.groundGroups ? JSON.parse(JSON.stringify(env.groundGroups)) : [
+        this.config.groundGroups = (env.groundGroups && env.groundGroups.length > 0) ? JSON.parse(JSON.stringify(env.groundGroups)) : [
             {
                 id: "default",
                 name: "Suelo 1",
@@ -732,7 +732,7 @@ export class MapShapeEditor {
         // Sync advanced walls
         this.config.invisibleWallsAdvanced = !!env.invisibleWallsAdvanced;
         this.config.customGridWallGroups = env.customGridWallGroups ? { ...env.customGridWallGroups } : {};
-        this.config.invisibleWallsGroups = env.invisibleWallsGroups ? JSON.parse(JSON.stringify(env.invisibleWallsGroups)) : [
+        this.config.invisibleWallsGroups = (env.invisibleWallsGroups && env.invisibleWallsGroups.length > 0) ? JSON.parse(JSON.stringify(env.invisibleWallsGroups)) : [
             {
                 id: "default",
                 name: "Pared 1",
@@ -747,7 +747,7 @@ export class MapShapeEditor {
         ];
 
         // Sync ceilings
-        this.config.ceilingGroups = env.ceilingGroups ? JSON.parse(JSON.stringify(env.ceilingGroups)) : [
+        this.config.ceilingGroups = (env.ceilingGroups && env.ceilingGroups.length > 0) ? JSON.parse(JSON.stringify(env.ceilingGroups)) : [
             {
                 id: "default",
                 name: "Techo 1",
@@ -2575,23 +2575,43 @@ export class MapShapeEditor {
         }
 
         sourceGroups.forEach((src) => {
-            const suffix = "_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
-            const id = (activeTab === "walls" ? "wall_group_" : (activeTab === "ceiling" ? "ceiling_group_" : "group_")) + suffix;
-            
-            const copiedGroup = {
-                ...JSON.parse(JSON.stringify(src)),
-                id: id,
-                // Assign sensible defaults if copying to walls
-                height: src.height !== undefined ? src.height : 10,
-                opacity: src.opacity !== undefined ? src.opacity : 1.0,
-                transparent: src.transparent !== undefined ? src.transparent : false
-            };
+            const isDefault = src.id === "default";
+            const targetName = isDefault ? (src.name + " (Copia)") : src.name;
 
-            if (src.id === "default") {
-                copiedGroup.name = src.name + " (Copia)";
+            const existingDestGroup = destGroups.find(
+                (g: any) => g.id === src.id || g.name.toLowerCase() === targetName.toLowerCase()
+            );
+
+            if (existingDestGroup) {
+                existingDestGroup.color = src.color;
+                existingDestGroup.color3D = src.color3D || src.color;
+                existingDestGroup.texturePath = src.texturePath;
+                existingDestGroup.textureAssetId = src.textureAssetId;
+                if (src.textureSettings) {
+                    existingDestGroup.textureSettings = JSON.parse(JSON.stringify(src.textureSettings));
+                }
+                if (src.height !== undefined) existingDestGroup.height = src.height;
+                if (src.opacity !== undefined) existingDestGroup.opacity = src.opacity;
+                if (src.transparent !== undefined) existingDestGroup.transparent = src.transparent;
+            } else {
+                const suffix = "_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
+                const id = (activeTab === "walls" ? "wall_group_" : (activeTab === "ceiling" ? "ceiling_group_" : "group_")) + suffix;
+                
+                const copiedGroup = {
+                    ...JSON.parse(JSON.stringify(src)),
+                    id: id,
+                    // Assign sensible defaults if copying to walls
+                    height: src.height !== undefined ? src.height : 10,
+                    opacity: src.opacity !== undefined ? src.opacity : 1.0,
+                    transparent: src.transparent !== undefined ? src.transparent : false
+                };
+
+                if (isDefault) {
+                    copiedGroup.name = src.name + " (Copia)";
+                }
+
+                destGroups.push(copiedGroup);
             }
-
-            destGroups.push(copiedGroup);
         });
 
         if (activeTab === "floor") {

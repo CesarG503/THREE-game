@@ -63,13 +63,46 @@ export function createEmptyMapData(): SavedMapData {
 			groundTexturePath: null,
 			groundTextureAssetId: null,
 			groundTextureSettings: { fitMode: "auto", tileSize: 5, repeatX: 1, repeatY: 1, offsetX: 0, offsetY: 0, rotation: 0, patternVariation: false },
-			groundGroups: [],
+			groundGroups: [
+				{
+					id: "default",
+					name: "Suelo 1",
+					color: "#FF9800",
+					color3D: "#FF9800",
+					texturePath: null,
+					textureAssetId: null,
+					textureSettings: { fitMode: "auto", tileSize: 5, repeatX: 1, repeatY: 1, offsetX: 0, offsetY: 0, rotation: 0, patternVariation: false }
+				}
+			],
 			customGridGroups: {},
 			customGridShapes: {},
 			invisibleWallsAdvanced: false,
-			invisibleWallsGroups: [],
+			invisibleWallsGroups: [
+				{
+					id: "default",
+					name: "Pared 1",
+					color: "#FF5722",
+					color3D: "#FF5722",
+					texturePath: null,
+					textureAssetId: null,
+					textureSettings: { fitMode: "auto", tileSize: 5, repeatX: 1, repeatY: 1, offsetX: 0, offsetY: 0, rotation: 0, patternVariation: false },
+					height: 10,
+					opacity: 1.0,
+					transparent: false
+				}
+			],
 			customGridWallGroups: {},
-			ceilingGroups: [],
+			ceilingGroups: [
+				{
+					id: "default",
+					name: "Techo 1",
+					color: "#E040FB",
+					color3D: "#E040FB",
+					texturePath: null,
+					textureAssetId: null,
+					textureSettings: { fitMode: "auto", tileSize: 5, repeatX: 1, repeatY: 1, offsetX: 0, offsetY: 0, rotation: 0, patternVariation: false }
+				}
+			],
 			customGridCeilingGroups: {},
 			customGridCeilingShapes: {},
 		},

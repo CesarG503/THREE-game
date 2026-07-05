@@ -265,7 +265,7 @@ export function applyMapObjectTexture(object3D: any, texture: THREE.Texture, fal
     const patternTexture = normalized.patternVariation
       ? createDeterministicPatternTexture(texture, normalized, mesh, object3D, dimensions)
       : null;
-    const meshTexture = patternTexture || (normalized.patternVariation ? texture.clone() : texture);
+    const meshTexture = patternTexture || texture.clone();
     configureTexture(meshTexture, normalized, getStableTextureVariant(mesh, object3D));
 
     const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];

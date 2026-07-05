@@ -1,5 +1,6 @@
 import { getRedis } from "../cache/redis.js";
 import { logger } from "../utils/Logger.js";
+import { anonymizeTelemetryEvent } from "./middleware/privacy.js";
 
 export interface TelemetryEvent {
   id: string;
@@ -39,7 +40,8 @@ export class EventBuffer {
       );
       return false;
     }
-    this.buffer.push(event);
+    const sanitized = anonymizeTelemetryEvent(event);
+    this.buffer.push(sanitized);
     return true;
   }
 

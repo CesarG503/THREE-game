@@ -1,5 +1,6 @@
 import { eventBuffer } from "../eventBuffer.js";
 import { logger } from "../../utils/Logger.js";
+import { alertService } from "./alerts.js";
 
 export class MetricsCollector {
   private receivedCounts = new Map<string, number>();
@@ -20,6 +21,7 @@ export class MetricsCollector {
   public recordReceived(eventType: string, count = 1) {
     const current = this.receivedCounts.get(eventType) ?? 0;
     this.receivedCounts.set(eventType, current + count);
+    alertService.recordReceived(eventType);
   }
 
   public recordPersisted(eventType: string, count = 1) {

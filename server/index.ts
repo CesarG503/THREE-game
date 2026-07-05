@@ -17,6 +17,7 @@ import { prisma } from "./db/prisma.js"
 import { handleHttpRequest } from "./http/ApiServer.js"
 import { eventBuffer } from "./analytics/eventBuffer.js"
 import { eventWorker } from "./analytics/eventWorker.js"
+import { alertService } from "./analytics/monitoring/alerts.js"
 import crypto from "node:crypto"
 
 // ── Bootstrap ──────────────────────────────────────────────────────────────
@@ -32,6 +33,7 @@ logger.info("Server", `Registered handlers: ${router.registeredTypes().join(", "
 void connectRedis().then(() => {
   eventBuffer.start()
   eventWorker.start()
+  alertService.start()
 })
 
 // ── HTTP + WebSocket Server ────────────────────────────────────────────────
@@ -124,6 +126,7 @@ async function shutdown(signal: string): Promise<void> {
   // Stop analytics worker & buffer, and flush remaining in-memory events to Redis
   eventWorker.stop()
   eventBuffer.stop()
+  alertService.stop()
   try {
     await eventBuffer.flush()
   } catch (err) {

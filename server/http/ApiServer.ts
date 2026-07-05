@@ -8,6 +8,7 @@ import { logger } from "../utils/Logger.js"
 import { validateTelemetryEvent } from "../analytics/middleware.js"
 import { eventBuffer } from "../analytics/eventBuffer.js"
 import { getRedis } from "../cache/redis.js"
+import { metricsCollector } from "../analytics/monitoring/metricsCollector.js"
 
 const MAX_BODY_BYTES = 1024 * 1024 * 2
 
@@ -31,6 +32,12 @@ export async function handleHttpRequest(
     return
   }
 
+  if (req.method === "GET" && url.pathname === "/api/metrics") {
+    res.writeHead(200, { "Content-Type": "text/plain; version=0.0.4; charset=utf-8" })
+    res.end(metricsCollector.toPrometheusFormat())
+    return
+  }
+
   if (req.method === "POST" && url.pathname === "/api/analytics/event") {
     // Rate limiting: max 100 events per IP per minute (fail-open: analytics are not safety-critical)
     const ip = getClientIp(req)
@@ -40,10 +47,14 @@ export async function handleHttpRequest(
       return
     }
     return withJsonBody(req, res, async (body) => {
+      const eventType = (body as any)?.eventType || "unknown"
+      metricsCollector.recordReceived(eventType)
+
       const validation = validateTelemetryEvent(body)
       if (!validation.valid) {
         // Log details internally, don't expose schema to clients
         logger.warn("HTTP", `Invalid telemetry event from ${ip}`, validation.errors)
+        metricsCollector.recordFailed(eventType)
         sendJson(res, 400, { 
           error: "Validation failed", 
           details: ["The event payload does not match the registered schema."] 
@@ -52,6 +63,7 @@ export async function handleHttpRequest(
       }
       const success = eventBuffer.push(body as any)
       if (!success) {
+        metricsCollector.recordFailed(eventType)
         sendJson(res, 429, { error: "Server busy" })
         return
       }

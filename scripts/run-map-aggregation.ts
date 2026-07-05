@@ -4,6 +4,7 @@ import { getRedis, connectRedis } from "../server/cache/redis.js";
 import { logger } from "../server/utils/Logger.js";
 import { MapProfileRepository } from "../server/analytics/models/MapProfile.js";
 import { computeMapDifficultyAndPace } from "../server/analytics/features/map_difficulty.js";
+import { computeMapViralityAndSticky } from "../server/analytics/features/map_virality.js";
 import "dotenv/config";
 
 function computeMedian(values: number[]): number | null {
@@ -129,7 +130,10 @@ export async function runMapAggregation(lookbackDays = 30): Promise<void> {
       // E) Calcular dificultad y ritmo
       await computeMapDifficultyAndPace(mapId);
 
-      // F) Invalidar/Actualizar caché en Redis inmediatamente
+      // F) Calcular viralidad y sticky factor
+      await computeMapViralityAndSticky(mapId, lookbackDays);
+
+      // G) Invalidar/Actualizar caché en Redis inmediatamente
       await MapProfileRepository.clearCache(mapId);
       // Precargar en caché de forma activa
       await MapProfileRepository.getMapProfile(mapId);

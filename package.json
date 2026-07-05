@@ -26,7 +26,10 @@
     "db:analytics:test-ingestion": "npx tsx scripts/test-navigation-ingestion.ts",
     "db:analytics:test-session": "npx tsx scripts/test-session-telemetry.ts",
     "db:analytics:test-interaction": "npx tsx scripts/test-game-interaction.ts",
-    "db:analytics:test-ui": "npx tsx scripts/test-ui-telemetry.ts"
+    "db:analytics:test-ui": "npx tsx scripts/test-ui-telemetry.ts",
+    "db:analytics:test-virality": "npx tsx scripts/test-map-virality.ts",
+    "db:analytics:test-quality": "npx tsx scripts/test-data-quality.ts",
+    "db:analytics:test-monitoring": "npx tsx scripts/test-telemetry-monitoring.ts"
   },
   "devDependencies": {
     "@types/busboy": "^1.5.4",

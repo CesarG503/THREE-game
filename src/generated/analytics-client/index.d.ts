@@ -48,6 +48,11 @@ export type SocialAffinity = $Result.DefaultSelection<Prisma.$SocialAffinityPayl
  * 
  */
 export type FatiguedMap = $Result.DefaultSelection<Prisma.$FatiguedMapPayload>
+/**
+ * Model DataQuarantine
+ * 
+ */
+export type DataQuarantine = $Result.DefaultSelection<Prisma.$DataQuarantinePayload>
 
 /**
  * ##  Prisma Client ʲˢ
@@ -239,6 +244,16 @@ export class PrismaClient<
     * ```
     */
   get fatiguedMap(): Prisma.FatiguedMapDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.dataQuarantine`: Exposes CRUD operations for the **DataQuarantine** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more DataQuarantines
+    * const dataQuarantines = await prisma.dataQuarantine.findMany()
+    * ```
+    */
+  get dataQuarantine(): Prisma.DataQuarantineDelegate<ExtArgs, ClientOptions>;
 }
 
 export namespace Prisma {
@@ -679,7 +694,8 @@ export namespace Prisma {
     PlayerFeatures: 'PlayerFeatures',
     MapFeatures: 'MapFeatures',
     SocialAffinity: 'SocialAffinity',
-    FatiguedMap: 'FatiguedMap'
+    FatiguedMap: 'FatiguedMap',
+    DataQuarantine: 'DataQuarantine'
   };
 
   export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -695,7 +711,7 @@ export namespace Prisma {
       omit: GlobalOmitOptions
     }
     meta: {
-      modelProps: "user" | "gameMap" | "rawEvent" | "playerFeatures" | "mapFeatures" | "socialAffinity" | "fatiguedMap"
+      modelProps: "user" | "gameMap" | "rawEvent" | "playerFeatures" | "mapFeatures" | "socialAffinity" | "fatiguedMap" | "dataQuarantine"
       txIsolationLevel: Prisma.TransactionIsolationLevel
     }
     model: {
@@ -1217,6 +1233,80 @@ export namespace Prisma {
           }
         }
       }
+      DataQuarantine: {
+        payload: Prisma.$DataQuarantinePayload<ExtArgs>
+        fields: Prisma.DataQuarantineFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.DataQuarantineFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$DataQuarantinePayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.DataQuarantineFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$DataQuarantinePayload>
+          }
+          findFirst: {
+            args: Prisma.DataQuarantineFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$DataQuarantinePayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.DataQuarantineFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$DataQuarantinePayload>
+          }
+          findMany: {
+            args: Prisma.DataQuarantineFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$DataQuarantinePayload>[]
+          }
+          create: {
+            args: Prisma.DataQuarantineCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$DataQuarantinePayload>
+          }
+          createMany: {
+            args: Prisma.DataQuarantineCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.DataQuarantineCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$DataQuarantinePayload>[]
+          }
+          delete: {
+            args: Prisma.DataQuarantineDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$DataQuarantinePayload>
+          }
+          update: {
+            args: Prisma.DataQuarantineUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$DataQuarantinePayload>
+          }
+          deleteMany: {
+            args: Prisma.DataQuarantineDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.DataQuarantineUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.DataQuarantineUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$DataQuarantinePayload>[]
+          }
+          upsert: {
+            args: Prisma.DataQuarantineUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$DataQuarantinePayload>
+          }
+          aggregate: {
+            args: Prisma.DataQuarantineAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateDataQuarantine>
+          }
+          groupBy: {
+            args: Prisma.DataQuarantineGroupByArgs<ExtArgs>
+            result: $Utils.Optional<DataQuarantineGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.DataQuarantineCountArgs<ExtArgs>
+            result: $Utils.Optional<DataQuarantineCountAggregateOutputType> | number
+          }
+        }
+      }
     }
   } & {
     other: {
@@ -1332,6 +1422,7 @@ export namespace Prisma {
     mapFeatures?: MapFeaturesOmit
     socialAffinity?: SocialAffinityOmit
     fatiguedMap?: FatiguedMapOmit
+    dataQuarantine?: DataQuarantineOmit
   }
 
   /* Types for Logging */
@@ -6094,6 +6185,8 @@ export namespace Prisma {
     difficultyScore: number | null
     paceScore: number | null
     earlyAbandonRate: number | null
+    stickyFactor: number | null
+    viralityFactor: number | null
   }
 
   export type MapFeaturesSumAggregateOutputType = {
@@ -6107,6 +6200,8 @@ export namespace Prisma {
     difficultyScore: number | null
     paceScore: number | null
     earlyAbandonRate: number | null
+    stickyFactor: number | null
+    viralityFactor: number | null
   }
 
   export type MapFeaturesMinAggregateOutputType = {
@@ -6123,6 +6218,8 @@ export namespace Prisma {
     paceScore: number | null
     paceLabel: string | null
     earlyAbandonRate: number | null
+    stickyFactor: number | null
+    viralityFactor: number | null
   }
 
   export type MapFeaturesMaxAggregateOutputType = {
@@ -6139,6 +6236,8 @@ export namespace Prisma {
     paceScore: number | null
     paceLabel: string | null
     earlyAbandonRate: number | null
+    stickyFactor: number | null
+    viralityFactor: number | null
   }
 
   export type MapFeaturesCountAggregateOutputType = {
@@ -6156,6 +6255,8 @@ export namespace Prisma {
     paceScore: number
     paceLabel: number
     earlyAbandonRate: number
+    stickyFactor: number
+    viralityFactor: number
     _all: number
   }
 
@@ -6171,6 +6272,8 @@ export namespace Prisma {
     difficultyScore?: true
     paceScore?: true
     earlyAbandonRate?: true
+    stickyFactor?: true
+    viralityFactor?: true
   }
 
   export type MapFeaturesSumAggregateInputType = {
@@ -6184,6 +6287,8 @@ export namespace Prisma {
     difficultyScore?: true
     paceScore?: true
     earlyAbandonRate?: true
+    stickyFactor?: true
+    viralityFactor?: true
   }
 
   export type MapFeaturesMinAggregateInputType = {
@@ -6200,6 +6305,8 @@ export namespace Prisma {
     paceScore?: true
     paceLabel?: true
     earlyAbandonRate?: true
+    stickyFactor?: true
+    viralityFactor?: true
   }
 
   export type MapFeaturesMaxAggregateInputType = {
@@ -6216,6 +6323,8 @@ export namespace Prisma {
     paceScore?: true
     paceLabel?: true
     earlyAbandonRate?: true
+    stickyFactor?: true
+    viralityFactor?: true
   }
 
   export type MapFeaturesCountAggregateInputType = {
@@ -6233,6 +6342,8 @@ export namespace Prisma {
     paceScore?: true
     paceLabel?: true
     earlyAbandonRate?: true
+    stickyFactor?: true
+    viralityFactor?: true
     _all?: true
   }
 
@@ -6337,6 +6448,8 @@ export namespace Prisma {
     paceScore: number | null
     paceLabel: string | null
     earlyAbandonRate: number | null
+    stickyFactor: number | null
+    viralityFactor: number | null
     _count: MapFeaturesCountAggregateOutputType | null
     _avg: MapFeaturesAvgAggregateOutputType | null
     _sum: MapFeaturesSumAggregateOutputType | null
@@ -6373,6 +6486,8 @@ export namespace Prisma {
     paceScore?: boolean
     paceLabel?: boolean
     earlyAbandonRate?: boolean
+    stickyFactor?: boolean
+    viralityFactor?: boolean
     map?: boolean | GameMapDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["mapFeatures"]>
 
@@ -6391,6 +6506,8 @@ export namespace Prisma {
     paceScore?: boolean
     paceLabel?: boolean
     earlyAbandonRate?: boolean
+    stickyFactor?: boolean
+    viralityFactor?: boolean
     map?: boolean | GameMapDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["mapFeatures"]>
 
@@ -6409,6 +6526,8 @@ export namespace Prisma {
     paceScore?: boolean
     paceLabel?: boolean
     earlyAbandonRate?: boolean
+    stickyFactor?: boolean
+    viralityFactor?: boolean
     map?: boolean | GameMapDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["mapFeatures"]>
 
@@ -6427,9 +6546,11 @@ export namespace Prisma {
     paceScore?: boolean
     paceLabel?: boolean
     earlyAbandonRate?: boolean
+    stickyFactor?: boolean
+    viralityFactor?: boolean
   }
 
-  export type MapFeaturesOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"mapId" | "totalJoins" | "totalLeaves" | "bounceCount" | "averageDuration" | "bounceRate" | "medianPlaytime" | "completionRate" | "retentionCurve" | "difficultyScore" | "difficultyLabel" | "paceScore" | "paceLabel" | "earlyAbandonRate", ExtArgs["result"]["mapFeatures"]>
+  export type MapFeaturesOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"mapId" | "totalJoins" | "totalLeaves" | "bounceCount" | "averageDuration" | "bounceRate" | "medianPlaytime" | "completionRate" | "retentionCurve" | "difficultyScore" | "difficultyLabel" | "paceScore" | "paceLabel" | "earlyAbandonRate" | "stickyFactor" | "viralityFactor", ExtArgs["result"]["mapFeatures"]>
   export type MapFeaturesInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     map?: boolean | GameMapDefaultArgs<ExtArgs>
   }
@@ -6460,6 +6581,8 @@ export namespace Prisma {
       paceScore: number | null
       paceLabel: string | null
       earlyAbandonRate: number | null
+      stickyFactor: number | null
+      viralityFactor: number | null
     }, ExtArgs["result"]["mapFeatures"]>
     composites: {}
   }
@@ -6898,6 +7021,8 @@ export namespace Prisma {
     readonly paceScore: FieldRef<"MapFeatures", 'Float'>
     readonly paceLabel: FieldRef<"MapFeatures", 'String'>
     readonly earlyAbandonRate: FieldRef<"MapFeatures", 'Float'>
+    readonly stickyFactor: FieldRef<"MapFeatures", 'Float'>
+    readonly viralityFactor: FieldRef<"MapFeatures", 'Float'>
   }
     
 
@@ -9481,6 +9606,1041 @@ export namespace Prisma {
 
 
   /**
+   * Model DataQuarantine
+   */
+
+  export type AggregateDataQuarantine = {
+    _count: DataQuarantineCountAggregateOutputType | null
+    _min: DataQuarantineMinAggregateOutputType | null
+    _max: DataQuarantineMaxAggregateOutputType | null
+  }
+
+  export type DataQuarantineMinAggregateOutputType = {
+    id: string | null
+    originalId: string | null
+    eventType: string | null
+    userId: string | null
+    timestamp: Date | null
+    reason: string | null
+    quarantinedAt: Date | null
+  }
+
+  export type DataQuarantineMaxAggregateOutputType = {
+    id: string | null
+    originalId: string | null
+    eventType: string | null
+    userId: string | null
+    timestamp: Date | null
+    reason: string | null
+    quarantinedAt: Date | null
+  }
+
+  export type DataQuarantineCountAggregateOutputType = {
+    id: number
+    originalId: number
+    eventType: number
+    userId: number
+    timestamp: number
+    payload: number
+    reason: number
+    quarantinedAt: number
+    _all: number
+  }
+
+
+  export type DataQuarantineMinAggregateInputType = {
+    id?: true
+    originalId?: true
+    eventType?: true
+    userId?: true
+    timestamp?: true
+    reason?: true
+    quarantinedAt?: true
+  }
+
+  export type DataQuarantineMaxAggregateInputType = {
+    id?: true
+    originalId?: true
+    eventType?: true
+    userId?: true
+    timestamp?: true
+    reason?: true
+    quarantinedAt?: true
+  }
+
+  export type DataQuarantineCountAggregateInputType = {
+    id?: true
+    originalId?: true
+    eventType?: true
+    userId?: true
+    timestamp?: true
+    payload?: true
+    reason?: true
+    quarantinedAt?: true
+    _all?: true
+  }
+
+  export type DataQuarantineAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which DataQuarantine to aggregate.
+     */
+    where?: DataQuarantineWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of DataQuarantines to fetch.
+     */
+    orderBy?: DataQuarantineOrderByWithRelationInput | DataQuarantineOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: DataQuarantineWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` DataQuarantines from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` DataQuarantines.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned DataQuarantines
+    **/
+    _count?: true | DataQuarantineCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: DataQuarantineMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: DataQuarantineMaxAggregateInputType
+  }
+
+  export type GetDataQuarantineAggregateType<T extends DataQuarantineAggregateArgs> = {
+        [P in keyof T & keyof AggregateDataQuarantine]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateDataQuarantine[P]>
+      : GetScalarType<T[P], AggregateDataQuarantine[P]>
+  }
+
+
+
+
+  export type DataQuarantineGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: DataQuarantineWhereInput
+    orderBy?: DataQuarantineOrderByWithAggregationInput | DataQuarantineOrderByWithAggregationInput[]
+    by: DataQuarantineScalarFieldEnum[] | DataQuarantineScalarFieldEnum
+    having?: DataQuarantineScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: DataQuarantineCountAggregateInputType | true
+    _min?: DataQuarantineMinAggregateInputType
+    _max?: DataQuarantineMaxAggregateInputType
+  }
+
+  export type DataQuarantineGroupByOutputType = {
+    id: string
+    originalId: string | null
+    eventType: string
+    userId: string | null
+    timestamp: Date
+    payload: JsonValue
+    reason: string
+    quarantinedAt: Date
+    _count: DataQuarantineCountAggregateOutputType | null
+    _min: DataQuarantineMinAggregateOutputType | null
+    _max: DataQuarantineMaxAggregateOutputType | null
+  }
+
+  type GetDataQuarantineGroupByPayload<T extends DataQuarantineGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<DataQuarantineGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof DataQuarantineGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], DataQuarantineGroupByOutputType[P]>
+            : GetScalarType<T[P], DataQuarantineGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type DataQuarantineSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    originalId?: boolean
+    eventType?: boolean
+    userId?: boolean
+    timestamp?: boolean
+    payload?: boolean
+    reason?: boolean
+    quarantinedAt?: boolean
+  }, ExtArgs["result"]["dataQuarantine"]>
+
+  export type DataQuarantineSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    originalId?: boolean
+    eventType?: boolean
+    userId?: boolean
+    timestamp?: boolean
+    payload?: boolean
+    reason?: boolean
+    quarantinedAt?: boolean
+  }, ExtArgs["result"]["dataQuarantine"]>
+
+  export type DataQuarantineSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    originalId?: boolean
+    eventType?: boolean
+    userId?: boolean
+    timestamp?: boolean
+    payload?: boolean
+    reason?: boolean
+    quarantinedAt?: boolean
+  }, ExtArgs["result"]["dataQuarantine"]>
+
+  export type DataQuarantineSelectScalar = {
+    id?: boolean
+    originalId?: boolean
+    eventType?: boolean
+    userId?: boolean
+    timestamp?: boolean
+    payload?: boolean
+    reason?: boolean
+    quarantinedAt?: boolean
+  }
+
+  export type DataQuarantineOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "originalId" | "eventType" | "userId" | "timestamp" | "payload" | "reason" | "quarantinedAt", ExtArgs["result"]["dataQuarantine"]>
+
+  export type $DataQuarantinePayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "DataQuarantine"
+    objects: {}
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      originalId: string | null
+      eventType: string
+      userId: string | null
+      timestamp: Date
+      payload: Prisma.JsonValue
+      reason: string
+      quarantinedAt: Date
+    }, ExtArgs["result"]["dataQuarantine"]>
+    composites: {}
+  }
+
+  type DataQuarantineGetPayload<S extends boolean | null | undefined | DataQuarantineDefaultArgs> = $Result.GetResult<Prisma.$DataQuarantinePayload, S>
+
+  type DataQuarantineCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<DataQuarantineFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: DataQuarantineCountAggregateInputType | true
+    }
+
+  export interface DataQuarantineDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['DataQuarantine'], meta: { name: 'DataQuarantine' } }
+    /**
+     * Find zero or one DataQuarantine that matches the filter.
+     * @param {DataQuarantineFindUniqueArgs} args - Arguments to find a DataQuarantine
+     * @example
+     * // Get one DataQuarantine
+     * const dataQuarantine = await prisma.dataQuarantine.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends DataQuarantineFindUniqueArgs>(args: SelectSubset<T, DataQuarantineFindUniqueArgs<ExtArgs>>): Prisma__DataQuarantineClient<$Result.GetResult<Prisma.$DataQuarantinePayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one DataQuarantine that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {DataQuarantineFindUniqueOrThrowArgs} args - Arguments to find a DataQuarantine
+     * @example
+     * // Get one DataQuarantine
+     * const dataQuarantine = await prisma.dataQuarantine.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends DataQuarantineFindUniqueOrThrowArgs>(args: SelectSubset<T, DataQuarantineFindUniqueOrThrowArgs<ExtArgs>>): Prisma__DataQuarantineClient<$Result.GetResult<Prisma.$DataQuarantinePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first DataQuarantine that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {DataQuarantineFindFirstArgs} args - Arguments to find a DataQuarantine
+     * @example
+     * // Get one DataQuarantine
+     * const dataQuarantine = await prisma.dataQuarantine.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends DataQuarantineFindFirstArgs>(args?: SelectSubset<T, DataQuarantineFindFirstArgs<ExtArgs>>): Prisma__DataQuarantineClient<$Result.GetResult<Prisma.$DataQuarantinePayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first DataQuarantine that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {DataQuarantineFindFirstOrThrowArgs} args - Arguments to find a DataQuarantine
+     * @example
+     * // Get one DataQuarantine
+     * const dataQuarantine = await prisma.dataQuarantine.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends DataQuarantineFindFirstOrThrowArgs>(args?: SelectSubset<T, DataQuarantineFindFirstOrThrowArgs<ExtArgs>>): Prisma__DataQuarantineClient<$Result.GetResult<Prisma.$DataQuarantinePayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more DataQuarantines that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {DataQuarantineFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all DataQuarantines
+     * const dataQuarantines = await prisma.dataQuarantine.findMany()
+     * 
+     * // Get first 10 DataQuarantines
+     * const dataQuarantines = await prisma.dataQuarantine.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const dataQuarantineWithIdOnly = await prisma.dataQuarantine.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends DataQuarantineFindManyArgs>(args?: SelectSubset<T, DataQuarantineFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$DataQuarantinePayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a DataQuarantine.
+     * @param {DataQuarantineCreateArgs} args - Arguments to create a DataQuarantine.
+     * @example
+     * // Create one DataQuarantine
+     * const DataQuarantine = await prisma.dataQuarantine.create({
+     *   data: {
+     *     // ... data to create a DataQuarantine
+     *   }
+     * })
+     * 
+     */
+    create<T extends DataQuarantineCreateArgs>(args: SelectSubset<T, DataQuarantineCreateArgs<ExtArgs>>): Prisma__DataQuarantineClient<$Result.GetResult<Prisma.$DataQuarantinePayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many DataQuarantines.
+     * @param {DataQuarantineCreateManyArgs} args - Arguments to create many DataQuarantines.
+     * @example
+     * // Create many DataQuarantines
+     * const dataQuarantine = await prisma.dataQuarantine.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends DataQuarantineCreateManyArgs>(args?: SelectSubset<T, DataQuarantineCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many DataQuarantines and returns the data saved in the database.
+     * @param {DataQuarantineCreateManyAndReturnArgs} args - Arguments to create many DataQuarantines.
+     * @example
+     * // Create many DataQuarantines
+     * const dataQuarantine = await prisma.dataQuarantine.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many DataQuarantines and only return the `id`
+     * const dataQuarantineWithIdOnly = await prisma.dataQuarantine.createManyAndReturn({
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends DataQuarantineCreateManyAndReturnArgs>(args?: SelectSubset<T, DataQuarantineCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$DataQuarantinePayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a DataQuarantine.
+     * @param {DataQuarantineDeleteArgs} args - Arguments to delete one DataQuarantine.
+     * @example
+     * // Delete one DataQuarantine
+     * const DataQuarantine = await prisma.dataQuarantine.delete({
+     *   where: {
+     *     // ... filter to delete one DataQuarantine
+     *   }
+     * })
+     * 
+     */
+    delete<T extends DataQuarantineDeleteArgs>(args: SelectSubset<T, DataQuarantineDeleteArgs<ExtArgs>>): Prisma__DataQuarantineClient<$Result.GetResult<Prisma.$DataQuarantinePayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one DataQuarantine.
+     * @param {DataQuarantineUpdateArgs} args - Arguments to update one DataQuarantine.
+     * @example
+     * // Update one DataQuarantine
+     * const dataQuarantine = await prisma.dataQuarantine.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends DataQuarantineUpdateArgs>(args: SelectSubset<T, DataQuarantineUpdateArgs<ExtArgs>>): Prisma__DataQuarantineClient<$Result.GetResult<Prisma.$DataQuarantinePayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more DataQuarantines.
+     * @param {DataQuarantineDeleteManyArgs} args - Arguments to filter DataQuarantines to delete.
+     * @example
+     * // Delete a few DataQuarantines
+     * const { count } = await prisma.dataQuarantine.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends DataQuarantineDeleteManyArgs>(args?: SelectSubset<T, DataQuarantineDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more DataQuarantines.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {DataQuarantineUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many DataQuarantines
+     * const dataQuarantine = await prisma.dataQuarantine.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends DataQuarantineUpdateManyArgs>(args: SelectSubset<T, DataQuarantineUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more DataQuarantines and returns the data updated in the database.
+     * @param {DataQuarantineUpdateManyAndReturnArgs} args - Arguments to update many DataQuarantines.
+     * @example
+     * // Update many DataQuarantines
+     * const dataQuarantine = await prisma.dataQuarantine.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more DataQuarantines and only return the `id`
+     * const dataQuarantineWithIdOnly = await prisma.dataQuarantine.updateManyAndReturn({
+     *   select: { id: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends DataQuarantineUpdateManyAndReturnArgs>(args: SelectSubset<T, DataQuarantineUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$DataQuarantinePayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one DataQuarantine.
+     * @param {DataQuarantineUpsertArgs} args - Arguments to update or create a DataQuarantine.
+     * @example
+     * // Update or create a DataQuarantine
+     * const dataQuarantine = await prisma.dataQuarantine.upsert({
+     *   create: {
+     *     // ... data to create a DataQuarantine
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the DataQuarantine we want to update
+     *   }
+     * })
+     */
+    upsert<T extends DataQuarantineUpsertArgs>(args: SelectSubset<T, DataQuarantineUpsertArgs<ExtArgs>>): Prisma__DataQuarantineClient<$Result.GetResult<Prisma.$DataQuarantinePayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of DataQuarantines.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {DataQuarantineCountArgs} args - Arguments to filter DataQuarantines to count.
+     * @example
+     * // Count the number of DataQuarantines
+     * const count = await prisma.dataQuarantine.count({
+     *   where: {
+     *     // ... the filter for the DataQuarantines we want to count
+     *   }
+     * })
+    **/
+    count<T extends DataQuarantineCountArgs>(
+      args?: Subset<T, DataQuarantineCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], DataQuarantineCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a DataQuarantine.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {DataQuarantineAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends DataQuarantineAggregateArgs>(args: Subset<T, DataQuarantineAggregateArgs>): Prisma.PrismaPromise<GetDataQuarantineAggregateType<T>>
+
+    /**
+     * Group by DataQuarantine.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {DataQuarantineGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends DataQuarantineGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: DataQuarantineGroupByArgs['orderBy'] }
+        : { orderBy?: DataQuarantineGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, DataQuarantineGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetDataQuarantineGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the DataQuarantine model
+   */
+  readonly fields: DataQuarantineFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for DataQuarantine.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__DataQuarantineClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the DataQuarantine model
+   */
+  interface DataQuarantineFieldRefs {
+    readonly id: FieldRef<"DataQuarantine", 'String'>
+    readonly originalId: FieldRef<"DataQuarantine", 'String'>
+    readonly eventType: FieldRef<"DataQuarantine", 'String'>
+    readonly userId: FieldRef<"DataQuarantine", 'String'>
+    readonly timestamp: FieldRef<"DataQuarantine", 'DateTime'>
+    readonly payload: FieldRef<"DataQuarantine", 'Json'>
+    readonly reason: FieldRef<"DataQuarantine", 'String'>
+    readonly quarantinedAt: FieldRef<"DataQuarantine", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * DataQuarantine findUnique
+   */
+  export type DataQuarantineFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the DataQuarantine
+     */
+    select?: DataQuarantineSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the DataQuarantine
+     */
+    omit?: DataQuarantineOmit<ExtArgs> | null
+    /**
+     * Filter, which DataQuarantine to fetch.
+     */
+    where: DataQuarantineWhereUniqueInput
+  }
+
+  /**
+   * DataQuarantine findUniqueOrThrow
+   */
+  export type DataQuarantineFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the DataQuarantine
+     */
+    select?: DataQuarantineSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the DataQuarantine
+     */
+    omit?: DataQuarantineOmit<ExtArgs> | null
+    /**
+     * Filter, which DataQuarantine to fetch.
+     */
+    where: DataQuarantineWhereUniqueInput
+  }
+
+  /**
+   * DataQuarantine findFirst
+   */
+  export type DataQuarantineFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the DataQuarantine
+     */
+    select?: DataQuarantineSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the DataQuarantine
+     */
+    omit?: DataQuarantineOmit<ExtArgs> | null
+    /**
+     * Filter, which DataQuarantine to fetch.
+     */
+    where?: DataQuarantineWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of DataQuarantines to fetch.
+     */
+    orderBy?: DataQuarantineOrderByWithRelationInput | DataQuarantineOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for DataQuarantines.
+     */
+    cursor?: DataQuarantineWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` DataQuarantines from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` DataQuarantines.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of DataQuarantines.
+     */
+    distinct?: DataQuarantineScalarFieldEnum | DataQuarantineScalarFieldEnum[]
+  }
+
+  /**
+   * DataQuarantine findFirstOrThrow
+   */
+  export type DataQuarantineFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the DataQuarantine
+     */
+    select?: DataQuarantineSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the DataQuarantine
+     */
+    omit?: DataQuarantineOmit<ExtArgs> | null
+    /**
+     * Filter, which DataQuarantine to fetch.
+     */
+    where?: DataQuarantineWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of DataQuarantines to fetch.
+     */
+    orderBy?: DataQuarantineOrderByWithRelationInput | DataQuarantineOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for DataQuarantines.
+     */
+    cursor?: DataQuarantineWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` DataQuarantines from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` DataQuarantines.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of DataQuarantines.
+     */
+    distinct?: DataQuarantineScalarFieldEnum | DataQuarantineScalarFieldEnum[]
+  }
+
+  /**
+   * DataQuarantine findMany
+   */
+  export type DataQuarantineFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the DataQuarantine
+     */
+    select?: DataQuarantineSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the DataQuarantine
+     */
+    omit?: DataQuarantineOmit<ExtArgs> | null
+    /**
+     * Filter, which DataQuarantines to fetch.
+     */
+    where?: DataQuarantineWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of DataQuarantines to fetch.
+     */
+    orderBy?: DataQuarantineOrderByWithRelationInput | DataQuarantineOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing DataQuarantines.
+     */
+    cursor?: DataQuarantineWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` DataQuarantines from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` DataQuarantines.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of DataQuarantines.
+     */
+    distinct?: DataQuarantineScalarFieldEnum | DataQuarantineScalarFieldEnum[]
+  }
+
+  /**
+   * DataQuarantine create
+   */
+  export type DataQuarantineCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the DataQuarantine
+     */
+    select?: DataQuarantineSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the DataQuarantine
+     */
+    omit?: DataQuarantineOmit<ExtArgs> | null
+    /**
+     * The data needed to create a DataQuarantine.
+     */
+    data: XOR<DataQuarantineCreateInput, DataQuarantineUncheckedCreateInput>
+  }
+
+  /**
+   * DataQuarantine createMany
+   */
+  export type DataQuarantineCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many DataQuarantines.
+     */
+    data: DataQuarantineCreateManyInput | DataQuarantineCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * DataQuarantine createManyAndReturn
+   */
+  export type DataQuarantineCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the DataQuarantine
+     */
+    select?: DataQuarantineSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the DataQuarantine
+     */
+    omit?: DataQuarantineOmit<ExtArgs> | null
+    /**
+     * The data used to create many DataQuarantines.
+     */
+    data: DataQuarantineCreateManyInput | DataQuarantineCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * DataQuarantine update
+   */
+  export type DataQuarantineUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the DataQuarantine
+     */
+    select?: DataQuarantineSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the DataQuarantine
+     */
+    omit?: DataQuarantineOmit<ExtArgs> | null
+    /**
+     * The data needed to update a DataQuarantine.
+     */
+    data: XOR<DataQuarantineUpdateInput, DataQuarantineUncheckedUpdateInput>
+    /**
+     * Choose, which DataQuarantine to update.
+     */
+    where: DataQuarantineWhereUniqueInput
+  }
+
+  /**
+   * DataQuarantine updateMany
+   */
+  export type DataQuarantineUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update DataQuarantines.
+     */
+    data: XOR<DataQuarantineUpdateManyMutationInput, DataQuarantineUncheckedUpdateManyInput>
+    /**
+     * Filter which DataQuarantines to update
+     */
+    where?: DataQuarantineWhereInput
+    /**
+     * Limit how many DataQuarantines to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * DataQuarantine updateManyAndReturn
+   */
+  export type DataQuarantineUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the DataQuarantine
+     */
+    select?: DataQuarantineSelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the DataQuarantine
+     */
+    omit?: DataQuarantineOmit<ExtArgs> | null
+    /**
+     * The data used to update DataQuarantines.
+     */
+    data: XOR<DataQuarantineUpdateManyMutationInput, DataQuarantineUncheckedUpdateManyInput>
+    /**
+     * Filter which DataQuarantines to update
+     */
+    where?: DataQuarantineWhereInput
+    /**
+     * Limit how many DataQuarantines to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * DataQuarantine upsert
+   */
+  export type DataQuarantineUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the DataQuarantine
+     */
+    select?: DataQuarantineSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the DataQuarantine
+     */
+    omit?: DataQuarantineOmit<ExtArgs> | null
+    /**
+     * The filter to search for the DataQuarantine to update in case it exists.
+     */
+    where: DataQuarantineWhereUniqueInput
+    /**
+     * In case the DataQuarantine found by the `where` argument doesn't exist, create a new DataQuarantine with this data.
+     */
+    create: XOR<DataQuarantineCreateInput, DataQuarantineUncheckedCreateInput>
+    /**
+     * In case the DataQuarantine was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<DataQuarantineUpdateInput, DataQuarantineUncheckedUpdateInput>
+  }
+
+  /**
+   * DataQuarantine delete
+   */
+  export type DataQuarantineDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the DataQuarantine
+     */
+    select?: DataQuarantineSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the DataQuarantine
+     */
+    omit?: DataQuarantineOmit<ExtArgs> | null
+    /**
+     * Filter which DataQuarantine to delete.
+     */
+    where: DataQuarantineWhereUniqueInput
+  }
+
+  /**
+   * DataQuarantine deleteMany
+   */
+  export type DataQuarantineDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which DataQuarantines to delete
+     */
+    where?: DataQuarantineWhereInput
+    /**
+     * Limit how many DataQuarantines to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * DataQuarantine without action
+   */
+  export type DataQuarantineDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the DataQuarantine
+     */
+    select?: DataQuarantineSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the DataQuarantine
+     */
+    omit?: DataQuarantineOmit<ExtArgs> | null
+  }
+
+
+  /**
    * Enums
    */
 
@@ -9560,7 +10720,9 @@ export namespace Prisma {
     difficultyLabel: 'difficultyLabel',
     paceScore: 'paceScore',
     paceLabel: 'paceLabel',
-    earlyAbandonRate: 'earlyAbandonRate'
+    earlyAbandonRate: 'earlyAbandonRate',
+    stickyFactor: 'stickyFactor',
+    viralityFactor: 'viralityFactor'
   };
 
   export type MapFeaturesScalarFieldEnum = (typeof MapFeaturesScalarFieldEnum)[keyof typeof MapFeaturesScalarFieldEnum]
@@ -9585,6 +10747,20 @@ export namespace Prisma {
   };
 
   export type FatiguedMapScalarFieldEnum = (typeof FatiguedMapScalarFieldEnum)[keyof typeof FatiguedMapScalarFieldEnum]
+
+
+  export const DataQuarantineScalarFieldEnum: {
+    id: 'id',
+    originalId: 'originalId',
+    eventType: 'eventType',
+    userId: 'userId',
+    timestamp: 'timestamp',
+    payload: 'payload',
+    reason: 'reason',
+    quarantinedAt: 'quarantinedAt'
+  };
+
+  export type DataQuarantineScalarFieldEnum = (typeof DataQuarantineScalarFieldEnum)[keyof typeof DataQuarantineScalarFieldEnum]
 
 
   export const SortOrder: {
@@ -10016,6 +11192,8 @@ export namespace Prisma {
     paceScore?: FloatNullableFilter<"MapFeatures"> | number | null
     paceLabel?: StringNullableFilter<"MapFeatures"> | string | null
     earlyAbandonRate?: FloatNullableFilter<"MapFeatures"> | number | null
+    stickyFactor?: FloatNullableFilter<"MapFeatures"> | number | null
+    viralityFactor?: FloatNullableFilter<"MapFeatures"> | number | null
     map?: XOR<GameMapScalarRelationFilter, GameMapWhereInput>
   }
 
@@ -10034,6 +11212,8 @@ export namespace Prisma {
     paceScore?: SortOrderInput | SortOrder
     paceLabel?: SortOrderInput | SortOrder
     earlyAbandonRate?: SortOrderInput | SortOrder
+    stickyFactor?: SortOrderInput | SortOrder
+    viralityFactor?: SortOrderInput | SortOrder
     map?: GameMapOrderByWithRelationInput
   }
 
@@ -10055,6 +11235,8 @@ export namespace Prisma {
     paceScore?: FloatNullableFilter<"MapFeatures"> | number | null
     paceLabel?: StringNullableFilter<"MapFeatures"> | string | null
     earlyAbandonRate?: FloatNullableFilter<"MapFeatures"> | number | null
+    stickyFactor?: FloatNullableFilter<"MapFeatures"> | number | null
+    viralityFactor?: FloatNullableFilter<"MapFeatures"> | number | null
     map?: XOR<GameMapScalarRelationFilter, GameMapWhereInput>
   }, "mapId">
 
@@ -10073,6 +11255,8 @@ export namespace Prisma {
     paceScore?: SortOrderInput | SortOrder
     paceLabel?: SortOrderInput | SortOrder
     earlyAbandonRate?: SortOrderInput | SortOrder
+    stickyFactor?: SortOrderInput | SortOrder
+    viralityFactor?: SortOrderInput | SortOrder
     _count?: MapFeaturesCountOrderByAggregateInput
     _avg?: MapFeaturesAvgOrderByAggregateInput
     _max?: MapFeaturesMaxOrderByAggregateInput
@@ -10098,6 +11282,8 @@ export namespace Prisma {
     paceScore?: FloatNullableWithAggregatesFilter<"MapFeatures"> | number | null
     paceLabel?: StringNullableWithAggregatesFilter<"MapFeatures"> | string | null
     earlyAbandonRate?: FloatNullableWithAggregatesFilter<"MapFeatures"> | number | null
+    stickyFactor?: FloatNullableWithAggregatesFilter<"MapFeatures"> | number | null
+    viralityFactor?: FloatNullableWithAggregatesFilter<"MapFeatures"> | number | null
   }
 
   export type SocialAffinityWhereInput = {
@@ -10213,6 +11399,73 @@ export namespace Prisma {
     mapId?: StringWithAggregatesFilter<"FatiguedMap"> | string
     fatiguedAt?: DateTimeWithAggregatesFilter<"FatiguedMap"> | Date | string
     expiresAt?: DateTimeWithAggregatesFilter<"FatiguedMap"> | Date | string
+  }
+
+  export type DataQuarantineWhereInput = {
+    AND?: DataQuarantineWhereInput | DataQuarantineWhereInput[]
+    OR?: DataQuarantineWhereInput[]
+    NOT?: DataQuarantineWhereInput | DataQuarantineWhereInput[]
+    id?: StringFilter<"DataQuarantine"> | string
+    originalId?: StringNullableFilter<"DataQuarantine"> | string | null
+    eventType?: StringFilter<"DataQuarantine"> | string
+    userId?: StringNullableFilter<"DataQuarantine"> | string | null
+    timestamp?: DateTimeFilter<"DataQuarantine"> | Date | string
+    payload?: JsonFilter<"DataQuarantine">
+    reason?: StringFilter<"DataQuarantine"> | string
+    quarantinedAt?: DateTimeFilter<"DataQuarantine"> | Date | string
+  }
+
+  export type DataQuarantineOrderByWithRelationInput = {
+    id?: SortOrder
+    originalId?: SortOrderInput | SortOrder
+    eventType?: SortOrder
+    userId?: SortOrderInput | SortOrder
+    timestamp?: SortOrder
+    payload?: SortOrder
+    reason?: SortOrder
+    quarantinedAt?: SortOrder
+  }
+
+  export type DataQuarantineWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    AND?: DataQuarantineWhereInput | DataQuarantineWhereInput[]
+    OR?: DataQuarantineWhereInput[]
+    NOT?: DataQuarantineWhereInput | DataQuarantineWhereInput[]
+    originalId?: StringNullableFilter<"DataQuarantine"> | string | null
+    eventType?: StringFilter<"DataQuarantine"> | string
+    userId?: StringNullableFilter<"DataQuarantine"> | string | null
+    timestamp?: DateTimeFilter<"DataQuarantine"> | Date | string
+    payload?: JsonFilter<"DataQuarantine">
+    reason?: StringFilter<"DataQuarantine"> | string
+    quarantinedAt?: DateTimeFilter<"DataQuarantine"> | Date | string
+  }, "id">
+
+  export type DataQuarantineOrderByWithAggregationInput = {
+    id?: SortOrder
+    originalId?: SortOrderInput | SortOrder
+    eventType?: SortOrder
+    userId?: SortOrderInput | SortOrder
+    timestamp?: SortOrder
+    payload?: SortOrder
+    reason?: SortOrder
+    quarantinedAt?: SortOrder
+    _count?: DataQuarantineCountOrderByAggregateInput
+    _max?: DataQuarantineMaxOrderByAggregateInput
+    _min?: DataQuarantineMinOrderByAggregateInput
+  }
+
+  export type DataQuarantineScalarWhereWithAggregatesInput = {
+    AND?: DataQuarantineScalarWhereWithAggregatesInput | DataQuarantineScalarWhereWithAggregatesInput[]
+    OR?: DataQuarantineScalarWhereWithAggregatesInput[]
+    NOT?: DataQuarantineScalarWhereWithAggregatesInput | DataQuarantineScalarWhereWithAggregatesInput[]
+    id?: StringWithAggregatesFilter<"DataQuarantine"> | string
+    originalId?: StringNullableWithAggregatesFilter<"DataQuarantine"> | string | null
+    eventType?: StringWithAggregatesFilter<"DataQuarantine"> | string
+    userId?: StringNullableWithAggregatesFilter<"DataQuarantine"> | string | null
+    timestamp?: DateTimeWithAggregatesFilter<"DataQuarantine"> | Date | string
+    payload?: JsonWithAggregatesFilter<"DataQuarantine">
+    reason?: StringWithAggregatesFilter<"DataQuarantine"> | string
+    quarantinedAt?: DateTimeWithAggregatesFilter<"DataQuarantine"> | Date | string
   }
 
   export type UserCreateInput = {
@@ -10535,6 +11788,8 @@ export namespace Prisma {
     paceScore?: number | null
     paceLabel?: string | null
     earlyAbandonRate?: number | null
+    stickyFactor?: number | null
+    viralityFactor?: number | null
     map: GameMapCreateNestedOneWithoutMapFeaturesInput
   }
 
@@ -10553,6 +11808,8 @@ export namespace Prisma {
     paceScore?: number | null
     paceLabel?: string | null
     earlyAbandonRate?: number | null
+    stickyFactor?: number | null
+    viralityFactor?: number | null
   }
 
   export type MapFeaturesUpdateInput = {
@@ -10569,6 +11826,8 @@ export namespace Prisma {
     paceScore?: NullableFloatFieldUpdateOperationsInput | number | null
     paceLabel?: NullableStringFieldUpdateOperationsInput | string | null
     earlyAbandonRate?: NullableFloatFieldUpdateOperationsInput | number | null
+    stickyFactor?: NullableFloatFieldUpdateOperationsInput | number | null
+    viralityFactor?: NullableFloatFieldUpdateOperationsInput | number | null
     map?: GameMapUpdateOneRequiredWithoutMapFeaturesNestedInput
   }
 
@@ -10587,6 +11846,8 @@ export namespace Prisma {
     paceScore?: NullableFloatFieldUpdateOperationsInput | number | null
     paceLabel?: NullableStringFieldUpdateOperationsInput | string | null
     earlyAbandonRate?: NullableFloatFieldUpdateOperationsInput | number | null
+    stickyFactor?: NullableFloatFieldUpdateOperationsInput | number | null
+    viralityFactor?: NullableFloatFieldUpdateOperationsInput | number | null
   }
 
   export type MapFeaturesCreateManyInput = {
@@ -10604,6 +11865,8 @@ export namespace Prisma {
     paceScore?: number | null
     paceLabel?: string | null
     earlyAbandonRate?: number | null
+    stickyFactor?: number | null
+    viralityFactor?: number | null
   }
 
   export type MapFeaturesUpdateManyMutationInput = {
@@ -10620,6 +11883,8 @@ export namespace Prisma {
     paceScore?: NullableFloatFieldUpdateOperationsInput | number | null
     paceLabel?: NullableStringFieldUpdateOperationsInput | string | null
     earlyAbandonRate?: NullableFloatFieldUpdateOperationsInput | number | null
+    stickyFactor?: NullableFloatFieldUpdateOperationsInput | number | null
+    viralityFactor?: NullableFloatFieldUpdateOperationsInput | number | null
   }
 
   export type MapFeaturesUncheckedUpdateManyInput = {
@@ -10637,6 +11902,8 @@ export namespace Prisma {
     paceScore?: NullableFloatFieldUpdateOperationsInput | number | null
     paceLabel?: NullableStringFieldUpdateOperationsInput | string | null
     earlyAbandonRate?: NullableFloatFieldUpdateOperationsInput | number | null
+    stickyFactor?: NullableFloatFieldUpdateOperationsInput | number | null
+    viralityFactor?: NullableFloatFieldUpdateOperationsInput | number | null
   }
 
   export type SocialAffinityCreateInput = {
@@ -10738,6 +12005,83 @@ export namespace Prisma {
     mapId?: StringFieldUpdateOperationsInput | string
     fatiguedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     expiresAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type DataQuarantineCreateInput = {
+    id?: string
+    originalId?: string | null
+    eventType: string
+    userId?: string | null
+    timestamp: Date | string
+    payload: JsonNullValueInput | InputJsonValue
+    reason: string
+    quarantinedAt?: Date | string
+  }
+
+  export type DataQuarantineUncheckedCreateInput = {
+    id?: string
+    originalId?: string | null
+    eventType: string
+    userId?: string | null
+    timestamp: Date | string
+    payload: JsonNullValueInput | InputJsonValue
+    reason: string
+    quarantinedAt?: Date | string
+  }
+
+  export type DataQuarantineUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    originalId?: NullableStringFieldUpdateOperationsInput | string | null
+    eventType?: StringFieldUpdateOperationsInput | string
+    userId?: NullableStringFieldUpdateOperationsInput | string | null
+    timestamp?: DateTimeFieldUpdateOperationsInput | Date | string
+    payload?: JsonNullValueInput | InputJsonValue
+    reason?: StringFieldUpdateOperationsInput | string
+    quarantinedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type DataQuarantineUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    originalId?: NullableStringFieldUpdateOperationsInput | string | null
+    eventType?: StringFieldUpdateOperationsInput | string
+    userId?: NullableStringFieldUpdateOperationsInput | string | null
+    timestamp?: DateTimeFieldUpdateOperationsInput | Date | string
+    payload?: JsonNullValueInput | InputJsonValue
+    reason?: StringFieldUpdateOperationsInput | string
+    quarantinedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type DataQuarantineCreateManyInput = {
+    id?: string
+    originalId?: string | null
+    eventType: string
+    userId?: string | null
+    timestamp: Date | string
+    payload: JsonNullValueInput | InputJsonValue
+    reason: string
+    quarantinedAt?: Date | string
+  }
+
+  export type DataQuarantineUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    originalId?: NullableStringFieldUpdateOperationsInput | string | null
+    eventType?: StringFieldUpdateOperationsInput | string
+    userId?: NullableStringFieldUpdateOperationsInput | string | null
+    timestamp?: DateTimeFieldUpdateOperationsInput | Date | string
+    payload?: JsonNullValueInput | InputJsonValue
+    reason?: StringFieldUpdateOperationsInput | string
+    quarantinedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type DataQuarantineUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    originalId?: NullableStringFieldUpdateOperationsInput | string | null
+    eventType?: StringFieldUpdateOperationsInput | string
+    userId?: NullableStringFieldUpdateOperationsInput | string | null
+    timestamp?: DateTimeFieldUpdateOperationsInput | Date | string
+    payload?: JsonNullValueInput | InputJsonValue
+    reason?: StringFieldUpdateOperationsInput | string
+    quarantinedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
   export type StringFilter<$PrismaModel = never> = {
@@ -11235,6 +12579,8 @@ export namespace Prisma {
     paceScore?: SortOrder
     paceLabel?: SortOrder
     earlyAbandonRate?: SortOrder
+    stickyFactor?: SortOrder
+    viralityFactor?: SortOrder
   }
 
   export type MapFeaturesAvgOrderByAggregateInput = {
@@ -11248,6 +12594,8 @@ export namespace Prisma {
     difficultyScore?: SortOrder
     paceScore?: SortOrder
     earlyAbandonRate?: SortOrder
+    stickyFactor?: SortOrder
+    viralityFactor?: SortOrder
   }
 
   export type MapFeaturesMaxOrderByAggregateInput = {
@@ -11264,6 +12612,8 @@ export namespace Prisma {
     paceScore?: SortOrder
     paceLabel?: SortOrder
     earlyAbandonRate?: SortOrder
+    stickyFactor?: SortOrder
+    viralityFactor?: SortOrder
   }
 
   export type MapFeaturesMinOrderByAggregateInput = {
@@ -11280,6 +12630,8 @@ export namespace Prisma {
     paceScore?: SortOrder
     paceLabel?: SortOrder
     earlyAbandonRate?: SortOrder
+    stickyFactor?: SortOrder
+    viralityFactor?: SortOrder
   }
 
   export type MapFeaturesSumOrderByAggregateInput = {
@@ -11293,6 +12645,8 @@ export namespace Prisma {
     difficultyScore?: SortOrder
     paceScore?: SortOrder
     earlyAbandonRate?: SortOrder
+    stickyFactor?: SortOrder
+    viralityFactor?: SortOrder
   }
 
   export type SocialAffinityUserId1UserId2CompoundUniqueInput = {
@@ -11356,6 +12710,37 @@ export namespace Prisma {
     mapId?: SortOrder
     fatiguedAt?: SortOrder
     expiresAt?: SortOrder
+  }
+
+  export type DataQuarantineCountOrderByAggregateInput = {
+    id?: SortOrder
+    originalId?: SortOrder
+    eventType?: SortOrder
+    userId?: SortOrder
+    timestamp?: SortOrder
+    payload?: SortOrder
+    reason?: SortOrder
+    quarantinedAt?: SortOrder
+  }
+
+  export type DataQuarantineMaxOrderByAggregateInput = {
+    id?: SortOrder
+    originalId?: SortOrder
+    eventType?: SortOrder
+    userId?: SortOrder
+    timestamp?: SortOrder
+    reason?: SortOrder
+    quarantinedAt?: SortOrder
+  }
+
+  export type DataQuarantineMinOrderByAggregateInput = {
+    id?: SortOrder
+    originalId?: SortOrder
+    eventType?: SortOrder
+    userId?: SortOrder
+    timestamp?: SortOrder
+    reason?: SortOrder
+    quarantinedAt?: SortOrder
   }
 
   export type RawEventCreateNestedManyWithoutUserInput = {
@@ -12278,6 +13663,8 @@ export namespace Prisma {
     paceScore?: number | null
     paceLabel?: string | null
     earlyAbandonRate?: number | null
+    stickyFactor?: number | null
+    viralityFactor?: number | null
   }
 
   export type MapFeaturesUncheckedCreateWithoutMapInput = {
@@ -12294,6 +13681,8 @@ export namespace Prisma {
     paceScore?: number | null
     paceLabel?: string | null
     earlyAbandonRate?: number | null
+    stickyFactor?: number | null
+    viralityFactor?: number | null
   }
 
   export type MapFeaturesCreateOrConnectWithoutMapInput = {
@@ -12348,6 +13737,8 @@ export namespace Prisma {
     paceScore?: NullableFloatFieldUpdateOperationsInput | number | null
     paceLabel?: NullableStringFieldUpdateOperationsInput | string | null
     earlyAbandonRate?: NullableFloatFieldUpdateOperationsInput | number | null
+    stickyFactor?: NullableFloatFieldUpdateOperationsInput | number | null
+    viralityFactor?: NullableFloatFieldUpdateOperationsInput | number | null
   }
 
   export type MapFeaturesUncheckedUpdateWithoutMapInput = {
@@ -12364,6 +13755,8 @@ export namespace Prisma {
     paceScore?: NullableFloatFieldUpdateOperationsInput | number | null
     paceLabel?: NullableStringFieldUpdateOperationsInput | string | null
     earlyAbandonRate?: NullableFloatFieldUpdateOperationsInput | number | null
+    stickyFactor?: NullableFloatFieldUpdateOperationsInput | number | null
+    viralityFactor?: NullableFloatFieldUpdateOperationsInput | number | null
   }
 
   export type FatiguedMapUpsertWithWhereUniqueWithoutMapInput = {

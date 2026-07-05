@@ -174,7 +174,9 @@ exports.Prisma.MapFeaturesScalarFieldEnum = {
   difficultyLabel: 'difficultyLabel',
   paceScore: 'paceScore',
   paceLabel: 'paceLabel',
-  earlyAbandonRate: 'earlyAbandonRate'
+  earlyAbandonRate: 'earlyAbandonRate',
+  stickyFactor: 'stickyFactor',
+  viralityFactor: 'viralityFactor'
 };
 
 exports.Prisma.SocialAffinityScalarFieldEnum = {
@@ -190,6 +192,17 @@ exports.Prisma.FatiguedMapScalarFieldEnum = {
   mapId: 'mapId',
   fatiguedAt: 'fatiguedAt',
   expiresAt: 'expiresAt'
+};
+
+exports.Prisma.DataQuarantineScalarFieldEnum = {
+  id: 'id',
+  originalId: 'originalId',
+  eventType: 'eventType',
+  userId: 'userId',
+  timestamp: 'timestamp',
+  payload: 'payload',
+  reason: 'reason',
+  quarantinedAt: 'quarantinedAt'
 };
 
 exports.Prisma.SortOrder = {
@@ -230,7 +243,8 @@ exports.Prisma.ModelName = {
   PlayerFeatures: 'PlayerFeatures',
   MapFeatures: 'MapFeatures',
   SocialAffinity: 'SocialAffinity',
-  FatiguedMap: 'FatiguedMap'
+  FatiguedMap: 'FatiguedMap',
+  DataQuarantine: 'DataQuarantine'
 };
 
 /**

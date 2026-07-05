@@ -29,6 +29,8 @@ export interface IGameMapProfile {
   paceScore: number | null;
   paceLabel: string | null;
   earlyAbandonRate: number | null;
+  stickyFactor: number | null;
+  viralityFactor: number | null;
 }
 
 export class MapProfileRepository {
@@ -125,6 +127,8 @@ export class MapProfileRepository {
       paceScore: features?.paceScore ?? null,
       paceLabel: features?.paceLabel ?? null,
       earlyAbandonRate: features?.earlyAbandonRate ?? null,
+      stickyFactor: features?.stickyFactor ?? null,
+      viralityFactor: features?.viralityFactor ?? null,
     };
 
     // 5. Intentar escribir en el caché de Redis

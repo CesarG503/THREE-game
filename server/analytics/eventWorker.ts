@@ -4,6 +4,8 @@ import { logger } from "../utils/Logger.js";
 import type { TelemetryEvent } from "./eventBuffer.js";
 import { computeReturnIntentForUser } from "./features/return_intent.js";
 import { computeScheduleProfileForUser } from "./features/schedule_profile.js";
+import { metricsCollector } from "./monitoring/metricsCollector.js";
+import { performance } from "node:perf_hooks";
 
 export class EventWorker {
   private isRunning = false;
@@ -84,6 +86,7 @@ export class EventWorker {
   public async processBatch(events: TelemetryEvent[]): Promise<void> {
     if (events.length === 0) return;
 
+    const startDbWrite = performance.now();
     try {
       // Attempt batch write
       await analyticsPrisma.rawEvent.createMany({
@@ -97,6 +100,11 @@ export class EventWorker {
         // If there are duplicate keys, PostgreSQL createMany will fail, and we fall back to individual inserts
       });
       logger.debug("EventWorker", `Successfully batch-inserted ${events.length} events into DB.`);
+      
+      // Record metrics
+      for (const event of events) {
+        metricsCollector.recordPersisted(event.eventType);
+      }
     } catch (err) {
       logger.warn(
         "EventWorker",
@@ -104,6 +112,19 @@ export class EventWorker {
         err
       );
       await this.processEventsIndividually(events);
+    } finally {
+      const duration = performance.now() - startDbWrite;
+      metricsCollector.recordProcessingOverhead(duration);
+
+      // Record latencies
+      const latencies: number[] = [];
+      for (const event of events) {
+        const time = new Date(event.timestamp).getTime();
+        if (!isNaN(time)) {
+          latencies.push(Date.now() - time);
+        }
+      }
+      metricsCollector.recordLatencies(latencies);
     }
 
     // Post-ingestion: Trigger calculations for SessionStart and SessionEnd events
@@ -148,12 +169,14 @@ export class EventWorker {
             payload: event.payload,
           },
         });
+        metricsCollector.recordPersisted(event.eventType);
       } catch (singleErr) {
         logger.error(
           "EventWorker",
           `Permanently failed to insert event ${event.id} of type ${event.eventType}. Sending to DLQ.`,
           singleErr
         );
+        metricsCollector.recordFailed(event.eventType);
         if (redis && redis.isOpen) {
           try {
             await redis.rPush(

@@ -82,6 +82,8 @@ model MapFeatures {
   paceScore        Float?
   paceLabel        String?
   earlyAbandonRate Float?
+  stickyFactor     Float?
+  viralityFactor   Float?
   map             GameMap  @relation(fields: [mapId], references: [id], onDelete: Cascade)
 
   @@schema("analytics")
@@ -114,5 +116,18 @@ model FatiguedMap {
 
   @@id([userId, mapId])
   @@index([expiresAt])
+  @@schema("analytics")
+}
+
+model DataQuarantine {
+  id            String   @id @default(cuid())
+  originalId    String?
+  eventType     String
+  userId        String?
+  timestamp     DateTime
+  payload       Json
+  reason        String
+  quarantinedAt DateTime @default(now())
+
   @@schema("analytics")
 }

@@ -72,7 +72,7 @@ export function updateEnvironmentConfig(this: any, config: any) {
 
 	const createGroundMaterialForGroup = (group: any) => {
 		const texPath = group ? group.texturePath : groundTexturePath;
-		const colorHex = (group && group.color) ? parseInt(group.color.replace("#", "0x")) : (groundTexturePath ? 0xffffff : 0x1a1a1a);
+		const colorHex = (group && (group.color3D || group.color)) ? parseInt((group.color3D || group.color).replace("#", "0x")) : (groundTexturePath ? 0xffffff : 0x1a1a1a);
 		return new THREE.MeshStandardMaterial({
 			color: texPath ? 0xffffff : colorHex,
 			roughness: 0.8
@@ -514,7 +514,7 @@ export function updateEnvironmentConfig(this: any, config: any) {
 
 			if (group) {
 				finalHeight = group.height !== undefined ? group.height : 10;
-				colorStr = group.color || "#FF5722";
+				colorStr = group.color3D || group.color || "#FF5722";
 				opacity = group.opacity !== undefined ? group.opacity : 1.0;
 				transparent = group.transparent !== undefined ? group.transparent : (opacity < 1.0);
 				texturePath = group.texturePath || null;

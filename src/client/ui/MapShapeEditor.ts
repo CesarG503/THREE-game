@@ -599,6 +599,14 @@ export class MapShapeEditor {
         const defaultW = this.config.invisibleWallsGroups.find(w => w.id === "default");
         if (defaultW && !defaultW.color) defaultW.color = "#FF5722";
 
+        // Ensure color3D exists for backward compatibility
+        this.config.groundGroups.forEach((g: any) => {
+            if (!g.color3D) g.color3D = g.color || "#FF9800";
+        });
+        this.config.invisibleWallsGroups.forEach((w: any) => {
+            if (!w.color3D) w.color3D = w.color || "#FF5722";
+        });
+
         // Backward compatibility: map existing cells
         this.config.customGrid.forEach(key => {
             if (!this.config.customGridGroups[key]) {
@@ -721,6 +729,7 @@ export class MapShapeEditor {
             id,
             name,
             color,
+            color3D: color,
             texturePath: null,
             textureAssetId: null,
             textureSettings: { fitMode: "auto", tileSize: 5, repeatX: 1, repeatY: 1, offsetX: 0, offsetY: 0, rotation: 0, patternVariation: false }
@@ -881,6 +890,24 @@ export class MapShapeEditor {
             };
             colorRow.appendChild(colorInput);
             this.groupPropertiesSection.appendChild(colorRow);
+
+            const color3DRow = document.createElement('div');
+            color3DRow.style.cssText = `display: flex; justify-content: space-between; align-items: center; margin-top: 5px;`;
+            color3DRow.innerHTML = `<span style="font-size:12px; color:#ccc;">Color 3D (suelo):</span>`;
+            
+            const color3DInput = document.createElement('input');
+            color3DInput.type = "color";
+            color3DInput.value = group.color3D || group.color || "#FF9800";
+            color3DInput.style.cssText = `
+                width: 40px; height: 26px; border: 1px solid #555; border-radius: 4px;
+                background: none; cursor: pointer; padding: 0;
+            `;
+            color3DInput.oninput = (e) => {
+                group.color3D = e.target.value;
+                this.draw();
+            };
+            color3DRow.appendChild(color3DInput);
+            this.groupPropertiesSection.appendChild(color3DRow);
         }
 
         const textureSubGroup = document.createElement('div');
@@ -1070,6 +1097,7 @@ export class MapShapeEditor {
             id,
             name,
             color,
+            color3D: color,
             texturePath: null,
             textureAssetId: null,
             textureSettings: { fitMode: "auto", tileSize: 5, repeatX: 1, repeatY: 1, offsetX: 0, offsetY: 0, rotation: 0, patternVariation: false },
@@ -1214,10 +1242,10 @@ export class MapShapeEditor {
         nameRow.appendChild(nameInput);
         this.wallPropertiesSection.appendChild(nameRow);
 
-        // Color Picker
+        // Color Picker (Editor)
         const colorRow = document.createElement('div');
         colorRow.style.cssText = `display: flex; justify-content: space-between; align-items: center;`;
-        colorRow.innerHTML = `<span style="font-size:12px; color:#ccc;">Color de Pared:</span>`;
+        colorRow.innerHTML = `<span style="font-size:12px; color:#ccc;">Color en Editor:</span>`;
         const colorInput = document.createElement('input');
         colorInput.type = "color";
         colorInput.value = group.color || "#FF5722";
@@ -1229,6 +1257,21 @@ export class MapShapeEditor {
         };
         colorRow.appendChild(colorInput);
         this.wallPropertiesSection.appendChild(colorRow);
+
+        // Color Picker (3D)
+        const color3DRow = document.createElement('div');
+        color3DRow.style.cssText = `display: flex; justify-content: space-between; align-items: center; margin-top: 5px;`;
+        color3DRow.innerHTML = `<span style="font-size:12px; color:#ccc;">Color 3D (pared):</span>`;
+        const color3DInput = document.createElement('input');
+        color3DInput.type = "color";
+        color3DInput.value = group.color3D || group.color || "#FF5722";
+        color3DInput.style.cssText = `width: 40px; height: 26px; border: 1px solid #555; border-radius: 4px; background: none; cursor: pointer; padding: 0;`;
+        color3DInput.oninput = (e) => {
+            group.color3D = e.target.value;
+            this.draw();
+        };
+        color3DRow.appendChild(color3DInput);
+        this.wallPropertiesSection.appendChild(color3DRow);
 
         // Height Input / Slider
         const heightRow = document.createElement('div');

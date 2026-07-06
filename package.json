@@ -34,7 +34,8 @@
     "db:analytics:gdpr-delete": "npx tsx scripts/gdpr-delete-user.ts",
     "db:analytics:test-privacy": "npx tsx scripts/test-data-privacy.ts",
     "db:analytics:test-bots": "npx tsx scripts/test-bot-filter.ts",
-    "db:analytics:test-cohorts": "npx tsx scripts/test-cohort-retention.ts"
+    "db:analytics:test-cohorts": "npx tsx scripts/test-cohort-retention.ts",
+    "db:analytics:test-funnel": "npx tsx scripts/test-conversion-funnel.ts"
   },
   "devDependencies": {
     "@types/busboy": "^1.5.4",

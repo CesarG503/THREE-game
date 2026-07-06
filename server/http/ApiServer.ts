@@ -10,6 +10,7 @@ import { evaluateEventReputation } from "../analytics/security/bot_filter.js"
 import { eventBuffer } from "../analytics/eventBuffer.js"
 import { getRedis } from "../cache/redis.js"
 import { metricsCollector } from "../analytics/monitoring/metricsCollector.js"
+import { getCohortRetention } from "../analytics/reports/cohorts.js"
 
 const MAX_BODY_BYTES = 1024 * 1024 * 2
 
@@ -111,6 +112,18 @@ export async function handleHttpRequest(
       const result = await loginUser(body as AuthInput)
       sendJson(res, 200, result)
     })
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/analytics/reports/cohorts") {
+    return withApiError(res, async () => {
+      const userType = url.searchParams.get("userType") as "registered" | "guest" | undefined;
+      if (userType && userType !== "registered" && userType !== "guest") {
+        sendJson(res, 400, { error: "userType invalido. Debe ser 'registered' o 'guest'." })
+        return
+      }
+      const cohorts = await getCohortRetention({ userType });
+      sendJson(res, 200, { cohorts });
+    });
   }
 
   if (req.method === "GET" && url.pathname === "/api/assets") {

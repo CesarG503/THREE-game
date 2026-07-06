@@ -4,7 +4,10 @@
   "properties": {
     "elementId": { "type": "string" },
     "elementType": { "type": "string" },
-    "visibleTimeMs": { "type": "number", "minimum": 0 }
+    "visibleTimeMs": { "type": "number", "minimum": 0 },
+    "mapId": { "type": "string" },
+    "catalogPosition": { "type": "integer" },
+    "algorithm": { "type": "string" }
   },
   "required": ["elementId", "elementType", "visibleTimeMs"],
   "additionalProperties": false

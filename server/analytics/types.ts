@@ -68,6 +68,9 @@ export interface UiImpressionPayload {
   elementId: string;
   elementType: string;
   visibleTimeMs: number;
+  mapId?: string;
+  catalogPosition?: number;
+  algorithm?: string;
 }
 
 export interface UiClickPayload {
@@ -76,6 +79,7 @@ export interface UiClickPayload {
   action: string;
   catalogPosition?: number;
   mapId?: string;
+  algorithm?: string;
 }
 
 export interface UiScrollDepthPayload {

@@ -13,6 +13,7 @@ import { metricsCollector } from "../analytics/monitoring/metricsCollector.js"
 import { getCohortRetention } from "../analytics/reports/cohorts.js"
 import { getConversionFunnel } from "../analytics/reports/funnels.js"
 import { getMatchmakingMetrics } from "../analytics/reports/matchmaking.js"
+import { getCatalogPerformance } from "../analytics/reports/catalog_performance.js"
 
 const MAX_BODY_BYTES = 1024 * 1024 * 2
 
@@ -183,6 +184,35 @@ export async function handleHttpRequest(
 
       const matchmaking = await getMatchmakingMetrics({ startDate, endDate });
       sendJson(res, 200, { matchmaking });
+    });
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/analytics/reports/catalog") {
+    return withApiError(res, async () => {
+      const rawStart = url.searchParams.get("startDate");
+      const rawEnd = url.searchParams.get("endDate");
+
+      let startDate: Date | undefined;
+      let endDate: Date | undefined;
+
+      if (rawStart) {
+        startDate = new Date(rawStart);
+        if (isNaN(startDate.getTime())) {
+          sendJson(res, 400, { error: "startDate invalido. Debe ser una fecha ISO valida." });
+          return;
+        }
+      }
+
+      if (rawEnd) {
+        endDate = new Date(rawEnd);
+        if (isNaN(endDate.getTime())) {
+          sendJson(res, 400, { error: "endDate invalido. Debe ser una fecha ISO valida." });
+          return;
+        }
+      }
+
+      const catalogPerformance = await getCatalogPerformance({ startDate, endDate });
+      sendJson(res, 200, { catalogPerformance });
     });
   }
 

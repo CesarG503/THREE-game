@@ -6,7 +6,8 @@
     "elementType": { "type": "string" },
     "action": { "type": "string" },
     "catalogPosition": { "type": "number" },
-    "mapId": { "type": "string" }
+    "mapId": { "type": "string" },
+    "algorithm": { "type": "string" }
   },
   "required": ["elementId", "elementType", "action"],
   "additionalProperties": false

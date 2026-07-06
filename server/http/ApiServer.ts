@@ -12,6 +12,7 @@ import { getRedis } from "../cache/redis.js"
 import { metricsCollector } from "../analytics/monitoring/metricsCollector.js"
 import { getCohortRetention } from "../analytics/reports/cohorts.js"
 import { getConversionFunnel } from "../analytics/reports/funnels.js"
+import { getMatchmakingMetrics } from "../analytics/reports/matchmaking.js"
 
 const MAX_BODY_BYTES = 1024 * 1024 * 2
 
@@ -153,6 +154,35 @@ export async function handleHttpRequest(
 
       const funnel = await getConversionFunnel({ startDate, endDate });
       sendJson(res, 200, { funnel });
+    });
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/analytics/reports/matchmaking") {
+    return withApiError(res, async () => {
+      const rawStart = url.searchParams.get("startDate");
+      const rawEnd = url.searchParams.get("endDate");
+
+      let startDate: Date | undefined;
+      let endDate: Date | undefined;
+
+      if (rawStart) {
+        startDate = new Date(rawStart);
+        if (isNaN(startDate.getTime())) {
+          sendJson(res, 400, { error: "startDate invalido. Debe ser una fecha ISO valida." });
+          return;
+        }
+      }
+
+      if (rawEnd) {
+        endDate = new Date(rawEnd);
+        if (isNaN(endDate.getTime())) {
+          sendJson(res, 400, { error: "endDate invalido. Debe ser una fecha ISO valida." });
+          return;
+        }
+      }
+
+      const matchmaking = await getMatchmakingMetrics({ startDate, endDate });
+      sendJson(res, 200, { matchmaking });
     });
   }
 

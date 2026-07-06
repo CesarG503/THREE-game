@@ -35,7 +35,8 @@
     "db:analytics:test-privacy": "npx tsx scripts/test-data-privacy.ts",
     "db:analytics:test-bots": "npx tsx scripts/test-bot-filter.ts",
     "db:analytics:test-cohorts": "npx tsx scripts/test-cohort-retention.ts",
-    "db:analytics:test-funnel": "npx tsx scripts/test-conversion-funnel.ts"
+    "db:analytics:test-funnel": "npx tsx scripts/test-conversion-funnel.ts",
+    "db:analytics:test-matchmaking": "npx tsx scripts/test-matchmaking.ts"
   },
   "devDependencies": {
     "@types/busboy": "^1.5.4",

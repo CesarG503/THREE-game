@@ -1,0 +1,17 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "queueId": {
+      "type": "string"
+    },
+    "latency": {
+      "type": "integer"
+    },
+    "mode": {
+      "type": "string"
+    }
+  },
+  "required": ["queueId", "latency", "mode"],
+  "additionalProperties": false
+}

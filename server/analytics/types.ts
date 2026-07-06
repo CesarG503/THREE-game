@@ -5,10 +5,10 @@
 
 export interface TelemetryEnvelope {
   id: string;
-  eventType: "PageView" | "SessionStart" | "SessionHeartbeat" | "SessionEnd" | "MatchJoin" | "MatchLeave" | "MatchStart" | "MatchEnd" | "UiImpression" | "UiClick" | "UiScrollDepth";
+  eventType: "PageView" | "SessionStart" | "SessionHeartbeat" | "SessionEnd" | "MatchJoin" | "MatchLeave" | "MatchStart" | "MatchEnd" | "UiImpression" | "UiClick" | "UiScrollDepth" | "QueueEnter" | "QueueLeave" | "MatchFormed";
   userId?: string | null;
   timestamp: string;
-  payload: PageViewPayload | SessionStartPayload | SessionHeartbeatPayload | SessionEndPayload | MatchJoinPayload | MatchLeavePayload | MatchStartPayload | MatchEndPayload | UiImpressionPayload | UiClickPayload | UiScrollDepthPayload;
+  payload: PageViewPayload | SessionStartPayload | SessionHeartbeatPayload | SessionEndPayload | MatchJoinPayload | MatchLeavePayload | MatchStartPayload | MatchEndPayload | UiImpressionPayload | UiClickPayload | UiScrollDepthPayload | QueueEnterPayload | QueueLeavePayload | MatchFormedPayload;
 }
 
 export interface PageViewPayload {
@@ -81,4 +81,23 @@ export interface UiClickPayload {
 export interface UiScrollDepthPayload {
   page: string;
   maxDepthPercent: number;
+}
+
+export interface QueueEnterPayload {
+  queueId: string;
+  latency: number;
+  mode: string;
+}
+
+export interface QueueLeavePayload {
+  queueId: string;
+  reason: string;
+  durationSeconds: number;
+}
+
+export interface MatchFormedPayload {
+  matchId: string;
+  queueIds: any[];
+  latencyDisparity: number;
+  playerPings?: any[];
 }

@@ -50,6 +50,9 @@ const uiScrollDepthSchema = loadSchema("uiScrollDepth.json");
 const editorSessionSchema = loadSchema("editorSession.json");
 const editorActionSchema = loadSchema("editorAction.json");
 const mapStateTransitionSchema = loadSchema("mapStateTransition.json");
+const queueEnterSchema = loadSchema("queueEnter.json");
+const queueLeaveSchema = loadSchema("queueLeave.json");
+const matchFormedSchema = loadSchema("matchFormed.json");
 
 // Register payload schemas under specific keys for reference
 ajv.addSchema(pageViewSchema, "pageView");
@@ -66,6 +69,9 @@ ajv.addSchema(uiScrollDepthSchema, "uiScrollDepth");
 ajv.addSchema(editorSessionSchema, "editorSession");
 ajv.addSchema(editorActionSchema, "editorAction");
 ajv.addSchema(mapStateTransitionSchema, "mapStateTransition");
+ajv.addSchema(queueEnterSchema, "queueEnter");
+ajv.addSchema(queueLeaveSchema, "queueLeave");
+ajv.addSchema(matchFormedSchema, "matchFormed");
 
 // Compile validators
 const validateEnvelope = ajv.compile(envelopeSchema);
@@ -83,6 +89,9 @@ const validateUiScrollDepth = ajv.compile(uiScrollDepthSchema);
 const validateEditorSession = ajv.compile(editorSessionSchema);
 const validateEditorAction = ajv.compile(editorActionSchema);
 const validateMapStateTransition = ajv.compile(mapStateTransitionSchema);
+const validateQueueEnter = ajv.compile(queueEnterSchema);
+const validateQueueLeave = ajv.compile(queueLeaveSchema);
+const validateMatchFormed = ajv.compile(matchFormedSchema);
 
 export interface ValidationErrorResponse {
   valid: boolean;
@@ -237,6 +246,33 @@ export function validateTelemetryEvent(event: any): ValidationErrorResponse {
           const field = err.instancePath || "/";
           return `payload: Field "${field}" ${err.message}`;
         }) || ["Invalid MapStateTransition payload"];
+      }
+      break;
+    case "QueueEnter":
+      isValidPayload = validateQueueEnter(event.payload);
+      if (!isValidPayload) {
+        errors = validateQueueEnter.errors?.map((err: any) => {
+          const field = err.instancePath || "/";
+          return `payload: Field "${field}" ${err.message}`;
+        }) || ["Invalid QueueEnter payload"];
+      }
+      break;
+    case "QueueLeave":
+      isValidPayload = validateQueueLeave(event.payload);
+      if (!isValidPayload) {
+        errors = validateQueueLeave.errors?.map((err: any) => {
+          const field = err.instancePath || "/";
+          return `payload: Field "${field}" ${err.message}`;
+        }) || ["Invalid QueueLeave payload"];
+      }
+      break;
+    case "MatchFormed":
+      isValidPayload = validateMatchFormed(event.payload);
+      if (!isValidPayload) {
+        errors = validateMatchFormed.errors?.map((err: any) => {
+          const field = err.instancePath || "/";
+          return `payload: Field "${field}" ${err.message}`;
+        }) || ["Invalid MatchFormed payload"];
       }
       break;
     default:

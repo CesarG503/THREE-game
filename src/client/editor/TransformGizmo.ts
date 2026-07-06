@@ -188,8 +188,14 @@ export class TransformGizmo {
 			this.applyWorldPositionToTarget(nextWorld);
 			this.inspector.syncTransformInputs?.();
 		} else if (mode === "rotate") {
-			const deltaQuat = this.proxy.quaternion.clone().multiply(this.dragState.proxyQuaternionStart.clone().invert());
-			this.target.quaternion.copy(deltaQuat.multiply(this.dragState.targetQuaternionStart));
+			if (this.target.parent && this.target.parent.name !== "TransformGizmoProxy" && this.target.parent.constructor.name !== "Scene") {
+				const parentWorldQuat = this.target.parent.getWorldQuaternion(new THREE.Quaternion());
+				const localQuat = parentWorldQuat.clone().invert().multiply(this.proxy.quaternion);
+				this.target.quaternion.copy(localQuat);
+			} else {
+				const deltaQuat = this.proxy.quaternion.clone().multiply(this.dragState.proxyQuaternionStart.clone().invert());
+				this.target.quaternion.copy(deltaQuat.multiply(this.dragState.targetQuaternionStart));
+			}
 			this.inspector.syncTransformInputs?.();
 		} else if (mode === "scale") {
 			this.inspector.previewGizmoDimensions?.(this.getPreviewDimensions());

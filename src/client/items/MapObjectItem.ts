@@ -19,6 +19,20 @@ type MapObjectScale = {
   bendAngleY?: number;
 };
 
+export const getTubeSegments = (scale: any) => {
+  if (scale && scale.segments && Array.isArray(scale.segments) && scale.segments.length > 0) {
+    return scale.segments;
+  }
+  const length1 = (scale && scale.y) || 2.0;
+  const length2 = (scale && scale.length2) !== undefined ? scale.length2 : 2.0;
+  const bendAngleX = (scale && scale.bendAngleX) !== undefined ? scale.bendAngleX : 0;
+  const bendAngleY = (scale && scale.bendAngleY) !== undefined ? scale.bendAngleY : 90;
+  return [
+    { length: length1, bendAngleX: 0, bendAngleY: 0 },
+    { length: length2, bendAngleX: bendAngleX, bendAngleY: bendAngleY }
+  ];
+};
+
 export class MapObjectItem extends Item {
   type: string;
   color: number;
@@ -1123,72 +1137,103 @@ export class MapObjectItem extends Item {
       object3D.userData.radius = radius;
     } else if (this.type === "tube") {
       const radius = this.scale.radius !== undefined ? this.scale.radius : 0.5;
-      const length1 = this.scale.y || 2.0;
-      const length2 = this.scale.length2 !== undefined ? this.scale.length2 : 2.0;
-      const bendAngleX = this.scale.bendAngleX !== undefined ? this.scale.bendAngleX : 0;
-      const bendAngleY = this.scale.bendAngleY !== undefined ? this.scale.bendAngleY : 90;
+      const segments = getTubeSegments(this.scale);
 
       const group = new THREE.Group();
-      const material = new THREE.MeshStandardMaterial({
-        color: this.color,
-        transparent: this.opacity !== undefined && this.opacity < 1.0,
-        opacity: this.opacity !== undefined ? this.opacity : 1.0
-      });
+      let parentGroup = group;
 
-      // Section 1: Cylinder along Y, starting at 0
-      const sec1Geo = new THREE.CylinderGeometry(radius, radius, length1, 32);
-      sec1Geo.translate(0, length1 / 2, 0);
-      const sec1Mesh = new THREE.Mesh(sec1Geo, material);
-      sec1Mesh.castShadow = true;
-      sec1Mesh.receiveShadow = true;
-      group.add(sec1Mesh);
+      for (let i = 0; i < segments.length; i++) {
+        const seg = segments[i];
+        const segLength = seg.length || 2.0;
 
-      // Elbow (Codo): Sphere at (0, length1, 0)
-      const elbowGeo = new THREE.SphereGeometry(radius, 32, 32);
-      elbowGeo.translate(0, length1, 0);
-      const elbowMesh = new THREE.Mesh(elbowGeo, material);
-      elbowMesh.castShadow = true;
-      elbowMesh.receiveShadow = true;
-      group.add(elbowMesh);
+        const material = new THREE.MeshStandardMaterial({
+          color: this.color,
+          transparent: this.opacity !== undefined && this.opacity < 1.0,
+          opacity: this.opacity !== undefined ? this.opacity : 1.0
+        });
 
-      // Section 2: Cylinder starting at (0, length1, 0) and extending in bend direction
-      const sec2Geo = new THREE.CylinderGeometry(radius, radius, length2, 32);
-      sec2Geo.translate(0, length2 / 2, 0);
-      const sec2Mesh = new THREE.Mesh(sec2Geo, material);
-      sec2Mesh.castShadow = true;
-      sec2Mesh.receiveShadow = true;
+        // Cylinder mesh
+        const cylGeo = new THREE.CylinderGeometry(radius, radius, segLength, 32);
+        const mesh = new THREE.Mesh(cylGeo, material);
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+        mesh.userData.isTubeSegment = true;
+        mesh.userData.segmentIndex = i;
+        mesh.position.set(0, segLength / 2, 0);
+        parentGroup.add(mesh);
 
-      sec2Mesh.position.set(0, length1, 0);
-      sec2Mesh.rotation.set(
-        bendAngleX * Math.PI / 180,
-        bendAngleY * Math.PI / 180,
-        0
-      );
-      group.add(sec2Mesh);
+        // Load segment texture asynchronously
+        const segTexPath = seg.texturePath || this.texturePath;
+        if (segTexPath) {
+          MapAssetManager.loadTexture(segTexPath)
+            .then((texture) => {
+              applyMapObjectTexture(mesh, texture, this.scale, this.textureSettings);
+            })
+            .catch(err => console.error("Failed to load segment texture:", err));
+        }
+
+        let elbowMesh: THREE.Mesh | null = null;
+        if (i < segments.length - 1) {
+          const elbowGeo = new THREE.SphereGeometry(radius, 32, 32);
+          elbowMesh = new THREE.Mesh(elbowGeo, material);
+          elbowMesh.castShadow = true;
+          elbowMesh.receiveShadow = true;
+          elbowMesh.userData.isTubeElbow = true;
+          elbowMesh.userData.segmentIndex = i;
+          elbowMesh.position.set(0, segLength, 0);
+          parentGroup.add(elbowMesh);
+
+          if (segTexPath) {
+            MapAssetManager.loadTexture(segTexPath)
+              .then((texture) => {
+                if (elbowMesh) applyMapObjectTexture(elbowMesh, texture, this.scale, this.textureSettings);
+              })
+              .catch(err => {});
+          }
+
+          // Next group
+          const nextSeg = segments[i + 1];
+          const childGroup = new THREE.Group();
+          childGroup.position.set(0, segLength, 0);
+          childGroup.rotation.set(
+            (nextSeg.bendAngleX || 0) * Math.PI / 180,
+            (nextSeg.bendAngleY || 0) * Math.PI / 180,
+            0,
+            "YXZ"
+          );
+          childGroup.userData.isTubeGroup = true;
+          childGroup.userData.segmentIndex = i + 1;
+          parentGroup.add(childGroup);
+          parentGroup = childGroup;
+        }
+      }
 
       object3D = group;
 
-      // Compound colliders in Rapier
-      const col1 = RAPIER.ColliderDesc.cylinder(length1 / 2, radius)
-        .setTranslation(0, length1 / 2, 0);
-      collidersDesc.push(col1);
+      // Extract absolute local matrices to register colliders in Rapier
+      group.updateMatrixWorld(true);
+      group.traverse((child: any) => {
+        if (child.isMesh && (child.userData.isTubeSegment || child.userData.isTubeElbow)) {
+          const localMat = group.matrixWorld.clone().invert().multiply(child.matrixWorld);
+          const pos = new THREE.Vector3();
+          const quat = new THREE.Quaternion();
+          const scaleVec = new THREE.Vector3();
+          localMat.decompose(pos, quat, scaleVec);
 
-      const colElbow = RAPIER.ColliderDesc.ball(radius)
-        .setTranslation(0, length1, 0);
-      collidersDesc.push(colElbow);
-
-      const bendRot = new THREE.Quaternion().setFromEuler(new THREE.Euler(
-        bendAngleX * Math.PI / 180,
-        bendAngleY * Math.PI / 180,
-        0
-      ));
-      const dir = new THREE.Vector3(0, 1, 0).applyQuaternion(bendRot).normalize();
-      const sec2Center = new THREE.Vector3(0, length1, 0).addScaledVector(dir, length2 / 2);
-
-      const col2 = RAPIER.ColliderDesc.cylinder(length2 / 2, radius)
-        .setTranslation(sec2Center.x, sec2Center.y, sec2Center.z)
-        .setRotation(bendRot);
-      collidersDesc.push(col2);
+          if (child.userData.isTubeSegment) {
+            const idx = child.userData.segmentIndex;
+            const segLength = segments[idx].length || 2.0;
+            const col = RAPIER.ColliderDesc.cylinder(segLength / 2, radius)
+              .setTranslation(pos.x, pos.y, pos.z)
+              .setRotation(quat);
+            collidersDesc.push(col);
+          } else if (child.userData.isTubeElbow) {
+            const col = RAPIER.ColliderDesc.ball(radius)
+              .setTranslation(pos.x, pos.y, pos.z);
+            collidersDesc.push(col);
+          }
+        }
+      });
 
       object3D.userData.shapeType = "tube";
     } else {

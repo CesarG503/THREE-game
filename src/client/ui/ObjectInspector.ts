@@ -262,7 +262,19 @@ export class ObjectInspector {
             rLen1.input.onchange = (e: any) => {
                 const val = parseFloat(e.target.value);
                 if (!isNaN(val) && val > 0 && this.selectedObject) {
-                    this.updateDimensions('y', val, true);
+                    const type = this.selectedObject.userData.mapObjectType;
+                    if (type === "tube") {
+                        const scale = this.selectedObject.userData.originalScale;
+                        const segments = getTubeSegments(scale);
+                        const idx = parseInt(this.selectSegmentDropdown.value) || 0;
+                        if (segments[idx]) {
+                            segments[idx].length = val;
+                            if (idx === 0) scale.y = val;
+                            this.updateDimensions('y', scale.y, true);
+                        }
+                    } else {
+                        this.updateDimensions('y', val, true);
+                    }
                 }
             };
             section.appendChild(rLen1.row);
@@ -288,8 +300,19 @@ export class ObjectInspector {
             rBendX.input.onchange = (e: any) => {
                 const val = parseFloat(e.target.value);
                 if (!isNaN(val) && this.selectedObject) {
-                    this.selectedObject.userData.originalScale.bendAngleX = val;
-                    this.updateDimensions('y', this.selectedObject.userData.originalScale.y, true);
+                    const type = this.selectedObject.userData.mapObjectType;
+                    if (type === "tube") {
+                        const scale = this.selectedObject.userData.originalScale;
+                        const segments = getTubeSegments(scale);
+                        const idx = parseInt(this.selectSegmentDropdown.value) || 0;
+                        if (segments[idx]) {
+                            segments[idx].bendAngleX = val;
+                            this.updateDimensions('y', scale.y, true);
+                        }
+                    } else {
+                        this.selectedObject.userData.originalScale.bendAngleX = val;
+                        this.updateDimensions('y', this.selectedObject.userData.originalScale.y, true);
+                    }
                 }
             };
             section.appendChild(rBendX.row);
@@ -301,13 +324,175 @@ export class ObjectInspector {
             rBendY.input.onchange = (e: any) => {
                 const val = parseFloat(e.target.value);
                 if (!isNaN(val) && this.selectedObject) {
-                    this.selectedObject.userData.originalScale.bendAngleY = val;
-                    this.updateDimensions('y', this.selectedObject.userData.originalScale.y, true);
+                    const type = this.selectedObject.userData.mapObjectType;
+                    if (type === "tube") {
+                        const scale = this.selectedObject.userData.originalScale;
+                        const segments = getTubeSegments(scale);
+                        const idx = parseInt(this.selectSegmentDropdown.value) || 0;
+                        if (segments[idx]) {
+                            segments[idx].bendAngleY = val;
+                            this.updateDimensions('y', scale.y, true);
+                        }
+                    } else {
+                        this.selectedObject.userData.originalScale.bendAngleY = val;
+                        this.updateDimensions('y', this.selectedObject.userData.originalScale.y, true);
+                    }
                 }
             };
             section.appendChild(rBendY.row);
             this.rowBendAngleY = rBendY.row;
             this.inputBendAngleY = rBendY.input;
+
+            // Tube Multi-segment Controls
+            const tubeRow = document.createElement("div");
+            tubeRow.style.cssText = "display: none; flex-direction: column; gap: 8px; margin-top: 10px; border-top: 1px solid #444; padding-top: 10px;";
+            
+            const tubeTitle = document.createElement("span");
+            tubeTitle.textContent = "Editar Dobleces de Tubo:";
+            tubeTitle.style.cssText = "font-size: 11px; font-weight: bold; color: orange;";
+            tubeRow.appendChild(tubeTitle);
+
+            const editBendsCheckRow = document.createElement("div");
+            editBendsCheckRow.style.cssText = "display: flex; align-items: center; justify-content: space-between; gap: 5px;";
+            const editBendsLbl = document.createElement("span");
+            editBendsLbl.textContent = "Editar Dobleces con Gizmo:";
+            editBendsLbl.style.fontSize = "11px";
+            const editBendsChk = document.createElement("input");
+            editBendsChk.type = "checkbox";
+            editBendsChk.addEventListener("change", () => {
+                this.updateGizmoAttachment();
+            });
+            editBendsCheckRow.appendChild(editBendsLbl);
+            editBendsCheckRow.appendChild(editBendsChk);
+            tubeRow.appendChild(editBendsCheckRow);
+            this.chkEditBends = editBendsChk;
+
+            const segSelectRow = document.createElement("div");
+            segSelectRow.style.cssText = "display: flex; align-items: center; justify-content: space-between; gap: 5px;";
+            const segSelectLbl = document.createElement("span");
+            segSelectLbl.textContent = "Seleccionar Tramo:";
+            segSelectLbl.style.fontSize = "11px";
+            const segSelectDropdown = document.createElement("select");
+            segSelectDropdown.style.cssText = "width: 120px; background: #222; color: white; border: 1px solid #444; border-radius: 4px; padding: 2px; font-size: 11px;";
+            segSelectDropdown.addEventListener("change", () => {
+                this.syncTransformInputs();
+                this.updateGizmoAttachment();
+            });
+            segSelectRow.appendChild(segSelectLbl);
+            segSelectRow.appendChild(segSelectDropdown);
+            tubeRow.appendChild(segSelectRow);
+            this.selectSegmentDropdown = segSelectDropdown;
+
+            const segActionsRow = document.createElement("div");
+            segActionsRow.style.cssText = "display: flex; gap: 5px; margin-top: 5px;";
+            const addSegBtn = document.createElement("button");
+            addSegBtn.textContent = "+ Agregar Doblez";
+            addSegBtn.style.cssText = "flex: 1; background: #22c55e; color: white; border: none; padding: 4px; border-radius: 4px; font-size: 10px; cursor: pointer;";
+            addSegBtn.addEventListener("click", () => {
+                if (this.selectedObject) {
+                    const scale = this.selectedObject.userData.originalScale;
+                    const segments = getTubeSegments(scale);
+                    const lastSeg = segments[segments.length - 1] || { length: 2.0, bendAngleX: 0, bendAngleY: 90 };
+                    segments.push({
+                        length: 2.0,
+                        bendAngleX: 45,
+                        bendAngleY: 0,
+                        texturePath: lastSeg.texturePath || null
+                    });
+                    scale.segments = segments;
+                    
+                    this.updateDimensions('y', scale.y, true);
+                    this.syncTubeSegmentDropdown();
+                    this.selectSegmentDropdown.value = String(segments.length - 1);
+                    this.selectSegmentDropdown.dispatchEvent(new Event("change"));
+                }
+            });
+            const delSegBtn = document.createElement("button");
+            delSegBtn.textContent = "- Eliminar Doblez";
+            delSegBtn.style.cssText = "flex: 1; background: #ef4444; color: white; border: none; padding: 4px; border-radius: 4px; font-size: 10px; cursor: pointer;";
+            delSegBtn.addEventListener("click", () => {
+                if (this.selectedObject) {
+                    const scale = this.selectedObject.userData.originalScale;
+                    const segments = getTubeSegments(scale);
+                    const idx = parseInt(this.selectSegmentDropdown.value) || 0;
+                    if (segments.length > 1) {
+                        segments.splice(idx, 1);
+                        scale.segments = segments;
+                        this.updateDimensions('y', scale.y, true);
+                        this.syncTubeSegmentDropdown();
+                        this.selectSegmentDropdown.value = String(Math.max(0, idx - 1));
+                        this.selectSegmentDropdown.dispatchEvent(new Event("change"));
+                    }
+                }
+            });
+            segActionsRow.appendChild(addSegBtn);
+            segActionsRow.appendChild(delSegBtn);
+            tubeRow.appendChild(segActionsRow);
+
+            // X Slider Row
+            const sliderXRow = document.createElement("div");
+            sliderXRow.style.cssText = "display: flex; align-items: center; justify-content: space-between; gap: 5px; margin-top: 5px;";
+            const sliderXLbl = document.createElement("span");
+            sliderXLbl.textContent = "Doblez X (Deslizar):";
+            sliderXLbl.style.fontSize = "11px";
+            const sliderXInput = document.createElement("input");
+            sliderXInput.type = "range";
+            sliderXInput.min = "-180";
+            sliderXInput.max = "180";
+            sliderXInput.step = "5";
+            sliderXInput.style.cssText = "flex: 1; accent-color: orange;";
+            sliderXInput.addEventListener("input", (e: any) => {
+                const val = parseInt(e.target.value);
+                if (this.selectedObject) {
+                    const scale = this.selectedObject.userData.originalScale;
+                    const segments = getTubeSegments(scale);
+                    const idx = parseInt(this.selectSegmentDropdown.value) || 0;
+                    if (segments[idx]) {
+                        segments[idx].bendAngleX = val;
+                        if (this.inputBendAngleX) this.inputBendAngleX.value = val;
+                        this.updateDimensions('y', scale.y, true);
+                    }
+                }
+            });
+            sliderXRow.appendChild(sliderXLbl);
+            sliderXRow.appendChild(sliderXInput);
+            tubeRow.appendChild(sliderXRow);
+            this.sliderBendX = sliderXInput;
+            this.rowSliderBendX = sliderXRow;
+
+            // Y Slider Row
+            const sliderYRow = document.createElement("div");
+            sliderYRow.style.cssText = "display: flex; align-items: center; justify-content: space-between; gap: 5px; margin-top: 5px;";
+            const sliderYLbl = document.createElement("span");
+            sliderYLbl.textContent = "Doblez Y (Deslizar):";
+            sliderYLbl.style.fontSize = "11px";
+            const sliderYInput = document.createElement("input");
+            sliderYInput.type = "range";
+            sliderYInput.min = "-180";
+            sliderYInput.max = "180";
+            sliderYInput.step = "5";
+            sliderYInput.style.cssText = "flex: 1; accent-color: orange;";
+            sliderYInput.addEventListener("input", (e: any) => {
+                const val = parseInt(e.target.value);
+                if (this.selectedObject) {
+                    const scale = this.selectedObject.userData.originalScale;
+                    const segments = getTubeSegments(scale);
+                    const idx = parseInt(this.selectSegmentDropdown.value) || 0;
+                    if (segments[idx]) {
+                        segments[idx].bendAngleY = val;
+                        if (this.inputBendAngleY) this.inputBendAngleY.value = val;
+                        this.updateDimensions('y', scale.y, true);
+                    }
+                }
+            });
+            sliderYRow.appendChild(sliderYLbl);
+            sliderYRow.appendChild(sliderYInput);
+            tubeRow.appendChild(sliderYRow);
+            this.sliderBendY = sliderYInput;
+            this.rowSliderBendY = sliderYRow;
+
+            section.appendChild(tubeRow);
+            this.rowTubeBends = tubeRow;
         })
 
         // ...
@@ -913,12 +1098,20 @@ export class ObjectInspector {
             if (this.editLogicBtn) this.editLogicBtn.style.display = "none"
         }
 
+        if (!isEnv && object.userData.mapObjectType === "tube") {
+            if (this.rowTubeBends) this.rowTubeBends.style.display = "flex";
+            this.syncTubeSegmentDropdown();
+            if (this.chkEditBends) this.chkEditBends.checked = false;
+        } else {
+            if (this.rowTubeBends) this.rowTubeBends.style.display = "none";
+        }
+
         // Disable Game Input - REMOVED to allow movement
         // if (this.game.inputManager) this.game.inputManager.enabled = false
         document.exitPointerLock()
         if (this.game.cameraController) this.game.cameraController.setUIOpen(true)
 
-        this.transformGizmo.attach(object)
+        this.updateGizmoAttachment()
 
         if (object.userData.mapObjectType === "logic_camera") {
             this.game?.logicCameraSystem?.showCameraPreview?.(object)
@@ -974,6 +1167,31 @@ export class ObjectInspector {
         const type = this.selectedObject.userData.mapObjectType;
         const dimRow = this.dimensionsSection.querySelector('div'); // Standard grid row
 
+        // Handle visual tube editing rotation writeback
+        if (type === "tube" && this.chkEditBends?.checked) {
+            const selectedSegIndex = parseInt(this.selectSegmentDropdown?.value || "0") || 0;
+            if (selectedSegIndex > 0) {
+                let targetGroup = null;
+                this.selectedObject.traverse((child: any) => {
+                    if (child.isGroup && child.userData.isTubeGroup && child.userData.segmentIndex === selectedSegIndex) {
+                        targetGroup = child;
+                    }
+                });
+
+                if (targetGroup) {
+                    const euler = new THREE.Euler().setFromQuaternion(targetGroup.quaternion, "YXZ");
+                    const bendAngleX = Math.round(euler.x * 180 / Math.PI);
+                    const bendAngleY = Math.round(euler.y * 180 / Math.PI);
+
+                    const segments = getTubeSegments(dims);
+                    if (segments[selectedSegIndex]) {
+                        segments[selectedSegIndex].bendAngleX = bendAngleX;
+                        segments[selectedSegIndex].bendAngleY = bendAngleY;
+                    }
+                }
+            }
+        }
+
         if (type === "sphere") {
             if (dimRow) dimRow.style.display = "none";
             if (this.rowRadius) this.rowRadius.style.display = "flex";
@@ -1004,14 +1222,34 @@ export class ObjectInspector {
             if (dimRow) dimRow.style.display = "none";
             if (this.rowRadius) this.rowRadius.style.display = "flex";
             if (this.rowLength1) this.rowLength1.style.display = "flex";
-            if (this.rowLength2) this.rowLength2.style.display = "flex";
-            if (this.rowBendAngleX) this.rowBendAngleX.style.display = "flex";
-            if (this.rowBendAngleY) this.rowBendAngleY.style.display = "flex";
+            if (this.rowLength2) this.rowLength2.style.display = "none"; // Hide standard Largo 2
+
+            const segments = getTubeSegments(dims);
+            const idx = parseInt(this.selectSegmentDropdown?.value || "0") || 0;
+            const seg = segments[idx] || { length: 2.0, bendAngleX: 0, bendAngleY: 0 };
+
             if (this.inputRadius) this.inputRadius.value = dims.radius || 0.5;
-            if (this.inputLength1) this.inputLength1.value = dims.y || 2.0;
-            if (this.inputLength2) this.inputLength2.value = dims.length2 || 2.0;
-            if (this.inputBendAngleX) this.inputBendAngleX.value = dims.bendAngleX !== undefined ? dims.bendAngleX : 0;
-            if (this.inputBendAngleY) this.inputBendAngleY.value = dims.bendAngleY !== undefined ? dims.bendAngleY : 90;
+            if (this.inputLength1) {
+                const label = this.rowLength1.querySelector("span");
+                if (label) label.textContent = idx === 0 ? "Largo 1 (Base):" : `Largo tramo ${idx + 1}:`;
+                this.inputLength1.value = seg.length || 2.0;
+            }
+
+            if (idx === 0) {
+                if (this.rowBendAngleX) this.rowBendAngleX.style.display = "none";
+                if (this.rowBendAngleY) this.rowBendAngleY.style.display = "none";
+                if (this.rowSliderBendX) this.rowSliderBendX.style.display = "none";
+                if (this.rowSliderBendY) this.rowSliderBendY.style.display = "none";
+            } else {
+                if (this.rowBendAngleX) this.rowBendAngleX.style.display = "flex";
+                if (this.rowBendAngleY) this.rowBendAngleY.style.display = "flex";
+                if (this.rowSliderBendX) this.rowSliderBendX.style.display = "flex";
+                if (this.rowSliderBendY) this.rowSliderBendY.style.display = "flex";
+                if (this.inputBendAngleX) this.inputBendAngleX.value = seg.bendAngleX !== undefined ? seg.bendAngleX : 0;
+                if (this.inputBendAngleY) this.inputBendAngleY.value = seg.bendAngleY !== undefined ? seg.bendAngleY : 0;
+                if (this.sliderBendX) this.sliderBendX.value = String(seg.bendAngleX !== undefined ? seg.bendAngleX : 0);
+                if (this.sliderBendY) this.sliderBendY.value = String(seg.bendAngleY !== undefined ? seg.bendAngleY : 0);
+            }
         } else {
             if (dimRow) dimRow.style.display = "grid";
             if (this.rowRadius) this.rowRadius.style.display = "none";
@@ -1236,12 +1474,8 @@ export class ObjectInspector {
             const height = dims.y || 0.05;
             newGeo = new THREE.CylinderGeometry(radius, radius, height, 32);
         } else if (this.selectedObject.userData.mapObjectType === 'tube') {
-            // Rebuild Tube children
             const radius = dims.radius !== undefined ? dims.radius : 0.5;
-            const length1 = dims.y || 2.0;
-            const length2 = dims.length2 !== undefined ? dims.length2 : 2.0;
-            const bendAngleX = dims.bendAngleX !== undefined ? dims.bendAngleX : 0;
-            const bendAngleY = dims.bendAngleY !== undefined ? dims.bendAngleY : 90;
+            const segments = getTubeSegments(dims);
 
             const toRemove = [...this.selectedObject.children];
             toRemove.forEach(c => {
@@ -1249,40 +1483,69 @@ export class ObjectInspector {
                 this.selectedObject.remove(c);
             });
 
-            let mat = new THREE.MeshStandardMaterial({ color: this.selectedObject.userData.color || 0xffffff });
-            if (toRemove.length > 0 && toRemove[0].material) {
-                mat = toRemove[0].material;
+            // Rebuild visual segments recursively
+            let parentGroup = this.selectedObject;
+
+            for (let i = 0; i < segments.length; i++) {
+                const seg = segments[i];
+                const segLength = seg.length || 2.0;
+
+                const material = new THREE.MeshStandardMaterial({
+                    color: this.selectedObject.userData.color || 0xffffff,
+                    transparent: this.selectedObject.userData.opacity !== undefined && this.selectedObject.userData.opacity < 1.0,
+                    opacity: this.selectedObject.userData.opacity !== undefined ? this.selectedObject.userData.opacity : 1.0
+                });
+
+                const cylGeo = new THREE.CylinderGeometry(radius, radius, segLength, 32);
+                const mesh = new THREE.Mesh(cylGeo, material);
+                mesh.castShadow = true;
+                mesh.receiveShadow = true;
+                mesh.userData.isTubeSegment = true;
+                mesh.userData.segmentIndex = i;
+                mesh.position.set(0, segLength / 2, 0);
+                parentGroup.add(mesh);
+
+                const segTexPath = seg.texturePath || this.selectedObject.userData.texturePath;
+                if (segTexPath) {
+                    const loader = new THREE.TextureLoader();
+                    loader.load(segTexPath, (texture) => {
+                        applyMapObjectTexture(mesh, texture, dims, this.selectedObject.userData.textureSettings);
+                    });
+                }
+
+                let elbowMesh: THREE.Mesh | null = null;
+                if (i < segments.length - 1) {
+                    const elbowGeo = new THREE.SphereGeometry(radius, 32, 32);
+                    elbowMesh = new THREE.Mesh(elbowGeo, material);
+                    elbowMesh.castShadow = true;
+                    elbowMesh.receiveShadow = true;
+                    elbowMesh.userData.isTubeElbow = true;
+                    elbowMesh.userData.segmentIndex = i;
+                    elbowMesh.position.set(0, segLength, 0);
+                    parentGroup.add(elbowMesh);
+
+                    if (segTexPath) {
+                        const loader = new THREE.TextureLoader();
+                        loader.load(segTexPath, (texture) => {
+                            if (elbowMesh) applyMapObjectTexture(elbowMesh, texture, dims, this.selectedObject.userData.textureSettings);
+                        });
+                    }
+
+                    const nextSeg = segments[i + 1];
+                    const childGroup = new THREE.Group();
+                    childGroup.position.set(0, segLength, 0);
+                    childGroup.rotation.set(
+                        (nextSeg.bendAngleX || 0) * Math.PI / 180,
+                        (nextSeg.bendAngleY || 0) * Math.PI / 180,
+                        0,
+                        "YXZ"
+                    );
+                    childGroup.userData.isTubeGroup = true;
+                    childGroup.userData.segmentIndex = i + 1;
+                    parentGroup.add(childGroup);
+                    parentGroup = childGroup;
+                }
             }
-
-            // Section 1
-            const sec1Geo = new THREE.CylinderGeometry(radius, radius, length1, 32);
-            sec1Geo.translate(0, length1 / 2, 0);
-            const sec1Mesh = new THREE.Mesh(sec1Geo, mat);
-            sec1Mesh.castShadow = true;
-            sec1Mesh.receiveShadow = true;
-            this.selectedObject.add(sec1Mesh);
-
-            // Elbow
-            const elbowGeo = new THREE.SphereGeometry(radius, 32, 32);
-            elbowGeo.translate(0, length1, 0);
-            const elbowMesh = new THREE.Mesh(elbowGeo, mat);
-            elbowMesh.castShadow = true;
-            elbowMesh.receiveShadow = true;
-            this.selectedObject.add(elbowMesh);
-
-            // Section 2
-            const sec2Geo = new THREE.CylinderGeometry(radius, radius, length2, 32);
-            sec2Geo.translate(0, length2 / 2, 0);
-            const sec2Mesh = new THREE.Mesh(sec2Geo, mat);
-            sec2Mesh.castShadow = true;
-            sec2Mesh.receiveShadow = true;
-            sec2Mesh.position.set(0, length1, 0);
-            sec2Mesh.rotation.set(
-                bendAngleX * Math.PI / 180,
-                bendAngleY * Math.PI / 180,
-                0
-            );
-            this.selectedObject.add(sec2Mesh);
         } else {
             // Default Box
             newGeo = new THREE.BoxGeometry(dims.x, dims.y, dims.z)
@@ -1351,6 +1614,21 @@ export class ObjectInspector {
                 this.rebuildEnvironment(mapObjectType, groupId);
             }
             return;
+        }
+
+        // Redirection to segment texture if it is a tube
+        if (this.selectedObject.userData.mapObjectType === "tube") {
+            const scale = this.selectedObject.userData.originalScale;
+            const segments = getTubeSegments(scale);
+            const idx = parseInt(this.selectSegmentDropdown?.value || "0") || 0;
+            if (segments[idx]) {
+                segments[idx].texturePath = pathOrDataUrl;
+                this.updateDimensions('y', scale.y, true);
+                if (this.game && this.game.broadcastObjectUpdate) {
+                    this.game.broadcastObjectUpdate(this.selectedObject);
+                }
+                return;
+            }
         }
 
         this.selectedObject.userData.texturePath = pathOrDataUrl
@@ -1528,6 +1806,11 @@ export class ObjectInspector {
     refreshPhysicsAndVisuals() {
         if (!this.game || !this.selectedObject) return
 
+        // If it's a tube, regenerate visual meshes on drag end to ensure perfect alignment!
+        if (this.selectedObject.userData.mapObjectType === "tube") {
+            this.updateDimensions('y', this.selectedObject.userData.originalScale.y, false);
+        }
+
         // Calls a method in Game to regenerate body
         if (this.game.regenerateObjectPhysics) {
             this.game.regenerateObjectPhysics(this.selectedObject)
@@ -1611,4 +1894,64 @@ export class ObjectInspector {
         // Destrucción local
         this.game.deleteObjectByUuid(uuid)
     }
+
+    syncTubeSegmentDropdown() {
+        if (!this.selectedObject || !this.selectSegmentDropdown) return;
+        const scale = this.selectedObject.userData.originalScale || {};
+        const segments = getTubeSegments(scale);
+        
+        const prevVal = this.selectSegmentDropdown.value;
+        this.selectSegmentDropdown.innerHTML = "";
+
+        segments.forEach((seg, i) => {
+            const opt = document.createElement("option");
+            opt.value = String(i);
+            opt.textContent = i === 0 ? "Tramo 1 (Base)" : `Tramo ${i + 1}`;
+            this.selectSegmentDropdown.appendChild(opt);
+        });
+
+        if (parseInt(prevVal) < segments.length) {
+            this.selectSegmentDropdown.value = prevVal;
+        } else {
+            this.selectSegmentDropdown.value = "0";
+        }
+    }
+
+    updateGizmoAttachment() {
+        if (!this.selectedObject) return;
+
+        if (this.selectedObject.userData.mapObjectType === "tube" && this.chkEditBends?.checked) {
+            const selectedSegIndex = parseInt(this.selectSegmentDropdown?.value || "0") || 0;
+            if (selectedSegIndex > 0) {
+                let targetGroup = null;
+                this.selectedObject.traverse((child: any) => {
+                    if (child.isGroup && child.userData.isTubeGroup && child.userData.segmentIndex === selectedSegIndex) {
+                        targetGroup = child;
+                    }
+                });
+
+                if (targetGroup) {
+                    this.transformGizmo.attach(targetGroup);
+                    this.transformGizmo.setMode("rotate");
+                    return;
+                }
+            }
+        }
+
+        this.transformGizmo.attach(this.selectedObject);
+    }
 }
+
+export const getTubeSegments = (scale: any) => {
+    if (scale && scale.segments && Array.isArray(scale.segments) && scale.segments.length > 0) {
+        return scale.segments;
+    }
+    const length1 = (scale && scale.y) || 2.0;
+    const length2 = (scale && scale.length2) !== undefined ? scale.length2 : 2.0;
+    const bendAngleX = (scale && scale.bendAngleX) !== undefined ? scale.bendAngleX : 0;
+    const bendAngleY = (scale && scale.bendAngleY) !== undefined ? scale.bendAngleY : 90;
+    return [
+        { length: length1, bendAngleX: 0, bendAngleY: 0 },
+        { length: length2, bendAngleX: bendAngleX, bendAngleY: bendAngleY }
+    ];
+};

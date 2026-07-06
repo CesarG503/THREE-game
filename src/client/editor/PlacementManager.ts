@@ -5,6 +5,20 @@ import { RampUtils } from "../utils/RampUtils";
  * Gestor de Colocación de Objetos
  * Maneja la lógica de previsualización (ghost) y raycasting para colocar items.
  */
+export const getTubeSegments = (scale: any) => {
+    if (scale && scale.segments && Array.isArray(scale.segments) && scale.segments.length > 0) {
+        return scale.segments;
+    }
+    const length1 = (scale && scale.y) || 2.0;
+    const length2 = (scale && scale.length2) !== undefined ? scale.length2 : 2.0;
+    const bendAngleX = (scale && scale.bendAngleX) !== undefined ? scale.bendAngleX : 0;
+    const bendAngleY = (scale && scale.bendAngleY) !== undefined ? scale.bendAngleY : 90;
+    return [
+        { length: length1, bendAngleX: 0, bendAngleY: 0 },
+        { length: length2, bendAngleX: bendAngleX, bendAngleY: bendAngleY }
+    ];
+};
+
 export class PlacementManager {
     scene: THREE.Scene;
     camera: THREE.Camera;
@@ -725,9 +739,9 @@ export class PlacementManager {
             size.set(r * 2, h, r * 2);
         } else if (item.type === "tube") {
             const r = item.scale.radius || 0.5;
-            const l1 = item.scale.y || 2.0;
-            const l2 = item.scale.length2 !== undefined ? item.scale.length2 : 2.0;
-            size.set(r * 2, l1 + l2, r * 2);
+            const segments = getTubeSegments(item.scale);
+            const totalLen = segments.reduce((sum, s) => sum + (s.length || 2.0), 0);
+            size.set(r * 2, totalLen, r * 2);
         } else if (item.constructor.name === "MapObjectItem") {
             size.set(item.scale.x || 1, item.scale.y || 1, item.scale.z || 1);
         } else if (item.id.includes("pad")) {
@@ -855,12 +869,9 @@ export class PlacementManager {
 
     rebuildTubeGhost(item) {
         const radius = item.scale.radius || 0.5;
-        const length1 = item.scale.y || 2.0;
-        const length2 = item.scale.length2 !== undefined ? item.scale.length2 : 2.0;
-        const bendAngleX = item.scale.bendAngleX !== undefined ? item.scale.bendAngleX : 0;
-        const bendAngleY = item.scale.bendAngleY !== undefined ? item.scale.bendAngleY : 90;
+        const segments = getTubeSegments(item.scale);
 
-        const key = `${radius}_${length1}_${length2}_${bendAngleX}_${bendAngleY}`;
+        const key = JSON.stringify(segments) + "_" + radius;
         if (this.ghostTubeLastKey === key && this.ghostTubeGroup && this.ghostTubeGroup.children.length > 0) return;
 
         this.ghostTubeLastKey = key;
@@ -870,32 +881,38 @@ export class PlacementManager {
             this.ghostTubeGroup.remove(this.ghostTubeGroup.children[0]);
         }
 
-        // Section 1
-        const sec1Geo = new THREE.CylinderGeometry(radius, radius, length1, 16);
-        sec1Geo.translate(0, length1 / 2, 0);
-        const sec1Mesh = new THREE.Mesh(sec1Geo, this.ghostBaseMat);
-        sec1Mesh.raycast = () => {};
-        this.ghostTubeGroup.add(sec1Mesh);
+        let parentGroup = this.ghostTubeGroup;
 
-        // Elbow
-        const elbowGeo = new THREE.SphereGeometry(radius, 16, 16);
-        elbowGeo.translate(0, length1, 0);
-        const elbowMesh = new THREE.Mesh(elbowGeo, this.ghostBaseMat);
-        elbowMesh.raycast = () => {};
-        this.ghostTubeGroup.add(elbowMesh);
+        for (let i = 0; i < segments.length; i++) {
+            const seg = segments[i];
+            const segLength = seg.length || 2.0;
 
-        // Section 2
-        const sec2Geo = new THREE.CylinderGeometry(radius, radius, length2, 16);
-        sec2Geo.translate(0, length2 / 2, 0);
-        const sec2Mesh = new THREE.Mesh(sec2Geo, this.ghostBaseMat);
-        sec2Mesh.raycast = () => {};
-        sec2Mesh.position.set(0, length1, 0);
-        sec2Mesh.rotation.set(
-            bendAngleX * Math.PI / 180,
-            bendAngleY * Math.PI / 180,
-            0
-        );
-        this.ghostTubeGroup.add(sec2Mesh);
+            const cylGeo = new THREE.CylinderGeometry(radius, radius, segLength, 16);
+            const mesh = new THREE.Mesh(cylGeo, this.ghostBaseMat);
+            mesh.raycast = () => {};
+            mesh.position.set(0, segLength / 2, 0);
+            parentGroup.add(mesh);
+
+            if (i < segments.length - 1) {
+                const elbowGeo = new THREE.SphereGeometry(radius, 16, 16);
+                const elbowMesh = new THREE.Mesh(elbowGeo, this.ghostBaseMat);
+                elbowMesh.raycast = () => {};
+                elbowMesh.position.set(0, segLength, 0);
+                parentGroup.add(elbowMesh);
+
+                const nextSeg = segments[i + 1];
+                const childGroup = new THREE.Group();
+                childGroup.position.set(0, segLength, 0);
+                childGroup.rotation.set(
+                    (nextSeg.bendAngleX || 0) * Math.PI / 180,
+                    (nextSeg.bendAngleY || 0) * Math.PI / 180,
+                    0,
+                    "YXZ"
+                );
+                parentGroup.add(childGroup);
+                parentGroup = childGroup;
+            }
+        }
     }
 
     /**

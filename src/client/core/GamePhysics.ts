@@ -4,6 +4,20 @@ import { StairsUtils } from "../utils/StairsUtils";
 import { RampUtils } from "../utils/RampUtils";
 import type { Game } from "../Game";
 
+export const getTubeSegments = (scale: any) => {
+	if (scale && scale.segments && Array.isArray(scale.segments) && scale.segments.length > 0) {
+		return scale.segments;
+	}
+	const length1 = (scale && scale.y) || 2.0;
+	const length2 = (scale && scale.length2) !== undefined ? scale.length2 : 2.0;
+	const bendAngleX = (scale && scale.bendAngleX) !== undefined ? scale.bendAngleX : 0;
+	const bendAngleY = (scale && scale.bendAngleY) !== undefined ? scale.bendAngleY : 90;
+	return [
+		{ length: length1, bendAngleX: 0, bendAngleY: 0 },
+		{ length: length2, bendAngleX: bendAngleX, bendAngleY: bendAngleY }
+	];
+};
+
 export function regenerateObjectPhysics(this: Game, objectMesh: THREE.Object3D) {
 	if (!objectMesh || !this.world) return;
 
@@ -78,31 +92,31 @@ export function regenerateObjectPhysics(this: Game, objectMesh: THREE.Object3D) 
 		this.world.createCollider(colDesc, rigidBody);
 	} else if (objectMesh.userData.mapObjectType === "tube") {
 		const radius = dims.radius !== undefined ? dims.radius : 0.5;
-		const length1 = dims.y || 2.0;
-		const length2 = dims.length2 !== undefined ? dims.length2 : 2.0;
-		const bendAngleX = dims.bendAngleX !== undefined ? dims.bendAngleX : 0;
-		const bendAngleY = dims.bendAngleY !== undefined ? dims.bendAngleY : 90;
+		const segments = getTubeSegments(dims);
 
-		const col1 = RAPIER.ColliderDesc.cylinder(length1 / 2, radius)
-			.setTranslation(0, length1 / 2, 0);
-		this.world.createCollider(col1, rigidBody);
+		objectMesh.updateMatrixWorld(true);
+		objectMesh.traverse((child: any) => {
+			if (child.isMesh && (child.userData.isTubeSegment || child.userData.isTubeElbow)) {
+				const localMat = objectMesh.matrixWorld.clone().invert().multiply(child.matrixWorld);
+				const pos = new THREE.Vector3();
+				const quat = new THREE.Quaternion();
+				const scaleVec = new THREE.Vector3();
+				localMat.decompose(pos, quat, scaleVec);
 
-		const colElbow = RAPIER.ColliderDesc.ball(radius)
-			.setTranslation(0, length1, 0);
-		this.world.createCollider(colElbow, rigidBody);
-
-		const bendRot = new THREE.Quaternion().setFromEuler(new THREE.Euler(
-			bendAngleX * Math.PI / 180,
-			bendAngleY * Math.PI / 180,
-			0
-		));
-		const dir = new THREE.Vector3(0, 1, 0).applyQuaternion(bendRot).normalize();
-		const sec2Center = new THREE.Vector3(0, length1, 0).addScaledVector(dir, length2 / 2);
-
-		const col2 = RAPIER.ColliderDesc.cylinder(length2 / 2, radius)
-			.setTranslation(sec2Center.x, sec2Center.y, sec2Center.z)
-			.setRotation(bendRot);
-		this.world.createCollider(col2, rigidBody);
+				if (child.userData.isTubeSegment) {
+					const idx = child.userData.segmentIndex;
+					const segLength = segments[idx].length || 2.0;
+					const col = RAPIER.ColliderDesc.cylinder(segLength / 2, radius)
+						.setTranslation(pos.x, pos.y, pos.z)
+						.setRotation(quat);
+					this.world.createCollider(col, rigidBody);
+				} else if (child.userData.isTubeElbow) {
+					const col = RAPIER.ColliderDesc.ball(radius)
+						.setTranslation(pos.x, pos.y, pos.z);
+					this.world.createCollider(col, rigidBody);
+				}
+			}
+		});
 	} else {
 		colDesc = RAPIER.ColliderDesc.cuboid(dims.x / 2, dims.y / 2, dims.z / 2);
 		this.world.createCollider(colDesc, rigidBody);

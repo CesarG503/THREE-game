@@ -165,6 +165,10 @@ export class ConstructionMenu {
             { id_prefix: "stairs", name: "Gradas", type: "stairs", scale: { x: 4, y: 2, z: 4 } },
             { id_prefix: "ladder", name: "Escalera", type: "ladder", scale: { x: 1, y: 3, z: 0.5 } },
             { id_prefix: "tall", name: "Torre", type: "pillar", scale: { x: 2, y: 10, z: 2 } },
+            { id_prefix: "sphere_shape", name: "Esfera", type: "sphere", scale: { x: 2, y: 2, z: 2, radius: 1 } },
+            { id_prefix: "cylinder_shape", name: "Cilindro", type: "cylinder", scale: { x: 2, y: 3, z: 2, radius: 1 } },
+            { id_prefix: "circle_shape", name: "Círculo con Superficie", type: "circle", scale: { x: 3, y: 0.05, z: 3, radius: 1.5 } },
+            { id_prefix: "tube_shape", name: "Tubo Dobladizo", type: "tube", scale: { x: 1, y: 2, z: 1, radius: 0.5, length2: 2, bendAngleX: 0, bendAngleY: 90 } },
             { id_prefix: "camera_prop", name: "Cámara (Decorativa)", type: "camera_prop", scale: { x: 0.7, y: 0.7, z: 0.7 } }
         ];
 
@@ -2831,6 +2835,146 @@ renderLogicLibraryGrid(container) {
         dimRow.appendChild(createDimInput("z", "Prof."));
 
         dimContainer.appendChild(dimRow);
+
+        // Radius row
+        const radiusRow = document.createElement("div");
+        radiusRow.style.cssText = "display: none; align-items: center; justify-content: space-between; gap: 10px; margin-top: 5px;";
+        const radiusLbl = document.createElement("span");
+        radiusLbl.textContent = "Radio:";
+        radiusLbl.style.fontSize = "12px";
+        radiusLbl.style.color = "#aaa";
+        const radiusInput = document.createElement("input");
+        radiusInput.type = "number";
+        radiusInput.step = "0.5";
+        radiusInput.min = "0.1";
+        radiusInput.style.cssText = "width: 80px; background: #333; color: white; border: 1px solid #555; border-radius: 4px; padding: 4px;";
+        radiusInput.addEventListener("input", (e: any) => {
+            const val = parseFloat(e.target.value);
+            if (!isNaN(val) && val > 0) {
+                if (this.currentDraftItem) {
+                    this.currentDraftItem.scale.radius = val;
+                    if (this.currentDraftItem.type === "sphere") {
+                        this.currentDraftItem.scale.x = val * 2;
+                        this.currentDraftItem.scale.y = val * 2;
+                        this.currentDraftItem.scale.z = val * 2;
+                    } else if (this.currentDraftItem.type === "circle") {
+                        this.currentDraftItem.scale.x = val * 2;
+                        this.currentDraftItem.scale.z = val * 2;
+                    } else if (this.currentDraftItem.type === "cylinder" || this.currentDraftItem.type === "tube") {
+                        this.currentDraftItem.scale.x = val * 2;
+                        this.currentDraftItem.scale.z = val * 2;
+                    }
+                }
+            }
+        });
+        radiusRow.appendChild(radiusLbl);
+        radiusRow.appendChild(radiusInput);
+        this.inputRadius = radiusInput;
+        this.rowRadius = radiusRow;
+        dimContainer.appendChild(radiusRow);
+
+        // Length 1 (Height) row
+        const length1Row = document.createElement("div");
+        length1Row.style.cssText = "display: none; align-items: center; justify-content: space-between; gap: 10px; margin-top: 5px;";
+        const length1Lbl = document.createElement("span");
+        length1Lbl.textContent = "Largo 1 (Alto):";
+        length1Lbl.style.fontSize = "12px";
+        length1Lbl.style.color = "#aaa";
+        const length1Input = document.createElement("input");
+        length1Input.type = "number";
+        length1Input.step = "0.5";
+        length1Input.min = "0.1";
+        length1Input.style.cssText = "width: 80px; background: #333; color: white; border: 1px solid #555; border-radius: 4px; padding: 4px;";
+        length1Input.addEventListener("input", (e: any) => {
+            const val = parseFloat(e.target.value);
+            if (!isNaN(val) && val > 0) {
+                if (this.currentDraftItem) {
+                    this.currentDraftItem.scale.y = val;
+                }
+            }
+        });
+        length1Row.appendChild(length1Lbl);
+        length1Row.appendChild(length1Input);
+        this.inputLength1 = length1Input;
+        this.rowLength1 = length1Row;
+        dimContainer.appendChild(length1Row);
+
+        // Length 2 row
+        const length2Row = document.createElement("div");
+        length2Row.style.cssText = "display: none; align-items: center; justify-content: space-between; gap: 10px; margin-top: 5px;";
+        const length2Lbl = document.createElement("span");
+        length2Lbl.textContent = "Largo 2:";
+        length2Lbl.style.fontSize = "12px";
+        length2Lbl.style.color = "#aaa";
+        const length2Input = document.createElement("input");
+        length2Input.type = "number";
+        length2Input.step = "0.5";
+        length2Input.min = "0.1";
+        length2Input.style.cssText = "width: 80px; background: #333; color: white; border: 1px solid #555; border-radius: 4px; padding: 4px;";
+        length2Input.addEventListener("input", (e: any) => {
+            const val = parseFloat(e.target.value);
+            if (!isNaN(val) && val > 0) {
+                if (this.currentDraftItem) {
+                    this.currentDraftItem.scale.length2 = val;
+                }
+            }
+        });
+        length2Row.appendChild(length2Lbl);
+        length2Row.appendChild(length2Input);
+        this.inputLength2 = length2Input;
+        this.rowLength2 = length2Row;
+        dimContainer.appendChild(length2Row);
+
+        // Bend Angle X row
+        const bendXRow = document.createElement("div");
+        bendXRow.style.cssText = "display: none; align-items: center; justify-content: space-between; gap: 10px; margin-top: 5px;";
+        const bendXLbl = document.createElement("span");
+        bendXLbl.textContent = "Doblez Ángulo X (°):";
+        bendXLbl.style.fontSize = "12px";
+        bendXLbl.style.color = "#aaa";
+        const bendXInput = document.createElement("input");
+        bendXInput.type = "number";
+        bendXInput.step = "15";
+        bendXInput.style.cssText = "width: 80px; background: #333; color: white; border: 1px solid #555; border-radius: 4px; padding: 4px;";
+        bendXInput.addEventListener("input", (e: any) => {
+            const val = parseFloat(e.target.value);
+            if (!isNaN(val)) {
+                if (this.currentDraftItem) {
+                    this.currentDraftItem.scale.bendAngleX = val;
+                }
+            }
+        });
+        bendXRow.appendChild(bendXLbl);
+        bendXRow.appendChild(bendXInput);
+        this.inputBendAngleX = bendXInput;
+        this.rowBendAngleX = bendXRow;
+        dimContainer.appendChild(bendXRow);
+
+        // Bend Angle Y row
+        const bendYRow = document.createElement("div");
+        bendYRow.style.cssText = "display: none; align-items: center; justify-content: space-between; gap: 10px; margin-top: 5px;";
+        const bendYLbl = document.createElement("span");
+        bendYLbl.textContent = "Doblez Ángulo Y (°):";
+        bendYLbl.style.fontSize = "12px";
+        bendYLbl.style.color = "#aaa";
+        const bendYInput = document.createElement("input");
+        bendYInput.type = "number";
+        bendYInput.step = "15";
+        bendYInput.style.cssText = "width: 80px; background: #333; color: white; border: 1px solid #555; border-radius: 4px; padding: 4px;";
+        bendYInput.addEventListener("input", (e: any) => {
+            const val = parseFloat(e.target.value);
+            if (!isNaN(val)) {
+                if (this.currentDraftItem) {
+                    this.currentDraftItem.scale.bendAngleY = val;
+                }
+            }
+        });
+        bendYRow.appendChild(bendYLbl);
+        bendYRow.appendChild(bendYInput);
+        this.inputBendAngleY = bendYInput;
+        this.rowBendAngleY = bendYRow;
+        dimContainer.appendChild(bendYRow);
+
         this.panelEditor.appendChild(dimContainer);
 
         // --- NEW: Weapon Controls
@@ -4001,6 +4145,63 @@ renderLogicLibraryGrid(container) {
         if (this.inputDimx) this.inputDimx.value = scaleCopy.x;
         if (this.inputDimy) this.inputDimy.value = scaleCopy.y;
         if (this.inputDimz) this.inputDimz.value = scaleCopy.z;
+
+        // Toggle Custom Inputs based on shape type
+        const type = baseItem.type;
+        const dimLabel = this.editorDimContainer.querySelector("span");
+        const dimRow = this.editorDimContainer.querySelector("div");
+
+        if (type === "sphere") {
+            if (dimLabel) dimLabel.textContent = "Parámetros de Esfera:";
+            if (dimRow) dimRow.style.display = "none";
+            this.rowRadius.style.display = "flex";
+            this.rowLength1.style.display = "none";
+            this.rowLength2.style.display = "none";
+            this.rowBendAngleX.style.display = "none";
+            this.rowBendAngleY.style.display = "none";
+            this.inputRadius.value = scaleCopy.radius || 1.0;
+        } else if (type === "cylinder") {
+            if (dimLabel) dimLabel.textContent = "Parámetros de Cilindro:";
+            if (dimRow) dimRow.style.display = "none";
+            this.rowRadius.style.display = "flex";
+            this.rowLength1.style.display = "flex";
+            this.rowLength2.style.display = "none";
+            this.rowBendAngleX.style.display = "none";
+            this.rowBendAngleY.style.display = "none";
+            this.inputRadius.value = scaleCopy.radius || 1.0;
+            this.inputLength1.value = scaleCopy.y || 2.0;
+        } else if (type === "circle") {
+            if (dimLabel) dimLabel.textContent = "Parámetros de Círculo:";
+            if (dimRow) dimRow.style.display = "none";
+            this.rowRadius.style.display = "flex";
+            this.rowLength1.style.display = "flex";
+            this.rowLength2.style.display = "none";
+            this.rowBendAngleX.style.display = "none";
+            this.rowBendAngleY.style.display = "none";
+            this.inputRadius.value = scaleCopy.radius || 1.0;
+            this.inputLength1.value = scaleCopy.y || 0.05;
+        } else if (type === "tube") {
+            if (dimLabel) dimLabel.textContent = "Parámetros de Tubo:";
+            if (dimRow) dimRow.style.display = "none";
+            this.rowRadius.style.display = "flex";
+            this.rowLength1.style.display = "flex";
+            this.rowLength2.style.display = "flex";
+            this.rowBendAngleX.style.display = "flex";
+            this.rowBendAngleY.style.display = "flex";
+            this.inputRadius.value = scaleCopy.radius || 0.5;
+            this.inputLength1.value = scaleCopy.y || 2.0;
+            this.inputLength2.value = scaleCopy.length2 || 2.0;
+            this.inputBendAngleX.value = scaleCopy.bendAngleX !== undefined ? scaleCopy.bendAngleX : 0;
+            this.inputBendAngleY.value = scaleCopy.bendAngleY !== undefined ? scaleCopy.bendAngleY : 90;
+        } else {
+            if (dimLabel) dimLabel.textContent = "Dimensiones (X, Y, Z):";
+            if (dimRow) dimRow.style.display = "flex";
+            if (this.rowRadius) this.rowRadius.style.display = "none";
+            if (this.rowLength1) this.rowLength1.style.display = "none";
+            if (this.rowLength2) this.rowLength2.style.display = "none";
+            if (this.rowBendAngleX) this.rowBendAngleX.style.display = "none";
+            if (this.rowBendAngleY) this.rowBendAngleY.style.display = "none";
+        }
 
         // Update Logic Controls
         this.updateLogicControls(baseItem);

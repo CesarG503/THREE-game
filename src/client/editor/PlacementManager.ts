@@ -28,9 +28,11 @@ export class PlacementManager {
     ghostRampMesh: THREE.Mesh | null;
     ghostStairsGroup: THREE.Group | null;
     ghostLadderGroup: THREE.Group | null;
+    ghostTubeGroup: THREE.Group | null;
     ghostRampLastKey: string | null;
     ghostStairsLastKey: string | null;
     ghostLadderLastKey: string | null;
+    ghostTubeLastKey: string | null;
     ghostLabelSprite: THREE.Sprite | null;
     logicToolbar: HTMLDivElement | null;
     toolbarInputs: Record<string, HTMLInputElement>;
@@ -70,6 +72,8 @@ export class PlacementManager {
         this.ghostRampLastKey = null;
         this.ghostStairsLastKey = null;
         this.ghostLadderLastKey = null;
+        this.ghostTubeGroup = null;
+        this.ghostTubeLastKey = null;
         this.ghostLabelSprite = null;
 
         // Texturas precargadas
@@ -165,6 +169,10 @@ export class PlacementManager {
         // 4. Ghost LADDER
         this.ghostLadderGroup = new THREE.Group();
         this.placementGhost.add(this.ghostLadderGroup);
+
+        // 5. Ghost TUBE
+        this.ghostTubeGroup = new THREE.Group();
+        this.placementGhost.add(this.ghostTubeGroup);
 
 
         // Flecha / Icono indicador (Solo para Pads viejos)
@@ -704,6 +712,22 @@ export class PlacementManager {
         } else if (item.type === "target") {
             const diameter = (this.currentTargetProperties && this.currentTargetProperties.radius) ? this.currentTargetProperties.radius * 2 : (item.scale.x || 2);
             size.set(diameter, item.scale.y || 0.2, diameter);
+        } else if (item.type === "sphere") {
+            const r = item.scale.radius || item.scale.x / 2 || 1.0;
+            size.set(r * 2, r * 2, r * 2);
+        } else if (item.type === "cylinder") {
+            const r = item.scale.radius || item.scale.x / 2 || 1.0;
+            const h = item.scale.y || 1.0;
+            size.set(r * 2, h, r * 2);
+        } else if (item.type === "circle") {
+            const r = item.scale.radius || item.scale.x / 2 || 1.0;
+            const h = item.scale.y || 0.05;
+            size.set(r * 2, h, r * 2);
+        } else if (item.type === "tube") {
+            const r = item.scale.radius || 0.5;
+            const l1 = item.scale.y || 2.0;
+            const l2 = item.scale.length2 !== undefined ? item.scale.length2 : 2.0;
+            size.set(r * 2, l1 + l2, r * 2);
         } else if (item.constructor.name === "MapObjectItem") {
             size.set(item.scale.x || 1, item.scale.y || 1, item.scale.z || 1);
         } else if (item.id.includes("pad")) {
@@ -824,9 +848,54 @@ export class PlacementManager {
             const rung = new THREE.Mesh(rungGeo, this.ghostBaseMat);
             // Start from bottom (0) + first step. 
             // Pivot is now at Y=0 (Bottom of ladder)
-            rung.position.set(0, (i + 1) * 0.4, 0);
+        rung.position.set(0, (i + 1) * 0.4, 0);
             this.ghostLadderGroup.add(rung);
         }
+    }
+
+    rebuildTubeGhost(item) {
+        const radius = item.scale.radius || 0.5;
+        const length1 = item.scale.y || 2.0;
+        const length2 = item.scale.length2 !== undefined ? item.scale.length2 : 2.0;
+        const bendAngleX = item.scale.bendAngleX !== undefined ? item.scale.bendAngleX : 0;
+        const bendAngleY = item.scale.bendAngleY !== undefined ? item.scale.bendAngleY : 90;
+
+        const key = `${radius}_${length1}_${length2}_${bendAngleX}_${bendAngleY}`;
+        if (this.ghostTubeLastKey === key && this.ghostTubeGroup && this.ghostTubeGroup.children.length > 0) return;
+
+        this.ghostTubeLastKey = key;
+
+        // Clear existing
+        while (this.ghostTubeGroup.children.length > 0) {
+            this.ghostTubeGroup.remove(this.ghostTubeGroup.children[0]);
+        }
+
+        // Section 1
+        const sec1Geo = new THREE.CylinderGeometry(radius, radius, length1, 16);
+        sec1Geo.translate(0, length1 / 2, 0);
+        const sec1Mesh = new THREE.Mesh(sec1Geo, this.ghostBaseMat);
+        sec1Mesh.raycast = () => {};
+        this.ghostTubeGroup.add(sec1Mesh);
+
+        // Elbow
+        const elbowGeo = new THREE.SphereGeometry(radius, 16, 16);
+        elbowGeo.translate(0, length1, 0);
+        const elbowMesh = new THREE.Mesh(elbowGeo, this.ghostBaseMat);
+        elbowMesh.raycast = () => {};
+        this.ghostTubeGroup.add(elbowMesh);
+
+        // Section 2
+        const sec2Geo = new THREE.CylinderGeometry(radius, radius, length2, 16);
+        sec2Geo.translate(0, length2 / 2, 0);
+        const sec2Mesh = new THREE.Mesh(sec2Geo, this.ghostBaseMat);
+        sec2Mesh.raycast = () => {};
+        sec2Mesh.position.set(0, length1, 0);
+        sec2Mesh.rotation.set(
+            bendAngleX * Math.PI / 180,
+            bendAngleY * Math.PI / 180,
+            0
+        );
+        this.ghostTubeGroup.add(sec2Mesh);
     }
 
     /**
@@ -1301,9 +1370,11 @@ export class PlacementManager {
                 this.ghostBaseMat.visible = true;
                 this.ghostRampMesh.visible = false;
                 this.ghostBoxMesh.visible = false;
-                if (this.ghostStairsGroup) {
-                    this.ghostStairsGroup.visible = false;
-                }
+                this.ghostSphereMesh.visible = false;
+                this.ghostCylinderMesh.visible = false;
+                if (this.ghostStairsGroup) this.ghostStairsGroup.visible = false;
+                if (this.ghostLadderGroup) this.ghostLadderGroup.visible = false;
+                if (this.ghostTubeGroup) this.ghostTubeGroup.visible = false;
 
                 if (item.type === "impulse_jump" || item.type === "impulse_lateral") {
                     const isJump = (item.type === "impulse_jump");
@@ -1393,21 +1464,21 @@ export class PlacementManager {
                         }
 
                         // Standard Box
-                        this.ghostBoxMesh.visible = true;
-                        if (item.type === "interaction_button") {
-                            // Use correct visual size for ghost
-                            this.ghostBoxMesh.scale.set(realSize.x, realSize.y, realSize.z);
-                        } else if (item.type === "target") {
-                            this.ghostBoxMesh.scale.set(realSize.x, realSize.y, realSize.z);
+                        if (["sphere", "cylinder", "circle", "tube"].includes(item.type)) {
+                            this.ghostBoxMesh.visible = false;
                         } else {
-                            this.ghostBoxMesh.scale.set(item.scale.x, item.scale.y, item.scale.z);
+                            this.ghostBoxMesh.visible = true;
+                            if (item.type === "interaction_button") {
+                                // Use correct visual size for ghost
+                                this.ghostBoxMesh.scale.set(realSize.x, realSize.y, realSize.z);
+                            } else if (item.type === "target") {
+                                this.ghostBoxMesh.scale.set(realSize.x, realSize.y, realSize.z);
+                            } else {
+                                this.ghostBoxMesh.scale.set(item.scale.x, item.scale.y, item.scale.z);
+                            }
+                            this.ghostBoxMesh.position.y = 0;
                         }
-                        // Reset Y because targetPos is Center now
-                        this.ghostBoxMesh.position.y = 0;
-                    }
-
-
-                    // --- INTERACTIVE COLLISION GHOST UPDATE ---
+                       // --- INTERACTIVE COLLISION GHOST UPDATE ---
                     if (item.type === "interactive_collision") {
                         // Ensure Spawn Ghost is Hidden
                         this.ghostCylinderMesh.visible = false;
@@ -1468,12 +1539,41 @@ export class PlacementManager {
                             this.ghostBoxMesh.scale.set(props.x, props.y, props.z);
                             this.ghostBoxMesh.position.y = 0;
                         }
-                    } else {
+                    } else if (item.type === "sphere") {
+                        this.ghostBoxMesh.visible = false;
+                        this.ghostCylinderMesh.visible = false;
+                        if (this.ghostTubeGroup) this.ghostTubeGroup.visible = false;
+                        this.ghostSphereMesh.visible = true;
+                        const r = item.scale.radius || item.scale.x / 2 || 1.0;
+                        this.ghostSphereMesh.scale.set(r, r, r);
+                        this.ghostSphereMesh.position.y = 0;
+                    } else if (item.type === "cylinder") {
+                        this.ghostBoxMesh.visible = false;
+                        this.ghostSphereMesh.visible = false;
+                        if (this.ghostTubeGroup) this.ghostTubeGroup.visible = false;
+                        this.ghostCylinderMesh.visible = true;
+                        const r = item.scale.radius || item.scale.x / 2 || 1.0;
+                        const h = item.scale.y || 1.0;
+                        this.ghostCylinderMesh.scale.set(r, h, r);
+                        this.ghostCylinderMesh.position.y = 0;
+                    } else if (item.type === "circle") {
+                        this.ghostBoxMesh.visible = false;
+                        this.ghostSphereMesh.visible = false;
+                        if (this.ghostTubeGroup) this.ghostTubeGroup.visible = false;
+                        this.ghostCylinderMesh.visible = true;
+                        const r = item.scale.radius || item.scale.x / 2 || 1.0;
+                        const h = item.scale.y || 0.05;
+                        this.ghostCylinderMesh.scale.set(r, h, r);
+                        this.ghostCylinderMesh.position.y = 0;
+                    } else if (item.type === "tube") {
+                        this.ghostBoxMesh.visible = false;
                         this.ghostSphereMesh.visible = false;
                         this.ghostCylinderMesh.visible = false;
+                        this.rebuildTubeGhost(item);
+                        if (this.ghostTubeGroup) this.ghostTubeGroup.visible = true;
                     }
-
                 }
+            }
             } else {
                 // Pads
                 this.ghostBoxMesh.position.y = 0;

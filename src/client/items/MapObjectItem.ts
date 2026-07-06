@@ -14,6 +14,9 @@ type MapObjectScale = {
   z: number;
   shapeType?: string;
   radius?: number;
+  length2?: number;
+  bendAngleX?: number;
+  bendAngleY?: number;
 };
 
 export class MapObjectItem extends Item {
@@ -322,6 +325,44 @@ export class MapObjectItem extends Item {
         ctx.lineTo(44, i);
       }
       ctx.stroke();
+    } else if (this.type === "sphere") {
+      ctx.beginPath();
+      ctx.arc(32, 32, 24, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.ellipse(32, 32, 24, 8, 0, 0, Math.PI * 2);
+      ctx.stroke();
+    } else if (this.type === "cylinder") {
+      ctx.beginPath();
+      ctx.ellipse(32, 16, 16, 6, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillRect(16, 16, 32, 32);
+      ctx.beginPath();
+      ctx.moveTo(16, 16);
+      ctx.lineTo(16, 48);
+      ctx.moveTo(48, 16);
+      ctx.lineTo(48, 48);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.ellipse(32, 48, 16, 6, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    } else if (this.type === "circle") {
+      ctx.beginPath();
+      ctx.ellipse(32, 32, 24, 12, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    } else if (this.type === "tube") {
+      ctx.lineWidth = 6;
+      ctx.beginPath();
+      ctx.moveTo(24, 52);
+      ctx.lineTo(24, 28);
+      ctx.quadraticCurveTo(24, 24, 28, 24);
+      ctx.lineTo(52, 24);
+      ctx.stroke();
+      ctx.lineWidth = 2;
     } else {
       ctx.fillRect(8, 20, 48, 24);
       ctx.strokeRect(8, 20, 48, 24);
@@ -1027,6 +1068,129 @@ export class MapObjectItem extends Item {
       if (this.logicProperties.oneShot === undefined) this.logicProperties.oneShot = false;
       if (this.logicProperties.pulsationMode === undefined) this.logicProperties.pulsationMode = false;
       if (this.logicProperties.triggered === undefined) this.logicProperties.triggered = false;
+    } else if (this.type === "sphere") {
+      const radius = this.scale.radius !== undefined ? this.scale.radius : (this.scale.x / 2 || 1.0);
+      const geometry = new THREE.SphereGeometry(radius, 32, 32);
+      const material = new THREE.MeshStandardMaterial({
+        color: this.color,
+        transparent: this.opacity !== undefined && this.opacity < 1.0,
+        opacity: this.opacity !== undefined ? this.opacity : 1.0
+      });
+      object3D = new THREE.Mesh(geometry, material);
+      object3D.castShadow = true;
+      object3D.receiveShadow = true;
+
+      const col = RAPIER.ColliderDesc.ball(radius);
+      collidersDesc.push(col);
+
+      object3D.userData.shapeType = "sphere";
+      object3D.userData.radius = radius;
+    } else if (this.type === "cylinder") {
+      const radius = this.scale.radius !== undefined ? this.scale.radius : (this.scale.x / 2 || 1.0);
+      const height = this.scale.y || 1.0;
+      const geometry = new THREE.CylinderGeometry(radius, radius, height, 32);
+      const material = new THREE.MeshStandardMaterial({
+        color: this.color,
+        transparent: this.opacity !== undefined && this.opacity < 1.0,
+        opacity: this.opacity !== undefined ? this.opacity : 1.0
+      });
+      object3D = new THREE.Mesh(geometry, material);
+      object3D.castShadow = true;
+      object3D.receiveShadow = true;
+
+      const col = RAPIER.ColliderDesc.cylinder(height / 2, radius);
+      collidersDesc.push(col);
+
+      object3D.userData.shapeType = "cylinder";
+      object3D.userData.radius = radius;
+    } else if (this.type === "circle") {
+      const radius = this.scale.radius !== undefined ? this.scale.radius : (this.scale.x / 2 || 1.0);
+      const height = this.scale.y !== undefined ? this.scale.y : 0.05;
+      const geometry = new THREE.CylinderGeometry(radius, radius, height, 32);
+      const material = new THREE.MeshStandardMaterial({
+        color: this.color,
+        transparent: this.opacity !== undefined && this.opacity < 1.0,
+        opacity: this.opacity !== undefined ? this.opacity : 1.0
+      });
+      object3D = new THREE.Mesh(geometry, material);
+      object3D.castShadow = true;
+      object3D.receiveShadow = true;
+
+      const col = RAPIER.ColliderDesc.cylinder(height / 2, radius);
+      collidersDesc.push(col);
+
+      object3D.userData.shapeType = "circle";
+      object3D.userData.radius = radius;
+    } else if (this.type === "tube") {
+      const radius = this.scale.radius !== undefined ? this.scale.radius : 0.5;
+      const length1 = this.scale.y || 2.0;
+      const length2 = this.scale.length2 !== undefined ? this.scale.length2 : 2.0;
+      const bendAngleX = this.scale.bendAngleX !== undefined ? this.scale.bendAngleX : 0;
+      const bendAngleY = this.scale.bendAngleY !== undefined ? this.scale.bendAngleY : 90;
+
+      const group = new THREE.Group();
+      const material = new THREE.MeshStandardMaterial({
+        color: this.color,
+        transparent: this.opacity !== undefined && this.opacity < 1.0,
+        opacity: this.opacity !== undefined ? this.opacity : 1.0
+      });
+
+      // Section 1: Cylinder along Y, starting at 0
+      const sec1Geo = new THREE.CylinderGeometry(radius, radius, length1, 32);
+      sec1Geo.translate(0, length1 / 2, 0);
+      const sec1Mesh = new THREE.Mesh(sec1Geo, material);
+      sec1Mesh.castShadow = true;
+      sec1Mesh.receiveShadow = true;
+      group.add(sec1Mesh);
+
+      // Elbow (Codo): Sphere at (0, length1, 0)
+      const elbowGeo = new THREE.SphereGeometry(radius, 32, 32);
+      elbowGeo.translate(0, length1, 0);
+      const elbowMesh = new THREE.Mesh(elbowGeo, material);
+      elbowMesh.castShadow = true;
+      elbowMesh.receiveShadow = true;
+      group.add(elbowMesh);
+
+      // Section 2: Cylinder starting at (0, length1, 0) and extending in bend direction
+      const sec2Geo = new THREE.CylinderGeometry(radius, radius, length2, 32);
+      sec2Geo.translate(0, length2 / 2, 0);
+      const sec2Mesh = new THREE.Mesh(sec2Geo, material);
+      sec2Mesh.castShadow = true;
+      sec2Mesh.receiveShadow = true;
+
+      sec2Mesh.position.set(0, length1, 0);
+      sec2Mesh.rotation.set(
+        bendAngleX * Math.PI / 180,
+        bendAngleY * Math.PI / 180,
+        0
+      );
+      group.add(sec2Mesh);
+
+      object3D = group;
+
+      // Compound colliders in Rapier
+      const col1 = RAPIER.ColliderDesc.cylinder(length1 / 2, radius)
+        .setTranslation(0, length1 / 2, 0);
+      collidersDesc.push(col1);
+
+      const colElbow = RAPIER.ColliderDesc.ball(radius)
+        .setTranslation(0, length1, 0);
+      collidersDesc.push(colElbow);
+
+      const bendRot = new THREE.Quaternion().setFromEuler(new THREE.Euler(
+        bendAngleX * Math.PI / 180,
+        bendAngleY * Math.PI / 180,
+        0
+      ));
+      const dir = new THREE.Vector3(0, 1, 0).applyQuaternion(bendRot).normalize();
+      const sec2Center = new THREE.Vector3(0, length1, 0).addScaledVector(dir, length2 / 2);
+
+      const col2 = RAPIER.ColliderDesc.cylinder(length2 / 2, radius)
+        .setTranslation(sec2Center.x, sec2Center.y, sec2Center.z)
+        .setRotation(bendRot);
+      collidersDesc.push(col2);
+
+      object3D.userData.shapeType = "tube";
     } else {
       const geometry = new THREE.BoxGeometry(this.scale.x, this.scale.y, this.scale.z);
       const material = new THREE.MeshStandardMaterial({
@@ -1043,7 +1207,7 @@ export class MapObjectItem extends Item {
     }
 
     object3D.position.copy(position);
-    if (this.type !== "interaction_button" && this.type !== "spawn_point" && !isCenterPosition) {
+    if (this.type !== "interaction_button" && this.type !== "spawn_point" && this.type !== "tube" && !isCenterPosition) {
       object3D.position.y += this.scale.y / 2;
     }
 
@@ -1068,7 +1232,7 @@ export class MapObjectItem extends Item {
     object3D.userData.originalUUID = object3D.userData.uuid;
     object3D.userData.color = this.color;
     object3D.userData.opacity = this.opacity !== undefined ? this.opacity : 1.0;
-    object3D.userData.originalScale = { x: this.scale.x, y: this.scale.y, z: this.scale.z };
+    object3D.userData.originalScale = { ...this.scale };
     object3D.userData.originalRotY = object3D.rotation.y;
     object3D.userData.texturePath = this.texturePath;
     object3D.userData.textureAssetId = this.textureAssetId;

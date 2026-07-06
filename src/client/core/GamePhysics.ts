@@ -52,9 +52,11 @@ export function regenerateObjectPhysics(this: Game, objectMesh: THREE.Object3D) 
 		colDesc = RAPIER.ColliderDesc.cuboid(dims.x / 2, dims.y / 2, dims.z / 2)
 			.setSensor(true);
 		this.world.createCollider(colDesc, rigidBody);
-	} else if (objectMesh.userData.shapeType === "sphere" || objectMesh.userData.logicProperties?.shapeType === "sphere") {
+	} else if (objectMesh.userData.mapObjectType === "sphere" || objectMesh.userData.shapeType === "sphere" || objectMesh.userData.logicProperties?.shapeType === "sphere") {
 		let r = 1.0;
-		if (objectMesh.userData.logicProperties && objectMesh.userData.logicProperties.radius) {
+		if (dims.radius !== undefined) {
+			r = dims.radius;
+		} else if (objectMesh.userData.logicProperties && objectMesh.userData.logicProperties.radius) {
 			r = objectMesh.userData.logicProperties.radius;
 		} else if (objectMesh.userData.radius) {
 			r = objectMesh.userData.radius;
@@ -64,6 +66,43 @@ export function regenerateObjectPhysics(this: Game, objectMesh: THREE.Object3D) 
 
 		colDesc = RAPIER.ColliderDesc.ball(r);
 		this.world.createCollider(colDesc, rigidBody);
+	} else if (objectMesh.userData.mapObjectType === "cylinder") {
+		const r = dims.radius !== undefined ? dims.radius : (dims.x / 2 || 1.0);
+		const h = dims.y || 1.0;
+		colDesc = RAPIER.ColliderDesc.cylinder(h / 2, r);
+		this.world.createCollider(colDesc, rigidBody);
+	} else if (objectMesh.userData.mapObjectType === "circle") {
+		const r = dims.radius !== undefined ? dims.radius : (dims.x / 2 || 1.0);
+		const h = dims.y || 0.05;
+		colDesc = RAPIER.ColliderDesc.cylinder(h / 2, r);
+		this.world.createCollider(colDesc, rigidBody);
+	} else if (objectMesh.userData.mapObjectType === "tube") {
+		const radius = dims.radius !== undefined ? dims.radius : 0.5;
+		const length1 = dims.y || 2.0;
+		const length2 = dims.length2 !== undefined ? dims.length2 : 2.0;
+		const bendAngleX = dims.bendAngleX !== undefined ? dims.bendAngleX : 0;
+		const bendAngleY = dims.bendAngleY !== undefined ? dims.bendAngleY : 90;
+
+		const col1 = RAPIER.ColliderDesc.cylinder(length1 / 2, radius)
+			.setTranslation(0, length1 / 2, 0);
+		this.world.createCollider(col1, rigidBody);
+
+		const colElbow = RAPIER.ColliderDesc.ball(radius)
+			.setTranslation(0, length1, 0);
+		this.world.createCollider(colElbow, rigidBody);
+
+		const bendRot = new THREE.Quaternion().setFromEuler(new THREE.Euler(
+			bendAngleX * Math.PI / 180,
+			bendAngleY * Math.PI / 180,
+			0
+		));
+		const dir = new THREE.Vector3(0, 1, 0).applyQuaternion(bendRot).normalize();
+		const sec2Center = new THREE.Vector3(0, length1, 0).addScaledVector(dir, length2 / 2);
+
+		const col2 = RAPIER.ColliderDesc.cylinder(length2 / 2, radius)
+			.setTranslation(sec2Center.x, sec2Center.y, sec2Center.z)
+			.setRotation(bendRot);
+		this.world.createCollider(col2, rigidBody);
 	} else {
 		colDesc = RAPIER.ColliderDesc.cuboid(dims.x / 2, dims.y / 2, dims.z / 2);
 		this.world.createCollider(colDesc, rigidBody);

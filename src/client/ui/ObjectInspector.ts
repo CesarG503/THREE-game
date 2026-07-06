@@ -203,7 +203,7 @@ export class ObjectInspector {
         })
 
         // 2. Dimensions/Scale Controls
-        this.dimensionsSection = this.createSection("Dimensiones", (section) => {
+         this.dimensionsSection = this.createSection("Dimensiones", (section) => {
             const row = document.createElement('div')
             row.style.cssText = `display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 5px;`
 
@@ -215,6 +215,99 @@ export class ObjectInspector {
             row.appendChild(this.inputScaleY.container)
             row.appendChild(this.inputScaleZ.container)
             section.appendChild(row)
+
+            // Custom rows for new geometries
+            const createCustomRow = (labelText) => {
+                const r = document.createElement("div");
+                r.style.cssText = "display: none; align-items: center; justify-content: space-between; gap: 10px; margin-top: 5px; font-size: 12px; color: #ccc;";
+                const lbl = document.createElement("span");
+                lbl.textContent = labelText;
+                const input = document.createElement("input");
+                input.type = "number";
+                input.style.cssText = "width: 70px; background: #222; color: white; border: 1px solid #444; border-radius: 4px; padding: 4px; font-size: 11px;";
+                r.appendChild(lbl);
+                r.appendChild(input);
+                return { row: r, input };
+            };
+
+            const rRad = createCustomRow("Radio:");
+            rRad.input.step = "0.5";
+            rRad.input.min = "0.1";
+            rRad.input.onchange = (e: any) => {
+                const val = parseFloat(e.target.value);
+                if (!isNaN(val) && val > 0 && this.selectedObject) {
+                    this.selectedObject.userData.originalScale.radius = val;
+                    const type = this.selectedObject.userData.mapObjectType;
+                    if (type === "sphere") {
+                        this.selectedObject.userData.originalScale.x = val * 2;
+                        this.selectedObject.userData.originalScale.y = val * 2;
+                        this.selectedObject.userData.originalScale.z = val * 2;
+                    } else if (type === "circle") {
+                        this.selectedObject.userData.originalScale.x = val * 2;
+                        this.selectedObject.userData.originalScale.z = val * 2;
+                    } else if (type === "cylinder" || type === "tube") {
+                        this.selectedObject.userData.originalScale.x = val * 2;
+                        this.selectedObject.userData.originalScale.z = val * 2;
+                    }
+                    this.updateDimensions('x', this.selectedObject.userData.originalScale.x, true);
+                }
+            };
+            section.appendChild(rRad.row);
+            this.rowRadius = rRad.row;
+            this.inputRadius = rRad.input;
+
+            const rLen1 = createCustomRow("Largo 1 (Alto):");
+            rLen1.input.step = "0.5";
+            rLen1.input.min = "0.1";
+            rLen1.input.onchange = (e: any) => {
+                const val = parseFloat(e.target.value);
+                if (!isNaN(val) && val > 0 && this.selectedObject) {
+                    this.updateDimensions('y', val, true);
+                }
+            };
+            section.appendChild(rLen1.row);
+            this.rowLength1 = rLen1.row;
+            this.inputLength1 = rLen1.input;
+
+            const rLen2 = createCustomRow("Largo 2:");
+            rLen2.input.step = "0.5";
+            rLen2.input.min = "0.1";
+            rLen2.input.onchange = (e: any) => {
+                const val = parseFloat(e.target.value);
+                if (!isNaN(val) && val > 0 && this.selectedObject) {
+                    this.selectedObject.userData.originalScale.length2 = val;
+                    this.updateDimensions('y', this.selectedObject.userData.originalScale.y, true);
+                }
+            };
+            section.appendChild(rLen2.row);
+            this.rowLength2 = rLen2.row;
+            this.inputLength2 = rLen2.input;
+
+            const rBendX = createCustomRow("Doblez Ángulo X (°):");
+            rBendX.input.step = "15";
+            rBendX.input.onchange = (e: any) => {
+                const val = parseFloat(e.target.value);
+                if (!isNaN(val) && this.selectedObject) {
+                    this.selectedObject.userData.originalScale.bendAngleX = val;
+                    this.updateDimensions('y', this.selectedObject.userData.originalScale.y, true);
+                }
+            };
+            section.appendChild(rBendX.row);
+            this.rowBendAngleX = rBendX.row;
+            this.inputBendAngleX = rBendX.input;
+
+            const rBendY = createCustomRow("Doblez Ángulo Y (°):");
+            rBendY.input.step = "15";
+            rBendY.input.onchange = (e: any) => {
+                const val = parseFloat(e.target.value);
+                if (!isNaN(val) && this.selectedObject) {
+                    this.selectedObject.userData.originalScale.bendAngleY = val;
+                    this.updateDimensions('y', this.selectedObject.userData.originalScale.y, true);
+                }
+            };
+            section.appendChild(rBendY.row);
+            this.rowBendAngleY = rBendY.row;
+            this.inputBendAngleY = rBendY.input;
         })
 
         // ...
@@ -876,6 +969,57 @@ export class ObjectInspector {
         this.inputScaleX.input.value = Number(dims.x).toFixed(2)
         this.inputScaleY.input.value = Number(dims.y).toFixed(2)
         this.inputScaleZ.input.value = Number(dims.z).toFixed(2)
+
+        // Toggle custom inputs based on mapObjectType
+        const type = this.selectedObject.userData.mapObjectType;
+        const dimRow = this.dimensionsSection.querySelector('div'); // Standard grid row
+
+        if (type === "sphere") {
+            if (dimRow) dimRow.style.display = "none";
+            if (this.rowRadius) this.rowRadius.style.display = "flex";
+            if (this.rowLength1) this.rowLength1.style.display = "none";
+            if (this.rowLength2) this.rowLength2.style.display = "none";
+            if (this.rowBendAngleX) this.rowBendAngleX.style.display = "none";
+            if (this.rowBendAngleY) this.rowBendAngleY.style.display = "none";
+            if (this.inputRadius) this.inputRadius.value = dims.radius || dims.x / 2 || 1.0;
+        } else if (type === "cylinder") {
+            if (dimRow) dimRow.style.display = "none";
+            if (this.rowRadius) this.rowRadius.style.display = "flex";
+            if (this.rowLength1) this.rowLength1.style.display = "flex";
+            if (this.rowLength2) this.rowLength2.style.display = "none";
+            if (this.rowBendAngleX) this.rowBendAngleX.style.display = "none";
+            if (this.rowBendAngleY) this.rowBendAngleY.style.display = "none";
+            if (this.inputRadius) this.inputRadius.value = dims.radius || dims.x / 2 || 1.0;
+            if (this.inputLength1) this.inputLength1.value = dims.y || 1.0;
+        } else if (type === "circle") {
+            if (dimRow) dimRow.style.display = "none";
+            if (this.rowRadius) this.rowRadius.style.display = "flex";
+            if (this.rowLength1) this.rowLength1.style.display = "flex";
+            if (this.rowLength2) this.rowLength2.style.display = "none";
+            if (this.rowBendAngleX) this.rowBendAngleX.style.display = "none";
+            if (this.rowBendAngleY) this.rowBendAngleY.style.display = "none";
+            if (this.inputRadius) this.inputRadius.value = dims.radius || dims.x / 2 || 1.0;
+            if (this.inputLength1) this.inputLength1.value = dims.y || 0.05;
+        } else if (type === "tube") {
+            if (dimRow) dimRow.style.display = "none";
+            if (this.rowRadius) this.rowRadius.style.display = "flex";
+            if (this.rowLength1) this.rowLength1.style.display = "flex";
+            if (this.rowLength2) this.rowLength2.style.display = "flex";
+            if (this.rowBendAngleX) this.rowBendAngleX.style.display = "flex";
+            if (this.rowBendAngleY) this.rowBendAngleY.style.display = "flex";
+            if (this.inputRadius) this.inputRadius.value = dims.radius || 0.5;
+            if (this.inputLength1) this.inputLength1.value = dims.y || 2.0;
+            if (this.inputLength2) this.inputLength2.value = dims.length2 || 2.0;
+            if (this.inputBendAngleX) this.inputBendAngleX.value = dims.bendAngleX !== undefined ? dims.bendAngleX : 0;
+            if (this.inputBendAngleY) this.inputBendAngleY.value = dims.bendAngleY !== undefined ? dims.bendAngleY : 90;
+        } else {
+            if (dimRow) dimRow.style.display = "grid";
+            if (this.rowRadius) this.rowRadius.style.display = "none";
+            if (this.rowLength1) this.rowLength1.style.display = "none";
+            if (this.rowLength2) this.rowLength2.style.display = "none";
+            if (this.rowBendAngleX) this.rowBendAngleX.style.display = "none";
+            if (this.rowBendAngleY) this.rowBendAngleY.style.display = "none";
+        }
     }
 
     cycleTransformMode() {
@@ -1080,6 +1224,65 @@ export class ObjectInspector {
             this.selectedObject.userData.needsBoundsUpdate = true
 
 
+        } else if (this.selectedObject.userData.mapObjectType === 'sphere') {
+            const radius = dims.radius !== undefined ? dims.radius : (dims.x / 2 || 1.0);
+            newGeo = new THREE.SphereGeometry(radius, 32, 32);
+        } else if (this.selectedObject.userData.mapObjectType === 'cylinder') {
+            const radius = dims.radius !== undefined ? dims.radius : (dims.x / 2 || 1.0);
+            const height = dims.y || 1.0;
+            newGeo = new THREE.CylinderGeometry(radius, radius, height, 32);
+        } else if (this.selectedObject.userData.mapObjectType === 'circle') {
+            const radius = dims.radius !== undefined ? dims.radius : (dims.x / 2 || 1.0);
+            const height = dims.y || 0.05;
+            newGeo = new THREE.CylinderGeometry(radius, radius, height, 32);
+        } else if (this.selectedObject.userData.mapObjectType === 'tube') {
+            // Rebuild Tube children
+            const radius = dims.radius !== undefined ? dims.radius : 0.5;
+            const length1 = dims.y || 2.0;
+            const length2 = dims.length2 !== undefined ? dims.length2 : 2.0;
+            const bendAngleX = dims.bendAngleX !== undefined ? dims.bendAngleX : 0;
+            const bendAngleY = dims.bendAngleY !== undefined ? dims.bendAngleY : 90;
+
+            const toRemove = [...this.selectedObject.children];
+            toRemove.forEach(c => {
+                if (c.geometry) c.geometry.dispose();
+                this.selectedObject.remove(c);
+            });
+
+            let mat = new THREE.MeshStandardMaterial({ color: this.selectedObject.userData.color || 0xffffff });
+            if (toRemove.length > 0 && toRemove[0].material) {
+                mat = toRemove[0].material;
+            }
+
+            // Section 1
+            const sec1Geo = new THREE.CylinderGeometry(radius, radius, length1, 32);
+            sec1Geo.translate(0, length1 / 2, 0);
+            const sec1Mesh = new THREE.Mesh(sec1Geo, mat);
+            sec1Mesh.castShadow = true;
+            sec1Mesh.receiveShadow = true;
+            this.selectedObject.add(sec1Mesh);
+
+            // Elbow
+            const elbowGeo = new THREE.SphereGeometry(radius, 32, 32);
+            elbowGeo.translate(0, length1, 0);
+            const elbowMesh = new THREE.Mesh(elbowGeo, mat);
+            elbowMesh.castShadow = true;
+            elbowMesh.receiveShadow = true;
+            this.selectedObject.add(elbowMesh);
+
+            // Section 2
+            const sec2Geo = new THREE.CylinderGeometry(radius, radius, length2, 32);
+            sec2Geo.translate(0, length2 / 2, 0);
+            const sec2Mesh = new THREE.Mesh(sec2Geo, mat);
+            sec2Mesh.castShadow = true;
+            sec2Mesh.receiveShadow = true;
+            sec2Mesh.position.set(0, length1, 0);
+            sec2Mesh.rotation.set(
+                bendAngleX * Math.PI / 180,
+                bendAngleY * Math.PI / 180,
+                0
+            );
+            this.selectedObject.add(sec2Mesh);
         } else {
             // Default Box
             newGeo = new THREE.BoxGeometry(dims.x, dims.y, dims.z)

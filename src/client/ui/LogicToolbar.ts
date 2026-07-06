@@ -1,15 +1,21 @@
-// @ts-nocheck
-
 export class LogicToolbar {
-    constructor(game) {
-        this.game = game
-        this.isVisible = false
-        this.activeTool = null // 'waypoint', 'select', etc.
-        this.onToolChange = null // Callback
-        this.onAction = null // Callback for one-shot actions
-        this.onClose = null // Callback
+    game: any;
+    isVisible: boolean;
+    activeTool: string | null;
+    onToolChange: ((toolId: string | null) => void) | null;
+    onAction: ((actionId: string) => void) | null;
+    onClose: (() => void) | null;
+    container!: HTMLDivElement;
 
-        this.setupUI()
+    constructor(game: any) {
+        this.game = game;
+        this.isVisible = false;
+        this.activeTool = null; // 'waypoint', 'select', etc.
+        this.onToolChange = null; // Callback
+        this.onAction = null; // Callback for one-shot actions
+        this.onClose = null; // Callback
+
+        this.setupUI();
     }
 
     setupUI() {
@@ -72,7 +78,7 @@ export class LogicToolbar {
         document.body.appendChild(this.container)
     }
 
-    addToolButton(icon, title, toolId) {
+    addToolButton(icon: string, title: string, toolId: string) {
         const btn = document.createElement('div')
         btn.textContent = icon
         btn.title = title
@@ -97,7 +103,7 @@ export class LogicToolbar {
         this.container.appendChild(btn)
     }
 
-    addActionButton(icon, title, actionId) {
+    addActionButton(icon: string, title: string, actionId: string) {
         const btn = document.createElement('div')
         btn.textContent = icon
         btn.title = title
@@ -118,18 +124,19 @@ export class LogicToolbar {
         this.container.appendChild(btn)
     }
 
-    setActiveTool(toolId) {
+    setActiveTool(toolId: string | null) {
         this.activeTool = (this.activeTool === toolId) ? null : toolId
 
         // Update UI
         Array.from(this.container.children).forEach(c => {
-            if (c.dataset && c.dataset.tool) {
-                if (c.dataset.tool === this.activeTool) {
-                    c.style.background = "#0066cc"
-                    c.style.borderColor = "#0088ff"
+            const hc = c as HTMLElement;
+            if (hc.dataset && hc.dataset.tool) {
+                if (hc.dataset.tool === this.activeTool) {
+                    hc.style.background = "#0066cc"
+                    hc.style.borderColor = "#0088ff"
                 } else {
-                    c.style.background = "#333"
-                    c.style.borderColor = "#555"
+                    hc.style.background = "#333"
+                    hc.style.borderColor = "#555"
                 }
             }
         })
@@ -137,8 +144,11 @@ export class LogicToolbar {
         if (this.onToolChange) this.onToolChange(this.activeTool)
     }
 
-    setPlayButtonState(isPlaying) {
-        const btn = Array.from(this.container.children).find(c => c.dataset && c.dataset.tool === 'play_pause')
+    setPlayButtonState(isPlaying: boolean) {
+        const btn = Array.from(this.container.children).find(c => {
+            const hc = c as HTMLElement;
+            return hc.dataset && hc.dataset.tool === 'play_pause';
+        }) as HTMLElement | undefined;
         if (btn) {
             btn.textContent = isPlaying ? "⏸" : "▶"
             btn.title = isPlaying ? "Pausar Animación" : "Iniciar Animación"
@@ -146,8 +156,11 @@ export class LogicToolbar {
         }
     }
 
-    setAerialGridState(isActive) {
-        const btn = Array.from(this.container.children).find(c => c.dataset && c.dataset.tool === 'aerial_grid')
+    setAerialGridState(isActive: boolean) {
+        const btn = Array.from(this.container.children).find(c => {
+            const hc = c as HTMLElement;
+            return hc.dataset && hc.dataset.tool === 'aerial_grid';
+        }) as HTMLElement | undefined;
         if (btn) {
             // Visual feedback for active grid
             btn.style.background = isActive ? "#004400" : "#333"

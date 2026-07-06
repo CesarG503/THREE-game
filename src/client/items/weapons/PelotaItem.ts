@@ -1,6 +1,6 @@
 import * as THREE from "three";
-import { Item } from "./Item";
-import { Projectile } from "../weapons/Projectile";
+import { Item } from "../Item";
+import { Projectile } from "../../weapons/Projectile";
 
 export class PelotaItem extends Item {
   type: any;

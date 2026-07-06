@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import type { GunConfig, WeaponSettingsMap } from "../types";
+import type { GunConfig, WeaponSettingsMap } from "../../types";
 
 /**
  * Configuration for weapon offsets and procedural animations.

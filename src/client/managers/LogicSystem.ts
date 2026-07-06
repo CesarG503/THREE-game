@@ -302,8 +302,8 @@ export class LogicSystem {
 		if (!seq?.waypoints) return [];
 		return seq.waypoints
 			.map((wp: MovementWaypoint, idx: number) => ({ wp, idx }))
-			.filter(({ wp }) => wp && wp.type !== "wait_signal" && wp.x !== undefined && wp.y !== undefined && wp.z !== undefined)
-			.map(({ idx }) => idx);
+			.filter(({ wp }: { wp: MovementWaypoint; idx: number }) => wp && wp.type !== "wait_signal" && wp.x !== undefined && wp.y !== undefined && wp.z !== undefined)
+			.map(({ idx }: { wp: MovementWaypoint; idx: number }) => idx);
 	}
 
 	moveEditingObjectToWaypoint(direction: number) {
@@ -720,7 +720,7 @@ export class LogicSystem {
 	 * Scans the scene for objects that have logic properties.
 	 */
 	scanScene(scene: any) {
-		const logicObjects = [];
+		const logicObjects: any[] = [];
 		if (!scene) return logicObjects;
 
 		scene.children.forEach((child: any) => {

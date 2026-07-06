@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { FuegoItem } from "../items/FuegoItem";
+import { FuegoItem } from "../items/droppables/FuegoItem";
 
 export class FarmingZone {
     scene: any;

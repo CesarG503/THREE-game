@@ -1,6 +1,6 @@
 import * as THREE from "three";
-import { Item } from "./Item";
-import { FarmingZone } from "../entities/FarmingZone";
+import { Item } from "../Item";
+import { FarmingZone } from "../../entities/FarmingZone";
 
 export class FarmingZoneItem extends Item {
   type: string;

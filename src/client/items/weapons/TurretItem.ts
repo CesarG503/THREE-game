@@ -1,6 +1,6 @@
 import * as THREE from "three";
-import { Item } from "./Item";
-import { TurretPad } from "../entities/TurretPad";
+import { Item } from "../Item";
+import { TurretPad } from "../../entities/TurretPad";
 
 export class TurretItem extends Item {
   constructor(id: any = "turret", name: any = "Turret", iconPath: any = "") {

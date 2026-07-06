@@ -1,16 +1,17 @@
 // @ts-nocheck
 
 import * as THREE from "three";
-import { MapObjectItem } from "../items/MapObjectItem";
+import { MapObjectItem } from "../items/objects/MapObjectItem";
+import { mapObjectFactory } from "../items/objects/MapObjectFactory";
 import { LogicSystem } from "../managers/LogicSystem";
 import { GameConfigPanel } from "./GameConfigPanel";
 import { PlayerConfigPanel } from "./PlayerConfigPanel";
-import { GunItem } from "../items/GunItem";
-import { WEAPONS_CONFIG } from "../items/WeaponSettings";
+import { GunItem } from "../items/weapons/GunItem";
+import { WEAPONS_CONFIG } from "../items/weapons/WeaponSettings";
 import { MapShapeEditor } from "./MapShapeEditor";
 import { AdvancedWeaponConfigPanel } from "./AdvancedWeaponConfigPanel";
 import { getActiveFarmingGroups } from "./GameHUD";
-import { JetpackItem } from "../items/JetpackItem";
+import { JetpackItem } from "../items/consumables/JetpackItem";
 import { savePlatformMapForRoom } from "../platform/mapRuntime";
 import { listAssets, uploadAsset } from "../platform/api";
 import { getDefaultTextureSettings, normalizeTextureSettings } from "../utils/TextureMapping";
@@ -171,7 +172,7 @@ export class ConstructionMenu {
         const whiteHex = 0xFFFFFF;
 
         shapes.forEach(shape => {
-            const item = new MapObjectItem(
+            const item = mapObjectFactory.create(
                 `${shape.id_prefix}`,
                 `${shape.name}`,
                 shape.type,
@@ -196,7 +197,7 @@ export class ConstructionMenu {
         this.logicItems = [];
 
         // Player Spawn
-        const spawn = new MapObjectItem(
+        const spawn = mapObjectFactory.create(
             "spawn_point",
             "Punto de Spawn",
             "spawn_point",
@@ -213,7 +214,7 @@ export class ConstructionMenu {
         this.logicItems.push(spawn);
 
         // Movement Controller
-        const mover = new MapObjectItem(
+        const mover = mapObjectFactory.create(
             "movement_controller",
             "Controlador de Movimiento",
             "movement_controller",
@@ -235,7 +236,7 @@ export class ConstructionMenu {
         this.logicItems.push(mover);
 
         // Interaction Button
-        const button = new MapObjectItem(
+        const button = mapObjectFactory.create(
             "button",
             "Botón Interactivo",
             "interaction_button",
@@ -252,7 +253,7 @@ export class ConstructionMenu {
         this.logicItems.push(button);
 
         // Gravity Sphere
-        const gravitySphere = new MapObjectItem(
+        const gravitySphere = mapObjectFactory.create(
             "gravity_sphere",
             "Esfera de Gravedad",
             "gravity_sphere",
@@ -269,7 +270,7 @@ export class ConstructionMenu {
         this.logicItems.push(gravitySphere);
 
         // Interactive Collision
-        const collision = new MapObjectItem(
+        const collision = mapObjectFactory.create(
             "interactive_collision",
             "Colisión Interactiva",
             "interactive_collision",
@@ -287,7 +288,7 @@ export class ConstructionMenu {
         this.logicItems.push(collision);
 
         // Target (Diana)
-        const target = new MapObjectItem(
+        const target = mapObjectFactory.create(
             "interactive_target",
             "Diana Interactiva",
             "target",
@@ -306,7 +307,7 @@ export class ConstructionMenu {
         };
         this.logicItems.push(target);
 
-        const impulseJump = new MapObjectItem(
+        const impulseJump = mapObjectFactory.create(
             "impulse_jump",
             "Pad de Salto",
             "impulse_jump",
@@ -322,7 +323,7 @@ export class ConstructionMenu {
         };
         this.logicItems.push(impulseJump);
 
-        const impulseLateral = new MapObjectItem(
+        const impulseLateral = mapObjectFactory.create(
             "impulse_lateral",
             "Pad de Empuje",
             "impulse_lateral",
@@ -338,7 +339,7 @@ export class ConstructionMenu {
         };
         this.logicItems.push(impulseLateral);
 
-        const gravityPad = new MapObjectItem(
+        const gravityPad = mapObjectFactory.create(
             "gravity_pad",
             "Pad de Gravedad",
             "gravity_pad",
@@ -354,7 +355,7 @@ export class ConstructionMenu {
         };
         this.logicItems.push(gravityPad);
 
-        const farmingZone = new MapObjectItem(
+        const farmingZone = mapObjectFactory.create(
             "farming_zone",
             "Zona de Farmeo",
             "farming_zone",
@@ -3830,7 +3831,7 @@ renderLogicLibraryGrid(container) {
         if ((type === "weapon" || type === "consumable") && baseItem && baseItem.clone) {
             this.currentDraftItem = baseItem.clone();
         } else {
-            this.currentDraftItem = new MapObjectItem(id, name, type, "", color, scale, texturePath, baseItem?.textureAssetId || null, baseItem?.textureSettings || null);
+            this.currentDraftItem = mapObjectFactory.create(id, name, type, "", color, scale, texturePath, baseItem?.textureAssetId || null, baseItem?.textureSettings || null);
             if (baseItem && baseItem.logicProperties) {
                 this.currentDraftItem.logicProperties = JSON.parse(JSON.stringify(baseItem.logicProperties));
             }

@@ -1,10 +1,12 @@
-// @ts-nocheck
-
 export class UIPositionSelector {
+    overlay: HTMLDivElement | null;
+    onSelectCallback: ((pos: string) => void) | null;
+    currentValue: string;
+
     constructor() {
-        this.overlay = null
-        this.onSelectCallback = null
-        this.currentValue = 'top-center'
+        this.overlay = null;
+        this.onSelectCallback = null;
+        this.currentValue = 'top-center';
     }
 
     /**
@@ -12,10 +14,10 @@ export class UIPositionSelector {
      * @param {string} currentPosition - The currently selected position ID (e.g., 'top-left')
      * @param {Function} onSelect - Callback function receiving the new position ID.
      */
-    open(currentPosition, onSelect) {
-        this.currentValue = currentPosition || 'top-center'
-        this.onSelectCallback = onSelect
-        this.createUI()
+    open(currentPosition: string | null, onSelect: (pos: string) => void) {
+        this.currentValue = currentPosition || 'top-center';
+        this.onSelectCallback = onSelect;
+        this.createUI();
     }
 
     createUI() {
@@ -104,7 +106,7 @@ export class UIPositionSelector {
         document.body.appendChild(this.overlay)
     }
 
-    selectPosition(id) {
+    selectPosition(id: string) {
         if (this.onSelectCallback) this.onSelectCallback(id)
         this.close()
     }

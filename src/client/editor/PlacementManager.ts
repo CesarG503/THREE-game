@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { RampUtils } from "../utils/RampUtils";
+import { MapObjectItem } from "../items/objects/MapObjectItem";
 
 /**
  * Gestor de Colocación de Objetos
@@ -52,7 +53,7 @@ export class PlacementManager {
     lastValidPosition: THREE.Vector3 | null;
     lastValidQuaternion: THREE.Quaternion | null;
 
-    constructor(scene, camera) {
+    constructor(scene: THREE.Scene, camera: THREE.Camera) {
         this.scene = scene;
         this.camera = camera;
 
@@ -606,7 +607,7 @@ export class PlacementManager {
         this.scene.add(this.aerialVisual);
     }
 
-    setAerialGrid(active) {
+    setAerialGrid(active: boolean) {
         this.aerialGridActive = active;
         // Reset fixed state when disabled? Or keep memory? 
         // User didn't specify, but usually disabling grid implies full reset.
@@ -628,7 +629,7 @@ export class PlacementManager {
      * Checks if the object is considered "Ground" (terrain/floor)
      * vs a constructed block.
      */
-    isGround(object) {
+    isGround(object: any) {
         // Simple heuristic: if it's explicitly explicitly the aerial collider or flagged as ground
         if (object === this.aerialCollider) return true;
         if (object.userData && object.userData.isGround) return true;
@@ -642,7 +643,7 @@ export class PlacementManager {
     /**
      * Checks for collisions at the proposed position
      */
-    checkCollision(position, size) {
+    checkCollision(position: THREE.Vector3, size: THREE.Vector3) {
         // Create box for the new object
         const box = new THREE.Box3();
         // Shrink slightly to avoid touching-is-collision
@@ -689,7 +690,7 @@ export class PlacementManager {
     /**
      * Calculates the actual dimensions of the item after rotation
      */
-    getRealSize(item, rotationIndex) {
+    getRealSize(item: any, rotationIndex: number) {
         let size = new THREE.Vector3(1, 1, 1); // Default
         if (item.type === "interactive_collision") {
             if (this.currentCollisionSize.shapeType === "sphere") {
@@ -704,7 +705,7 @@ export class PlacementManager {
         } else if (item.type === "target") {
             const diameter = (this.currentTargetProperties && this.currentTargetProperties.radius) ? this.currentTargetProperties.radius * 2 : (item.scale.x || 2);
             size.set(diameter, item.scale.y || 0.2, diameter);
-        } else if (item.constructor.name === "MapObjectItem") {
+        } else if (item instanceof MapObjectItem) {
             size.set(item.scale.x || 1, item.scale.y || 1, item.scale.z || 1);
         } else if (item.id.includes("pad")) {
             size.set(3, 0.2, 3);
@@ -720,14 +721,14 @@ export class PlacementManager {
         return size;
     }
 
-    getRotationAngle(rotationIndex) {
+    getRotationAngle(rotationIndex: number) {
         if (rotationIndex === 1) return -Math.PI / 2;
         if (rotationIndex === 2) return -Math.PI;
         if (rotationIndex === 3) return Math.PI / 2;
         return 0;
     }
 
-    getSurfaceAlignedQuaternion(normal, rotationIndex = 0) {
+    getSurfaceAlignedQuaternion(normal: THREE.Vector3, rotationIndex: number = 0) {
         const safeNormal = normal.clone().normalize();
         if (safeNormal.lengthSq() < 0.0001) safeNormal.set(0, 1, 0);
 
@@ -737,7 +738,7 @@ export class PlacementManager {
         return quaternion;
     }
 
-    rebuildStairsGhost(item) {
+    rebuildStairsGhost(item: any) {
         // Prevent rebuilding if same item scale
         const key = `${item.scale.x}_${item.scale.y}_${item.scale.z}`;
         if (this.ghostStairsLastKey === key && this.ghostStairsGroup.children.length > 0) return;
@@ -777,7 +778,7 @@ export class PlacementManager {
         }
     }
 
-    rebuildRampGhost(item) {
+    rebuildRampGhost(item: any) {
         if (!this.ghostRampMesh) return;
 
         const key = `${item.scale.x}_${item.scale.y}_${item.scale.z}`;
@@ -789,7 +790,7 @@ export class PlacementManager {
         this.ghostRampMesh.scale.set(1, 1, 1);
     }
 
-    rebuildLadderGhost(item) {
+    rebuildLadderGhost(item: any) {
         const key = `${item.scale.x}_${item.scale.y}_${item.scale.z}`;
         if (this.ghostLadderLastKey === key && this.ghostLadderGroup.children.length > 0) return;
 
@@ -836,7 +837,7 @@ export class PlacementManager {
      * @param {THREE.Vector3} [playerPosition] - Posición del jugador para altura dinámica
      * @returns {THREE.Vector3|null} - Punto de impacto válido o null
      */
-    update(item, rotationIndex, playerPosition) {
+    update(item: any, rotationIndex: number, playerPosition?: THREE.Vector3 | null) {
         this.currentItem = item;
         this.rotationIndex = rotationIndex;
 
@@ -1109,7 +1110,7 @@ export class PlacementManager {
                     // Snap Logic on Surface
                     // Keep axis parallel to normal (flush)
                     // Snap axes perpendicular to normal
-                    const axes = ["x", "y", "z"];
+                    const axes: Array<"x" | "y" | "z"> = ["x", "y", "z"];
                     axes.forEach(ax => {
                         if (Math.abs(normal[ax]) > 0.5) {
                             // Parallel to normal -> flush but OFFSET by half height
@@ -1148,7 +1149,7 @@ export class PlacementManager {
                     let finalPos = hitCenter.clone().add(offsetDist);
 
                     // Surface Axis Snapping
-                    const axes = ["x", "y", "z"];
+                    const axes: Array<"x" | "y" | "z"> = ["x", "y", "z"];
                     axes.forEach(ax => {
                         if (Math.abs(axis[ax]) < 0.1) {
                             // If dimensions match, align perfectly with the target object (Stacking/Rowing)
@@ -1193,7 +1194,7 @@ export class PlacementManager {
                         // Snap Logic on Surface
                         // Keep axis parallel to normal (flush)
                         // Snap axes perpendicular to normal
-                        const axes = ["x", "y", "z"];
+                        const axes: Array<"x" | "y" | "z"> = ["x", "y", "z"];
                         axes.forEach(ax => {
                             if (Math.abs(normal[ax]) > 0.5) {
                                 // Parallel to normal -> flush but OFFSET by half height
@@ -1210,7 +1211,7 @@ export class PlacementManager {
                         const globalY = isAerialHit ? this.aerialCollider.position.y : hit.point.y;
 
                         // X/Z Snap with Dual-Snap for Thin Walls
-                        ["x", "z"].forEach(ax => {
+                        (["x", "z"] as Array<"x" | "z">).forEach(ax => {
                             let val = hit.point[ax];
                             const s = realSize[ax];
 
@@ -1297,7 +1298,7 @@ export class PlacementManager {
             this.placementGhost.position.copy(targetPos);
 
             // Adjust visual geometry matches RealSize
-            if (item.constructor.name === "MapObjectItem") {
+            if (item instanceof MapObjectItem) {
                 this.ghostBaseMat.visible = true;
                 this.ghostRampMesh.visible = false;
                 this.ghostBoxMesh.visible = false;
@@ -1434,7 +1435,7 @@ export class PlacementManager {
             // Apply rotation to ghost group
             if (this.lastValidQuaternion) {
                 this.placementGhost.quaternion.copy(this.lastValidQuaternion);
-            } else if (item.constructor.name === "MapObjectItem") {
+            } else if (item instanceof MapObjectItem) {
                 this.placementGhost.rotation.y = 0;
                 if (rotationIndex === 1) this.placementGhost.rotation.y = -Math.PI / 2;
                 if (rotationIndex === 2) this.placementGhost.rotation.y = -Math.PI;
@@ -1473,7 +1474,7 @@ export class PlacementManager {
 
             // Visual Feedback
             if (isValid) {
-                if (item.constructor.name === "MapObjectItem") {
+                if (item instanceof MapObjectItem) {
                     this.ghostBaseMat.color.setHex(0x00ff00);
                     this.ghostArrowMat.color.setHex(0xffffff);
                 } else {
@@ -1504,7 +1505,7 @@ export class PlacementManager {
     /**
      * Updates ghost for Logic Map Editor (References a live scene object instead of inventory item)
      */
-    updateLogicGhost(targetObject, playerPosition, rotationIndex) {
+    updateLogicGhost(targetObject: THREE.Object3D | null | undefined, playerPosition: THREE.Vector3 | null | undefined, rotationIndex: number) {
         if (!targetObject) {
             this.placementGhost.visible = false;
             return null;
@@ -1641,7 +1642,7 @@ export class PlacementManager {
         return this.lastValidPosition || this.currentHit;
     }
 
-    createLabelSprite(text, colorStr) {
+    createLabelSprite(text: string, colorStr: string) {
         const canvas = document.createElement("canvas");
         const ctx = canvas.getContext("2d");
         canvas.width = 256;
@@ -1656,11 +1657,11 @@ export class PlacementManager {
         return sprite;
     }
 
-    updateLabelSprite(sprite, text, colorStr) {
+    updateLabelSprite(sprite: THREE.Sprite, text: string, colorStr: string) {
         if (!sprite || !sprite.material || !sprite.material.map) return;
 
         const tex = sprite.material.map;
-        const canvas = tex.image;
+        const canvas = tex.image as HTMLCanvasElement;
         if (!canvas) return;
 
         const ctx = canvas.getContext("2d");
@@ -1670,7 +1671,8 @@ export class PlacementManager {
         tex.needsUpdate = true;
     }
 
-    drawLabelOnCanvas(ctx, text, colorStr, w, h) {
+    drawLabelOnCanvas(ctx: CanvasRenderingContext2D | null, text: string, colorStr: string, w: number, h: number) {
+        if (!ctx) return;
         ctx.fillStyle = "rgba(0,0,0,0.6)";
         ctx.fillRect(0, 0, w, h);
 

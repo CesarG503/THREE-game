@@ -230,8 +230,7 @@ export class PlayerConfigManager {
             gravityTransitionDuration: 0.65,
             skinMode: "player",
             skinUrl: DEFAULT_POLYGON_SKIN_URL,
-            skinAssetId: null,
-            cameraMode: "third-person-collision",
+            skinAssetId: null as string | null,
             roleVisual: createRoleVisual(undefined, {
                 ...DEFAULT_VISUAL_RULE,
                 color: "#" + Math.floor(Math.random() * 16777215).toString(16).padStart(6, "0")
@@ -267,7 +266,7 @@ export class PlayerConfigManager {
                 inventorySlotSize: 50,
                 inventoryPadding: 10,
                 inventoryFreeLayout: false,
-                inventorySlotPositions: [],
+                inventorySlotPositions: [] as any[],
                 inventorySlotAlignment: "top-center",
                 layerOrder: [
                     "health",

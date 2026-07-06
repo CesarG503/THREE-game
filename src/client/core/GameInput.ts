@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { GunItem } from "../items/GunItem";
+import { GunItem } from "../items/weapons/GunItem";
 import { serializeItemForNetwork } from "../items/ItemNetworkSerializer";
 import type { Game } from "../Game";
 

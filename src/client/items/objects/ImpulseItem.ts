@@ -1,6 +1,6 @@
 import * as THREE from "three";
-import { Item } from "./Item";
-import { ImpulsePlatform } from "../entities/ImpulsePlatform";
+import { Item } from "../Item";
+import { ImpulsePlatform } from "../../entities/ImpulsePlatform";
 
 export class ImpulseItem extends Item {
   type: any;

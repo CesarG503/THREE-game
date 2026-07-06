@@ -1,7 +1,8 @@
 import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
 import { animate } from "animejs";
-import { MapObjectItem } from "../items/MapObjectItem";
+import { MapObjectItem } from "../items/objects/MapObjectItem";
+import { mapObjectFactory } from "../items/objects/MapObjectFactory";
 import {
 	applyAnimatedObjectScale,
 	getWaypointPosition,
@@ -104,11 +105,11 @@ export function loadMap(this: any, jsonData: any) {
 		}
 	}
 
-	const loader = new MapObjectItem("loader", "Loading...", "wall", "", 0, { x: 1, y: 1, z: 1 });
+	const loader = mapObjectFactory.create("loader", "Loading...", "wall", "", 0, { x: 1, y: 1, z: 1 });
 	void loader;
 
 	jsonData.objects.forEach((data: any) => {
-		const tempItem = new MapObjectItem(
+		const tempItem = mapObjectFactory.create(
 			"loaded_" + Math.random(),
 			data.customName || data.type || "Loaded Obj",
 			data.type,
@@ -319,7 +320,7 @@ export function _loadSingleMapObject(this: any, data: any) {
 		this.deleteObjectByUuid(data.uuid);
 	}
 
-	const tempItem = new MapObjectItem(
+	const tempItem = mapObjectFactory.create(
 		"collab_" + Math.random(),
 		"Collab Obj",
 		data.type,
@@ -427,7 +428,7 @@ export function updateButtonInteraction(this: any, dt: number) {
 	const charPos = this.character ? this.character.getPosition() : null;
 	if (!charPos) return;
 
-	let nearest = null;
+	let nearest: any = null;
 	let minDistSq = 9.0;
 
 	this.sceneManager.scene.children.forEach((obj: any) => {

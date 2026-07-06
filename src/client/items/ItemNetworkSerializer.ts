@@ -1,12 +1,13 @@
 import * as THREE from "three";
 import { Item } from "./Item";
-import { FuegoItem } from "./FuegoItem";
-import { GunItem } from "./GunItem";
-import { ImpulseItem } from "./ImpulseItem";
-import { JetpackItem } from "./JetpackItem";
-import { MapObjectItem } from "./MapObjectItem";
-import { PelotaItem } from "./PelotaItem";
-import { TurretItem } from "./TurretItem";
+import { FuegoItem } from "./droppables/FuegoItem";
+import { GunItem } from "./weapons/GunItem";
+import { ImpulseItem } from "./objects/ImpulseItem";
+import { JetpackItem } from "./consumables/JetpackItem";
+import { MapObjectItem } from "./objects/MapObjectItem";
+import { mapObjectFactory } from "./objects/MapObjectFactory";
+import { PelotaItem } from "./weapons/PelotaItem";
+import { TurretItem } from "./weapons/TurretItem";
 import { ensureItemUid } from "./ItemInstance";
 import type { ItemLike } from "../types";
 
@@ -119,7 +120,7 @@ export function createItemFromNetworkData(data: any): ItemLike {
       itemData.bulletDrop
     );
   } else if (itemData.itemClass === "MapObjectItem") {
-    item = new MapObjectItem(
+    item = mapObjectFactory.create(
       itemData.id,
       itemData.name,
       itemData.type,

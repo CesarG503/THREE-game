@@ -1,9 +1,8 @@
 import * as THREE from "three";
-import { Item } from "./Item";
+import { Item } from "../Item";
 
 export class FuegoItem extends Item {
   type: string;
-  value: number;
   groupId: string;
   itemTexture: string;
 

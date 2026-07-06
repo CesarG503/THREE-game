@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
-import { Item } from "./Item";
+import { Item } from "../Item";
 import { PI } from "three/src/nodes/TSL.js";
 
 export class JetpackItem extends Item {

@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
-import type { ItemLike } from "../types";
+import type { ItemLike } from "../../types";
 
 export class DroppedItem {
   scene: THREE.Scene;

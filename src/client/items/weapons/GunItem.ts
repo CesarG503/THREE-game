@@ -1,13 +1,13 @@
 import * as THREE from "three";
 import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
-import { Item } from "./Item";
-import { Projectile } from "../weapons/Projectile";
-import { BlasterSystem } from "../fx/BlasterSystem";
+import { Item } from "../Item";
+import { Projectile } from "../../weapons/Projectile";
+import { BlasterSystem } from "../../fx/BlasterSystem";
 import { WEAPON_SETTINGS } from "./WeaponSettings";
-import type { GunConfig, ItemContext } from "../types";
+import type { GunConfig, ItemContext } from "../../types";
 
-const GUN_COLOR_PALETTE = {
+const GUN_COLOR_PALETTE: Record<string, number> = {
   Metal: 0xc0c0c0,
   DarkerMetal: 0x4a4a4a,
   DarkMetal: 0x2f2f2f,
@@ -25,7 +25,7 @@ const GUN_COLOR_PALETTE = {
   Green: 0x32cd32
 };
 
-const GUN_MODEL_MATERIAL_OVERRIDES = {
+const GUN_MODEL_MATERIAL_OVERRIDES: Record<string, Record<string, number>> = {
   "/assets/gun animated/GLB/P90.glb": {
     "Material.001": 0xededed,
     "Material.003": 0x5a5a5a,

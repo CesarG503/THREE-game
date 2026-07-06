@@ -166,9 +166,9 @@ export async function apiFetch<T>(
 		headers,
 	});
 
-	const payload = await response.json().catch(() => null) as { error?: string } | T | null;
+	const payload = await response.json().catch((): null => null) as { error?: string } | T | null;
 	if (!response.ok) {
-		throw new Error(payload && "error" in payload && payload.error ? payload.error : "Error de API");
+		throw new Error((payload as any)?.error || "Error de API");
 	}
 
 	return payload as T;

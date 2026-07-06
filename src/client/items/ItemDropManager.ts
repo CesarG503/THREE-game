@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { DroppedItem } from "./DroppedItem";
+import { DroppedItem } from "./droppables/DroppedItem";
 import { createItemFromNetworkData } from "./ItemNetworkSerializer";
 import { ensureItemUid } from "./ItemInstance";
 import type { ItemLike } from "../types";

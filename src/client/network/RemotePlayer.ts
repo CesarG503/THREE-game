@@ -3,10 +3,10 @@ import RAPIER from "@dimforge/rapier3d-compat";
 import { GLBModel } from "../character/models/GLBModel";
 import { PolygonModel } from "../character/models/PolygonModel";
 import { PolygonModelSkin } from "../character/models/PolygonModelSkin";
-import { GunItem } from "../items/GunItem";
-import { WEAPONS_CONFIG } from "../items/WeaponSettings";
-import { PelotaItem } from "../items/PelotaItem";
-import { JetpackItem } from "../items/JetpackItem";
+import { GunItem } from "../items/weapons/GunItem";
+import { WEAPONS_CONFIG } from "../items/weapons/WeaponSettings";
+import { PelotaItem } from "../items/weapons/PelotaItem";
+import { JetpackItem } from "../items/consumables/JetpackItem";
 import type { GunConfig } from "../types";
 import { getGravityQuaternion, normalizeGravityOrientation, type GravityOrientation } from "../utils/GravityOrientation";
 

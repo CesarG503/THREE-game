@@ -13,21 +13,22 @@ import { PlacementManager } from "./editor/PlacementManager";
 import { InventoryManager } from "./items/InventoryManager";
 import { ItemDropManager } from "./items/ItemDropManager";
 import { Item } from "./items/Item";
-import { ImpulseItem } from "./items/ImpulseItem";
-import { FarmingZoneItem } from "./items/FarmingZoneItem";
+import { ImpulseItem } from "./items/objects/ImpulseItem";
+import { FarmingZoneItem } from "./items/objects/FarmingZoneItem";
 import { FarmingZone } from "./entities/FarmingZone";
-import { FuegoItem } from "./items/FuegoItem";
-import { TurretItem } from "./items/TurretItem";
+import { FuegoItem } from "./items/droppables/FuegoItem";
+import { TurretItem } from "./items/weapons/TurretItem";
 import { TurretPad } from "./entities/TurretPad";
-import { PelotaItem } from "./items/PelotaItem";
-import { MapObjectItem } from "./items/MapObjectItem";
+import { PelotaItem } from "./items/weapons/PelotaItem";
+import { MapObjectItem } from "./items/objects/MapObjectItem";
+import { mapObjectFactory } from "./items/objects/MapObjectFactory";
 import { PlayerConfigManager } from "./managers/PlayerConfigManager";
 import { FloatingTextManager } from "./ui/FloatingTextManager";
 import { Projectile } from "./weapons/Projectile";
 import { BlasterSystem } from "./fx/BlasterSystem";
 import { Router } from "./routing/Router";
-import { GunItem } from "./items/GunItem";
-import { JetpackItem } from "./items/JetpackItem";
+import { GunItem } from "./items/weapons/GunItem";
+import { JetpackItem } from "./items/consumables/JetpackItem";
 import { setupGameInput } from "./core/GameInput";
 import { animate, setupDebugRender, setupOrientationGizmo, updateDebugRender, renderOrientationGizmo } from "./core/GameLoop";
 import { setupMultiplayerUI, updateConnectionStatus, handleRemoteShoot } from "./core/GameNetwork";
@@ -477,11 +478,11 @@ export class Game {
 		this.updateEnvironmentConfig(this.environmentConfig);
 
 		if (this.gameMode === "editor") {
-			const wall = new MapObjectItem("wall", "Pared", "wall", "/assets/textures/impulso.png", 0xFFFFFF, { x: 5, y: 3, z: 0.5 });
-			const pillar = new MapObjectItem("pillar", "Pilar", "pillar", "/assets/textures/salto.png", 0xFFFFFF, { x: 1, y: 4, z: 1 });
-			const floor = new MapObjectItem("floor", "Suelo", "wall", "/assets/textures/impulso.png", 0xFFFFFF, { x: 5, y: 0.5, z: 5 });
-			const ramp = new MapObjectItem("stairs", "Gradas", "stairs", "/assets/textures/impulso.png", 0xFFFFFF, { x: 4, y: 2, z: 4 });
-			const tall = new MapObjectItem("tall", "Torre", "pillar", "/assets/textures/salto.png", 0xFFFFFF, { x: 2, y: 10, z: 2 });
+			const wall = mapObjectFactory.create("wall", "Pared", "wall", "/assets/textures/impulso.png", 0xFFFFFF, { x: 5, y: 3, z: 0.5 });
+			const pillar = mapObjectFactory.create("pillar", "Pilar", "pillar", "/assets/textures/salto.png", 0xFFFFFF, { x: 1, y: 4, z: 1 });
+			const floor = mapObjectFactory.create("floor", "Suelo", "wall", "/assets/textures/impulso.png", 0xFFFFFF, { x: 5, y: 0.5, z: 5 });
+			const ramp = mapObjectFactory.create("stairs", "Gradas", "stairs", "/assets/textures/impulso.png", 0xFFFFFF, { x: 4, y: 2, z: 4 });
+			const tall = mapObjectFactory.create("tall", "Torre", "pillar", "/assets/textures/salto.png", 0xFFFFFF, { x: 2, y: 10, z: 2 });
 
 			this.inventoryManager.addItem(wall);
 			this.inventoryManager.addItem(pillar);
@@ -540,7 +541,7 @@ export class Game {
 							newItem = new JetpackItem(source);
 						}
 					} else {
-						newItem = new MapObjectItem(
+						newItem = mapObjectFactory.create(
 							source.id,
 							source.name,
 							source.type,

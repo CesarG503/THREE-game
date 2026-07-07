@@ -1146,10 +1146,14 @@ export class MapObjectItem extends Item {
         const seg = segments[i];
         const segLength = seg.length || 2.0;
 
+        const segColor = seg.color !== undefined ? seg.color : this.color;
+        const segOpacity = seg.opacity !== undefined ? seg.opacity : (this.opacity !== undefined ? this.opacity : 1.0);
+        const segTexSettings = seg.textureSettings || this.textureSettings;
+
         const material = new THREE.MeshStandardMaterial({
-          color: this.color,
-          transparent: this.opacity !== undefined && this.opacity < 1.0,
-          opacity: this.opacity !== undefined ? this.opacity : 1.0
+          color: segColor,
+          transparent: segOpacity < 1.0,
+          opacity: segOpacity
         });
 
         // Cylinder mesh
@@ -1167,7 +1171,7 @@ export class MapObjectItem extends Item {
         if (segTexPath) {
           MapAssetManager.loadTexture(segTexPath)
             .then((texture) => {
-              applyMapObjectTexture(mesh, texture, this.scale, this.textureSettings);
+              applyMapObjectTexture(mesh, texture, this.scale, segTexSettings);
             })
             .catch(err => console.error("Failed to load segment texture:", err));
         }
@@ -1186,7 +1190,7 @@ export class MapObjectItem extends Item {
           if (segTexPath) {
             MapAssetManager.loadTexture(segTexPath)
               .then((texture) => {
-                if (elbowMesh) applyMapObjectTexture(elbowMesh, texture, this.scale, this.textureSettings);
+                if (elbowMesh) applyMapObjectTexture(elbowMesh, texture, this.scale, segTexSettings);
               })
               .catch(err => {});
           }

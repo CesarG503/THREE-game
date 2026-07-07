@@ -397,7 +397,10 @@ export class ObjectInspector {
                         length: 2.0,
                         bendAngleX: 45,
                         bendAngleY: 0,
-                        texturePath: lastSeg.texturePath || null
+                        color: lastSeg.color !== undefined ? lastSeg.color : undefined,
+                        opacity: lastSeg.opacity !== undefined ? lastSeg.opacity : undefined,
+                        texturePath: lastSeg.texturePath || null,
+                        textureSettings: lastSeg.textureSettings ? JSON.parse(JSON.stringify(lastSeg.textureSettings)) : undefined
                     });
                     scale.segments = segments;
                     
@@ -1225,31 +1228,68 @@ export class ObjectInspector {
             if (this.rowLength2) this.rowLength2.style.display = "none"; // Hide standard Largo 2
 
             const segments = getTubeSegments(dims);
-            const idx = parseInt(this.selectSegmentDropdown?.value || "0") || 0;
-            const seg = segments[idx] || { length: 2.0, bendAngleX: 0, bendAngleY: 0 };
+            const val = this.selectSegmentDropdown?.value || "all";
 
-            if (this.inputRadius) this.inputRadius.value = dims.radius || 0.5;
-            if (this.inputLength1) {
-                const label = this.rowLength1.querySelector("span");
-                if (label) label.textContent = idx === 0 ? "Largo 1 (Base):" : `Largo tramo ${idx + 1}:`;
-                this.inputLength1.value = seg.length || 2.0;
-            }
+            let segColor, segOpacity, segTexSettings;
 
-            if (idx === 0) {
+            if (val === "all") {
+                if (this.rowLength1) this.rowLength1.style.display = "none";
                 if (this.rowBendAngleX) this.rowBendAngleX.style.display = "none";
                 if (this.rowBendAngleY) this.rowBendAngleY.style.display = "none";
                 if (this.rowSliderBendX) this.rowSliderBendX.style.display = "none";
                 if (this.rowSliderBendY) this.rowSliderBendY.style.display = "none";
+                if (this.chkEditBends?.parentElement) this.chkEditBends.parentElement.style.display = "none";
+
+                // In "all" mode, use base properties
+                segColor = this.selectedObject.userData.color || 0xffffff;
+                segOpacity = this.selectedObject.userData.opacity !== undefined ? this.selectedObject.userData.opacity : 1.0;
+                segTexSettings = this.selectedObject.userData.textureSettings || {};
             } else {
-                if (this.rowBendAngleX) this.rowBendAngleX.style.display = "flex";
-                if (this.rowBendAngleY) this.rowBendAngleY.style.display = "flex";
-                if (this.rowSliderBendX) this.rowSliderBendX.style.display = "flex";
-                if (this.rowSliderBendY) this.rowSliderBendY.style.display = "flex";
-                if (this.inputBendAngleX) this.inputBendAngleX.value = seg.bendAngleX !== undefined ? seg.bendAngleX : 0;
-                if (this.inputBendAngleY) this.inputBendAngleY.value = seg.bendAngleY !== undefined ? seg.bendAngleY : 0;
-                if (this.sliderBendX) this.sliderBendX.value = String(seg.bendAngleX !== undefined ? seg.bendAngleX : 0);
-                if (this.sliderBendY) this.sliderBendY.value = String(seg.bendAngleY !== undefined ? seg.bendAngleY : 0);
+                if (this.rowLength1) this.rowLength1.style.display = "flex";
+                if (this.chkEditBends?.parentElement) this.chkEditBends.parentElement.style.display = "flex";
+                const idx = parseInt(val) || 0;
+                const seg = segments[idx] || { length: 2.0, bendAngleX: 0, bendAngleY: 0 };
+
+                if (this.inputRadius) this.inputRadius.value = dims.radius || 0.5;
+                if (this.inputLength1) {
+                    const label = this.rowLength1.querySelector("span");
+                    if (label) label.textContent = idx === 0 ? "Largo 1 (Base):" : `Largo tramo ${idx + 1}:`;
+                    this.inputLength1.value = seg.length || 2.0;
+                }
+
+                if (idx === 0) {
+                    if (this.rowBendAngleX) this.rowBendAngleX.style.display = "none";
+                    if (this.rowBendAngleY) this.rowBendAngleY.style.display = "none";
+                    if (this.rowSliderBendX) this.rowSliderBendX.style.display = "none";
+                    if (this.rowSliderBendY) this.rowSliderBendY.style.display = "none";
+                } else {
+                    if (this.rowBendAngleX) this.rowBendAngleX.style.display = "flex";
+                    if (this.rowBendAngleY) this.rowBendAngleY.style.display = "flex";
+                    if (this.rowSliderBendX) this.rowSliderBendX.style.display = "flex";
+                    if (this.rowSliderBendY) this.rowSliderBendY.style.display = "flex";
+                    if (this.inputBendAngleX) this.inputBendAngleX.value = seg.bendAngleX !== undefined ? seg.bendAngleX : 0;
+                    if (this.inputBendAngleY) this.inputBendAngleY.value = seg.bendAngleY !== undefined ? seg.bendAngleY : 0;
+                    if (this.sliderBendX) this.sliderBendX.value = String(seg.bendAngleX !== undefined ? seg.bendAngleX : 0);
+                    if (this.sliderBendY) this.sliderBendY.value = String(seg.bendAngleY !== undefined ? seg.bendAngleY : 0);
+                }
+
+                // In segment mode, resolve segment properties falling back to base
+                segColor = seg.color !== undefined ? seg.color : (this.selectedObject.userData.color || 0xffffff);
+                segOpacity = seg.opacity !== undefined ? seg.opacity : (this.selectedObject.userData.opacity !== undefined ? this.selectedObject.userData.opacity : 1.0);
+                segTexSettings = { ...(this.selectedObject.userData.textureSettings || {}), ...(seg.textureSettings || {}) };
             }
+
+            // Sync visual property inputs
+            if (this.colorPicker) {
+                this.colorPicker.value = "#" + new THREE.Color(segColor).getHexString();
+            }
+            if (this.opacitySlider) {
+                this.opacitySlider.value = segOpacity;
+            }
+            if (this.opacityNumber) {
+                this.opacityNumber.value = Math.round(segOpacity * 100);
+            }
+            this.syncTextureSettingsInputs(segTexSettings);
         } else {
             if (dimRow) dimRow.style.display = "grid";
             if (this.rowRadius) this.rowRadius.style.display = "none";
@@ -1490,10 +1530,14 @@ export class ObjectInspector {
                 const seg = segments[i];
                 const segLength = seg.length || 2.0;
 
+                const segColor = seg.color !== undefined ? seg.color : (this.selectedObject.userData.color || 0xffffff);
+                const segOpacity = seg.opacity !== undefined ? seg.opacity : (this.selectedObject.userData.opacity !== undefined ? this.selectedObject.userData.opacity : 1.0);
+                const segTexSettings = seg.textureSettings || this.selectedObject.userData.textureSettings;
+
                 const material = new THREE.MeshStandardMaterial({
-                    color: this.selectedObject.userData.color || 0xffffff,
-                    transparent: this.selectedObject.userData.opacity !== undefined && this.selectedObject.userData.opacity < 1.0,
-                    opacity: this.selectedObject.userData.opacity !== undefined ? this.selectedObject.userData.opacity : 1.0
+                    color: segColor,
+                    transparent: segOpacity < 1.0,
+                    opacity: segOpacity
                 });
 
                 const cylGeo = new THREE.CylinderGeometry(radius, radius, segLength, 32);
@@ -1509,7 +1553,7 @@ export class ObjectInspector {
                 if (segTexPath) {
                     const loader = new THREE.TextureLoader();
                     loader.load(segTexPath, (texture) => {
-                        applyMapObjectTexture(mesh, texture, dims, this.selectedObject.userData.textureSettings);
+                        applyMapObjectTexture(mesh, texture, dims, segTexSettings);
                     });
                 }
 
@@ -1527,7 +1571,7 @@ export class ObjectInspector {
                     if (segTexPath) {
                         const loader = new THREE.TextureLoader();
                         loader.load(segTexPath, (texture) => {
-                            if (elbowMesh) applyMapObjectTexture(elbowMesh, texture, dims, this.selectedObject.userData.textureSettings);
+                            if (elbowMesh) applyMapObjectTexture(elbowMesh, texture, dims, segTexSettings);
                         });
                     }
 
@@ -1580,7 +1624,31 @@ export class ObjectInspector {
             return;
         }
 
-        this.selectedObject.userData.color = parseInt(hex.replace('#', '0x'))
+        const colorNum = parseInt(hex.replace('#', '0x'));
+
+        if (this.selectedObject.userData.mapObjectType === "tube") {
+            const scale = this.selectedObject.userData.originalScale;
+            const segments = getTubeSegments(scale);
+            const val = this.selectSegmentDropdown?.value || "all";
+            if (val === "all") {
+                this.selectedObject.userData.color = colorNum;
+                segments.forEach(seg => {
+                    delete seg.color;
+                });
+            } else {
+                const idx = parseInt(val) || 0;
+                if (segments[idx]) {
+                    segments[idx].color = colorNum;
+                }
+            }
+            this.updateDimensions('y', scale.y, true);
+            if (this.game && this.game.broadcastObjectUpdate) {
+                this.game.broadcastObjectUpdate(this.selectedObject);
+            }
+            return;
+        }
+
+        this.selectedObject.userData.color = colorNum
 
         if (this.selectedObject.material) {
             this.selectedObject.material.color.set(hex)
@@ -1620,15 +1688,24 @@ export class ObjectInspector {
         if (this.selectedObject.userData.mapObjectType === "tube") {
             const scale = this.selectedObject.userData.originalScale;
             const segments = getTubeSegments(scale);
-            const idx = parseInt(this.selectSegmentDropdown?.value || "0") || 0;
-            if (segments[idx]) {
-                segments[idx].texturePath = pathOrDataUrl;
-                this.updateDimensions('y', scale.y, true);
-                if (this.game && this.game.broadcastObjectUpdate) {
-                    this.game.broadcastObjectUpdate(this.selectedObject);
+            const val = this.selectSegmentDropdown?.value || "all";
+            if (val === "all") {
+                this.selectedObject.userData.texturePath = pathOrDataUrl;
+                this.selectedObject.userData.textureAssetId = assetId;
+                segments.forEach(seg => {
+                    delete seg.texturePath;
+                });
+            } else {
+                const idx = parseInt(val) || 0;
+                if (segments[idx]) {
+                    segments[idx].texturePath = pathOrDataUrl;
                 }
-                return;
             }
+            this.updateDimensions('y', scale.y, true);
+            if (this.game && this.game.broadcastObjectUpdate) {
+                this.game.broadcastObjectUpdate(this.selectedObject);
+            }
+            return;
         }
 
         this.selectedObject.userData.texturePath = pathOrDataUrl
@@ -1690,6 +1767,45 @@ export class ObjectInspector {
             return;
         }
 
+        if (this.selectedObject.userData.mapObjectType === "tube") {
+            const scale = this.selectedObject.userData.originalScale;
+            const segments = getTubeSegments(scale);
+            const val = this.selectSegmentDropdown?.value || "all";
+            if (val === "all") {
+                this.selectedObject.userData.textureSettings = normalizeTextureSettings({
+                    ...(this.selectedObject.userData.textureSettings || {}),
+                    [key]: value
+                });
+                segments.forEach(seg => {
+                    if (seg.textureSettings) {
+                        delete seg.textureSettings[key];
+                    }
+                });
+            } else {
+                const idx = parseInt(val) || 0;
+                if (segments[idx]) {
+                    if (!segments[idx].textureSettings) {
+                        segments[idx].textureSettings = {};
+                    }
+                    segments[idx].textureSettings[key] = value;
+                }
+            }
+            this.updateDimensions('y', scale.y, true);
+
+            // Sync visual inputs for the active selection
+            const activeSeg = segments[val === "all" ? 0 : parseInt(val)] || {};
+            const activeSettings = {
+                ...(this.selectedObject.userData.textureSettings || {}),
+                ...(activeSeg.textureSettings || {})
+            };
+            this.syncTextureSettingsInputs(activeSettings);
+
+            if (this.game && this.game.broadcastObjectUpdate) {
+                this.game.broadcastObjectUpdate(this.selectedObject);
+            }
+            return;
+        }
+
         this.selectedObject.userData.textureSettings = normalizeTextureSettings({
             ...(this.selectedObject.userData.textureSettings || {}),
             [key]: value
@@ -1704,7 +1820,15 @@ export class ObjectInspector {
     }
 
     reapplySelectedTexture() {
-        if (!this.selectedObject || !this.selectedObject.userData.texturePath) return
+        if (!this.selectedObject) return;
+
+        if (this.selectedObject.userData.mapObjectType === "tube") {
+            const scale = this.selectedObject.userData.originalScale || {};
+            this.updateDimensions('y', scale.y, true);
+            return;
+        }
+
+        if (!this.selectedObject.userData.texturePath) return
         const loader = new THREE.TextureLoader()
         const target = this.selectedObject
         loader.load(target.userData.texturePath, (tex) => {
@@ -1729,6 +1853,28 @@ export class ObjectInspector {
                 group.opacity = opacity;
                 group.transparent = opacity < 1.0;
                 this.rebuildEnvironment(mapObjectType, groupId);
+            }
+            return;
+        }
+
+        if (this.selectedObject.userData.mapObjectType === "tube") {
+            const scale = this.selectedObject.userData.originalScale;
+            const segments = getTubeSegments(scale);
+            const val = this.selectSegmentDropdown?.value || "all";
+            if (val === "all") {
+                this.selectedObject.userData.opacity = opacity;
+                segments.forEach(seg => {
+                    delete seg.opacity;
+                });
+            } else {
+                const idx = parseInt(val) || 0;
+                if (segments[idx]) {
+                    segments[idx].opacity = opacity;
+                }
+            }
+            this.updateDimensions('y', scale.y, true);
+            if (this.game && this.game.broadcastObjectUpdate) {
+                this.game.broadcastObjectUpdate(this.selectedObject);
             }
             return;
         }
@@ -1903,6 +2049,11 @@ export class ObjectInspector {
         const prevVal = this.selectSegmentDropdown.value;
         this.selectSegmentDropdown.innerHTML = "";
 
+        const allOpt = document.createElement("option");
+        allOpt.value = "all";
+        allOpt.textContent = "Todos los tramos";
+        this.selectSegmentDropdown.appendChild(allOpt);
+
         segments.forEach((seg, i) => {
             const opt = document.createElement("option");
             opt.value = String(i);
@@ -1910,10 +2061,10 @@ export class ObjectInspector {
             this.selectSegmentDropdown.appendChild(opt);
         });
 
-        if (parseInt(prevVal) < segments.length) {
+        if (prevVal === "all" || (prevVal !== "" && parseInt(prevVal) < segments.length)) {
             this.selectSegmentDropdown.value = prevVal;
         } else {
-            this.selectSegmentDropdown.value = "0";
+            this.selectSegmentDropdown.value = "all";
         }
     }
 
@@ -1921,19 +2072,22 @@ export class ObjectInspector {
         if (!this.selectedObject) return;
 
         if (this.selectedObject.userData.mapObjectType === "tube" && this.chkEditBends?.checked) {
-            const selectedSegIndex = parseInt(this.selectSegmentDropdown?.value || "0") || 0;
-            if (selectedSegIndex > 0) {
-                let targetGroup = null;
-                this.selectedObject.traverse((child: any) => {
-                    if (child.isGroup && child.userData.isTubeGroup && child.userData.segmentIndex === selectedSegIndex) {
-                        targetGroup = child;
-                    }
-                });
+            const val = this.selectSegmentDropdown?.value || "all";
+            if (val !== "all") {
+                const selectedSegIndex = parseInt(val) || 0;
+                if (selectedSegIndex > 0) {
+                    let targetGroup = null;
+                    this.selectedObject.traverse((child: any) => {
+                        if (child.isGroup && child.userData.isTubeGroup && child.userData.segmentIndex === selectedSegIndex) {
+                            targetGroup = child;
+                        }
+                    });
 
-                if (targetGroup) {
-                    this.transformGizmo.attach(targetGroup);
-                    this.transformGizmo.setMode("rotate");
-                    return;
+                    if (targetGroup) {
+                        this.transformGizmo.attach(targetGroup);
+                        this.transformGizmo.setMode("rotate");
+                        return;
+                    }
                 }
             }
         }

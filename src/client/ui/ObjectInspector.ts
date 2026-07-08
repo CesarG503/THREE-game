@@ -1052,7 +1052,9 @@ export class ObjectInspector {
             this.chkInvisible.checked = false
         }
 
-        this.syncTextureSettingsInputs(texSettings)
+        if (object.userData.mapObjectType !== "tube") {
+            this.syncTextureSettingsInputs(texSettings)
+        }
 
         // Logic Properties
         if (!isEnv && object.userData.logicProperties) {
@@ -1737,7 +1739,13 @@ export class ObjectInspector {
     syncTextureSettingsInputs(settings = null) {
         const normalized = normalizeTextureSettings(settings)
         if (this.selectedObject) {
-            this.selectedObject.userData.textureSettings = { ...normalized }
+            if (this.selectedObject.userData.mapObjectType === "tube") {
+                if (!this.selectedObject.userData.textureSettings) {
+                    this.selectedObject.userData.textureSettings = normalizeTextureSettings(null);
+                }
+            } else {
+                this.selectedObject.userData.textureSettings = { ...normalized }
+            }
         }
         if (this.textureFitModeSelect) this.textureFitModeSelect.value = normalized.fitMode
         ;["tileSize", "repeatX", "repeatY", "offsetX", "offsetY", "rotation", "globalRotation"].forEach((key) => {

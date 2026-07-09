@@ -5,10 +5,10 @@
   "description": "Three.js Game",
   "scripts": {
     "dev": "vite",
-    "server": "tsc && node ./dist/index.js",
+    "server": "tsc && cp -r server/analytics/schemas dist/analytics/schemas && node ./dist/index.js",
     "server:watch": "tsc --watch",
     "start": "concurrently \"npm run dev -- --host\" \"npm run server\"",
-    "build": "vite build && tsc",
+    "build": "vite build && tsc && cp -r server/analytics/schemas dist/analytics/schemas",
     "preview": "vite preview",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",

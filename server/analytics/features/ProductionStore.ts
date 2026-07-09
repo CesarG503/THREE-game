@@ -213,6 +213,7 @@ export class ProductionFeatureStore {
     const features: any = {};
     for (const key of Object.keys(hash)) {
       const val = hash[key];
+      if (val === undefined) continue;
       if (val === "null") {
         features[key] = null;
         continue;

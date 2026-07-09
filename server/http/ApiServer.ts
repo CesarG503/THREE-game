@@ -497,12 +497,17 @@ export async function handleHttpRequest(
         try {
           const { computeSkillScore, fetchPreferredLanguage } = await import("../services/matchmaking/skill_matcher.js")
 
-          if (skillScore === undefined) {
-            skillScore = await computeSkillScore(resolvedUserId)
-          }
-          if (preferredLanguage === undefined) {
-            preferredLanguage = await fetchPreferredLanguage(resolvedUserId) ?? undefined
-          }
+          // Run both enrichment queries in parallel, capped at 800ms to never block queue entry
+          const timeout = new Promise<[number, string | null]>((resolve) =>
+            setTimeout(() => resolve([0.40, null]), 800)
+          )
+          const enrichment = Promise.all([
+            skillScore !== undefined ? Promise.resolve(skillScore) : computeSkillScore(resolvedUserId),
+            preferredLanguage !== undefined ? Promise.resolve(preferredLanguage ?? null) : fetchPreferredLanguage(resolvedUserId),
+          ])
+          const [resolvedSkill, resolvedLang] = await Promise.race([enrichment, timeout])
+          if (skillScore === undefined) skillScore = resolvedSkill
+          if (preferredLanguage === undefined) preferredLanguage = resolvedLang ?? undefined
         } catch (err) {
           // Non-critical: matchmaker works without enrichment
           logger.warn("HTTP", `Failed to enrich matchmaker ticket for user ${resolvedUserId}`, err)

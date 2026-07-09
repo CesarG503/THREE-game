@@ -188,21 +188,27 @@ export function renderLobby(router: Router): () => void {
 		 */
 		const detectBestRegion = async (): Promise<string> => {
 			const saved = localStorage.getItem("vp-preferred-region");
-			try {
-				const results = await Promise.all(
-					REGION_CANDIDATES.map(async (r) => {
-						const t0 = performance.now();
-						await fetch(`/api/matchmaker/ewt?region=${r.code}`);
-						return { code: r.code, latency: performance.now() - t0 };
-					}),
-				);
-				results.sort((a, b) => a.latency - b.latency);
-				const best = results[0]!.code;
-				localStorage.setItem("vp-preferred-region", best);
-				return best;
-			} catch {
-				return saved || "sa-east";
-			}
+			const timeout = new Promise<string>((resolve) =>
+				setTimeout(() => resolve(saved || "sa-east"), 1500)
+			);
+			const ping = (async () => {
+				try {
+					const results = await Promise.all(
+						REGION_CANDIDATES.map(async (r) => {
+							const t0 = performance.now();
+							await fetch(`/api/matchmaker/ewt?region=${r.code}`);
+							return { code: r.code, latency: performance.now() - t0 };
+						}),
+					);
+					results.sort((a, b) => a.latency - b.latency);
+					const best = results[0]!.code;
+					localStorage.setItem("vp-preferred-region", best);
+					return best;
+				} catch {
+					return saved || "sa-east";
+				}
+			})();
+			return Promise.race([ping, timeout]);
 		};
 
 		// Show a loading state while detecting region
@@ -315,7 +321,7 @@ export function renderLobby(router: Router): () => void {
 							.catch((err) => {
 								console.error("Error polling matchmaking ticket status", err);
 							});
-					}, 2000);
+					}, 300);
 				})
 				.catch((err) => {
 					console.error("Failed to join matchmaking queue", err);

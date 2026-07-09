@@ -96,7 +96,7 @@ export class EventWorker {
           id: event.id,
           eventType: event.eventType,
           userId: event.userId || null,
-          timestamp: new Date(event.timestamp),
+          timestamp: (() => { const d = new Date(event.timestamp); return isNaN(d.getTime()) ? new Date() : d; })(),
           payload: event.payload,
         })),
         // If there are duplicate keys, PostgreSQL createMany will fail, and we fall back to individual inserts
@@ -181,7 +181,7 @@ export class EventWorker {
             id: event.id,
             eventType: event.eventType,
             userId: event.userId || null,
-            timestamp: new Date(event.timestamp),
+            timestamp: (() => { const d = new Date(event.timestamp); return isNaN(d.getTime()) ? new Date() : d; })(),
             payload: event.payload,
           },
         });

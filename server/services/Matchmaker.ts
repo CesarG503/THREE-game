@@ -10,7 +10,7 @@ import crypto from "node:crypto";
 
 const MIN_PLAYERS = Number(process.env["MM_MIN_PLAYERS"] ?? 2);
 const MAX_PLAYERS_PER_ROOM = 8;
-const TICK_INTERVAL_MS = 2000;
+const TICK_INTERVAL_MS = 300;
 const REGIONAL_WAIT_MS = 30_000;
 const GLOBAL_FALLBACK_MS = 60_000;
 

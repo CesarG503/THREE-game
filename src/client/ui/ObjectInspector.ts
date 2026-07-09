@@ -14,6 +14,8 @@ export class ObjectInspector {
         this.isVisible = false
         this.selectedObject = null
         this.customTextureAssets = []
+        this.allowDynamicSwitch = false
+        this.isCollapsed = false
 
         this.setupUI()
         this.transformGizmo = new TransformGizmo(this.game, this)
@@ -60,14 +62,34 @@ export class ObjectInspector {
         this.title.style.margin = "0"
         this.title.textContent = "Inspector"
 
+        // Buttons container
+        const btnContainer = document.createElement('div')
+        btnContainer.style.cssText = `
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        `
+
+        // Toggle Collapse Button
+        this.collapseBtn = document.createElement('span')
+        this.collapseBtn.textContent = "▲"
+        this.collapseBtn.style.cursor = "pointer"
+        this.collapseBtn.style.fontSize = "16px"
+        this.collapseBtn.style.color = "#aaa"
+        this.collapseBtn.title = "Minimizar / Maximizar"
+        this.collapseBtn.onclick = () => this.toggleCollapse()
+
         const closeBtn = document.createElement('span')
         closeBtn.textContent = "✕"
         closeBtn.style.cursor = "pointer"
         closeBtn.style.fontSize = "20px"
         closeBtn.onclick = () => this.hide()
 
+        btnContainer.appendChild(this.collapseBtn)
+        btnContainer.appendChild(closeBtn)
+
         header.appendChild(this.title)
-        header.appendChild(closeBtn)
+        header.appendChild(btnContainer)
         this.container.appendChild(header)
 
         // Properties Container
@@ -433,15 +455,6 @@ export class ObjectInspector {
             section.appendChild(row)
         })
 
-        // 4.6 Danger Zone
-        this.createSection("Acciones", (section) => {
-            const btnDelete = document.createElement('button')
-            btnDelete.textContent = "Eliminar Objeto"
-            btnDelete.style.cssText = `width: 100%; padding: 8px; cursor: pointer; background: #cc3333; color: white; border: none; border-radius: 4px; font-weight: bold;`
-            btnDelete.onclick = () => this.deleteSelected()
-            section.appendChild(btnDelete)
-        })
-
         // 5. Logic Properties (Dynamic)
         this.logicSectionWrapper = this.createSection("Lógica de Juego", (section) => {
             this.logicContainer = document.createElement('div')
@@ -451,6 +464,60 @@ export class ObjectInspector {
             section.appendChild(this.logicContainer)
         })
         this.logicSectionWrapper.style.display = 'none'
+
+        // Preferencia de Cambio Rápido
+        this.createSection("Preferencia", (section) => {
+            const row = document.createElement('div')
+            row.style.cssText = `display: flex; align-items: center; gap: 8px;`
+
+            this.chkDynamicSwitch = document.createElement('input')
+            this.chkDynamicSwitch.type = 'checkbox'
+            this.chkDynamicSwitch.id = 'chk-dynamic-switch'
+            this.chkDynamicSwitch.style.transform = "scale(1.1)"
+            this.chkDynamicSwitch.checked = this.allowDynamicSwitch
+            this.chkDynamicSwitch.onchange = (e) => {
+                this.allowDynamicSwitch = e.target.checked
+            }
+
+            const label = document.createElement('label')
+            label.textContent = "Cambio rápido (Clic Derecho)"
+            label.htmlFor = 'chk-dynamic-switch'
+            label.style.fontSize = "11px"
+            label.style.cursor = "pointer"
+            label.style.color = "#ccc"
+
+            row.appendChild(this.chkDynamicSwitch)
+            row.appendChild(label)
+            section.appendChild(row)
+        })
+
+        // Nombre Personalizado / Identificación
+        this.createSection("Identificación", (section) => {
+            this.inputCustomName = document.createElement('input')
+            this.inputCustomName.type = "text"
+            this.inputCustomName.placeholder = "Nombre del objeto"
+            this.inputCustomName.style.cssText = `
+                width: 100%; background: #222; color: white; border: 1px solid #444; 
+                border-radius: 4px; padding: 6px; font-size: 12px; box-sizing: border-box;
+            `
+            this.inputCustomName.oninput = (e) => {
+                if (this.selectedObject) {
+                    const newName = e.target.value;
+                    this.selectedObject.userData.customName = newName;
+                    this.title.textContent = `Propiedades: ${newName || this.selectedObject.userData.mapObjectType || "Objeto"}`;
+                }
+            }
+            section.appendChild(this.inputCustomName)
+        })
+
+        // 4.6 Danger Zone
+        this.createSection("Acciones", (section) => {
+            const btnDelete = document.createElement('button')
+            btnDelete.textContent = "Eliminar Objeto"
+            btnDelete.style.cssText = `width: 100%; padding: 8px; cursor: pointer; background: #cc3333; color: white; border: none; border-radius: 4px; font-weight: bold;`
+            btnDelete.onclick = () => this.deleteSelected()
+            section.appendChild(btnDelete)
+        })
             // Move the logic section into the main content
             // Note: createSection appends to this.content immediately.
             // So I need to capture the section element wrapper if I want to hide it whole.
@@ -579,7 +646,23 @@ export class ObjectInspector {
         this.container.style.display = 'flex'
 
         // Populate Data
-        this.title.textContent = `Propiedades: ${object.userData.mapObjectType || "Objeto"}`
+        const objName = object.userData.customName || object.userData.mapObjectType || "Objeto"
+        this.title.textContent = `Propiedades: ${objName}`
+        if (this.inputCustomName) {
+            this.inputCustomName.value = object.userData.customName || ""
+        }
+
+        if (this.chkDynamicSwitch) {
+            this.chkDynamicSwitch.checked = this.allowDynamicSwitch
+        }
+
+        if (this.isCollapsed) {
+            this.content.style.display = "none"
+            this.container.style.maxHeight = "50px"
+        } else {
+            this.content.style.display = "flex"
+            this.container.style.maxHeight = "90vh"
+        }
 
         this.syncTransformInputs()
 
@@ -621,8 +704,10 @@ export class ObjectInspector {
             object.userData.mapObjectType === 'movement_controller' ||
             object.userData.mapObjectType === 'spawn_point' ||
             object.userData.mapObjectType === 'interaction_button' ||
+            object.userData.mapObjectType === 'gravity_sphere' ||
             object.userData.mapObjectType === 'impulse_jump' ||
             object.userData.mapObjectType === 'impulse_lateral' ||
+            object.userData.mapObjectType === 'gravity_pad' ||
             object.userData.mapObjectType === 'farming_zone'
         )
 
@@ -667,6 +752,19 @@ export class ObjectInspector {
 
         // Enable Game Input - REMOVED (never disabled)
         // if (this.game.inputManager) this.game.inputManager.enabled = true
+    }
+
+    toggleCollapse() {
+        this.isCollapsed = !this.isCollapsed
+        if (this.isCollapsed) {
+            this.content.style.display = "none"
+            if (this.collapseBtn) this.collapseBtn.textContent = "▼"
+            this.container.style.maxHeight = "50px"
+        } else {
+            this.content.style.display = "flex"
+            if (this.collapseBtn) this.collapseBtn.textContent = "▲"
+            this.container.style.maxHeight = "90vh"
+        }
     }
 
     syncTransformInputs(dimensionsOverride = null) {
@@ -1095,6 +1193,27 @@ export class ObjectInspector {
                 this.selectedObject.userData.logicProperties[key] = value
                 console.log(`Updated Logic Prop [${key}]:`, value)
                 
+                // Recalculate multipliers if 'rings' changes
+                if (key === 'rings') {
+                    const val = parseInt(value);
+                    const newMults = [];
+                    if (val === 1) {
+                        newMults.push(1.0);
+                    } else {
+                        for (let i = 0; i < val; i++) {
+                            const t = i / (val - 1);
+                            const v = 0.1 + t * 0.9;
+                            newMults.push(Number(v.toFixed(2)));
+                        }
+                    }
+                    this.selectedObject.userData.logicProperties.ringMultipliers = newMults;
+                }
+
+                // If target visual update function exists, call it
+                if (typeof this.selectedObject.updateTargetVisuals === 'function') {
+                    this.selectedObject.updateTargetVisuals();
+                }
+
                 if (this.game && this.game.broadcastObjectUpdate) {
                     this.game.broadcastObjectUpdate(this.selectedObject);
                 }

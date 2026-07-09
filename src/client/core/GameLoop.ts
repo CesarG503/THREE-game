@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { FuegoItem } from "../items/FuegoItem";
+import { normalizeGravityOrientation } from "../utils/GravityOrientation";
 
 export function setupDebugRender(this: any) {
 	this.debugMesh = new THREE.LineSegments(
@@ -114,6 +115,53 @@ function updateMapImpulsePads(game: any) {
 		game.character.applyImpulse(direction.multiplyScalar(strength));
 		state.wasInZone = true;
 		state.lastImpulseTime = now;
+	});
+}
+
+function updateMapGravityPads(game: any) {
+	if (!game.character || !game.sceneManager?.scene) return;
+
+	const charPos = game.character.getPosition();
+	const now = game.clock ? game.clock.getElapsedTime() : performance.now() / 1000;
+	const pads = getEditableMapObjects(game.sceneManager.scene, ["gravity_pad"]);
+
+	pads.forEach((pad: any) => {
+		if (!pad.userData.logicProperties) pad.userData.logicProperties = {};
+		if (!pad.userData.runtimeState) pad.userData.runtimeState = {};
+
+		const props = pad.userData.logicProperties;
+		const state = pad.userData.runtimeState;
+		const dims = pad.userData.originalScale || { x: 3, y: 0.2, z: 3 };
+		const localPos = pad.worldToLocal(charPos.clone());
+
+		const inZone =
+			Math.abs(localPos.x) < dims.x / 2 &&
+			Math.abs(localPos.z) < dims.z / 2 &&
+			localPos.y >= -dims.y / 2 - 0.15 &&
+			localPos.y < dims.y / 2 + 0.85;
+
+		if (!inZone) {
+			state.wasInZone = false;
+			return;
+		}
+
+		const cooldown = Math.max(0, Number(props.cooldown ?? 0.35));
+		const canTrigger = !state.wasInZone && (!state.lastGravityTime || now - state.lastGravityTime >= cooldown);
+		if (!canTrigger) return;
+
+		const orientation = normalizeGravityOrientation(props.gravityOrientation);
+		const duration = Math.max(0, Number(props.transitionDuration ?? 0.8));
+		const padUp = new THREE.Vector3(0, 1, 0).applyQuaternion(pad.quaternion).normalize();
+		const surfaceSide = localPos.y >= 0 ? 1 : -1;
+		const contactNormal = padUp.clone().multiplyScalar(surfaceSide);
+		const contactPoint = pad.position.clone().addScaledVector(contactNormal, dims.y / 2);
+
+		if (typeof game.character.setGravityOrientation === "function") {
+			game.character.setGravityOrientation(orientation, { duration, contactNormal, contactPoint });
+		}
+
+		state.wasInZone = true;
+		state.lastGravityTime = now;
 	});
 }
 
@@ -255,13 +303,113 @@ export function animate(this: any) {
 
 	// Character Update
 	const remotePlayers = this.networkManager ? this.networkManager.remotePlayers : null;
+
+	if (this.gravityQteActive && this.gravityInitialPos) {
+		// 1. Freeze character position and velocities
+		if (this.character.rigidBody) {
+			this.character.rigidBody.setTranslation(this.gravityInitialPos, true);
+			this.character.rigidBody.setNextKinematicTranslation(this.gravityInitialPos);
+			this.character.rigidBody.setLinvel({ x: 0, y: 0, z: 0 }, true);
+			this.character.rigidBody.setAngvel({ x: 0, y: 0, z: 0 }, true);
+		}
+		this.character.verticalVelocity = 0;
+
+		// 2. Rotate character to face camera looking direction
+		if (this.cameraController) {
+			const targetBodyRot = this.character.getAimYaw() + Math.PI;
+			this.character.currentRotation = targetBodyRot;
+		}
+	}
+
 	this.character.update(dt, this.inputManager, remotePlayers);
+
+	// Update 3D Gravity Helper Group
+	if (this.gravityQteActive && this.gravityHelperGroup && this.character) {
+		const feetPos = this.character.getPosition();
+		const upVector = this.character.getGravityUpVector ? this.character.getGravityUpVector() : new THREE.Vector3(0, 1, 0);
+
+		// Place at hip height (1.0 unit above feet)
+		this.gravityHelperGroup.group.position.copy(feetPos).addScaledVector(upVector, 1.0);
+
+		const currentMode = this.gravitySelectorMode || "dynamic";
+		const gravityQuat = this.character.getGravityQuaternion ? this.character.getGravityQuaternion() : new THREE.Quaternion();
+		const yawQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), this.character.currentRotation);
+
+		if (currentMode === "dynamic") {
+			// Both ring and keycaps rotate with character
+			this.gravityHelperGroup.group.quaternion.copy(gravityQuat).multiply(yawQuat);
+			const keys = ["w", "a", "s", "d"];
+			keys.forEach(k => {
+				const keycap = this.gravityHelperGroup.keycaps[k];
+				if (keycap) {
+					keycap.position.set(
+						k === "w" ? 0 : (k === "a" ? -1.2 : (k === "s" ? 0 : 1.2)),
+						0.01,
+						k === "w" ? -1.2 : (k === "a" ? 0 : (k === "s" ? 1.2 : 0))
+					);
+					keycap.quaternion.setFromEuler(new THREE.Euler(-Math.PI / 2, 0, 0));
+				}
+			});
+		} else if (currentMode === "ring_static") {
+			// Ring is static, keycaps rotate with character
+			this.gravityHelperGroup.group.quaternion.copy(gravityQuat);
+
+			const sectors = [
+				{ name: "w", dir: new THREE.Vector3(0, 0, -1.2) },
+				{ name: "a", dir: new THREE.Vector3(-1.2, 0, 0) },
+				{ name: "s", dir: new THREE.Vector3(0, 0, 1.2) },
+				{ name: "d", dir: new THREE.Vector3(1.2, 0, 0) }
+			];
+
+			sectors.forEach(s => {
+				const keycap = this.gravityHelperGroup.keycaps[s.name];
+				if (keycap) {
+					keycap.position.copy(s.dir).applyAxisAngle(new THREE.Vector3(0, 1, 0), this.character.currentRotation);
+					keycap.position.y = 0.01; // Offset slightly to prevent Z-fighting flickering
+					const localRot = new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI / 2, 0, this.character.currentRotation, "YXZ"));
+					keycap.quaternion.copy(localRot);
+				}
+			});
+		} else if (currentMode === "static") {
+			// Both ring and keycaps are static
+			this.gravityHelperGroup.group.quaternion.copy(gravityQuat);
+
+			const sectors = [
+				{ name: "w", dir: new THREE.Vector3(0, 0, -1.2) },
+				{ name: "a", dir: new THREE.Vector3(-1.2, 0, 0) },
+				{ name: "s", dir: new THREE.Vector3(0, 0, 1.2) },
+				{ name: "d", dir: new THREE.Vector3(1.2, 0, 0) }
+			];
+			sectors.forEach(s => {
+				const keycap = this.gravityHelperGroup.keycaps[s.name];
+				if (keycap) {
+					keycap.position.copy(s.dir);
+					keycap.position.y = 0.01; // Offset slightly to prevent Z-fighting flickering
+					keycap.quaternion.setFromEuler(new THREE.Euler(-Math.PI / 2, 0, 0));
+				}
+			});
+		}
+
+		// Billboard the Space keycap to face the camera
+		if (this.gravityHelperGroup.keycaps["space"] && this.sceneManager?.camera) {
+			const cameraQuat = this.sceneManager.camera.quaternion;
+			this.gravityHelperGroup.keycaps["space"].quaternion.copy(this.gravityHelperGroup.group.quaternion).invert().multiply(cameraQuat);
+		}
+	}
+
 	if (this.inventoryManager) {
 		this.inventoryManager.updateFuelBars();
 	}
 
 	// Camera Update
-	this.cameraController.update(this.character.getPosition(), this.character.getRotation(), dt);
+	this.cameraController.update(
+		this.character.getPosition(),
+		this.character.getRotation(),
+		dt,
+		this.character.getGravityQuaternion ? this.character.getGravityQuaternion() : (this.character.getGravityUpVector ? this.character.getGravityUpVector() : null),
+		this.sceneManager.scene,
+		this.inputManager
+	);
 
 	// Fall Death Logic
 	if (this.environmentConfig && this.environmentConfig.fallDeath && this.character.getPosition().y < this.environmentConfig.fallDeathY) {
@@ -313,7 +461,9 @@ export function animate(this: any) {
 				headYaw: this.character.headYaw || 0,
 				isSuperman: this.character.isSuperman !== undefined ? this.character.isSuperman : (this.character.polygonModelSkin ? this.character.polygonModelSkin.isSuperman : false),
 				noPitchTilt: this.character.noPitchTilt !== undefined ? this.character.noPitchTilt : false,
-				isUsingJetpack: this.character.isUsingJetpack !== undefined ? this.character.isUsingJetpack : false
+				isUsingJetpack: this.character.isUsingJetpack !== undefined ? this.character.isUsingJetpack : false,
+				gravityOrientation: this.character.getGravityOrientation ? this.character.getGravityOrientation() : "down",
+				gravityTransitionDuration: this.character.gravityTransitionDuration ?? 0.65
 			};
 
 			this.networkManager.localRoleId = playerState.roleId;
@@ -329,8 +479,6 @@ export function animate(this: any) {
 			}
 		}
 
-		const countEl = document.getElementById("player-count");
-		if (countEl) countEl.textContent = `Jugadores: ${this.networkManager.getPlayerCount()}`;
 	}
 
 	if (this.npc) this.npc.update(dt);
@@ -344,6 +492,7 @@ export function animate(this: any) {
 	}
 
 	updateMapImpulsePads(this);
+	updateMapGravityPads(this);
 	updateMapFarmingZones(this, dt);
 
 	if (this.projectiles) {

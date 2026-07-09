@@ -1,5 +1,6 @@
 import { DEFAULT_POLYGON_SKIN_URL, getSelectedSkin } from "../platform/skinPreferences";
 import { getStoredAuth } from "../platform/auth";
+import { normalizeGravityOrientation } from "../utils/GravityOrientation";
 
 const DEFAULT_VISUAL_RULE = {
     type: "none",
@@ -29,9 +30,12 @@ export class PlayerConfigManager {
                 jumpAnimationType: "none",
                 fallAnimationType: "none",
                 playerCollision: "push",
+                gravityOrientation: "down",
+                gravityTransitionDuration: 0.65,
                 skinMode: "player",
                 skinUrl: DEFAULT_POLYGON_SKIN_URL,
                 skinAssetId: null,
+                cameraMode: "third-person-collision",
                 roleVisual: createRoleVisual(),
                 statModes: {},
                 hudSettings: {
@@ -112,9 +116,12 @@ export class PlayerConfigManager {
                 jumpAnimationType: "none",
                 fallAnimationType: "none",
                 playerCollision: "push",
+                gravityOrientation: "down",
+                gravityTransitionDuration: 0.65,
                 skinMode: "player",
                 skinUrl: DEFAULT_POLYGON_SKIN_URL,
                 skinAssetId: null,
+                cameraMode: "third-person-collision",
                 roleVisual: createRoleVisual(),
                 statModes: {},
                 hudSettings: {
@@ -219,9 +226,12 @@ export class PlayerConfigManager {
             jumpAnimationType: "none",
             fallAnimationType: "none",
             playerCollision: "push",
+            gravityOrientation: "down",
+            gravityTransitionDuration: 0.65,
             skinMode: "player",
             skinUrl: DEFAULT_POLYGON_SKIN_URL,
             skinAssetId: null,
+            cameraMode: "third-person-collision",
             roleVisual: createRoleVisual(undefined, {
                 ...DEFAULT_VISUAL_RULE,
                 color: "#" + Math.floor(Math.random() * 16777215).toString(16).padStart(6, "0")
@@ -390,7 +400,9 @@ export class PlayerConfigManager {
                 maxMultiJumps: profile.maxMultiJumps,
                 jumpAnimationType: profile.jumpAnimationType,
                 fallAnimationType: profile.fallAnimationType,
-                playerCollision: profile.playerCollision
+                playerCollision: profile.playerCollision,
+                gravityOrientation: normalizeGravityOrientation(profile.gravityOrientation),
+                gravityTransitionDuration: profile.gravityTransitionDuration
             });
         } else {
             character.speed = profile.speed;
@@ -423,6 +435,10 @@ export class PlayerConfigManager {
         if (character.polygonModelSkin && character.polygonModelSkin.setRoleVisual) {
             character.polygonModelSkin.setRoleVisual(character.roleVisual.sameRole);
         }
+
+        if (this.game.cameraController && profile.cameraMode) {
+            this.game.cameraController.setCameraMode(profile.cameraMode, false);
+        }
     }
 
     saveData() {
@@ -440,6 +456,9 @@ export class PlayerConfigManager {
                 skinUrl: DEFAULT_POLYGON_SKIN_URL,
                 skinAssetId: null,
                 roleVisual: createRoleVisual(),
+                gravityOrientation: "down",
+                gravityTransitionDuration: 0.65,
+                cameraMode: "third-person-collision",
                 ...profile
             }));
         }

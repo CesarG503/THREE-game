@@ -8,6 +8,7 @@ import { WEAPONS_CONFIG } from "../items/WeaponSettings";
 import { PelotaItem } from "../items/PelotaItem";
 import { JetpackItem } from "../items/JetpackItem";
 import type { GunConfig } from "../types";
+import { getGravityQuaternion, normalizeGravityOrientation, type GravityOrientation } from "../utils/GravityOrientation";
 
 export class RemotePlayer {
     scene: any;
@@ -42,6 +43,14 @@ export class RemotePlayer {
     weaponsCache: any;
     particleSystem: any;
     localRoleId: any;
+    gravityOrientation: GravityOrientation;
+    targetGravityOrientation: GravityOrientation;
+    gravityTransitionActive: boolean;
+    gravityTransitionElapsed: number;
+    gravityTransitionDuration: number;
+    gravityTransitionStart: THREE.Quaternion;
+    currentGravityQuaternion: THREE.Quaternion;
+    targetGravityQuaternion: THREE.Quaternion;
 
     constructor(scene: any, world: any, playerId: any, playerName: any, position: any = new THREE.Vector3(0, 0, 0)) {
         this.scene = scene;
@@ -85,6 +94,14 @@ export class RemotePlayer {
         this.attackEndTime = 0;
         this.weaponsCache = null;
         this.localRoleId = null;
+        this.gravityOrientation = "down";
+        this.targetGravityOrientation = "down";
+        this.gravityTransitionActive = false;
+        this.gravityTransitionElapsed = 0;
+        this.gravityTransitionDuration = 0.65;
+        this.gravityTransitionStart = new THREE.Quaternion();
+        this.currentGravityQuaternion = new THREE.Quaternion();
+        this.targetGravityQuaternion = new THREE.Quaternion();
 
         this.initPhysics();
         this.createLabel();
@@ -192,6 +209,11 @@ export class RemotePlayer {
 
         this.state = state;
 
+        if (state.gravityOrientation !== undefined) {
+            const gravityDuration = Number(state.gravityTransitionDuration ?? 0.65);
+            this.setGravityOrientation(state.gravityOrientation, Number.isFinite(gravityDuration) ? gravityDuration : 0.65);
+        }
+
         if (state.modelType && state.modelType !== this.currentType) {
             this.setModelType(state.modelType);
         }
@@ -267,13 +289,54 @@ export class RemotePlayer {
         }
     }
 
+    setGravityOrientation(orientation: any, duration = 0.65) {
+        const nextOrientation = normalizeGravityOrientation(orientation);
+        if (nextOrientation === this.targetGravityOrientation) return;
+
+        this.targetGravityOrientation = nextOrientation;
+        this.targetGravityQuaternion.copy(getGravityQuaternion(nextOrientation));
+        this.gravityTransitionStart.copy(this.currentGravityQuaternion);
+        this.gravityTransitionElapsed = 0;
+        this.gravityTransitionDuration = Math.max(0.01, duration);
+        this.gravityTransitionActive = true;
+    }
+
+    updateGravityTransition(dt: number) {
+        if (!this.gravityTransitionActive) return;
+
+        this.gravityTransitionElapsed += dt;
+        const t = THREE.MathUtils.clamp(this.gravityTransitionElapsed / this.gravityTransitionDuration, 0, 1);
+        const eased = t * t * (3 - 2 * t);
+        this.currentGravityQuaternion.copy(this.gravityTransitionStart).slerp(this.targetGravityQuaternion, eased);
+
+        if (t >= 1) {
+            this.currentGravityQuaternion.copy(this.targetGravityQuaternion);
+            this.gravityOrientation = this.targetGravityOrientation;
+            this.gravityTransitionActive = false;
+        }
+    }
+
+    getGravityUpVector() {
+        return new THREE.Vector3(0, 1, 0).applyQuaternion(this.currentGravityQuaternion).normalize();
+    }
+
+    applyModelTransform(modelController: any, yawOffset: number) {
+        if (!modelController?.model) return;
+        const yaw = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), this.currentRotation + yawOffset);
+        modelController.model.position.copy(this.currentPosition);
+        modelController.model.quaternion.copy(this.currentGravityQuaternion).multiply(yaw);
+    }
+
     update(dt: number) {
+        this.updateGravityTransition(dt);
         this.currentPosition.lerp(this.targetPosition, this.interpolationSpeed * dt);
+        const up = this.getGravityUpVector();
 
         if (this.label) {
             this.label.position.x = this.currentPosition.x;
-            this.label.position.y = this.currentPosition.y + 2.2;
+            this.label.position.y = this.currentPosition.y;
             this.label.position.z = this.currentPosition.z;
+            this.label.position.addScaledVector(up, 2.2);
         }
 
         if (this.rigidBody) {
@@ -282,6 +345,7 @@ export class RemotePlayer {
                 y: this.currentPosition.y,
                 z: this.currentPosition.z
             });
+            this.rigidBody.setNextKinematicRotation(this.currentGravityQuaternion);
         }
 
         let diff = this.targetRotation - this.currentRotation;
@@ -289,14 +353,9 @@ export class RemotePlayer {
         while (diff < -Math.PI) diff += Math.PI * 2;
         this.currentRotation += diff * 0.15;
 
-        this.glbModel.setPosition(this.currentPosition);
-        this.glbModel.setRotation(this.currentRotation);
-
-        this.polygonModel.setPosition(this.currentPosition);
-        this.polygonModel.setRotation(this.currentRotation);
-
-        this.polygonModelSkin.setPosition(this.currentPosition);
-        this.polygonModelSkin.setRotation(this.currentRotation);
+        this.applyModelTransform(this.glbModel, 0);
+        this.applyModelTransform(this.polygonModel, Math.PI);
+        this.applyModelTransform(this.polygonModelSkin, Math.PI);
 
         if (this.polygonModelSkin.setHeadRotation) {
             this.polygonModelSkin.setHeadRotation(this.state.headPitch || 0, this.state.headYaw || 0);

@@ -6,6 +6,11 @@ import { PolygonModelSkin } from "./models/PolygonModelSkin";
 import { ParticleSystem } from "../effects/ParticleSystem";
 import { InputManager } from "../input/InputManager";
 import type { CharacterStats, JumpConfig, FlightConfig, PlayerCollisionMode, RemotePlayerState } from "../types";
+import {
+  getGravityQuaternion,
+  normalizeGravityOrientation,
+  type GravityOrientation
+} from "../utils/GravityOrientation";
 
 type LadderObject = THREE.Object3D & { bounds?: THREE.Box3 };
 
@@ -58,6 +63,21 @@ export class CharacterController {
   isSuperman: boolean;
   noPitchTilt: boolean;
   isUsingJetpack: boolean;
+  gravityOrientation: GravityOrientation;
+  targetGravityOrientation: GravityOrientation;
+  gravityTransitionDuration: number;
+  gravityTransitionElapsed: number;
+  gravityTransitionActive: boolean;
+  gravityTransitionStart: THREE.Quaternion;
+  currentGravityQuaternion: THREE.Quaternion;
+  targetGravityQuaternion: THREE.Quaternion;
+  gravityAcceleration: number;
+  gravityContactAnchorPoint: THREE.Vector3 | null;
+  gravityContactAnchorNormal: THREE.Vector3 | null;
+  gravityContactPreserveTime: number;
+  capsuleHalfHeight: number;
+  capsuleRadius: number;
+  capsuleCenterOffset: number;
 
 
   constructor(scene: THREE.Scene, world: RAPIER.World, camera: THREE.Camera, cameraController: any) {
@@ -114,6 +134,22 @@ export class CharacterController {
     this.startPosition = new THREE.Vector3(0, 5, 0);
     this.isDead = false;
 
+    this.gravityOrientation = "down";
+    this.targetGravityOrientation = "down";
+    this.gravityTransitionDuration = 0;
+    this.gravityTransitionElapsed = 0;
+    this.gravityTransitionActive = false;
+    this.gravityTransitionStart = new THREE.Quaternion();
+    this.currentGravityQuaternion = new THREE.Quaternion();
+    this.targetGravityQuaternion = new THREE.Quaternion();
+    this.gravityAcceleration = 50;
+    this.gravityContactAnchorPoint = null;
+    this.gravityContactAnchorNormal = null;
+    this.gravityContactPreserveTime = 0;
+    this.capsuleHalfHeight = 0.5;
+    this.capsuleRadius = 0.4;
+    this.capsuleCenterOffset = 0.9;
+
     this.initPhysics();
     this.particleSystem = new ParticleSystem(scene);
 
@@ -159,6 +195,7 @@ export class CharacterController {
   }
 
   getAimPitch() {
+    const up = this.getGravityUpVector();
     if (!this.cameraController) return 0;
     if (this.cameraController.isFirstPerson) return this.cameraController.fpPitch || 0;
 
@@ -169,7 +206,7 @@ export class CharacterController {
 
     const camDir = new THREE.Vector3();
     this.camera.getWorldDirection(camDir);
-    return Math.asin(THREE.MathUtils.clamp(camDir.y, -1, 1));
+    return Math.asin(THREE.MathUtils.clamp(camDir.dot(up), -1, 1));
   }
 
   getAimYaw() {
@@ -220,7 +257,7 @@ export class CharacterController {
     const bodyDesc = RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(0, 5, 0);
     this.rigidBody = this.world.createRigidBody(bodyDesc);
 
-    const colliderDesc = RAPIER.ColliderDesc.capsule(0.5, 0.4).setTranslation(0, 0.9, 0);
+    const colliderDesc = RAPIER.ColliderDesc.capsule(this.capsuleHalfHeight, this.capsuleRadius).setTranslation(0, this.capsuleCenterOffset, 0);
     this.collider = this.world.createCollider(colliderDesc, this.rigidBody);
 
     this.characterController = this.world.createCharacterController(0.1);
@@ -232,6 +269,7 @@ export class CharacterController {
 
     this.characterController.setMaxSlopeClimbAngle((45 * Math.PI) / 180);
     this.characterController.setMinSlopeSlideAngle((45 * Math.PI) / 180);
+    this.characterController.setUp({ x: 0, y: 1, z: 0 });
   }
 
   applyCollisionProfile() {
@@ -251,11 +289,189 @@ export class CharacterController {
     console.log("No-Clip", enabled ? "Enabled" : "Disabled");
   }
 
+  getGravityUpVector() {
+    return new THREE.Vector3(0, 1, 0).applyQuaternion(this.currentGravityQuaternion).normalize();
+  }
+
+  getGravityDirection() {
+    return this.getGravityUpVector().multiplyScalar(-1);
+  }
+
+  getGravityOrientation() {
+    return this.targetGravityOrientation || this.gravityOrientation;
+  }
+
+  getGravityQuaternion() {
+    return this.currentGravityQuaternion.clone();
+  }
+
+  getGravityState() {
+    return {
+      orientation: this.getGravityOrientation(),
+      up: this.getGravityUpVector(),
+      quaternion: this.getGravityQuaternion()
+    };
+  }
+
+  setGravityOrientation(orientation: any, options: { duration?: number; instant?: boolean; contactNormal?: THREE.Vector3; contactPoint?: THREE.Vector3 } = {}) {
+    const nextOrientation = normalizeGravityOrientation(orientation);
+    const nextQuaternion = getGravityQuaternion(nextOrientation);
+    const duration = Math.max(0, Number(options.duration ?? 0.65));
+    const isSameTarget = nextOrientation === this.targetGravityOrientation;
+
+    if (isSameTarget && !this.gravityTransitionActive) {
+      return;
+    }
+
+    this.targetGravityOrientation = nextOrientation;
+    this.targetGravityQuaternion.copy(nextQuaternion);
+    this.captureGravityContactAnchor(duration, options.contactNormal, options.contactPoint);
+
+    if (options.instant || duration <= 0) {
+      this.gravityOrientation = nextOrientation;
+      this.currentGravityQuaternion.copy(nextQuaternion);
+      this.gravityTransitionActive = false;
+      this.gravityTransitionElapsed = 0;
+      this.gravityTransitionDuration = 0;
+      this.applyGravityUpToPhysics();
+      this.correctRotationAgainstAnchor();
+      this.updateModelVisuals();
+      return;
+    }
+
+    this.gravityTransitionStart.copy(this.currentGravityQuaternion);
+    this.gravityTransitionDuration = duration;
+    this.gravityTransitionElapsed = 0;
+    this.gravityTransitionActive = true;
+    this.applyGravityUpToPhysics();
+  }
+
+  getCapsuleSupportOffsetAlong(normal: THREE.Vector3, rotation: THREE.Quaternion) {
+    const axis = new THREE.Vector3(0, 1, 0).applyQuaternion(rotation).normalize();
+    const center = new THREE.Vector3(0, this.capsuleCenterOffset, 0).applyQuaternion(rotation);
+    return center.dot(normal) - this.capsuleHalfHeight * Math.abs(axis.dot(normal)) - this.capsuleRadius;
+  }
+
+  captureGravityContactAnchor(duration: number, contactNormal?: THREE.Vector3, contactPoint?: THREE.Vector3) {
+    const isGrounded = this.characterController ? this.characterController.computedGrounded() : this.grounded;
+    if (!this.rigidBody || this.noClip || this.isFlying || (!contactNormal && !isGrounded)) {
+      this.gravityContactAnchorPoint = null;
+      this.gravityContactAnchorNormal = null;
+      this.gravityContactPreserveTime = 0;
+      return;
+    }
+
+    const position = this.getPosition();
+    const normal = contactNormal ? contactNormal.clone().normalize() : this.getGravityUpVector();
+    if (normal.lengthSq() < 0.0001) {
+      this.gravityContactAnchorPoint = null;
+      this.gravityContactAnchorNormal = null;
+      this.gravityContactPreserveTime = 0;
+      return;
+    }
+    const supportOffset = this.getCapsuleSupportOffsetAlong(normal, this.currentGravityQuaternion);
+
+    this.gravityContactAnchorPoint = contactPoint ? contactPoint.clone() : position.clone().addScaledVector(normal, supportOffset);
+    this.gravityContactAnchorNormal = normal;
+    this.gravityContactPreserveTime = Math.max(0.12, duration + 0.12);
+  }
+
+  constrainPositionToGravityAnchor(position: THREE.Vector3) {
+    if (!this.gravityContactAnchorPoint || !this.gravityContactAnchorNormal || this.gravityContactPreserveTime <= 0) {
+      return position;
+    }
+
+    const normal = this.gravityContactAnchorNormal;
+    const supportOffset = this.getCapsuleSupportOffsetAlong(normal, this.currentGravityQuaternion);
+    const currentSupport = position.dot(normal) + supportOffset;
+    const anchorSupport = this.gravityContactAnchorPoint.dot(normal);
+    const correction = anchorSupport - currentSupport;
+
+    if (correction > 0.0001) {
+      position.addScaledVector(normal, correction);
+    }
+
+    return position;
+  }
+
+  correctRotationAgainstAnchor() {
+    if (!this.rigidBody) return;
+    const t = this.rigidBody.translation();
+    const corrected = this.constrainPositionToGravityAnchor(new THREE.Vector3(t.x, t.y, t.z));
+    if (Math.abs(corrected.x - t.x) > 0.0001 || Math.abs(corrected.y - t.y) > 0.0001 || Math.abs(corrected.z - t.z) > 0.0001) {
+      this.rigidBody.setTranslation({ x: corrected.x, y: corrected.y, z: corrected.z }, true);
+      this.rigidBody.setNextKinematicTranslation({ x: corrected.x, y: corrected.y, z: corrected.z });
+    }
+  }
+
+  updateGravityTransition(dt: number) {
+    if (this.gravityContactPreserveTime > 0) {
+      this.gravityContactPreserveTime = Math.max(0, this.gravityContactPreserveTime - dt);
+      if (this.gravityContactPreserveTime === 0) {
+        this.gravityContactAnchorPoint = null;
+        this.gravityContactAnchorNormal = null;
+      }
+    }
+
+    if (this.gravityTransitionActive) {
+      this.gravityTransitionElapsed += dt;
+      const t = THREE.MathUtils.clamp(this.gravityTransitionElapsed / Math.max(this.gravityTransitionDuration, 0.0001), 0, 1);
+      const eased = t * t * (3 - 2 * t);
+      this.currentGravityQuaternion.copy(this.gravityTransitionStart).slerp(this.targetGravityQuaternion, eased);
+
+      if (t >= 1) {
+        this.currentGravityQuaternion.copy(this.targetGravityQuaternion);
+        this.gravityOrientation = this.targetGravityOrientation;
+        this.gravityTransitionActive = false;
+      }
+    }
+
+    this.applyGravityUpToPhysics();
+
+    if (this.rigidBody) {
+      this.correctRotationAgainstAnchor();
+      this.rigidBody.setNextKinematicRotation(this.currentGravityQuaternion);
+    }
+
+    if (this.cameraController) {
+      if (typeof this.cameraController.setGravityQuaternion === "function") {
+        this.cameraController.setGravityQuaternion(this.getGravityQuaternion());
+      } else if (typeof this.cameraController.setGravityUpVector === "function") {
+        this.cameraController.setGravityUpVector(this.getGravityUpVector());
+      }
+    }
+  }
+
+  applyGravityUpToPhysics() {
+    if (!this.characterController) return;
+    const up = this.getGravityUpVector();
+    this.characterController.setUp({ x: up.x, y: up.y, z: up.z });
+  }
+
+  getGravityBasis() {
+    const q = this.currentGravityQuaternion;
+    const up = new THREE.Vector3(0, 1, 0).applyQuaternion(q).normalize();
+    const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(q).normalize();
+    const right = new THREE.Vector3(-1, 0, 0).applyQuaternion(q).normalize();
+    return { up, forward, right };
+  }
+
+  getYawFromWorldDirection(direction: THREE.Vector3) {
+    const { up, forward, right } = this.getGravityBasis();
+    const planar = direction.clone().projectOnPlane(up);
+    if (planar.lengthSq() < 0.0001) return this.currentRotation;
+    planar.normalize();
+    return Math.atan2(planar.dot(right.clone().multiplyScalar(-1)), planar.dot(forward)) + Math.PI;
+  }
+
   applyImpulse(force: THREE.Vector3) {
-    this.momentum.add(force);
-    if (force.y !== 0) {
-      this.verticalVelocity = force.y;
-      this.momentum.y = 0;
+    const up = this.getGravityUpVector();
+    const verticalImpulse = force.dot(up);
+    const lateralImpulse = force.clone().sub(up.clone().multiplyScalar(verticalImpulse));
+
+    this.momentum.add(lateralImpulse);
+    if (Math.abs(verticalImpulse) > 0.0001) {
+      this.verticalVelocity = verticalImpulse;
       this.grounded = false;
     }
   }
@@ -263,11 +479,25 @@ export class CharacterController {
   update(dt: number, input: InputManager, remotePlayers: any[]) {
     if (!this.rigidBody) return;
 
+    if (this.cameraController && this.cameraController.mode === 'free-fly') {
+      this.verticalVelocity = 0;
+      this.glbModel.update(dt, false);
+      this.polygonModel.update(dt, false);
+      this.polygonModelSkin.update(dt, false, false, false, true, 0, false, false);
+      this.updateModelVisuals();
+      return;
+    }
+
+    this.updateGravityTransition(dt);
+
     this.isSuperman = false;
     this.noPitchTilt = false;
     this.isUsingJetpack = false;
 
     const isGrounded = this.characterController ? this.characterController.computedGrounded() : false;
+    this.grounded = isGrounded;
+    const up = this.getGravityUpVector();
+    const gravityDir = up.clone().multiplyScalar(-1);
 
     const hasJetpack = this.equippedItem && (this.equippedItem.id === "jetpack" || this.equippedItem.id.startsWith("jetpack_"));
     const hasFuel = hasJetpack && this.equippedItem.consumableUse > 0;
@@ -325,7 +555,7 @@ export class CharacterController {
         if (input.keys.right) moveDir.add(right);
         if (input.keys.left) moveDir.sub(right);
 
-        if (input.keys.jump) moveDir.y += 1;
+        if (input.keys.jump) moveDir.add(up);
       }
 
       if (moveDir.lengthSq() > 0) {
@@ -386,9 +616,14 @@ export class CharacterController {
       const forward = this.cameraController.getForwardDirection();
       const right = this.cameraController.getRightDirection();
 
-      desiredTranslation.x = forward.x * moveDir.z + right.x * moveDir.x;
-      desiredTranslation.z = forward.z * moveDir.z + right.z * moveDir.x;
-      desiredTranslation.normalize().multiplyScalar(this.speed * dt);
+      desiredTranslation
+        .addScaledVector(forward, moveDir.z)
+        .addScaledVector(right, moveDir.x)
+        .projectOnPlane(up);
+
+      if (desiredTranslation.lengthSq() > 0.0001) {
+        desiredTranslation.normalize().multiplyScalar(this.speed * dt);
+      }
 
       if (shouldAimAlign) {
         this.updateAimAlignment(dt, true);
@@ -398,9 +633,9 @@ export class CharacterController {
         if (isUsingJetpack || this.isFlying) {
           const camDir = new THREE.Vector3();
           this.camera.getWorldDirection(camDir);
-          this.headPitch = Math.asin(camDir.y);
+          this.headPitch = Math.asin(THREE.MathUtils.clamp(camDir.dot(up), -1, 1));
         }
-        const targetRotation = Math.atan2(desiredTranslation.x, desiredTranslation.z) + Math.PI;
+        const targetRotation = this.getYawFromWorldDirection(desiredTranslation);
         let rotDiff = targetRotation - this.currentRotation;
         while (rotDiff > Math.PI) rotDiff -= Math.PI * 2;
         while (rotDiff < -Math.PI) rotDiff += Math.PI * 2;
@@ -415,7 +650,7 @@ export class CharacterController {
         if (isUsingJetpack || this.isFlying) {
           const camDir = new THREE.Vector3();
           this.camera.getWorldDirection(camDir);
-          this.headPitch = Math.asin(camDir.y);
+          this.headPitch = Math.asin(THREE.MathUtils.clamp(camDir.dot(up), -1, 1));
         }
       }
     }
@@ -486,6 +721,7 @@ export class CharacterController {
       flyDir.normalize();
 
       const velocity = flyDir.clone().multiplyScalar(this.equippedItem.thrust);
+      const verticalComponent = velocity.dot(up);
 
       let limitActive = false;
       if (this.equippedItem && this.equippedItem.limitHeightEnabled) {
@@ -496,14 +732,14 @@ export class CharacterController {
         }
       }
 
-      if (limitActive && velocity.y > 0) {
-        velocity.y = 0;
+      if (limitActive && verticalComponent > 0) {
+        velocity.addScaledVector(up, -verticalComponent);
       }
 
-      this.verticalVelocity = velocity.y;
+      this.verticalVelocity = velocity.dot(up);
       desiredTranslation.copy(velocity).multiplyScalar(dt);
 
-      const targetRotation = Math.atan2(flyDir.x, flyDir.z) + Math.PI;
+      const targetRotation = this.getYawFromWorldDirection(flyDir);
       let rotDiff = targetRotation - this.currentRotation;
       while (rotDiff > Math.PI) rotDiff -= Math.PI * 2;
       while (rotDiff < -Math.PI) rotDiff += Math.PI * 2;
@@ -522,7 +758,7 @@ export class CharacterController {
         jetpackMesh.localToWorld(leftNozzleWorld.copy(leftOffset));
         jetpackMesh.localToWorld(rightNozzleWorld.copy(rightOffset));
 
-        const normal = new THREE.Vector3(0, -1, 0);
+        const normal = gravityDir.clone();
         this.particleSystem.spawnJetpackEffect(leftNozzleWorld, normal, this.equippedItem.particleVFX);
         this.particleSystem.spawnJetpackEffect(rightNozzleWorld, normal, this.equippedItem.particleVFX);
       }
@@ -585,7 +821,7 @@ export class CharacterController {
           jetpackMesh.localToWorld(leftNozzleWorld.copy(leftOffset));
           jetpackMesh.localToWorld(rightNozzleWorld.copy(rightOffset));
 
-          const normal = new THREE.Vector3(0, -1, 0);
+          const normal = gravityDir.clone();
           this.particleSystem.spawnJetpackEffect(leftNozzleWorld, normal, this.equippedItem.particleVFX);
           this.particleSystem.spawnJetpackEffect(rightNozzleWorld, normal, this.equippedItem.particleVFX);
         }
@@ -635,7 +871,7 @@ export class CharacterController {
       this.verticalVelocity = -5;
     }
 
-    desiredTranslation.y = this.verticalVelocity * dt;
+    desiredTranslation.addScaledVector(up, this.verticalVelocity * dt);
 
     const dampingFactor = Math.exp(-this.momentumDamping * dt);
     this.momentum.multiplyScalar(dampingFactor);
@@ -652,31 +888,28 @@ export class CharacterController {
         const rpCollision = (rp.state && rp.state.playerCollision) || "push";
         if (rpCollision === "none") return;
 
-        const dy = Math.abs(myPos.y + 0.9 - (rp.currentPosition.y + 0.9));
-        if (dy > 1.8) return;
+        const delta = myPos.clone().sub(rp.currentPosition);
+        const verticalGap = Math.abs(delta.dot(up));
+        if (verticalGap > 1.8) return;
 
-        const dx = myPos.x - rp.currentPosition.x;
-        const dz = myPos.z - rp.currentPosition.z;
-        const distSq = dx * dx + dz * dz;
+        const planarDelta = delta.projectOnPlane(up);
+        const distSq = planarDelta.lengthSq();
         const maxDist = radius * 2.0;
 
         if (distSq > 0.0001 && distSq < maxDist * maxDist) {
           const dist = Math.sqrt(distSq);
           const overlap = maxDist - dist;
 
-          const nx = dx / dist;
-          const nz = dz / dist;
+          const pushDir = planarDelta.multiplyScalar(1 / dist);
 
           if (this.playerCollision === "no-push" || rpCollision === "no-push") {
-            const dot = desiredTranslation.x * nx + desiredTranslation.z * nz;
+            const dot = desiredTranslation.dot(pushDir);
             if (dot < 0) {
-              desiredTranslation.x -= dot * nx;
-              desiredTranslation.z -= dot * nz;
+              desiredTranslation.addScaledVector(pushDir, -dot);
             }
           } else if (this.playerCollision === "push" && rpCollision === "push") {
             const pushStrength = 30 * overlap;
-            desiredTranslation.x += nx * pushStrength * dt;
-            desiredTranslation.z += nz * pushStrength * dt;
+            desiredTranslation.addScaledVector(pushDir, pushStrength * dt);
           }
         }
       });
@@ -696,7 +929,12 @@ export class CharacterController {
     newPos.y += correctedMovement.y;
     newPos.z += correctedMovement.z;
 
-    this.rigidBody.setNextKinematicTranslation(newPos);
+    const anchoredPos = this.constrainPositionToGravityAnchor(new THREE.Vector3(newPos.x, newPos.y, newPos.z));
+    this.rigidBody.setNextKinematicTranslation({
+      x: anchoredPos.x,
+      y: anchoredPos.y,
+      z: anchoredPos.z
+    });
 
     this.isSuperman = isSuperman;
     this.noPitchTilt = noPitchTilt;
@@ -716,6 +954,7 @@ export class CharacterController {
     this.verticalVelocity = 0;
     const desiredTranslation = new THREE.Vector3();
     const speed = this.speed * 2;
+    const up = this.getGravityUpVector();
 
     if (this.cameraController) {
       const forward = this.cameraController.getForwardDirection();
@@ -728,7 +967,7 @@ export class CharacterController {
       if (input.keys.right) desiredTranslation.add(right);
       if (input.keys.left) desiredTranslation.sub(right);
 
-      if (input.keys.jump) desiredTranslation.y += 1;
+      if (input.keys.jump) desiredTranslation.add(up);
     }
 
     if (desiredTranslation.lengthSq() > 0) {
@@ -815,14 +1054,9 @@ export class CharacterController {
     const pos = this.rigidBody.translation();
     const position = new THREE.Vector3(pos.x, pos.y, pos.z);
 
-    this.glbModel.setPosition(position);
-    this.glbModel.setRotation(this.currentRotation);
-
-    this.polygonModel.setPosition(position);
-    this.polygonModel.setRotation(this.currentRotation);
-
-    this.polygonModelSkin.setPosition(position);
-    this.polygonModelSkin.setRotation(this.currentRotation);
+    this.applyModelTransform(this.glbModel, position, 0);
+    this.applyModelTransform(this.polygonModel, position, Math.PI);
+    this.applyModelTransform(this.polygonModelSkin, position, Math.PI);
     if (this.polygonModelSkin.setHeadRotation) {
       this.polygonModelSkin.setHeadRotation(this.headPitch, this.headYaw);
     }
@@ -831,6 +1065,13 @@ export class CharacterController {
     if (this.polygonModelSkin.setFirstPerson) {
       this.polygonModelSkin.setFirstPerson(isFP);
     }
+  }
+
+  applyModelTransform(modelController: any, position: THREE.Vector3, yawOffset: number) {
+    if (!modelController?.model) return;
+    const yaw = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), this.currentRotation + yawOffset);
+    modelController.model.position.copy(position);
+    modelController.model.quaternion.copy(this.currentGravityQuaternion).multiply(yaw);
   }
 
   getPosition() {
@@ -845,7 +1086,7 @@ export class CharacterController {
     return this.currentRotation;
   }
 
-  setStats(stats: Partial<CharacterStats & JumpConfig & FlightConfig & { playerCollision: PlayerCollisionMode }>) {
+  setStats(stats: Partial<CharacterStats & JumpConfig & FlightConfig & { playerCollision: PlayerCollisionMode; gravityOrientation: GravityOrientation; gravityTransitionDuration: number }>) {
     if (stats.speed !== undefined) this.speed = stats.speed;
     if (stats.jumpForce !== undefined) this.jumpForce = stats.jumpForce;
     if (stats.maxHealth !== undefined) {
@@ -865,6 +1106,14 @@ export class CharacterController {
     if (stats.playerCollision !== undefined) {
       this.playerCollision = stats.playerCollision;
       this.applyCollisionProfile();
+    }
+    if (stats.gravityTransitionDuration !== undefined) {
+      this.gravityTransitionDuration = Math.max(0, Number(stats.gravityTransitionDuration) || 0);
+    }
+    if (stats.gravityOrientation !== undefined) {
+      this.setGravityOrientation(stats.gravityOrientation, {
+        duration: this.gravityTransitionDuration || 0.65
+      });
     }
 
     console.log("Stats Updated:", stats);

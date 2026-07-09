@@ -3,9 +3,11 @@ import { LogicToolbar } from "../ui/LogicToolbar";
 import { LogicSequenceEditor } from "../ui/LogicSequenceEditor";
 import { InteractiveCollisionLogic } from "../ui/logic_items/InteractiveCollisionLogic";
 import { TargetLogic } from "../ui/logic_items/TargetLogic";
+import { DianaLogic } from "../ui/logic_items/DianaLogic";
 import { PlayerConfigManager } from "./PlayerConfigManager";
 import { getActiveFarmingGroups } from "../ui/GameHUD";
 import { WaypointTransformGizmo } from "../editor/WaypointTransformGizmo";
+import { GRAVITY_ORIENTATION_OPTIONS, normalizeGravityOrientation } from "../utils/GravityOrientation";
 import {
 	applyAnimatedObjectScale,
 	createMovementWaypointFromTransform,
@@ -36,6 +38,7 @@ export class LogicSystem {
 	configPanel: any;
 	interactiveCollisionLogic: any;
 	targetLogic: any;
+	dianaLogic: any;
 	waypointGizmo: any;
 	selectedWaypoint: any;
 	waypointPanel: HTMLElement | null;
@@ -50,6 +53,7 @@ export class LogicSystem {
 		this.sequenceEditor = new LogicSequenceEditor(game, this);
 		this.interactiveCollisionLogic = new InteractiveCollisionLogic(game, this);
 		this.targetLogic = new TargetLogic(game, this);
+		this.dianaLogic = new DianaLogic();
 		this.selectedWaypoint = null;
 		this.waypointPanel = null;
 		this.waypointNavIndex = -1;
@@ -725,7 +729,7 @@ export class LogicSystem {
 				const isButton = child.userData.mapObjectType === "interaction_button";
 				const isCollision = child.userData.mapObjectType === "interactive_collision";
 				const isTarget = child.userData.mapObjectType === "target";
-				const isInteractiveZone = ["impulse_jump", "impulse_lateral", "farming_zone"].includes(child.userData.mapObjectType);
+				const isInteractiveZone = ["impulse_jump", "impulse_lateral", "gravity_pad", "farming_zone", "gravity_sphere"].includes(child.userData.mapObjectType);
 				const hasWaypoints = this.hasMovementLogic(child);
 
 				if (isSpawn || isButton || isCollision || isTarget || isInteractiveZone || hasWaypoints) {
@@ -774,6 +778,18 @@ export class LogicSystem {
 			this.renderButtonUI(container, object, props);
 		}
 
+		// 3b. Gravity Sphere Logic
+		if (object.userData.mapObjectType === "gravity_sphere") {
+			this.renderButtonUI(container, object, props);
+			if (props.selectorMode === undefined) props.selectorMode = "dynamic";
+			const SELECTOR_MODE_OPTIONS = [
+				{ value: "dynamic", label: "Dinámico (Círculo y Teclas móviles)" },
+				{ value: "ring_static", label: "Círculo fijo, Teclas móviles" },
+				{ value: "static", label: "Círculo y Teclas fijos" }
+			];
+			this.createSelectInput(container, object, "selectorMode", props.selectorMode, SELECTOR_MODE_OPTIONS, "Modo Selección 3D");
+		}
+
 		// 4. Interactive Collision Logic
 		if (object.userData.mapObjectType === "interactive_collision") {
 			this.interactiveCollisionLogic.render(container, props, (key: string, value: any) => {
@@ -784,14 +800,46 @@ export class LogicSystem {
 
 		// 5. Target Logic
 		if (object.userData.mapObjectType === "target") {
-			this.targetLogic.render(container, props, (key: string, value: any) => {
+			// Ensure default props for target are set
+			if (props.name === undefined) props.name = "Diana Interactiva";
+			if (props.rings === undefined) props.rings = 3;
+			if (props.baseDamage === undefined) props.baseDamage = 10;
+			if (props.radius === undefined) props.radius = 1.0;
+			if (props.useProjectileDamage === undefined) props.useProjectileDamage = false;
+
+			this.dianaLogic.render(container, props, (key: string, value: any) => {
 				props[key] = value;
+
+				// Recalculate multipliers if 'rings' changes
+				if (key === 'rings') {
+					const val = parseInt(value);
+					const newMults = [];
+					if (val === 1) {
+						newMults.push(1.0);
+					} else {
+						for (let i = 0; i < val; i++) {
+							const t = i / (val - 1);
+							const v = 0.1 + t * 0.9;
+							newMults.push(Number(v.toFixed(2)));
+						}
+					}
+					props.ringMultipliers = newMults;
+				}
+
+				if (typeof object.updateTargetVisuals === 'function') {
+					object.updateTargetVisuals();
+				}
+
 				if (refreshCallback) refreshCallback();
 			});
 		}
 
 		if (object.userData.mapObjectType === "impulse_jump" || object.userData.mapObjectType === "impulse_lateral") {
 			this.renderImpulsePadUI(container, object, props);
+		}
+
+		if (object.userData.mapObjectType === "gravity_pad") {
+			this.renderGravityPadUI(container, object, props);
 		}
 
 		if (object.userData.mapObjectType === "farming_zone") {
@@ -828,6 +876,24 @@ export class LogicSystem {
 		hint.textContent = props.padKind === "lateral"
 			? "La rotación Y del objeto controla la dirección del empuje."
 			: "Impulsa al jugador hacia arriba al entrar en el pad.";
+		hint.style.cssText = "font-size:11px; color:#aaa; margin-top:8px; line-height:1.35;";
+		container.appendChild(hint);
+	}
+
+	renderGravityPadUI(container: HTMLElement, object: any, props: any) {
+		if (props.name === undefined) props.name = "Pad de Gravedad";
+		if (props.gravityOrientation === undefined) props.gravityOrientation = "up";
+		if (props.transitionDuration === undefined) props.transitionDuration = 0.8;
+		if (props.cooldown === undefined) props.cooldown = 0.35;
+		props.gravityOrientation = normalizeGravityOrientation(props.gravityOrientation);
+
+		this.createInput(container, object, "name", props.name, "text", "Nombre");
+		this.createSelectInput(container, object, "gravityOrientation", props.gravityOrientation, GRAVITY_ORIENTATION_OPTIONS, "Orientación");
+		this.createInput(container, object, "transitionDuration", props.transitionDuration, "number", "Duración Giro (s)");
+		this.createInput(container, object, "cooldown", props.cooldown, "number", "Cooldown (s)");
+
+		const hint = document.createElement("div");
+		hint.textContent = "Al entrar, cambia la atracción del jugador. Arriba hace que el techo sea el nuevo suelo.";
 		hint.style.cssText = "font-size:11px; color:#aaa; margin-top:8px; line-height:1.35;";
 		container.appendChild(hint);
 	}
@@ -1583,6 +1649,34 @@ export class LogicSystem {
 		container.appendChild(row);
 	}
 
+	createSelectInput(container: HTMLElement, object: any, key: string, val: any, options: Array<{ value: string; label: string }>, labelText: string) {
+		const row = document.createElement("div");
+		row.style.cssText = "display: flex; gap: 10px; align-items: center; justify-content: space-between; margin-bottom:5px;";
+
+		const label = document.createElement("label");
+		label.textContent = labelText || key;
+		label.style.color = "#aaa";
+		label.style.fontSize = "14px";
+
+		const select = document.createElement("select");
+		select.style.cssText = "background: #111; border: 1px solid #444; color: white; padding: 4px; border-radius: 4px; width: 60%;";
+		options.forEach((option) => {
+			const opt = document.createElement("option");
+			opt.value = option.value;
+			opt.textContent = option.label;
+			if (val === option.value) opt.selected = true;
+			select.appendChild(opt);
+		});
+		select.onchange = (e: any) => {
+			if (object?.userData?.logicProperties) object.userData.logicProperties[key] = e.target.value;
+			else object[key] = e.target.value;
+		};
+
+		row.appendChild(label);
+		row.appendChild(select);
+		container.appendChild(row);
+	}
+
 	broadcastSignal(signalName: string) {
 		if (!this.game) return;
 
@@ -1608,6 +1702,7 @@ export class LogicSystem {
 			case "interactive_zones": return "Pads y Zonas";
 			case "impulse_jump": return "Pad de Salto";
 			case "impulse_lateral": return "Pad de Empuje";
+			case "gravity_pad": return "Pad de Gravedad";
 			case "farming_zone": return "Zona de Farmeo";
 			default: return type ? (type.charAt(0).toUpperCase() + type.slice(1)) : "Objeto";
 		}

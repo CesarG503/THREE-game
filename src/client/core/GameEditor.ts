@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
+import { animate } from "animejs";
 import { MapObjectItem } from "../items/MapObjectItem";
 import {
 	applyAnimatedObjectScale,
@@ -48,7 +49,8 @@ export function saveMap(this: any) {
 				uuid: obj.userData.uuid,
 				invisible: obj.userData.invisible,
 				opacity: obj.userData.opacity,
-				authorId: obj.userData.authorId
+				authorId: obj.userData.authorId,
+				customName: obj.userData.customName || ""
 			});
 		}
 	});
@@ -109,7 +111,7 @@ export function loadMap(this: any, jsonData: any) {
 	jsonData.objects.forEach((data: any) => {
 		const tempItem = new MapObjectItem(
 			"loaded_" + Math.random(),
-			"Loaded Obj",
+			data.customName || data.type || "Loaded Obj",
 			data.type,
 			"",
 			data.color,
@@ -131,8 +133,13 @@ export function loadMap(this: any, jsonData: any) {
 
 		const lastObj = this.sceneManager.scene.children[this.sceneManager.scene.children.length - 1];
 
-		if (lastObj && data.authorId) {
-			lastObj.userData.authorId = data.authorId;
+		if (lastObj) {
+			if (data.authorId) {
+				lastObj.userData.authorId = data.authorId;
+			}
+			if (data.customName) {
+				lastObj.userData.customName = data.customName;
+			}
 		}
 
 		if (data.opacity !== undefined && lastObj) {
@@ -432,9 +439,9 @@ export function updateButtonInteraction(this: any, dt: number) {
 	let minDistSq = 9.0;
 
 	this.sceneManager.scene.children.forEach((obj: any) => {
-		if (obj.userData.mapObjectType === "interaction_button") {
+		if (obj.userData.mapObjectType === "interaction_button" || obj.userData.mapObjectType === "gravity_sphere") {
 			const props = obj.userData.logicProperties;
-			if (props.oneShot && props.triggered) return;
+			if (props && props.oneShot && props.triggered) return;
 
 			const dSq = obj.position.distanceToSquared(charPos);
 			if (dSq < minDistSq) {
@@ -499,7 +506,11 @@ export function updateButtonInteraction(this: any, dt: number) {
 					(progressCircle as unknown as SVGElement).style.strokeDashoffset = String(offset);
 
 					if (props._currentHoldTime >= holdTime) {
-						this.triggerButton(nearest);
+						if (nearest.userData.mapObjectType === "gravity_sphere") {
+							this.triggerGravitySphere(nearest);
+						} else {
+							this.triggerButton(nearest);
+						}
 						props._currentHoldTime = 0;
 						(progressCircle as unknown as SVGElement).style.strokeDashoffset = String(circumference);
 						this.isFKeyDown = false;
@@ -828,4 +839,327 @@ export function updateMovementLogic(this: any, dt: number) {
 			});
 		}
 	});
+}
+
+function createKeycapTexture(char: string, isHovered = false): THREE.Texture {
+	const canvas = document.createElement("canvas");
+	canvas.width = 128;
+	canvas.height = 128;
+	const ctx = canvas.getContext("2d")!;
+
+	ctx.clearRect(0, 0, 128, 128);
+
+	// Keycap shape
+	ctx.fillStyle = isHovered ? "#4a148c" : "#1e1e1e";
+	ctx.beginPath();
+	if (typeof ctx.roundRect === "function") {
+		ctx.roundRect(8, 8, 112, 112, 16);
+	} else {
+		ctx.rect(8, 8, 112, 112);
+	}
+	ctx.fill();
+
+	// Border
+	ctx.strokeStyle = isHovered ? "#e040fb" : "#555555";
+	ctx.lineWidth = 6;
+	ctx.stroke();
+
+	// Inner bevel
+	ctx.fillStyle = isHovered ? "#6a1b9a" : "#2d2d2d";
+	ctx.beginPath();
+	if (typeof ctx.roundRect === "function") {
+		ctx.roundRect(16, 16, 96, 96, 12);
+	} else {
+		ctx.rect(16, 16, 96, 96);
+	}
+	ctx.fill();
+
+	// Text
+	ctx.fillStyle = isHovered ? "#ffffff" : "#cccccc";
+	ctx.font = char === "SPACE" ? "bold 24px sans-serif" : "bold 56px sans-serif";
+	ctx.textAlign = "center";
+	ctx.textBaseline = "middle";
+	ctx.shadowColor = "rgba(0, 0, 0, 0.6)";
+	ctx.shadowBlur = 4;
+	ctx.shadowOffsetY = 3;
+	ctx.fillText(char, 64, 64);
+
+	const texture = new THREE.CanvasTexture(canvas);
+	return texture;
+}
+
+function createGravityHelper3D() {
+	const helperGroup = new THREE.Group();
+	helperGroup.name = "gravityHelper3D";
+
+	const innerRadius = 1.0;
+	const outerRadius = 1.4;
+
+	const sectors = [
+		{ name: "w", color: 0xff3333, thetaStart: Math.PI / 4, thetaLength: Math.PI / 2, dir: new THREE.Vector3(0, 0, -1.2), key: "W" },
+		{ name: "a", color: 0x33ff33, thetaStart: 3 * Math.PI / 4, thetaLength: Math.PI / 2, dir: new THREE.Vector3(-1.2, 0, 0), key: "A" },
+		{ name: "s", color: 0x3333ff, thetaStart: 5 * Math.PI / 4, thetaLength: Math.PI / 2, dir: new THREE.Vector3(0, 0, 1.2), key: "S" },
+		{ name: "d", color: 0xffff33, thetaStart: -Math.PI / 4, thetaLength: Math.PI / 2, dir: new THREE.Vector3(1.2, 0, 0), key: "D" }
+	];
+
+	const materials: Record<string, THREE.MeshBasicMaterial> = {};
+	const keycaps: Record<string, THREE.Mesh> = {};
+
+	sectors.forEach(s => {
+		// Sector Mesh
+		const geom = new THREE.RingGeometry(innerRadius, outerRadius, 32, 1, s.thetaStart, s.thetaLength);
+		const mat = new THREE.MeshBasicMaterial({
+			color: s.color,
+			transparent: true,
+			opacity: 0.4,
+			side: THREE.DoubleSide
+		});
+		materials[s.name] = mat;
+
+		const mesh = new THREE.Mesh(geom, mat);
+		mesh.rotation.x = -Math.PI / 2;
+		helperGroup.add(mesh);
+
+		// Keycap
+		const tex = createKeycapTexture(s.key, false);
+		const keycapGeo = new THREE.PlaneGeometry(0.35, 0.35);
+		const keycapMat = new THREE.MeshBasicMaterial({
+			map: tex,
+			transparent: true,
+			opacity: 0.9,
+			side: THREE.DoubleSide
+		});
+		const keycap = new THREE.Mesh(keycapGeo, keycapMat);
+		keycap.position.copy(s.dir);
+		keycap.position.y = 0.01;
+		keycap.rotation.x = -Math.PI / 2;
+		helperGroup.add(keycap);
+		keycaps[s.name] = keycap;
+	});
+
+	// Space Keycap (floating 1.0 unit above ring/hip height)
+	const spaceTex = createKeycapTexture("SPACE", false);
+	const spaceGeo = new THREE.PlaneGeometry(0.6, 0.3);
+	const spaceMat = new THREE.MeshBasicMaterial({
+		map: spaceTex,
+		transparent: true,
+		opacity: 0.9,
+		side: THREE.DoubleSide
+	});
+	const spaceKeycap = new THREE.Mesh(spaceGeo, spaceMat);
+	spaceKeycap.position.set(0, 1.0, 0);
+	helperGroup.add(spaceKeycap);
+	keycaps["space"] = spaceKeycap;
+
+	return {
+		group: helperGroup,
+		materials,
+		keycaps
+	};
+}
+
+function disposeGravityHelper(helper: any, scene: THREE.Scene) {
+	if (!helper) return;
+	scene.remove(helper.group);
+	helper.group.traverse((child: any) => {
+		if (child.geometry) child.geometry.dispose();
+		if (child.material) {
+			if (Array.isArray(child.material)) {
+				child.material.forEach((m: any) => {
+					if (m.map) m.map.dispose();
+					m.dispose();
+				});
+			} else {
+				if (child.material.map) child.material.map.dispose();
+				child.material.dispose();
+			}
+		}
+	});
+}
+
+function getClosestGravityOrientation(dir: THREE.Vector3): string {
+	const orientations = ["down", "up", "left", "right", "front", "back"];
+	const targetDirs: Record<string, THREE.Vector3> = {
+		down: new THREE.Vector3(0, -1, 0),
+		up: new THREE.Vector3(0, 1, 0),
+		left: new THREE.Vector3(-1, 0, 0),
+		right: new THREE.Vector3(1, 0, 0),
+		front: new THREE.Vector3(0, 0, -1),
+		back: new THREE.Vector3(0, 0, 1)
+	};
+
+	let maxDot = -Infinity;
+	let closest = "down";
+
+	const normDir = dir.clone().normalize();
+	for (const orient of orientations) {
+		const dot = normDir.dot(targetDirs[orient]);
+		if (dot > maxDot) {
+			maxDot = dot;
+			closest = orient;
+		}
+	}
+	return closest;
+}
+
+export function triggerGravitySphere(this: any, sphereObj: any) {
+	if (document.getElementById("gravity-qte-overlay")) return;
+
+	const props = sphereObj.userData.logicProperties;
+	if (props.oneShot && props.triggered) return;
+
+	animate(sphereObj.scale, {
+		x: [1.3, 1.0],
+		y: [1.3, 1.0],
+		z: [1.3, 1.0],
+		duration: 350,
+		easing: 'easeOutBack'
+	});
+
+	if (this.inputManager) {
+		this.inputManager.enabled = false;
+		this.inputManager.reset();
+	}
+
+	this.gravityQteActive = true;
+	this.gravityInitialPos = this.character.getPosition().clone();
+	this.gravitySelectorMode = props.selectorMode || "dynamic";
+	this.gravityHelperGroup = createGravityHelper3D();
+	this.sceneManager.scene.add(this.gravityHelperGroup.group);
+
+	const overlay = document.createElement("div");
+	overlay.id = "gravity-qte-overlay";
+	overlay.style.cssText = `
+		position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+		background: transparent; backdrop-filter: none;
+		pointer-events: none; z-index: 99999;
+	`;
+	document.body.appendChild(overlay);
+
+	const closeOverlay = (onCompleteCallback: () => void = () => { }) => {
+		document.removeEventListener("keydown", keydownHandler);
+		document.removeEventListener("mousedown", mousedownHandler);
+		overlay.remove();
+
+		if (this.gravityHelperGroup) {
+			disposeGravityHelper(this.gravityHelperGroup, this.sceneManager.scene);
+			this.gravityHelperGroup = null;
+		}
+
+		this.gravityQteActive = false;
+
+		if (this.inputManager) {
+			this.inputManager.enabled = true;
+			this.inputManager.reset();
+		}
+		onCompleteCallback();
+	};
+
+	const handleKeySelection = (key: string) => {
+		let keyName = "";
+		if (key === "w") keyName = "w";
+		else if (key === "a") keyName = "a";
+		else if (key === "s") keyName = "s";
+		else if (key === "d") keyName = "d";
+		else if (key === " ") keyName = "space";
+
+		if (keyName && this.gravityHelperGroup) {
+			// Change 3D keycap to active style
+			const keycap = this.gravityHelperGroup.keycaps[keyName];
+			if (keycap) {
+				if (keycap.material.map) {
+					keycap.material.map.dispose();
+				}
+				const label = keyName === "space" ? "SPACE" : keyName.toUpperCase();
+				keycap.material.map = createKeycapTexture(label, true);
+				keycap.material.needsUpdate = true;
+
+				// Scale active keycap for visual feedback
+				animate(keycap.scale, {
+					x: 1.4,
+					y: 1.4,
+					z: 1.4,
+					duration: 250,
+					easing: 'easeOutBack'
+				});
+			}
+		}
+
+		let orientation: string | null = null;
+		const currentMode = this.gravitySelectorMode || "dynamic";
+
+		if (currentMode === "static") {
+			if (key === "w") orientation = "front";
+			else if (key === "s") orientation = "back";
+			else if (key === "a") orientation = "left";
+			else if (key === "d") orientation = "right";
+			else if (key === " ") orientation = "up";
+		} else {
+			if (this.cameraController) {
+				const basis = this.cameraController.getGravityBasis(this.cameraController.isFirstPerson ? this.cameraController.fpYaw : this.cameraController.theta);
+				const targetVector = new THREE.Vector3();
+
+				if (key === "w") {
+					targetVector.copy(basis.forward);
+				} else if (key === "s") {
+					targetVector.copy(basis.forward).multiplyScalar(-1);
+				} else if (key === "a") {
+					targetVector.copy(basis.right).multiplyScalar(-1);
+				} else if (key === "d") {
+					targetVector.copy(basis.right);
+				} else if (key === " ") {
+					targetVector.copy(basis.up);
+				}
+
+				orientation = getClosestGravityOrientation(targetVector);
+			} else {
+				if (key === "w") orientation = "front";
+				else if (key === "s") orientation = "back";
+				else if (key === "a") orientation = "left";
+				else if (key === "d") orientation = "right";
+				else if (key === " ") orientation = "up";
+			}
+		}
+
+		if (orientation && this.character) {
+			const currentOrient = this.character.getGravityOrientation();
+			if (currentOrient === orientation) {
+				orientation = "down";
+			}
+
+			const finalOrientation = orientation;
+			setTimeout(() => {
+				closeOverlay(() => {
+					this.character.setGravityOrientation(finalOrientation, { duration: 0.65 });
+					if (props.oneShot) {
+						props.triggered = true;
+					}
+					this.emitSignal(sphereObj.userData.uuid);
+				});
+			}, 250);
+		}
+	};
+
+	const keydownHandler = (e: KeyboardEvent) => {
+		const k = e.key.toLowerCase();
+		if (k === "escape") {
+			e.preventDefault();
+			closeOverlay();
+			return;
+		}
+
+		if (["w", "a", "s", "d", " "].includes(k)) {
+			e.preventDefault();
+			handleKeySelection(k);
+		}
+	};
+
+	const mousedownHandler = (e: MouseEvent) => {
+		if (e.button === 0) { // Left click
+			closeOverlay();
+		}
+	};
+
+	document.addEventListener("keydown", keydownHandler);
+	document.addEventListener("mousedown", mousedownHandler);
 }

@@ -11,6 +11,9 @@ export function setupGameInput(this: Game) {
 		if (activeElement && (activeElement.tagName === "INPUT" || activeElement.tagName === "SELECT" || activeElement.tagName === "TEXTAREA")) {
 			if (e.key === "Escape") {
 				activeElement.blur();
+				if (this.objectInspector && this.objectInspector.isVisible) {
+					this.objectInspector.hide();
+				}
 			} else {
 				return;
 			}
@@ -86,13 +89,17 @@ export function setupGameInput(this: Game) {
 
 			let triggeredButton = false;
 			this.sceneManager.scene.children.forEach((obj: THREE.Object3D) => {
-				if (!triggeredButton && obj.userData.mapObjectType === "interaction_button") {
+				if (!triggeredButton && (obj.userData.mapObjectType === "interaction_button" || obj.userData.mapObjectType === "gravity_sphere")) {
 					const dSq = obj.position.distanceToSquared(charPos);
 					if (dSq < 9.0) {
 						const props = obj.userData.logicProperties;
 						if (props && (props.pulsationMode || props.holdTime === 0)) {
 							if (!props.oneShot || !props.triggered) {
-								this.triggerButton(obj);
+								if (obj.userData.mapObjectType === "gravity_sphere") {
+									this.triggerGravitySphere(obj);
+								} else {
+									this.triggerButton(obj);
+								}
 								triggeredButton = true;
 							}
 						}

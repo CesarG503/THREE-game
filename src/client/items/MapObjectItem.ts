@@ -5,6 +5,7 @@ import { StairsUtils } from "../utils/StairsUtils";
 import { RampUtils } from "../utils/RampUtils";
 import { applyMapObjectTexture, normalizeTextureSettings, type MapTextureSettings } from "../utils/TextureMapping";
 import type { ItemContext } from "../types";
+import { normalizeGravityOrientation } from "../utils/GravityOrientation";
 
 type MapObjectScale = {
   x: number;
@@ -149,6 +150,27 @@ export class MapObjectItem extends Item {
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.fillText("⚡", 32, 32);
+    } else if (this.type === "gravity_pad") {
+      ctx.fillStyle = "#233b68";
+      ctx.fillRect(10, 36, 44, 12);
+      ctx.strokeRect(10, 36, 44, 12);
+
+      ctx.strokeStyle = "#8bd8ff";
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.moveTo(32, 48);
+      ctx.lineTo(32, 15);
+      ctx.moveTo(32, 15);
+      ctx.lineTo(20, 27);
+      ctx.moveTo(32, 15);
+      ctx.lineTo(44, 27);
+      ctx.stroke();
+
+      ctx.fillStyle = "white";
+      ctx.font = "bold 16px Arial";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("G", 32, 31);
     } else if (this.type === "target") {
       ctx.fillStyle = "white";
       ctx.beginPath();
@@ -165,6 +187,47 @@ export class MapObjectItem extends Item {
       ctx.beginPath();
       ctx.arc(32, 32, 8, 0, Math.PI * 2);
       ctx.fill();
+    } else if (this.type === "gravity_pad") {
+      const geometry = new THREE.BoxGeometry(this.scale.x, this.scale.y, this.scale.z);
+      const padColor = this.color !== undefined ? this.color : 0x2f75ff;
+      const material = new THREE.MeshStandardMaterial({
+        color: padColor,
+        roughness: 0.72,
+        emissive: 0x123a88,
+        emissiveIntensity: 0.45
+      });
+
+      object3D = new THREE.Mesh(geometry, material);
+      object3D.receiveShadow = true;
+
+      const ring = new THREE.Mesh(
+        new THREE.TorusGeometry(Math.min(this.scale.x, this.scale.z) * 0.26, 0.025, 8, 36),
+        new THREE.MeshBasicMaterial({ color: 0x9be7ff, transparent: true, opacity: 0.85 })
+      );
+      ring.rotation.x = Math.PI / 2;
+      ring.position.y = this.scale.y / 2 + 0.025;
+      object3D.add(ring);
+
+      const arrow = new THREE.ArrowHelper(
+        new THREE.Vector3(0, 0, -1),
+        new THREE.Vector3(0, this.scale.y / 2 + 0.05, this.scale.z * 0.28),
+        Math.min(this.scale.x, this.scale.z) * 0.45,
+        0xffffff,
+        0.24,
+        0.16
+      );
+      arrow.userData.isGravityPadArrow = true;
+      object3D.add(arrow);
+
+      const col = RAPIER.ColliderDesc.cuboid(this.scale.x / 2, this.scale.y / 2, this.scale.z / 2).setSensor(true);
+      collidersDesc.push(col);
+
+      if (!this.logicProperties) this.logicProperties = {};
+      if (this.logicProperties.name === undefined) this.logicProperties.name = "Pad de Gravedad";
+      if (this.logicProperties.gravityOrientation === undefined) this.logicProperties.gravityOrientation = "up";
+      if (this.logicProperties.transitionDuration === undefined) this.logicProperties.transitionDuration = 0.8;
+      if (this.logicProperties.cooldown === undefined) this.logicProperties.cooldown = 0.35;
+      this.logicProperties.gravityOrientation = normalizeGravityOrientation(this.logicProperties.gravityOrientation);
     } else if (this.type === "impulse_jump" || this.type === "impulse_lateral") {
       const isJump = this.type === "impulse_jump";
       ctx.fillStyle = isJump ? "#00ffff" : "#00ff00";
@@ -202,6 +265,18 @@ export class MapObjectItem extends Item {
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.fillText("$", 32, 36);
+    } else if (this.type === "gravity_sphere") {
+      ctx.beginPath();
+      ctx.arc(32, 32, 24, 0, Math.PI * 2);
+      ctx.fillStyle = "#9C27B0";
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = "white";
+      ctx.font = "bold 20px Arial";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("G-S", 32, 32);
     } else if (this.type === "ladder") {
       ctx.strokeStyle = ctx.fillStyle;
       ctx.beginPath();
@@ -729,6 +804,38 @@ export class MapObjectItem extends Item {
 
       const rightRailCol = RAPIER.ColliderDesc.cuboid(railHalfW, railHalfH, railHalfD).setTranslation(width / 2, 0, 0);
       collidersDesc.push(rightRailCol);
+    } else if (this.type === "gravity_sphere") {
+      const radius = this.scale.radius !== undefined ? this.scale.radius : (this.scale.x / 2 || 0.75);
+      const geometry = new THREE.SphereGeometry(radius, 32, 32);
+      const matColor = this.color !== undefined ? this.color : 0x9C27B0;
+      const material = new THREE.MeshStandardMaterial({
+        color: matColor,
+        roughness: 0.2,
+        metalness: 0.8,
+        emissive: 0x4a148c,
+        emissiveIntensity: 0.4
+      });
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+
+      const ring = new THREE.Mesh(
+        new THREE.TorusGeometry(radius * 1.2, 0.05, 16, 100),
+        new THREE.MeshBasicMaterial({ color: 0xe040fb, transparent: true, opacity: 0.8 })
+      );
+      ring.rotation.x = Math.PI / 2;
+      mesh.add(ring);
+
+      object3D = mesh;
+
+      const col = RAPIER.ColliderDesc.ball(radius);
+      collidersDesc.push(col);
+
+      if (!this.logicProperties) this.logicProperties = {};
+      if (this.logicProperties.holdTime === undefined) this.logicProperties.holdTime = 0.5;
+      if (this.logicProperties.oneShot === undefined) this.logicProperties.oneShot = false;
+      if (this.logicProperties.pulsationMode === undefined) this.logicProperties.pulsationMode = false;
+      if (this.logicProperties.triggered === undefined) this.logicProperties.triggered = false;
     } else {
       const geometry = new THREE.BoxGeometry(this.scale.x, this.scale.y, this.scale.z);
       const material = new THREE.MeshStandardMaterial({
@@ -762,6 +869,7 @@ export class MapObjectItem extends Item {
     object3D.userData.isEditableMapObject = true;
     object3D.userData.isMapObject = true;
     object3D.userData.mapObjectType = this.type;
+    object3D.userData.customName = this.name || "";
     object3D.userData.uuid = THREE.MathUtils.generateUUID();
     object3D.userData.originalUUID = object3D.userData.uuid;
     object3D.userData.color = this.color;

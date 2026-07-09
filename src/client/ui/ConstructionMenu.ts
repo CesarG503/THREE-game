@@ -15,6 +15,7 @@ import { savePlatformMapForRoom } from "../platform/mapRuntime";
 import { editorTelemetry } from "../editor/analytics-editor";
 import { listAssets, uploadAsset } from "../platform/api";
 import { getDefaultTextureSettings, normalizeTextureSettings } from "../utils/TextureMapping";
+import { GRAVITY_ORIENTATION_OPTIONS } from "../utils/GravityOrientation";
 
 const SKYBOX_CUBEMAP_DIR = "/assets/skybox/Cubemap";
 const SKYBOX_VALUE_PREFIX = "skybox:";
@@ -251,6 +252,23 @@ export class ConstructionMenu {
         };
         this.logicItems.push(button);
 
+        // Gravity Sphere
+        const gravitySphere = new MapObjectItem(
+            "gravity_sphere",
+            "Esfera de Gravedad",
+            "gravity_sphere",
+            "",
+            0x9C27B0,
+            { x: 1.5, y: 1.5, z: 1.5, radius: 0.75 }
+        );
+        gravitySphere.logicProperties = {
+            holdTime: 0.5,
+            oneShot: false,
+            pulsationMode: false,
+            targetUuid: null
+        };
+        this.logicItems.push(gravitySphere);
+
         // Interactive Collision
         const collision = new MapObjectItem(
             "interactive_collision",
@@ -262,6 +280,7 @@ export class ConstructionMenu {
         );
         // Default Properties handled in MapObjectItem logic, but good to init here too if needed
         collision.logicProperties = {
+            name: "Colisión Interactiva",
             isTraversable: false,
             triggerOnTouch: false,
             triggerOnEnter: false
@@ -279,9 +298,12 @@ export class ConstructionMenu {
         );
         // Default Logic
         target.logicProperties = {
+            name: "Diana Interactiva",
             rings: 3,
             baseDamage: 10,
-            ringMultipliers: [1, 2, 3]
+            ringMultipliers: [1, 2, 3],
+            radius: 1.0,
+            useProjectileDamage: false
         };
         this.logicItems.push(target);
 
@@ -316,6 +338,22 @@ export class ConstructionMenu {
             padKind: "lateral"
         };
         this.logicItems.push(impulseLateral);
+
+        const gravityPad = new MapObjectItem(
+            "gravity_pad",
+            "Pad de Gravedad",
+            "gravity_pad",
+            "",
+            0x2F75FF,
+            { x: 3, y: 0.2, z: 3 }
+        );
+        gravityPad.logicProperties = {
+            name: "Pad de Gravedad",
+            gravityOrientation: "up",
+            transitionDuration: 0.8,
+            cooldown: 0.35
+        };
+        this.logicItems.push(gravityPad);
 
         const farmingZone = new MapObjectItem(
             "farming_zone",
@@ -2092,18 +2130,17 @@ export class ConstructionMenu {
             container.appendChild(card);
         });
     }
-
-    renderLogicLibraryGrid(container) {
+renderLogicLibraryGrid(container) {
         container.innerHTML = "";
 
         const groups = [
             {
                 title: "Bases y Señales",
-                types: ["spawn_point", "movement_controller", "interaction_button", "interactive_collision", "target"]
+                types: ["spawn_point", "movement_controller", "interaction_button", "interactive_collision", "target", "gravity_sphere"]
             },
             {
                 title: "Pads y Zonas",
-                types: ["impulse_jump", "impulse_lateral", "farming_zone"]
+                types: ["impulse_jump", "impulse_lateral", "gravity_pad", "farming_zone"]
             }
         ];
 
@@ -3813,7 +3850,7 @@ export class ConstructionMenu {
     updateLogicControls(baseItem) {
         this.editorLogicControlsContainer.innerHTML = "";
 
-        const logicTypes = ["spawn_point", "movement_controller", "interaction_button", "interactive_collision", "target", "impulse_jump", "impulse_lateral", "farming_zone"];
+        const logicTypes = ["spawn_point", "movement_controller", "interaction_button", "interactive_collision", "target", "impulse_jump", "impulse_lateral", "gravity_pad", "farming_zone", "gravity_sphere"];
         if (!logicTypes.includes(baseItem.type) && !baseItem.logicProperties) {
             this.editorLogicControlsContainer.style.display = "none";
             return;
@@ -3844,6 +3881,10 @@ export class ConstructionMenu {
             this.createLogicDraftInput(this.editorLogicControlsContainer, "Tiempo Retener (s):", "holdTime", "number", 1.0);
             this.createLogicDraftInput(this.editorLogicControlsContainer, "Un Solo Uso:", "oneShot", "boolean", false);
             this.createLogicDraftInput(this.editorLogicControlsContainer, "Modo Pulsación:", "pulsationMode", "boolean", false);
+        } else if (type === "gravity_sphere") {
+            this.createLogicDraftInput(this.editorLogicControlsContainer, "Tiempo Retener (s):", "holdTime", "number", 0.5);
+            this.createLogicDraftInput(this.editorLogicControlsContainer, "Un Solo Uso:", "oneShot", "boolean", false);
+            this.createLogicDraftInput(this.editorLogicControlsContainer, "Modo Pulsación:", "pulsationMode", "boolean", false);
         } else if (type === "interactive_collision") {
             this.createLogicDraftInput(this.editorLogicControlsContainer, "Travesable (Sin colisión):", "isTraversable", "boolean", false);
             this.createLogicDraftInput(this.editorLogicControlsContainer, "Disparar al Tocar:", "triggerOnTouch", "boolean", false);
@@ -3856,6 +3897,11 @@ export class ConstructionMenu {
             this.createLogicDraftInput(this.editorLogicControlsContainer, "Nombre:", "name", "text", isJump ? "Pad de Salto" : "Pad de Empuje");
             this.createLogicDraftInput(this.editorLogicControlsContainer, "Fuerza:", "strength", "number", isJump ? 25 : 40);
             this.createLogicDraftInput(this.editorLogicControlsContainer, "Recarga (s):", "cooldown", "number", 0.25);
+        } else if (type === "gravity_pad") {
+            this.createLogicDraftInput(this.editorLogicControlsContainer, "Nombre:", "name", "text", "Pad de Gravedad");
+            this.createLogicDraftSelect(this.editorLogicControlsContainer, "Orientación:", "gravityOrientation", GRAVITY_ORIENTATION_OPTIONS, "up");
+            this.createLogicDraftInput(this.editorLogicControlsContainer, "Duración Giro (s):", "transitionDuration", "number", 0.8);
+            this.createLogicDraftInput(this.editorLogicControlsContainer, "Recarga (s):", "cooldown", "number", 0.35);
         } else if (type === "farming_zone") {
             this.createLogicDraftInput(this.editorLogicControlsContainer, "Nombre:", "name", "text", "Zona de Farmeo");
             this.createLogicDraftInput(this.editorLogicControlsContainer, "Intervalo Spawn (s):", "spawnInterval", "number", 1.0);
@@ -3919,6 +3965,41 @@ export class ConstructionMenu {
 
         row.appendChild(label);
         row.appendChild(input);
+        container.appendChild(row);
+    }
+
+    createLogicDraftSelect(container, labelText, key, options, defaultValue) {
+        const row = document.createElement("div");
+        row.style.cssText = "display: flex; gap: 10px; align-items: center; justify-content: space-between; margin-bottom:5px; width: 100%;";
+
+        const label = document.createElement("span");
+        label.textContent = labelText;
+        label.style.color = "#aaa";
+        label.style.fontSize = "13px";
+
+        if (!this.currentDraftItem.logicProperties) {
+            this.currentDraftItem.logicProperties = {};
+        }
+
+        if (this.currentDraftItem.logicProperties[key] === undefined) {
+            this.currentDraftItem.logicProperties[key] = defaultValue;
+        }
+
+        const select = document.createElement("select");
+        select.style.cssText = "background: #333; border: 1px solid #555; color: white; padding: 4px; border-radius: 4px; width: 120px;";
+        options.forEach((option) => {
+            const opt = document.createElement("option");
+            opt.value = option.value;
+            opt.textContent = option.label;
+            if (this.currentDraftItem.logicProperties[key] === option.value) opt.selected = true;
+            select.appendChild(opt);
+        });
+        select.onchange = (e) => {
+            this.currentDraftItem.logicProperties[key] = e.target.value;
+        };
+
+        row.appendChild(label);
+        row.appendChild(select);
         container.appendChild(row);
     }
 
@@ -4333,7 +4414,7 @@ export class ConstructionMenu {
             // Determine primary logic category
             if (obj.userData.mapObjectType === "spawn_point") {
                 type = "spawn_point";
-            } else if (["impulse_jump", "impulse_lateral", "farming_zone"].includes(obj.userData.mapObjectType)) {
+            } else if (["impulse_jump", "impulse_lateral", "gravity_pad", "farming_zone", "gravity_sphere"].includes(obj.userData.mapObjectType)) {
                 type = "interactive_zones";
             } else if (
                 obj.userData.logicProperties &&
@@ -4369,11 +4450,18 @@ export class ConstructionMenu {
             objs.forEach((obj, index) => {
                 const itemRow = document.createElement("div");
 
-                // Determine Name: Use signalName if available, otherwise name, otherwise default
-                let displayName = `Objeto #${index + 1}`;
+                // Determine Name: Use signalName if available, otherwise name, otherwise customName, otherwise type-based default
+                let displayName = "";
                 if (obj.userData.logicProperties) {
                     if (obj.userData.logicProperties.signalName) displayName = obj.userData.logicProperties.signalName;
                     else if (obj.userData.logicProperties.name) displayName = obj.userData.logicProperties.name;
+                }
+                if (!displayName && obj.userData.customName) {
+                    displayName = obj.userData.customName;
+                }
+                if (!displayName) {
+                    const baseName = this.getHumanReadableName(obj.userData.mapObjectType) || "Objeto";
+                    displayName = `${baseName} #${index + 1}`;
                 }
 
                 itemRow.textContent = displayName;
@@ -4439,7 +4527,10 @@ export class ConstructionMenu {
 
                     const confirm = () => {
                         let newName = input.value.trim();
-                        if (!newName) newName = `Objeto #${index + 1}`;
+                        if (!newName) {
+                            const baseName = this.getHumanReadableName(obj.userData.mapObjectType) || "Objeto";
+                            newName = `${baseName} #${index + 1}`;
+                        }
 
                         // Update Logic Props
                         if (!obj.userData.logicProperties) obj.userData.logicProperties = {};

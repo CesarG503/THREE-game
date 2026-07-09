@@ -32,7 +32,7 @@ import { setupGameInput } from "./core/GameInput";
 import { animate, setupDebugRender, setupOrientationGizmo, updateDebugRender, renderOrientationGizmo } from "./core/GameLoop";
 import { setupMultiplayerUI, updateConnectionStatus, handleRemoteShoot } from "./core/GameNetwork";
 import { buildEnvironment, loadLevelFromFile, updateEnvironmentConfig } from "./core/GameEnvironment";
-import { setupEditorUI, saveMap, loadMap, useCurrentItem, _loadSingleMapObject, deleteObjectByUuid, broadcastObjectUpdate, setObjectBodyType, updateButtonInteraction, emitSignal, triggerButton, updateCollisionLogic, updateMovementLogic } from "./core/GameEditor";
+import { setupEditorUI, saveMap, loadMap, useCurrentItem, _loadSingleMapObject, deleteObjectByUuid, broadcastObjectUpdate, setObjectBodyType, updateButtonInteraction, emitSignal, triggerButton, updateCollisionLogic, updateMovementLogic, triggerGravitySphere } from "./core/GameEditor";
 import { regenerateObjectPhysics, updateObjectPhysics } from "./core/GamePhysics";
 import { GameHUD } from "./ui/GameHUD";
 import { ObjectInspector } from "./ui/ObjectInspector";
@@ -120,6 +120,7 @@ export class Game {
 	updateButtonInteraction: any;
 	emitSignal: any;
 	triggerButton: any;
+	triggerGravitySphere: any;
 	updateCollisionLogic: any;
 	updateMovementLogic: any;
 	regenerateObjectPhysics: any;
@@ -162,6 +163,7 @@ export class Game {
 		this.updateButtonInteraction = updateButtonInteraction.bind(this);
 		this.emitSignal = emitSignal.bind(this);
 		this.triggerButton = triggerButton.bind(this);
+		this.triggerGravitySphere = triggerGravitySphere.bind(this);
 		this.updateCollisionLogic = updateCollisionLogic.bind(this);
 		this.updateMovementLogic = updateMovementLogic.bind(this);
 		this.regenerateObjectPhysics = regenerateObjectPhysics.bind(this);
@@ -203,6 +205,7 @@ export class Game {
 			this.sceneManager.camera,
 			this.sceneManager.renderer.domElement
 		);
+		this.cameraController.character = this.character;
 		this.scopeController = new ScopeController(this.sceneManager.camera, this);
 		this.sceneManager.renderer.autoClear = false;
 		this.setupOrientationGizmo();
@@ -639,7 +642,7 @@ export class Game {
 					return;
 				}
 
-				if (this.objectInspector && e.button === 2) {
+				const selectEditableObjectFromPointer = () => {
 					const mouse = new THREE.Vector2();
 					if (document.pointerLockElement) {
 						mouse.x = 0;
@@ -663,19 +666,28 @@ export class Game {
 						return false;
 					});
 
-					if (hit) {
-						let target: THREE.Object3D | null = hit.object;
-						while (target && (!target.userData || !target.userData.isEditableMapObject)) {
-							target = target.parent;
-						}
+					if (!hit) return null;
 
+					let target: THREE.Object3D | null = hit.object;
+					while (target && (!target.userData || !target.userData.isEditableMapObject)) {
+						target = target.parent;
+					}
+					return target || null;
+				};
+
+					if (this.objectInspector && e.button === 2) {
+						const target = selectEditableObjectFromPointer();
 						if (target) {
+							if (this.objectInspector.isVisible && this.objectInspector.selectedObject && this.objectInspector.selectedObject !== target) {
+								if (!this.objectInspector.allowDynamicSwitch) {
+									return;
+								}
+							}
 							this.objectInspector.show(target);
 						}
 					}
 				}
-			}
-		}, false);
+			}, false);
 
 		document.addEventListener("contextmenu", (e) => e.preventDefault(), false);
 
@@ -765,7 +777,6 @@ export class Game {
 		}
 
 		[
-			"multiplayer-panel",
 			"chat-container",
 			"construction-menu",
 			"object-inspector",

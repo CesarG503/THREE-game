@@ -4,7 +4,16 @@ import Busboy from "busboy"
 import { AuthError, getUserBySessionToken, loginUser, registerUser, requireUserBySessionToken, type AuthInput } from "../services/AuthService.js"
 import { createAsset, getAsset, getAssetObject, listAssets, type UploadedAssetFile } from "../services/AssetService.js"
 import { createMap, deleteMap, getMap, listMaps, updateMap, type MapWriteInput } from "../services/MapService.js"
+import { getPopularityRecommendations } from "../services/RecommendationService.js"
+import { getContentRecommendations } from "../services/ContentRecommender.js"
+import { getCollaborativeRecommendations } from "../services/CollaborativeRecommender.js"
+import { applyQualityFilter } from "../services/filters/QualityFilter.js"
+import { setUserVisibility, getSocialRecommendations, type PlayerVisibility } from "../services/SocialRecommender.js"
+import { getBanditRecommendations } from "../services/ExplorationBandit.js"
+import { getHybridRecommendations } from "../services/HybridRecommender.js"
+import { parseAcceptLanguage } from "../analytics/features/language_matcher.js"
 import { logger } from "../utils/Logger.js"
+import { PlayerProfileRepository } from "../analytics/models/PlayerProfile.js"
 import { validateTelemetryEvent } from "../analytics/middleware.js"
 import { evaluateEventReputation } from "../analytics/security/bot_filter.js"
 import { eventBuffer } from "../analytics/eventBuffer.js"
@@ -14,6 +23,9 @@ import { getCohortRetention } from "../analytics/reports/cohorts.js"
 import { getConversionFunnel } from "../analytics/reports/funnels.js"
 import { getMatchmakingMetrics } from "../analytics/reports/matchmaking.js"
 import { getCatalogPerformance } from "../analytics/reports/catalog_performance.js"
+import { getCreatorsActivityReport } from "../analytics/reports/creators_activity.js"
+import { matchmaker } from "../services/Matchmaker.js"
+import { ewtCalculator } from "../services/matchmaking/ewt_calculator.js"
 
 const MAX_BODY_BYTES = 1024 * 1024 * 2
 
@@ -54,6 +66,14 @@ export async function handleHttpRequest(
     return withJsonBody(req, res, async (body) => {
       const eventType = (body as any)?.eventType || "unknown"
       metricsCollector.recordReceived(eventType)
+
+      // Inject Accept-Language header for SessionStart events
+      if (body && typeof body === "object") {
+        const castedBody = body as any;
+        if (castedBody.eventType === "SessionStart" && castedBody.payload && typeof castedBody.payload === "object") {
+          castedBody.payload.acceptLanguage = req.headers["accept-language"] || null;
+        }
+      }
 
       const validation = validateTelemetryEvent(body)
       if (!validation.valid) {
@@ -216,6 +236,35 @@ export async function handleHttpRequest(
     });
   }
 
+  if (req.method === "GET" && url.pathname === "/api/analytics/reports/creators") {
+    return withApiError(res, async () => {
+      const rawStart = url.searchParams.get("startDate");
+      const rawEnd = url.searchParams.get("endDate");
+
+      let startDate: Date | undefined;
+      let endDate: Date | undefined;
+
+      if (rawStart) {
+        startDate = new Date(rawStart);
+        if (isNaN(startDate.getTime())) {
+          sendJson(res, 400, { error: "startDate invalido. Debe ser una fecha ISO valida." });
+          return;
+        }
+      }
+
+      if (rawEnd) {
+        endDate = new Date(rawEnd);
+        if (isNaN(endDate.getTime())) {
+          sendJson(res, 400, { error: "endDate invalido. Debe ser una fecha ISO valida." });
+          return;
+        }
+      }
+
+      const creatorsActivity = await getCreatorsActivityReport({ startDate, endDate });
+      sendJson(res, 200, { creatorsActivity });
+    });
+  }
+
   if (req.method === "GET" && url.pathname === "/api/assets") {
     return withApiError(res, async () => {
       const user = await getOptionalRequestUser(req)
@@ -256,6 +305,286 @@ export async function handleHttpRequest(
       const identifier = decodeURIComponent(assetMatch[1] ?? "")
       const result = await getAsset(identifier, user?.id ?? null)
       sendJson(res, 200, result)
+    })
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/recommendations/popularity") {
+    return withApiError(res, async () => {
+      const limitParam = url.searchParams.get("limit")
+      const gravityParam = url.searchParams.get("gravity")
+      const regionParam = url.searchParams.get("region")
+      const langParam = url.searchParams.get("language")
+
+      const limit = limitParam ? parseInt(limitParam, 10) : undefined
+      const gravity = gravityParam ? parseFloat(gravityParam) : undefined
+
+      const acceptLangHeader = req.headers["accept-language"]
+      const parsedLangs = parseAcceptLanguage(Array.isArray(acceptLangHeader) ? acceptLangHeader[0] : acceptLangHeader)
+      const defaultHeaderLang = parsedLangs[0]
+
+      const result = await getPopularityRecommendations({ limit, gravity })
+      const filtered = await applyQualityFilter(result, null, {
+        clientRegion: regionParam ?? undefined,
+        preferredLanguage: langParam ?? defaultHeaderLang ?? undefined,
+        minItemsCount: limit ? Math.max(1, Math.floor(limit / 2)) : undefined,
+      })
+      sendJson(res, 200, { recommendations: filtered })
+    })
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/recommendations/content-based") {
+    return withApiError(res, async () => {
+      const limitParam = url.searchParams.get("limit")
+      const regionParam = url.searchParams.get("region")
+      const langParam = url.searchParams.get("language")
+
+      const limit = limitParam ? parseInt(limitParam, 10) : undefined
+
+      const user = await getOptionalRequestUser(req)
+      const acceptLangHeader = req.headers["accept-language"]
+      const parsedLangs = parseAcceptLanguage(Array.isArray(acceptLangHeader) ? acceptLangHeader[0] : acceptLangHeader)
+      const defaultHeaderLang = parsedLangs[0]
+
+      const result = await getContentRecommendations(user?.id ?? null, { limit })
+      const filtered = await applyQualityFilter(result, user?.id ?? null, {
+        clientRegion: regionParam ?? undefined,
+        preferredLanguage: langParam ?? defaultHeaderLang ?? undefined,
+        minItemsCount: limit ? Math.max(1, Math.floor(limit / 2)) : undefined,
+      })
+      sendJson(res, 200, { recommendations: filtered })
+    })
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/recommendations/collaborative") {
+    return withApiError(res, async () => {
+      const limitParam = url.searchParams.get("limit")
+      const gravityParam = url.searchParams.get("gravity")
+      const regionParam = url.searchParams.get("region")
+      const langParam = url.searchParams.get("language")
+
+      const limit = limitParam ? parseInt(limitParam, 10) : undefined
+      const gravity = gravityParam ? parseFloat(gravityParam) : undefined
+
+      const user = await getOptionalRequestUser(req)
+      const acceptLangHeader = req.headers["accept-language"]
+      const parsedLangs = parseAcceptLanguage(Array.isArray(acceptLangHeader) ? acceptLangHeader[0] : acceptLangHeader)
+      const defaultHeaderLang = parsedLangs[0]
+
+      const result = await getCollaborativeRecommendations(user?.id ?? null, { limit, gravity })
+      const filtered = await applyQualityFilter(result, user?.id ?? null, {
+        clientRegion: regionParam ?? undefined,
+        preferredLanguage: langParam ?? defaultHeaderLang ?? undefined,
+        minItemsCount: limit ? Math.max(1, Math.floor(limit / 2)) : undefined,
+      })
+      sendJson(res, 200, { recommendations: filtered })
+    })
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/presence/status") {
+    return withJsonBody(req, res, async (body) => {
+      const user = await getRequiredRequestUser(req)
+      const data = body as { status?: string }
+      if (!data.status || !["ONLINE", "INVISIBLE", "DND"].includes(data.status)) {
+        sendJson(res, 400, { error: "status invalido. Debe ser 'ONLINE', 'INVISIBLE' o 'DND'." })
+        return
+      }
+      await setUserVisibility(user.id, data.status as PlayerVisibility)
+      sendJson(res, 200, { ok: true, status: data.status })
+    })
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/recommendations/social") {
+    return withApiError(res, async () => {
+      const limitParam = url.searchParams.get("limit")
+      const regionParam = url.searchParams.get("region")
+      const langParam = url.searchParams.get("language")
+
+      const limit = limitParam ? parseInt(limitParam, 10) : undefined
+
+      const user = await getOptionalRequestUser(req)
+      const acceptLangHeader = req.headers["accept-language"]
+      const parsedLangs = parseAcceptLanguage(Array.isArray(acceptLangHeader) ? acceptLangHeader[0] : acceptLangHeader)
+      const defaultHeaderLang = parsedLangs[0]
+
+      const result = await getSocialRecommendations(user?.id ?? null, { limit })
+      const filtered = await applyQualityFilter(result as any, user?.id ?? null, {
+        clientRegion: regionParam ?? undefined,
+        preferredLanguage: langParam ?? defaultHeaderLang ?? undefined,
+        minItemsCount: limit ? Math.max(1, Math.floor(limit / 2)) : undefined,
+      })
+      sendJson(res, 200, { recommendations: filtered })
+    })
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/recommendations/bandit") {
+    return withApiError(res, async () => {
+      const limitParam = url.searchParams.get("limit")
+      const modeParam = url.searchParams.get("mode")
+      const regionParam = url.searchParams.get("region")
+      const langParam = url.searchParams.get("language")
+
+      const limit = limitParam ? parseInt(limitParam, 10) : undefined
+      const mode = (modeParam === "thompson" || modeParam === "epsilon-greedy") ? modeParam : "epsilon-greedy"
+
+      const user = await getOptionalRequestUser(req)
+      const acceptLangHeader = req.headers["accept-language"]
+      const parsedLangs = parseAcceptLanguage(Array.isArray(acceptLangHeader) ? acceptLangHeader[0] : acceptLangHeader)
+      const defaultHeaderLang = parsedLangs[0]
+
+      const result = await getBanditRecommendations(user?.id ?? null, { limit, mode })
+      const filtered = await applyQualityFilter(result as any, user?.id ?? null, {
+        clientRegion: regionParam ?? undefined,
+        preferredLanguage: langParam ?? defaultHeaderLang ?? undefined,
+        minItemsCount: limit ? Math.max(1, Math.floor(limit / 2)) : undefined,
+      })
+      sendJson(res, 200, { recommendations: filtered })
+    })
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/recommendations/hybrid") {
+    return withApiError(res, async () => {
+      const limitParam = url.searchParams.get("limit")
+      const regionParam = url.searchParams.get("region")
+      const langParam = url.searchParams.get("language")
+
+      const limit = limitParam ? parseInt(limitParam, 10) : undefined
+
+      const user = await getOptionalRequestUser(req)
+      const acceptLangHeader = req.headers["accept-language"]
+      const parsedLangs = parseAcceptLanguage(Array.isArray(acceptLangHeader) ? acceptLangHeader[0] : acceptLangHeader)
+      const defaultHeaderLang = parsedLangs[0]
+
+      const result = await getHybridRecommendations(user?.id ?? null, { limit })
+      const filtered = await applyQualityFilter(result as any, user?.id ?? null, {
+        clientRegion: regionParam ?? undefined,
+        preferredLanguage: langParam ?? defaultHeaderLang ?? undefined,
+        minItemsCount: limit ? Math.max(1, Math.floor(limit / 2)) : undefined,
+      })
+
+      let retentionIncentiveActive = false;
+      let incentiveMessage: string | undefined = undefined;
+
+      if (user) {
+        const profile = await PlayerProfileRepository.getProfile(user.id);
+        const atRisk = profile?.atRisk === true || (profile?.churnScore !== null && profile?.churnScore !== undefined && profile.churnScore >= 0.85);
+        if (atRisk) {
+          retentionIncentiveActive = true;
+          incentiveMessage = "¡Tus amigos están en línea jugando! Únete a ellos ahora mismo.";
+        }
+      }
+
+      sendJson(res, 200, {
+        recommendations: filtered,
+        retentionIncentiveActive,
+        incentiveMessage
+      })
+    })
+  }
+
+  // ── Matchmaker Endpoints ───────────────────────────────────────────────
+
+  if (req.method === "POST" && url.pathname === "/api/matchmaker/join") {
+    return withJsonBody(req, res, async (body) => {
+      const data = body as { region?: string; mapId?: string; userId?: string; skillScore?: number; preferredLanguage?: string }
+      const user = await getOptionalRequestUser(req)
+      const resolvedUserId = user?.id ?? data.userId ?? null
+
+      // Auto-enrich with skill score and language from PlayerFeatures if user is authenticated
+      let skillScore = data.skillScore
+      let preferredLanguage = data.preferredLanguage
+
+      if (resolvedUserId && (skillScore === undefined || preferredLanguage === undefined)) {
+        try {
+          const { computeSkillScore, fetchPreferredLanguage } = await import("../services/matchmaking/skill_matcher.js")
+
+          if (skillScore === undefined) {
+            skillScore = await computeSkillScore(resolvedUserId)
+          }
+          if (preferredLanguage === undefined) {
+            preferredLanguage = await fetchPreferredLanguage(resolvedUserId) ?? undefined
+          }
+        } catch (err) {
+          // Non-critical: matchmaker works without enrichment
+          logger.warn("HTTP", `Failed to enrich matchmaker ticket for user ${resolvedUserId}`, err)
+        }
+      }
+
+      const { ticketId, region, queuePosition } = matchmaker.joinQueue({
+        userId: resolvedUserId,
+        region: data.region,
+        mapId: data.mapId ?? null,
+        skillScore,
+        preferredLanguage,
+      })
+
+      const queue = (matchmaker as any).queues.get(region) ?? []
+      const ewt = ewtCalculator.calculateEWT(region, "FFA", skillScore, queue.length)
+      const estimatedWaitMs = ewt.estimatedWaitMs
+      const estimatedWaitRange = ewt.estimatedWaitRange
+
+      sendJson(res, 200, {
+        ticketId,
+        region,
+        queuePosition,
+        estimatedWaitMs,
+        estimatedWaitRange,
+      })
+    })
+  }
+
+  if (req.method === "DELETE" && url.pathname === "/api/matchmaker/leave") {
+    return withJsonBody(req, res, async (body) => {
+      const data = body as { ticketId?: string }
+      if (!data.ticketId) {
+        sendJson(res, 400, { error: "ticketId is required" })
+        return
+      }
+      const removed = matchmaker.leaveQueue(data.ticketId)
+      sendJson(res, 200, { ok: removed })
+    })
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/matchmaker/status") {
+    return withApiError(res, async () => {
+      const status = matchmaker.getQueueStatus()
+      sendJson(res, 200, status)
+    })
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/matchmaker/ewt") {
+    return withApiError(res, async () => {
+      const region = url.searchParams.get("region") || "us-east"
+      const skillScoreStr = url.searchParams.get("skillScore")
+      const skillScore = skillScoreStr !== null && skillScoreStr !== "" ? Number(skillScoreStr) : undefined
+      const queue = (matchmaker as any).queues.get(region) ?? []
+      const ewt = ewtCalculator.calculateEWT(region, "FFA", skillScore, queue.length)
+      sendJson(res, 200, ewt)
+    })
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/matchmaker/ticket") {
+    return withApiError(res, async () => {
+      const ticketId = url.searchParams.get("ticketId")
+      if (!ticketId) {
+        sendJson(res, 400, { error: "ticketId is required" })
+        return
+      }
+      // Check if the ticket was already matched
+      const matchedResult = matchmaker.getMatchedTicketResult(ticketId)
+      if (matchedResult) {
+        sendJson(res, 200, { status: "matched", match: matchedResult })
+        return
+      }
+      // Check if the ticket is still in queue
+      const ticket = matchmaker.getTicket(ticketId)
+      if (ticket) {
+        const queue = (matchmaker as any).queues.get(ticket.region) ?? []
+        const pos = queue.findIndex((t: any) => t.ticketId === ticketId) + 1
+        sendJson(res, 200, { status: "waiting", queuePosition: pos })
+        return
+      }
+      // Otherwise, not found (either expired or canceled)
+      sendJson(res, 200, { status: "not_found" })
     })
   }
 

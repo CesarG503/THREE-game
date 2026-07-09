@@ -1,0 +1,11 @@
+{
+  "weights": {
+    "intercept": 0.5,
+    "consecutiveLosses": 1.2,
+    "abandonCount": 2.0,
+    "sessionPlaytimeRatio": -0.8,
+    "historicalChurnScore": 2.5,
+    "logMatchesPlayed": -0.5
+  },
+  "threshold": 0.85
+}

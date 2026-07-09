@@ -56,12 +56,19 @@ model PlayerFeatures {
   lastActive            DateTime
   totalPlayTime         Float    @default(0) // in seconds
   matchesPlayed         Int      @default(0)
+  matchesWon            Int      @default(0)
   preferredLanguage     String   @default("en")
   explorerRatio         Float?
   playerProfile         String?
   popularitySensitivity Float?
   returnIntent          Float?
   scheduleProfile       Json?
+  clusterId             String?
+  churnScore            Float?
+  atRisk                Boolean  @default(false)
+  temporalTag           String?
+  archetypeWeights      Json?
+  collaborativeEmbedding Json?
   user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@schema("analytics")
@@ -84,6 +91,7 @@ model MapFeatures {
   earlyAbandonRate Float?
   stickyFactor     Float?
   viralityFactor   Float?
+  collaborativeEmbedding Json?
   map             GameMap  @relation(fields: [mapId], references: [id], onDelete: Cascade)
 
   @@schema("analytics")
@@ -128,6 +136,18 @@ model DataQuarantine {
   payload       Json
   reason        String
   quarantinedAt DateTime @default(now())
+
+  @@schema("analytics")
+}
+
+model Experiment {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  isActive    Boolean  @default(true)
+  splitA      Int      @default(50) // Percentage allocated to variant A (0-100)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   @@schema("analytics")
 }

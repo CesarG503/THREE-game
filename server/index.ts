@@ -6,7 +6,7 @@ import "dotenv/config"
 import { createServer } from "node:http"
 import { WebSocketServer } from "ws"
 import type { ExtendedWebSocket, IncomingMessage } from "./types.js"
-import { RoomManager }    from "./managers/RoomManager.js"
+import { roomManager }    from "./managers/RoomManager.js"
 import { MessageRouter }  from "./handlers/MessageRouter.js"
 import { registerHandlers } from "./handlers/Handlers.js"
 import { handleJoinRoom } from "./handlers/Joinroom.js"
@@ -18,22 +18,25 @@ import { handleHttpRequest } from "./http/ApiServer.js"
 import { eventBuffer } from "./analytics/eventBuffer.js"
 import { eventWorker } from "./analytics/eventWorker.js"
 import { alertService } from "./analytics/monitoring/alerts.js"
+import { matchmaker } from "./services/Matchmaker.js"
+import { ewtCalculator } from "./services/matchmaking/ewt_calculator.js"
+import { notificationSystem } from "./services/NotificationSystem.js"
 import crypto from "node:crypto"
 
 // ── Bootstrap ──────────────────────────────────────────────────────────────
 
 const PORT = Number(process.env.PORT) || 8080
 
-const roomManager = new RoomManager()
-
 const router = new MessageRouter()
 registerHandlers(router)
 
 logger.info("Server", `Registered handlers: ${router.registeredTypes().join(", ")}`)
-void connectRedis().then(() => {
+void connectRedis().then(async () => {
   eventBuffer.start()
   eventWorker.start()
   alertService.start()
+  await ewtCalculator.start()
+  matchmaker.start()
 })
 
 // ── HTTP + WebSocket Server ────────────────────────────────────────────────
@@ -64,7 +67,7 @@ wss.on("connection", (ws: ExtendedWebSocket) => {
 
     // ── joinRoom bypasses session middleware ──────────────────────────────
     if (message.type === "joinRoom") {
-      handleJoinRoom(ws, message, roomManager)
+      void handleJoinRoom(ws, message, roomManager)
       return
     }
 
@@ -77,6 +80,9 @@ wss.on("connection", (ws: ExtendedWebSocket) => {
 
   ws.on("close", () => {
     const { playerId, roomId, connectedAt, userId } = ws
+    if (userId) {
+      notificationSystem.unregisterSocket(userId, ws)
+    }
     if (!playerId || !roomId) return
 
     const durationSeconds = connectedAt ? Math.floor((Date.now() - connectedAt) / 1000) : 0
@@ -127,6 +133,8 @@ async function shutdown(signal: string): Promise<void> {
   eventWorker.stop()
   eventBuffer.stop()
   alertService.stop()
+  ewtCalculator.stop()
+  matchmaker.stop()
   try {
     await eventBuffer.flush()
   } catch (err) {

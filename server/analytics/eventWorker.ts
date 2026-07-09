@@ -4,8 +4,10 @@ import { logger } from "../utils/Logger.js";
 import type { TelemetryEvent } from "./eventBuffer.js";
 import { computeReturnIntentForUser } from "./features/return_intent.js";
 import { computeScheduleProfileForUser } from "./features/schedule_profile.js";
+import { computeLanguagePreferenceForUser } from "./features/language_matcher.js";
 import { metricsCollector } from "./monitoring/metricsCollector.js";
 import { performance } from "node:perf_hooks";
+import { evaluateUserChurn } from "./ml/churn_evaluator.js";
 
 export class EventWorker {
   private isRunning = false;
@@ -127,14 +129,17 @@ export class EventWorker {
       metricsCollector.recordLatencies(latencies);
     }
 
-    // Post-ingestion: Trigger calculations for SessionStart and SessionEnd events
+    // Post-ingestion: Trigger calculations for SessionStart, SessionEnd, MatchLeave and MatchEnd events
     const sessionStartUserIds = new Set<string>();
     const sessionEndUserIds = new Set<string>();
+    const matchActivityUserIds = new Set<string>();
     for (const event of events) {
       if (event.eventType === "SessionStart" && event.userId) {
         sessionStartUserIds.add(event.userId);
       } else if (event.eventType === "SessionEnd" && event.userId) {
         sessionEndUserIds.add(event.userId);
+      } else if ((event.eventType === "MatchLeave" || event.eventType === "MatchEnd") && event.userId) {
+        matchActivityUserIds.add(event.userId);
       }
     }
 
@@ -143,6 +148,9 @@ export class EventWorker {
         computeScheduleProfileForUser(userId).catch((err) => {
           logger.error("EventWorker", `Failed to run background schedule profiling for user ${userId}`, err);
         });
+        computeLanguagePreferenceForUser(userId).catch((err) => {
+          logger.error("EventWorker", `Failed to run background language profiling for user ${userId}`, err);
+        });
       }
     }
 
@@ -150,6 +158,14 @@ export class EventWorker {
       for (const userId of sessionEndUserIds) {
         computeReturnIntentForUser(userId).catch((err) => {
           logger.error("EventWorker", `Failed to run background IRI calculation for user ${userId}`, err);
+        });
+      }
+    }
+
+    if (matchActivityUserIds.size > 0) {
+      for (const userId of matchActivityUserIds) {
+        evaluateUserChurn(userId).catch((err) => {
+          logger.error("EventWorker", `Failed to run real-time churn prediction for user ${userId}`, err);
         });
       }
     }

@@ -12,8 +12,11 @@ import type {
   GameConfigUpdateMessage,
   PlayerConfigUpdateMessage,
   SimulationControlMessage,
+  NotificationClickMessage,
 } from "../types.js"
 import { logger } from "../utils/Logger.js"
+import { eventBuffer } from "../analytics/eventBuffer.js"
+import crypto from "node:crypto"
 
 /**
  * Registers all message handlers on the router.
@@ -229,5 +232,25 @@ export function registerHandlers(router: MessageRouter): void {
       state:    msg.state,
     }, playerId)
     logger.info(`Room:${roomId}`, `Simulation control (${msg.action}) by ${playerId}`)
+  })
+
+  // ── Retention / Notifications ──────────────────────────────────────────
+
+  router.register<NotificationClickMessage>("notificationClick", ({ ws }, msg) => {
+    if (!ws.userId) return
+    logger.info("NotificationClick", `User ${ws.userId} clicked notification ${msg.notificationId} (variant ${msg.variant})`)
+
+    // Record CTR Telemetry click event
+    eventBuffer.push({
+      id: crypto.randomUUID(),
+      eventType: "NotificationClick",
+      userId: ws.userId,
+      timestamp: new Date(),
+      payload: {
+        notificationId: msg.notificationId,
+        campaignName: msg.campaignName,
+        variant: msg.variant,
+      },
+    })
   })
 }

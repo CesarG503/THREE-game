@@ -41,6 +41,7 @@ model User {
   maps         GameMap[]
   assets       Asset[]
   matches      MatchPlayer[]
+  clusterId    String?
 }
 
 model UserSession {

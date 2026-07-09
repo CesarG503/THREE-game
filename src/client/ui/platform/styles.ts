@@ -834,6 +834,190 @@ export function injectPlatformStyles() {
 				grid-template-columns: repeat(2, minmax(0, 1fr));
 			}
 		}
+
+		/* Matchmaking Modal & UI */
+		.vp-modal-overlay {
+			position: fixed;
+			inset: 0;
+			background: rgba(5, 7, 13, 0.82);
+			backdrop-filter: blur(8px);
+			display: grid;
+			place-items: center;
+			z-index: 5000;
+			animation: vp-fade-in 0.25s ease-out;
+		}
+
+		.vp-modal {
+			background: rgba(17, 19, 27, 0.94);
+			border: 1px solid var(--vp-border-strong);
+			border-radius: calc(var(--vp-radius) * 1.5);
+			width: min(420px, 90vw);
+			padding: 28px;
+			box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
+			position: relative;
+			display: flex;
+			flex-direction: column;
+			gap: 20px;
+			animation: vp-slide-up 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+		}
+
+		.vp-modal-header {
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			border-bottom: 1px solid var(--vp-border);
+			padding-bottom: 14px;
+		}
+
+		.vp-modal-title {
+			margin: 0;
+			font-size: 18px;
+			font-weight: 950;
+			letter-spacing: -0.5px;
+			background: linear-gradient(135deg, #fff, var(--vp-cyan));
+			-webkit-background-clip: text;
+			-webkit-text-fill-color: transparent;
+		}
+
+		.vp-modal-close-btn {
+			background: transparent;
+			border: 0;
+			color: var(--vp-muted);
+			font-size: 20px;
+			cursor: pointer;
+			display: inline-flex;
+			padding: 4px;
+			border-radius: 50%;
+			transition: background 0.2s;
+		}
+
+		.vp-modal-close-btn:hover {
+			background: rgba(255, 255, 255, 0.08);
+			color: var(--vp-text);
+		}
+
+		.vp-modal-content {
+			display: flex;
+			flex-direction: column;
+			gap: 16px;
+		}
+
+		.vp-select {
+			width: 100%;
+			background: rgba(255, 255, 255, 0.05);
+			border: 1px solid var(--vp-border);
+			border-radius: var(--vp-radius);
+			color: var(--vp-text);
+			padding: 12px;
+			font-family: inherit;
+			font-size: 14px;
+			font-weight: 800;
+			outline: none;
+			cursor: pointer;
+			transition: border-color 0.2s;
+		}
+
+		.vp-select:focus {
+			border-color: var(--vp-cyan);
+		}
+
+		.vp-mm-ewt-display {
+			background: rgba(8, 217, 255, 0.06);
+			border: 1px solid rgba(8, 217, 255, 0.15);
+			border-radius: var(--vp-radius);
+			padding: 14px;
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			font-size: 13px;
+			font-weight: 800;
+			color: var(--vp-cyan);
+		}
+
+		.vp-mm-ewt-val {
+			font-size: 15px;
+			font-weight: 950;
+			color: #fff;
+			text-shadow: 0 0 10px rgba(8, 217, 255, 0.4);
+		}
+
+		.vp-mm-search-state {
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+			justify-content: center;
+			gap: 20px;
+			padding: 12px 0;
+		}
+
+		/* Pulsing Circle Animation */
+		.vp-mm-pulse-circle {
+			width: 76px;
+			height: 76px;
+			border-radius: 50%;
+			background: rgba(139, 92, 246, 0.1);
+			border: 2px solid var(--vp-purple);
+			display: grid;
+			place-items: center;
+			position: relative;
+			box-shadow: 0 0 20px rgba(139, 92, 246, 0.3);
+		}
+
+		.vp-mm-pulse-circle::before,
+		.vp-mm-pulse-circle::after {
+			content: "";
+			position: absolute;
+			inset: -2px;
+			border-radius: 50%;
+			border: 2px solid var(--vp-purple);
+			animation: vp-pulse 2s infinite ease-out;
+			opacity: 0;
+		}
+
+		.vp-mm-pulse-circle::after {
+			animation-delay: 1s;
+		}
+
+		.vp-mm-timer {
+			font-size: 26px;
+			font-weight: 950;
+			font-feature-settings: "tnum";
+			color: #fff;
+			text-shadow: 0 0 15px rgba(255, 255, 255, 0.3);
+		}
+
+		.vp-mm-search-msg {
+			font-size: 13px;
+			font-weight: 800;
+			color: var(--vp-muted);
+			text-align: center;
+			line-height: 1.4;
+		}
+
+		.vp-mm-cancel-btn {
+			width: 100%;
+		}
+
+		@keyframes vp-fade-in {
+			from { opacity: 0; }
+			to { opacity: 1; }
+		}
+
+		@keyframes vp-slide-up {
+			from { transform: translateY(16px); opacity: 0; }
+			to { transform: translateY(0); opacity: 1; }
+		}
+
+		@keyframes vp-pulse {
+			0% {
+				transform: scale(1);
+				opacity: 0.8;
+			}
+			100% {
+				transform: scale(1.6);
+				opacity: 0;
+			}
+		}
 	`;
 	document.head.appendChild(style);
 }

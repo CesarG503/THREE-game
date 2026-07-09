@@ -158,8 +158,186 @@ export function renderLobby(router: Router): () => void {
 		});
 	};
 
+	const openMatchmakingModal = (mapId?: string) => {
+		const overlay = createElement("div", "vp-modal-overlay");
+		const modal = createElement("div", "vp-modal");
+		
+		const header = createElement("div", "vp-modal-header");
+		const title = createElement("h2", "vp-modal-title", "Búsqueda de Partida");
+		const closeBtn = createButton("vp-modal-close-btn", "×", () => {
+			cleanupMatchmaking();
+			overlay.remove();
+		});
+		header.appendChild(title);
+		header.appendChild(closeBtn);
+		modal.appendChild(header);
+
+		const content = createElement("div", "vp-modal-content");
+		
+		const label = createElement("label", "vp-label", "Seleccionar Región");
+		const select = createElement("select", "vp-select") as HTMLSelectElement;
+		
+		const regions = [
+			{ code: "us-east", name: "EE.UU. Este (Virginia)" },
+			{ code: "eu-west", name: "Europa Oeste (Fráncfort)" },
+			{ code: "sa-east", name: "Sudamérica Este (São Paulo)" },
+			{ code: "asia-east", name: "Asia Este (Tokio)" },
+		];
+		
+		const savedRegion = localStorage.getItem("vp-preferred-region") || "us-east";
+		
+		regions.forEach((r) => {
+			const option = document.createElement("option");
+			option.value = r.code;
+			option.text = r.name;
+			if (r.code === savedRegion) option.selected = true;
+			select.appendChild(option);
+		});
+		
+		label.appendChild(select);
+		content.appendChild(label);
+		
+		const ewtDisplay = createElement("div", "vp-mm-ewt-display");
+		const ewtLabel = createElement("span", "", "Tiempo estimado:");
+		const ewtValue = createElement("span", "vp-mm-ewt-val", "Cargando...");
+		ewtDisplay.appendChild(ewtLabel);
+		ewtDisplay.appendChild(ewtValue);
+		content.appendChild(ewtDisplay);
+
+		const updateEWT = () => {
+			const region = select.value;
+			localStorage.setItem("vp-preferred-region", region);
+			
+			fetch(`/api/matchmaker/ewt?region=${region}`)
+				.then((res) => res.json())
+				.then((data) => {
+					ewtValue.textContent = data.estimatedWaitRange || "30-45s";
+				})
+				.catch(() => {
+					ewtValue.textContent = "30-45s";
+				});
+		};
+
+		select.onchange = updateEWT;
+		updateEWT();
+		
+		const actionBtn = createButton("vp-primary-btn", "Buscar Partida", () => {
+			startSearch(select.value);
+		});
+		content.appendChild(actionBtn);
+		
+		modal.appendChild(content);
+		overlay.appendChild(modal);
+		document.body.appendChild(overlay);
+
+		let searchInterval: any = null;
+		let ticketId: string | null = null;
+		let elapsedSeconds = 0;
+		let timerInterval: any = null;
+
+		const cleanupMatchmaking = () => {
+			if (searchInterval) {
+				clearInterval(searchInterval);
+				searchInterval = null;
+			}
+			if (timerInterval) {
+				clearInterval(timerInterval);
+				timerInterval = null;
+			}
+			if (ticketId) {
+				fetch("/api/matchmaker/leave", {
+					method: "DELETE",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({ ticketId }),
+				}).catch(() => {});
+				ticketId = null;
+			}
+		};
+
+		const startSearch = (region: string) => {
+			content.innerHTML = "";
+			
+			const searchState = createElement("div", "vp-mm-search-state");
+			
+			const pulseCircle = createElement("div", "vp-mm-pulse-circle");
+			const pulseIcon = createIcon("mdi:radar", "vp-brand-icon");
+			pulseIcon.style.color = "var(--vp-purple)";
+			pulseCircle.appendChild(pulseIcon);
+			searchState.appendChild(pulseCircle);
+			
+			const timerEl = createElement("div", "vp-mm-timer", "00:00");
+			searchState.appendChild(timerEl);
+			
+			const currentEWT = ewtValue.textContent;
+			const msgEl = createElement("div", "vp-mm-search-msg", `Buscando oponentes en ${regions.find(r => r.code === region)?.name}...\nTiempo estimado: ${currentEWT}`);
+			searchState.appendChild(msgEl);
+			
+			const cancelBtn = createButton("vp-secondary-btn vp-mm-cancel-btn", "Cancelar Búsqueda", () => {
+				cleanupMatchmaking();
+				overlay.remove();
+			});
+			
+			content.appendChild(searchState);
+			content.appendChild(cancelBtn);
+			
+			const joinPayload: any = { region };
+			if (mapId) joinPayload.mapId = mapId;
+			if (auth?.user?.id) joinPayload.userId = auth.user.id;
+			
+			fetch("/api/matchmaker/join", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify(joinPayload),
+			})
+				.then((res) => res.json())
+				.then((data) => {
+					ticketId = data.ticketId;
+					
+					timerInterval = setInterval(() => {
+						elapsedSeconds++;
+						const m = Math.floor(elapsedSeconds / 60).toString().padStart(2, "0");
+						const s = (elapsedSeconds % 60).toString().padStart(2, "0");
+						timerEl.textContent = `${m}:${s}`;
+					}, 1000);
+					
+					searchInterval = setInterval(() => {
+						if (!ticketId) return;
+						fetch(`/api/matchmaker/ticket?ticketId=${ticketId}`)
+							.then((res) => res.json())
+							.then((ticketData) => {
+								if (ticketData.status === "matched") {
+									const match = ticketData.match;
+									cleanupMatchmaking();
+									overlay.remove();
+									router.navigate("play", match.roomId);
+								} else if (ticketData.status === "waiting") {
+									msgEl.textContent = `Buscando oponentes (Posición: ${ticketData.queuePosition})...\nTiempo estimado: ${currentEWT}`;
+								} else if (ticketData.status === "not_found") {
+									cleanupMatchmaking();
+									overlay.remove();
+									alert("La búsqueda de partida expiró o fue cancelada.");
+								}
+							})
+							.catch((err) => {
+								console.error("Error polling matchmaking ticket status", err);
+							});
+					}, 2000);
+				})
+				.catch((err) => {
+					console.error("Failed to join matchmaking queue", err);
+					cleanupMatchmaking();
+					overlay.remove();
+					alert("Error al iniciar el emparejamiento. Intente de nuevo.");
+				});
+		};
+	};
+
 	const navigateToMap = (mode: "play" | "editor", map: PlatformMap) => {
-		router.navigate(mode, map.slug);
+		if (mode === "play") {
+			openMatchmakingModal(map.id);
+		} else {
+			router.navigate(mode, map.slug);
+		}
 	};
 
 	const switchView = (view: LobbyView) => {
@@ -286,7 +464,7 @@ export function renderLobby(router: Router): () => void {
 			if (featured) {
 				navigateToMap("play", featured);
 			} else {
-				router.navigate("play");
+				openMatchmakingModal();
 			}
 		});
 		prependIcon(playNowButton, "mdi:play");
@@ -337,7 +515,7 @@ export function renderLobby(router: Router): () => void {
 			}
 		} else {
 			actions.appendChild(prependIcon(createButton("vp-primary-btn vp-icon-btn", "Crear mapa", () => switchView("create")), "mdi:hammer-wrench"));
-			actions.appendChild(prependIcon(createButton("vp-secondary-btn vp-icon-btn", "Jugar sala libre", () => router.navigate("play")), "mdi:gamepad-variant"));
+			actions.appendChild(prependIcon(createButton("vp-secondary-btn vp-icon-btn", "Jugar sala libre", () => openMatchmakingModal()), "mdi:gamepad-variant"));
 		}
 
 		body.appendChild(badges);

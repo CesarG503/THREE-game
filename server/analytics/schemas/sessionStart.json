@@ -10,6 +10,9 @@
     },
     "screenResolution": {
       "type": "string"
+    },
+    "acceptLanguage": {
+      "type": ["string", "null"]
     }
   },
   "required": ["userAgent"],

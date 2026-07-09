@@ -195,6 +195,27 @@ export class RoomManager {
     }
   }
 
+  getActiveRoomsAndPlayers(): { roomId: string; players: { playerId: string; userId: string | null; name: string }[] }[] {
+    const results = []
+    for (const [roomId, playerMap] of this.rooms.entries()) {
+      const playersList = []
+      const socketsMap = this.roomSockets.get(roomId)
+      for (const [playerId, playerData] of playerMap.entries()) {
+        const ws = socketsMap?.get(playerId)
+        playersList.push({
+          playerId,
+          userId: ws?.userId ?? null,
+          name: playerData.name,
+        })
+      }
+      results.push({
+        roomId,
+        players: playersList,
+      })
+    }
+    return results
+  }
+
   // ── Diagnostics ────────────────────────────────────────────────────────
 
   stats(): { rooms: number; players: number } {
@@ -203,3 +224,6 @@ export class RoomManager {
     return { rooms: this.rooms.size, players }
   }
 }
+
+export const roomManager = new RoomManager()
+

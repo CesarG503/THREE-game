@@ -31,6 +31,7 @@ export interface IGameMapProfile {
   earlyAbandonRate: number | null;
   stickyFactor: number | null;
   viralityFactor: number | null;
+  collaborativeEmbedding: number[] | null;
 }
 
 export class MapProfileRepository {
@@ -129,6 +130,7 @@ export class MapProfileRepository {
       earlyAbandonRate: features?.earlyAbandonRate ?? null,
       stickyFactor: features?.stickyFactor ?? null,
       viralityFactor: features?.viralityFactor ?? null,
+      collaborativeEmbedding: (features?.collaborativeEmbedding as number[]) ?? null,
     };
 
     // 5. Intentar escribir en el caché de Redis

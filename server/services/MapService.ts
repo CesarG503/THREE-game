@@ -178,7 +178,7 @@ export async function deleteMap(identifier: string, ownerId: string) {
   return { ok: true }
 }
 
-const mapInclude = {
+export const mapInclude = {
   owner: {
     select: {
       id: true,
@@ -215,9 +215,10 @@ const mapInclude = {
   },
 } satisfies Prisma.GameMapInclude
 
-type MapWithInclude = Prisma.GameMapGetPayload<{ include: typeof mapInclude }>
+export type MapWithInclude = Prisma.GameMapGetPayload<{ include: typeof mapInclude }>
+export type MapDto = ReturnType<typeof toMapDto>
 
-function toMapDto(map: MapWithInclude, includeData: boolean) {
+export function toMapDto(map: MapWithInclude, includeData: boolean) {
   const currentVersion = map.versions[0] ?? null
   const data = currentVersion?.data ?? null
 

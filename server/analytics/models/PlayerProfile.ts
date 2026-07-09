@@ -2,6 +2,7 @@ import { prisma } from "../../db/prisma.js";
 import { analyticsPrisma } from "../../db/analyticsPrisma.js";
 import { getRedis } from "../../cache/redis.js";
 import { logger } from "../../utils/Logger.js";
+import { productionFeatureStore } from "../features/ProductionStore.js";
 
 export interface IPlayerProfile {
   // Operational details (User)
@@ -10,6 +11,7 @@ export interface IPlayerProfile {
   username: string;
   displayName: string | null;
   createdAt: Date;
+  clusterId: string | null;
 
   // Analytical features (PlayerFeatures)
   lastActive: Date | null;
@@ -21,6 +23,11 @@ export interface IPlayerProfile {
   popularitySensitivity: number | null;
   returnIntent: number | null;
   scheduleProfile: any | null;
+  churnScore: number | null;
+  atRisk: boolean | null;
+  temporalTag: string | null;
+  archetypeWeights: any | null;
+  collaborativeEmbedding: number[] | null;
 }
 
 export class PlayerProfileRepository {
@@ -67,6 +74,7 @@ export class PlayerProfileRepository {
         username: true,
         displayName: true,
         createdAt: true,
+        clusterId: true,
       },
     });
 
@@ -75,10 +83,8 @@ export class PlayerProfileRepository {
       return null;
     }
 
-    // 3. Consultar base de datos analítica (PlayerFeatures)
-    const features = await analyticsPrisma.playerFeatures.findUnique({
-      where: { userId },
-    });
+    // 3. Consultar la Feature Store en caliente (Redis + DB Fallback)
+    const features = await productionFeatureStore.getPlayerFeatures(userId);
 
     // 4. Consolidar el objeto unificado
     const profile: IPlayerProfile = {
@@ -87,6 +93,7 @@ export class PlayerProfileRepository {
       username: user.username,
       displayName: user.displayName,
       createdAt: user.createdAt,
+      clusterId: user.clusterId ?? features?.clusterId ?? null,
 
       lastActive: features?.lastActive ?? null,
       totalPlayTime: features?.totalPlayTime ?? null,
@@ -97,6 +104,11 @@ export class PlayerProfileRepository {
       popularitySensitivity: features?.popularitySensitivity ?? null,
       returnIntent: features?.returnIntent ?? null,
       scheduleProfile: features?.scheduleProfile ?? null,
+      churnScore: features?.churnScore ?? null,
+      atRisk: features?.atRisk ?? null,
+      temporalTag: features?.temporalTag ?? null,
+      archetypeWeights: features?.archetypeWeights ?? null,
+      collaborativeEmbedding: (features?.collaborativeEmbedding as number[]) ?? null,
     };
 
     // 5. Intentar escribir en el caché de Redis

@@ -142,7 +142,7 @@ export class TelemetryAlertService {
   private cleanAndGetCount(eventType: string, now: number): number {
     const list = this.receivedTimestamps.get(eventType) ?? [];
     const limit = now - 15 * 60 * 1000;
-    while (list.length > 0 && list[0] < limit) {
+    while (list.length > 0 && list[0] !== undefined && list[0] < limit) {
       list.shift();
     }
     return list.length;

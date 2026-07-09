@@ -60,6 +60,7 @@ export interface JoinRoomMessage extends BaseMessage {
   type: "joinRoom"
   roomId?: string
   playerName?: string
+  token?: string
 }
 
 export interface PlayerUpdateMessage extends BaseMessage {
@@ -159,6 +160,13 @@ export interface SimulationControlMessage extends BaseMessage {
   state: unknown
 }
 
+export interface NotificationClickMessage extends BaseMessage {
+  type: "notificationClick"
+  notificationId: string
+  campaignName: string
+  variant: "A" | "B"
+}
+
 export type IncomingMessage =
   | JoinRoomMessage
   | PlayerUpdateMessage
@@ -173,6 +181,7 @@ export type IncomingMessage =
   | GameConfigUpdateMessage
   | PlayerConfigUpdateMessage
   | SimulationControlMessage
+  | NotificationClickMessage
 
 // ── Outgoing Messages ─────────────────────────────
 export interface WelcomeMessage extends BaseMessage {
@@ -204,6 +213,22 @@ export interface RequestMapSyncMessage extends BaseMessage {
   targetId: string
 }
 
+export interface MatchmakingFoundMessage extends BaseMessage {
+  type: "matchmakingFound"
+  roomId: string
+  region: string
+  players: { ticketId: string; userId: string | null; playerId: string | null }[]
+  averageLatency: number
+}
+
+export interface MatchmakingStatusMessage extends BaseMessage {
+  type: "matchmakingStatus"
+  ticketId: string
+  queuePosition: number
+  estimatedWaitMs: number
+  region: string
+}
+
 export type OutgoingMessage =
   | WelcomeMessage
   | GameStateMessage
@@ -223,3 +248,6 @@ export type OutgoingMessage =
   | GameConfigUpdateMessage
   | PlayerConfigUpdateMessage
   | SimulationControlMessage
+  | MatchmakingFoundMessage
+  | MatchmakingStatusMessage
+

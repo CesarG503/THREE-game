@@ -1,6 +1,7 @@
 import { getRedis } from "../cache/redis.js";
 import { logger } from "../utils/Logger.js";
 import { anonymizeTelemetryEvent } from "./middleware/privacy.js";
+import { abSdk } from "./experiments/ab_sdk.js";
 
 export interface TelemetryEvent {
   id: string;
@@ -40,6 +41,19 @@ export class EventBuffer {
       );
       return false;
     }
+
+    // Automatically enrich event payload with active A/B testing variants
+    if (event.userId) {
+      const activeExps = abSdk.getActiveExperiments();
+      if (activeExps.length > 0) {
+        event.payload = event.payload || {};
+        event.payload.ab_variants = event.payload.ab_variants || {};
+        for (const exp of activeExps) {
+          event.payload.ab_variants[exp.name] = abSdk.getVariant(event.userId, exp.name);
+        }
+      }
+    }
+
     const sanitized = anonymizeTelemetryEvent(event);
     this.buffer.push(sanitized);
     return true;

@@ -152,12 +152,19 @@ exports.Prisma.PlayerFeaturesScalarFieldEnum = {
   lastActive: 'lastActive',
   totalPlayTime: 'totalPlayTime',
   matchesPlayed: 'matchesPlayed',
+  matchesWon: 'matchesWon',
   preferredLanguage: 'preferredLanguage',
   explorerRatio: 'explorerRatio',
   playerProfile: 'playerProfile',
   popularitySensitivity: 'popularitySensitivity',
   returnIntent: 'returnIntent',
-  scheduleProfile: 'scheduleProfile'
+  scheduleProfile: 'scheduleProfile',
+  clusterId: 'clusterId',
+  churnScore: 'churnScore',
+  atRisk: 'atRisk',
+  temporalTag: 'temporalTag',
+  archetypeWeights: 'archetypeWeights',
+  collaborativeEmbedding: 'collaborativeEmbedding'
 };
 
 exports.Prisma.MapFeaturesScalarFieldEnum = {
@@ -176,7 +183,8 @@ exports.Prisma.MapFeaturesScalarFieldEnum = {
   paceLabel: 'paceLabel',
   earlyAbandonRate: 'earlyAbandonRate',
   stickyFactor: 'stickyFactor',
-  viralityFactor: 'viralityFactor'
+  viralityFactor: 'viralityFactor',
+  collaborativeEmbedding: 'collaborativeEmbedding'
 };
 
 exports.Prisma.SocialAffinityScalarFieldEnum = {
@@ -203,6 +211,16 @@ exports.Prisma.DataQuarantineScalarFieldEnum = {
   payload: 'payload',
   reason: 'reason',
   quarantinedAt: 'quarantinedAt'
+};
+
+exports.Prisma.ExperimentScalarFieldEnum = {
+  id: 'id',
+  name: 'name',
+  description: 'description',
+  isActive: 'isActive',
+  splitA: 'splitA',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
 };
 
 exports.Prisma.SortOrder = {
@@ -244,7 +262,8 @@ exports.Prisma.ModelName = {
   MapFeatures: 'MapFeatures',
   SocialAffinity: 'SocialAffinity',
   FatiguedMap: 'FatiguedMap',
-  DataQuarantine: 'DataQuarantine'
+  DataQuarantine: 'DataQuarantine',
+  Experiment: 'Experiment'
 };
 
 /**

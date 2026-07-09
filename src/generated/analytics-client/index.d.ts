@@ -53,6 +53,11 @@ export type FatiguedMap = $Result.DefaultSelection<Prisma.$FatiguedMapPayload>
  * 
  */
 export type DataQuarantine = $Result.DefaultSelection<Prisma.$DataQuarantinePayload>
+/**
+ * Model Experiment
+ * 
+ */
+export type Experiment = $Result.DefaultSelection<Prisma.$ExperimentPayload>
 
 /**
  * ##  Prisma Client ʲˢ
@@ -254,6 +259,16 @@ export class PrismaClient<
     * ```
     */
   get dataQuarantine(): Prisma.DataQuarantineDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.experiment`: Exposes CRUD operations for the **Experiment** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more Experiments
+    * const experiments = await prisma.experiment.findMany()
+    * ```
+    */
+  get experiment(): Prisma.ExperimentDelegate<ExtArgs, ClientOptions>;
 }
 
 export namespace Prisma {
@@ -695,7 +710,8 @@ export namespace Prisma {
     MapFeatures: 'MapFeatures',
     SocialAffinity: 'SocialAffinity',
     FatiguedMap: 'FatiguedMap',
-    DataQuarantine: 'DataQuarantine'
+    DataQuarantine: 'DataQuarantine',
+    Experiment: 'Experiment'
   };
 
   export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -711,7 +727,7 @@ export namespace Prisma {
       omit: GlobalOmitOptions
     }
     meta: {
-      modelProps: "user" | "gameMap" | "rawEvent" | "playerFeatures" | "mapFeatures" | "socialAffinity" | "fatiguedMap" | "dataQuarantine"
+      modelProps: "user" | "gameMap" | "rawEvent" | "playerFeatures" | "mapFeatures" | "socialAffinity" | "fatiguedMap" | "dataQuarantine" | "experiment"
       txIsolationLevel: Prisma.TransactionIsolationLevel
     }
     model: {
@@ -1307,6 +1323,80 @@ export namespace Prisma {
           }
         }
       }
+      Experiment: {
+        payload: Prisma.$ExperimentPayload<ExtArgs>
+        fields: Prisma.ExperimentFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.ExperimentFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ExperimentPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.ExperimentFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ExperimentPayload>
+          }
+          findFirst: {
+            args: Prisma.ExperimentFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ExperimentPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.ExperimentFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ExperimentPayload>
+          }
+          findMany: {
+            args: Prisma.ExperimentFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ExperimentPayload>[]
+          }
+          create: {
+            args: Prisma.ExperimentCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ExperimentPayload>
+          }
+          createMany: {
+            args: Prisma.ExperimentCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.ExperimentCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ExperimentPayload>[]
+          }
+          delete: {
+            args: Prisma.ExperimentDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ExperimentPayload>
+          }
+          update: {
+            args: Prisma.ExperimentUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ExperimentPayload>
+          }
+          deleteMany: {
+            args: Prisma.ExperimentDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.ExperimentUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.ExperimentUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ExperimentPayload>[]
+          }
+          upsert: {
+            args: Prisma.ExperimentUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ExperimentPayload>
+          }
+          aggregate: {
+            args: Prisma.ExperimentAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateExperiment>
+          }
+          groupBy: {
+            args: Prisma.ExperimentGroupByArgs<ExtArgs>
+            result: $Utils.Optional<ExperimentGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.ExperimentCountArgs<ExtArgs>
+            result: $Utils.Optional<ExperimentCountAggregateOutputType> | number
+          }
+        }
+      }
     }
   } & {
     other: {
@@ -1423,6 +1513,7 @@ export namespace Prisma {
     socialAffinity?: SocialAffinityOmit
     fatiguedMap?: FatiguedMapOmit
     dataQuarantine?: DataQuarantineOmit
+    experiment?: ExperimentOmit
   }
 
   /* Types for Logging */
@@ -5003,17 +5094,21 @@ export namespace Prisma {
   export type PlayerFeaturesAvgAggregateOutputType = {
     totalPlayTime: number | null
     matchesPlayed: number | null
+    matchesWon: number | null
     explorerRatio: number | null
     popularitySensitivity: number | null
     returnIntent: number | null
+    churnScore: number | null
   }
 
   export type PlayerFeaturesSumAggregateOutputType = {
     totalPlayTime: number | null
     matchesPlayed: number | null
+    matchesWon: number | null
     explorerRatio: number | null
     popularitySensitivity: number | null
     returnIntent: number | null
+    churnScore: number | null
   }
 
   export type PlayerFeaturesMinAggregateOutputType = {
@@ -5021,11 +5116,16 @@ export namespace Prisma {
     lastActive: Date | null
     totalPlayTime: number | null
     matchesPlayed: number | null
+    matchesWon: number | null
     preferredLanguage: string | null
     explorerRatio: number | null
     playerProfile: string | null
     popularitySensitivity: number | null
     returnIntent: number | null
+    clusterId: string | null
+    churnScore: number | null
+    atRisk: boolean | null
+    temporalTag: string | null
   }
 
   export type PlayerFeaturesMaxAggregateOutputType = {
@@ -5033,11 +5133,16 @@ export namespace Prisma {
     lastActive: Date | null
     totalPlayTime: number | null
     matchesPlayed: number | null
+    matchesWon: number | null
     preferredLanguage: string | null
     explorerRatio: number | null
     playerProfile: string | null
     popularitySensitivity: number | null
     returnIntent: number | null
+    clusterId: string | null
+    churnScore: number | null
+    atRisk: boolean | null
+    temporalTag: string | null
   }
 
   export type PlayerFeaturesCountAggregateOutputType = {
@@ -5045,12 +5150,19 @@ export namespace Prisma {
     lastActive: number
     totalPlayTime: number
     matchesPlayed: number
+    matchesWon: number
     preferredLanguage: number
     explorerRatio: number
     playerProfile: number
     popularitySensitivity: number
     returnIntent: number
     scheduleProfile: number
+    clusterId: number
+    churnScore: number
+    atRisk: number
+    temporalTag: number
+    archetypeWeights: number
+    collaborativeEmbedding: number
     _all: number
   }
 
@@ -5058,17 +5170,21 @@ export namespace Prisma {
   export type PlayerFeaturesAvgAggregateInputType = {
     totalPlayTime?: true
     matchesPlayed?: true
+    matchesWon?: true
     explorerRatio?: true
     popularitySensitivity?: true
     returnIntent?: true
+    churnScore?: true
   }
 
   export type PlayerFeaturesSumAggregateInputType = {
     totalPlayTime?: true
     matchesPlayed?: true
+    matchesWon?: true
     explorerRatio?: true
     popularitySensitivity?: true
     returnIntent?: true
+    churnScore?: true
   }
 
   export type PlayerFeaturesMinAggregateInputType = {
@@ -5076,11 +5192,16 @@ export namespace Prisma {
     lastActive?: true
     totalPlayTime?: true
     matchesPlayed?: true
+    matchesWon?: true
     preferredLanguage?: true
     explorerRatio?: true
     playerProfile?: true
     popularitySensitivity?: true
     returnIntent?: true
+    clusterId?: true
+    churnScore?: true
+    atRisk?: true
+    temporalTag?: true
   }
 
   export type PlayerFeaturesMaxAggregateInputType = {
@@ -5088,11 +5209,16 @@ export namespace Prisma {
     lastActive?: true
     totalPlayTime?: true
     matchesPlayed?: true
+    matchesWon?: true
     preferredLanguage?: true
     explorerRatio?: true
     playerProfile?: true
     popularitySensitivity?: true
     returnIntent?: true
+    clusterId?: true
+    churnScore?: true
+    atRisk?: true
+    temporalTag?: true
   }
 
   export type PlayerFeaturesCountAggregateInputType = {
@@ -5100,12 +5226,19 @@ export namespace Prisma {
     lastActive?: true
     totalPlayTime?: true
     matchesPlayed?: true
+    matchesWon?: true
     preferredLanguage?: true
     explorerRatio?: true
     playerProfile?: true
     popularitySensitivity?: true
     returnIntent?: true
     scheduleProfile?: true
+    clusterId?: true
+    churnScore?: true
+    atRisk?: true
+    temporalTag?: true
+    archetypeWeights?: true
+    collaborativeEmbedding?: true
     _all?: true
   }
 
@@ -5200,12 +5333,19 @@ export namespace Prisma {
     lastActive: Date
     totalPlayTime: number
     matchesPlayed: number
+    matchesWon: number
     preferredLanguage: string
     explorerRatio: number | null
     playerProfile: string | null
     popularitySensitivity: number | null
     returnIntent: number | null
     scheduleProfile: JsonValue | null
+    clusterId: string | null
+    churnScore: number | null
+    atRisk: boolean
+    temporalTag: string | null
+    archetypeWeights: JsonValue | null
+    collaborativeEmbedding: JsonValue | null
     _count: PlayerFeaturesCountAggregateOutputType | null
     _avg: PlayerFeaturesAvgAggregateOutputType | null
     _sum: PlayerFeaturesSumAggregateOutputType | null
@@ -5232,12 +5372,19 @@ export namespace Prisma {
     lastActive?: boolean
     totalPlayTime?: boolean
     matchesPlayed?: boolean
+    matchesWon?: boolean
     preferredLanguage?: boolean
     explorerRatio?: boolean
     playerProfile?: boolean
     popularitySensitivity?: boolean
     returnIntent?: boolean
     scheduleProfile?: boolean
+    clusterId?: boolean
+    churnScore?: boolean
+    atRisk?: boolean
+    temporalTag?: boolean
+    archetypeWeights?: boolean
+    collaborativeEmbedding?: boolean
     user?: boolean | UserDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["playerFeatures"]>
 
@@ -5246,12 +5393,19 @@ export namespace Prisma {
     lastActive?: boolean
     totalPlayTime?: boolean
     matchesPlayed?: boolean
+    matchesWon?: boolean
     preferredLanguage?: boolean
     explorerRatio?: boolean
     playerProfile?: boolean
     popularitySensitivity?: boolean
     returnIntent?: boolean
     scheduleProfile?: boolean
+    clusterId?: boolean
+    churnScore?: boolean
+    atRisk?: boolean
+    temporalTag?: boolean
+    archetypeWeights?: boolean
+    collaborativeEmbedding?: boolean
     user?: boolean | UserDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["playerFeatures"]>
 
@@ -5260,12 +5414,19 @@ export namespace Prisma {
     lastActive?: boolean
     totalPlayTime?: boolean
     matchesPlayed?: boolean
+    matchesWon?: boolean
     preferredLanguage?: boolean
     explorerRatio?: boolean
     playerProfile?: boolean
     popularitySensitivity?: boolean
     returnIntent?: boolean
     scheduleProfile?: boolean
+    clusterId?: boolean
+    churnScore?: boolean
+    atRisk?: boolean
+    temporalTag?: boolean
+    archetypeWeights?: boolean
+    collaborativeEmbedding?: boolean
     user?: boolean | UserDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["playerFeatures"]>
 
@@ -5274,15 +5435,22 @@ export namespace Prisma {
     lastActive?: boolean
     totalPlayTime?: boolean
     matchesPlayed?: boolean
+    matchesWon?: boolean
     preferredLanguage?: boolean
     explorerRatio?: boolean
     playerProfile?: boolean
     popularitySensitivity?: boolean
     returnIntent?: boolean
     scheduleProfile?: boolean
+    clusterId?: boolean
+    churnScore?: boolean
+    atRisk?: boolean
+    temporalTag?: boolean
+    archetypeWeights?: boolean
+    collaborativeEmbedding?: boolean
   }
 
-  export type PlayerFeaturesOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"userId" | "lastActive" | "totalPlayTime" | "matchesPlayed" | "preferredLanguage" | "explorerRatio" | "playerProfile" | "popularitySensitivity" | "returnIntent" | "scheduleProfile", ExtArgs["result"]["playerFeatures"]>
+  export type PlayerFeaturesOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"userId" | "lastActive" | "totalPlayTime" | "matchesPlayed" | "matchesWon" | "preferredLanguage" | "explorerRatio" | "playerProfile" | "popularitySensitivity" | "returnIntent" | "scheduleProfile" | "clusterId" | "churnScore" | "atRisk" | "temporalTag" | "archetypeWeights" | "collaborativeEmbedding", ExtArgs["result"]["playerFeatures"]>
   export type PlayerFeaturesInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     user?: boolean | UserDefaultArgs<ExtArgs>
   }
@@ -5303,12 +5471,19 @@ export namespace Prisma {
       lastActive: Date
       totalPlayTime: number
       matchesPlayed: number
+      matchesWon: number
       preferredLanguage: string
       explorerRatio: number | null
       playerProfile: string | null
       popularitySensitivity: number | null
       returnIntent: number | null
       scheduleProfile: Prisma.JsonValue | null
+      clusterId: string | null
+      churnScore: number | null
+      atRisk: boolean
+      temporalTag: string | null
+      archetypeWeights: Prisma.JsonValue | null
+      collaborativeEmbedding: Prisma.JsonValue | null
     }, ExtArgs["result"]["playerFeatures"]>
     composites: {}
   }
@@ -5737,12 +5912,19 @@ export namespace Prisma {
     readonly lastActive: FieldRef<"PlayerFeatures", 'DateTime'>
     readonly totalPlayTime: FieldRef<"PlayerFeatures", 'Float'>
     readonly matchesPlayed: FieldRef<"PlayerFeatures", 'Int'>
+    readonly matchesWon: FieldRef<"PlayerFeatures", 'Int'>
     readonly preferredLanguage: FieldRef<"PlayerFeatures", 'String'>
     readonly explorerRatio: FieldRef<"PlayerFeatures", 'Float'>
     readonly playerProfile: FieldRef<"PlayerFeatures", 'String'>
     readonly popularitySensitivity: FieldRef<"PlayerFeatures", 'Float'>
     readonly returnIntent: FieldRef<"PlayerFeatures", 'Float'>
     readonly scheduleProfile: FieldRef<"PlayerFeatures", 'Json'>
+    readonly clusterId: FieldRef<"PlayerFeatures", 'String'>
+    readonly churnScore: FieldRef<"PlayerFeatures", 'Float'>
+    readonly atRisk: FieldRef<"PlayerFeatures", 'Boolean'>
+    readonly temporalTag: FieldRef<"PlayerFeatures", 'String'>
+    readonly archetypeWeights: FieldRef<"PlayerFeatures", 'Json'>
+    readonly collaborativeEmbedding: FieldRef<"PlayerFeatures", 'Json'>
   }
     
 
@@ -6257,6 +6439,7 @@ export namespace Prisma {
     earlyAbandonRate: number
     stickyFactor: number
     viralityFactor: number
+    collaborativeEmbedding: number
     _all: number
   }
 
@@ -6344,6 +6527,7 @@ export namespace Prisma {
     earlyAbandonRate?: true
     stickyFactor?: true
     viralityFactor?: true
+    collaborativeEmbedding?: true
     _all?: true
   }
 
@@ -6450,6 +6634,7 @@ export namespace Prisma {
     earlyAbandonRate: number | null
     stickyFactor: number | null
     viralityFactor: number | null
+    collaborativeEmbedding: JsonValue | null
     _count: MapFeaturesCountAggregateOutputType | null
     _avg: MapFeaturesAvgAggregateOutputType | null
     _sum: MapFeaturesSumAggregateOutputType | null
@@ -6488,6 +6673,7 @@ export namespace Prisma {
     earlyAbandonRate?: boolean
     stickyFactor?: boolean
     viralityFactor?: boolean
+    collaborativeEmbedding?: boolean
     map?: boolean | GameMapDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["mapFeatures"]>
 
@@ -6508,6 +6694,7 @@ export namespace Prisma {
     earlyAbandonRate?: boolean
     stickyFactor?: boolean
     viralityFactor?: boolean
+    collaborativeEmbedding?: boolean
     map?: boolean | GameMapDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["mapFeatures"]>
 
@@ -6528,6 +6715,7 @@ export namespace Prisma {
     earlyAbandonRate?: boolean
     stickyFactor?: boolean
     viralityFactor?: boolean
+    collaborativeEmbedding?: boolean
     map?: boolean | GameMapDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["mapFeatures"]>
 
@@ -6548,9 +6736,10 @@ export namespace Prisma {
     earlyAbandonRate?: boolean
     stickyFactor?: boolean
     viralityFactor?: boolean
+    collaborativeEmbedding?: boolean
   }
 
-  export type MapFeaturesOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"mapId" | "totalJoins" | "totalLeaves" | "bounceCount" | "averageDuration" | "bounceRate" | "medianPlaytime" | "completionRate" | "retentionCurve" | "difficultyScore" | "difficultyLabel" | "paceScore" | "paceLabel" | "earlyAbandonRate" | "stickyFactor" | "viralityFactor", ExtArgs["result"]["mapFeatures"]>
+  export type MapFeaturesOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"mapId" | "totalJoins" | "totalLeaves" | "bounceCount" | "averageDuration" | "bounceRate" | "medianPlaytime" | "completionRate" | "retentionCurve" | "difficultyScore" | "difficultyLabel" | "paceScore" | "paceLabel" | "earlyAbandonRate" | "stickyFactor" | "viralityFactor" | "collaborativeEmbedding", ExtArgs["result"]["mapFeatures"]>
   export type MapFeaturesInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     map?: boolean | GameMapDefaultArgs<ExtArgs>
   }
@@ -6583,6 +6772,7 @@ export namespace Prisma {
       earlyAbandonRate: number | null
       stickyFactor: number | null
       viralityFactor: number | null
+      collaborativeEmbedding: Prisma.JsonValue | null
     }, ExtArgs["result"]["mapFeatures"]>
     composites: {}
   }
@@ -7023,6 +7213,7 @@ export namespace Prisma {
     readonly earlyAbandonRate: FieldRef<"MapFeatures", 'Float'>
     readonly stickyFactor: FieldRef<"MapFeatures", 'Float'>
     readonly viralityFactor: FieldRef<"MapFeatures", 'Float'>
+    readonly collaborativeEmbedding: FieldRef<"MapFeatures", 'Json'>
   }
     
 
@@ -10641,6 +10832,1066 @@ export namespace Prisma {
 
 
   /**
+   * Model Experiment
+   */
+
+  export type AggregateExperiment = {
+    _count: ExperimentCountAggregateOutputType | null
+    _avg: ExperimentAvgAggregateOutputType | null
+    _sum: ExperimentSumAggregateOutputType | null
+    _min: ExperimentMinAggregateOutputType | null
+    _max: ExperimentMaxAggregateOutputType | null
+  }
+
+  export type ExperimentAvgAggregateOutputType = {
+    splitA: number | null
+  }
+
+  export type ExperimentSumAggregateOutputType = {
+    splitA: number | null
+  }
+
+  export type ExperimentMinAggregateOutputType = {
+    id: string | null
+    name: string | null
+    description: string | null
+    isActive: boolean | null
+    splitA: number | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type ExperimentMaxAggregateOutputType = {
+    id: string | null
+    name: string | null
+    description: string | null
+    isActive: boolean | null
+    splitA: number | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type ExperimentCountAggregateOutputType = {
+    id: number
+    name: number
+    description: number
+    isActive: number
+    splitA: number
+    createdAt: number
+    updatedAt: number
+    _all: number
+  }
+
+
+  export type ExperimentAvgAggregateInputType = {
+    splitA?: true
+  }
+
+  export type ExperimentSumAggregateInputType = {
+    splitA?: true
+  }
+
+  export type ExperimentMinAggregateInputType = {
+    id?: true
+    name?: true
+    description?: true
+    isActive?: true
+    splitA?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type ExperimentMaxAggregateInputType = {
+    id?: true
+    name?: true
+    description?: true
+    isActive?: true
+    splitA?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type ExperimentCountAggregateInputType = {
+    id?: true
+    name?: true
+    description?: true
+    isActive?: true
+    splitA?: true
+    createdAt?: true
+    updatedAt?: true
+    _all?: true
+  }
+
+  export type ExperimentAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which Experiment to aggregate.
+     */
+    where?: ExperimentWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of Experiments to fetch.
+     */
+    orderBy?: ExperimentOrderByWithRelationInput | ExperimentOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: ExperimentWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` Experiments from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` Experiments.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned Experiments
+    **/
+    _count?: true | ExperimentCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to average
+    **/
+    _avg?: ExperimentAvgAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to sum
+    **/
+    _sum?: ExperimentSumAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: ExperimentMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: ExperimentMaxAggregateInputType
+  }
+
+  export type GetExperimentAggregateType<T extends ExperimentAggregateArgs> = {
+        [P in keyof T & keyof AggregateExperiment]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateExperiment[P]>
+      : GetScalarType<T[P], AggregateExperiment[P]>
+  }
+
+
+
+
+  export type ExperimentGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: ExperimentWhereInput
+    orderBy?: ExperimentOrderByWithAggregationInput | ExperimentOrderByWithAggregationInput[]
+    by: ExperimentScalarFieldEnum[] | ExperimentScalarFieldEnum
+    having?: ExperimentScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: ExperimentCountAggregateInputType | true
+    _avg?: ExperimentAvgAggregateInputType
+    _sum?: ExperimentSumAggregateInputType
+    _min?: ExperimentMinAggregateInputType
+    _max?: ExperimentMaxAggregateInputType
+  }
+
+  export type ExperimentGroupByOutputType = {
+    id: string
+    name: string
+    description: string | null
+    isActive: boolean
+    splitA: number
+    createdAt: Date
+    updatedAt: Date
+    _count: ExperimentCountAggregateOutputType | null
+    _avg: ExperimentAvgAggregateOutputType | null
+    _sum: ExperimentSumAggregateOutputType | null
+    _min: ExperimentMinAggregateOutputType | null
+    _max: ExperimentMaxAggregateOutputType | null
+  }
+
+  type GetExperimentGroupByPayload<T extends ExperimentGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<ExperimentGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof ExperimentGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], ExperimentGroupByOutputType[P]>
+            : GetScalarType<T[P], ExperimentGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type ExperimentSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    name?: boolean
+    description?: boolean
+    isActive?: boolean
+    splitA?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }, ExtArgs["result"]["experiment"]>
+
+  export type ExperimentSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    name?: boolean
+    description?: boolean
+    isActive?: boolean
+    splitA?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }, ExtArgs["result"]["experiment"]>
+
+  export type ExperimentSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    name?: boolean
+    description?: boolean
+    isActive?: boolean
+    splitA?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }, ExtArgs["result"]["experiment"]>
+
+  export type ExperimentSelectScalar = {
+    id?: boolean
+    name?: boolean
+    description?: boolean
+    isActive?: boolean
+    splitA?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }
+
+  export type ExperimentOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "name" | "description" | "isActive" | "splitA" | "createdAt" | "updatedAt", ExtArgs["result"]["experiment"]>
+
+  export type $ExperimentPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "Experiment"
+    objects: {}
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      name: string
+      description: string | null
+      isActive: boolean
+      splitA: number
+      createdAt: Date
+      updatedAt: Date
+    }, ExtArgs["result"]["experiment"]>
+    composites: {}
+  }
+
+  type ExperimentGetPayload<S extends boolean | null | undefined | ExperimentDefaultArgs> = $Result.GetResult<Prisma.$ExperimentPayload, S>
+
+  type ExperimentCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<ExperimentFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: ExperimentCountAggregateInputType | true
+    }
+
+  export interface ExperimentDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['Experiment'], meta: { name: 'Experiment' } }
+    /**
+     * Find zero or one Experiment that matches the filter.
+     * @param {ExperimentFindUniqueArgs} args - Arguments to find a Experiment
+     * @example
+     * // Get one Experiment
+     * const experiment = await prisma.experiment.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends ExperimentFindUniqueArgs>(args: SelectSubset<T, ExperimentFindUniqueArgs<ExtArgs>>): Prisma__ExperimentClient<$Result.GetResult<Prisma.$ExperimentPayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one Experiment that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {ExperimentFindUniqueOrThrowArgs} args - Arguments to find a Experiment
+     * @example
+     * // Get one Experiment
+     * const experiment = await prisma.experiment.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends ExperimentFindUniqueOrThrowArgs>(args: SelectSubset<T, ExperimentFindUniqueOrThrowArgs<ExtArgs>>): Prisma__ExperimentClient<$Result.GetResult<Prisma.$ExperimentPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first Experiment that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ExperimentFindFirstArgs} args - Arguments to find a Experiment
+     * @example
+     * // Get one Experiment
+     * const experiment = await prisma.experiment.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends ExperimentFindFirstArgs>(args?: SelectSubset<T, ExperimentFindFirstArgs<ExtArgs>>): Prisma__ExperimentClient<$Result.GetResult<Prisma.$ExperimentPayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first Experiment that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ExperimentFindFirstOrThrowArgs} args - Arguments to find a Experiment
+     * @example
+     * // Get one Experiment
+     * const experiment = await prisma.experiment.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends ExperimentFindFirstOrThrowArgs>(args?: SelectSubset<T, ExperimentFindFirstOrThrowArgs<ExtArgs>>): Prisma__ExperimentClient<$Result.GetResult<Prisma.$ExperimentPayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more Experiments that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ExperimentFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all Experiments
+     * const experiments = await prisma.experiment.findMany()
+     * 
+     * // Get first 10 Experiments
+     * const experiments = await prisma.experiment.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const experimentWithIdOnly = await prisma.experiment.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends ExperimentFindManyArgs>(args?: SelectSubset<T, ExperimentFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ExperimentPayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a Experiment.
+     * @param {ExperimentCreateArgs} args - Arguments to create a Experiment.
+     * @example
+     * // Create one Experiment
+     * const Experiment = await prisma.experiment.create({
+     *   data: {
+     *     // ... data to create a Experiment
+     *   }
+     * })
+     * 
+     */
+    create<T extends ExperimentCreateArgs>(args: SelectSubset<T, ExperimentCreateArgs<ExtArgs>>): Prisma__ExperimentClient<$Result.GetResult<Prisma.$ExperimentPayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many Experiments.
+     * @param {ExperimentCreateManyArgs} args - Arguments to create many Experiments.
+     * @example
+     * // Create many Experiments
+     * const experiment = await prisma.experiment.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends ExperimentCreateManyArgs>(args?: SelectSubset<T, ExperimentCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many Experiments and returns the data saved in the database.
+     * @param {ExperimentCreateManyAndReturnArgs} args - Arguments to create many Experiments.
+     * @example
+     * // Create many Experiments
+     * const experiment = await prisma.experiment.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many Experiments and only return the `id`
+     * const experimentWithIdOnly = await prisma.experiment.createManyAndReturn({
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends ExperimentCreateManyAndReturnArgs>(args?: SelectSubset<T, ExperimentCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ExperimentPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a Experiment.
+     * @param {ExperimentDeleteArgs} args - Arguments to delete one Experiment.
+     * @example
+     * // Delete one Experiment
+     * const Experiment = await prisma.experiment.delete({
+     *   where: {
+     *     // ... filter to delete one Experiment
+     *   }
+     * })
+     * 
+     */
+    delete<T extends ExperimentDeleteArgs>(args: SelectSubset<T, ExperimentDeleteArgs<ExtArgs>>): Prisma__ExperimentClient<$Result.GetResult<Prisma.$ExperimentPayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one Experiment.
+     * @param {ExperimentUpdateArgs} args - Arguments to update one Experiment.
+     * @example
+     * // Update one Experiment
+     * const experiment = await prisma.experiment.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends ExperimentUpdateArgs>(args: SelectSubset<T, ExperimentUpdateArgs<ExtArgs>>): Prisma__ExperimentClient<$Result.GetResult<Prisma.$ExperimentPayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more Experiments.
+     * @param {ExperimentDeleteManyArgs} args - Arguments to filter Experiments to delete.
+     * @example
+     * // Delete a few Experiments
+     * const { count } = await prisma.experiment.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends ExperimentDeleteManyArgs>(args?: SelectSubset<T, ExperimentDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more Experiments.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ExperimentUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many Experiments
+     * const experiment = await prisma.experiment.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends ExperimentUpdateManyArgs>(args: SelectSubset<T, ExperimentUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more Experiments and returns the data updated in the database.
+     * @param {ExperimentUpdateManyAndReturnArgs} args - Arguments to update many Experiments.
+     * @example
+     * // Update many Experiments
+     * const experiment = await prisma.experiment.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more Experiments and only return the `id`
+     * const experimentWithIdOnly = await prisma.experiment.updateManyAndReturn({
+     *   select: { id: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends ExperimentUpdateManyAndReturnArgs>(args: SelectSubset<T, ExperimentUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ExperimentPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one Experiment.
+     * @param {ExperimentUpsertArgs} args - Arguments to update or create a Experiment.
+     * @example
+     * // Update or create a Experiment
+     * const experiment = await prisma.experiment.upsert({
+     *   create: {
+     *     // ... data to create a Experiment
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the Experiment we want to update
+     *   }
+     * })
+     */
+    upsert<T extends ExperimentUpsertArgs>(args: SelectSubset<T, ExperimentUpsertArgs<ExtArgs>>): Prisma__ExperimentClient<$Result.GetResult<Prisma.$ExperimentPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of Experiments.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ExperimentCountArgs} args - Arguments to filter Experiments to count.
+     * @example
+     * // Count the number of Experiments
+     * const count = await prisma.experiment.count({
+     *   where: {
+     *     // ... the filter for the Experiments we want to count
+     *   }
+     * })
+    **/
+    count<T extends ExperimentCountArgs>(
+      args?: Subset<T, ExperimentCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], ExperimentCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a Experiment.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ExperimentAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends ExperimentAggregateArgs>(args: Subset<T, ExperimentAggregateArgs>): Prisma.PrismaPromise<GetExperimentAggregateType<T>>
+
+    /**
+     * Group by Experiment.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ExperimentGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends ExperimentGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: ExperimentGroupByArgs['orderBy'] }
+        : { orderBy?: ExperimentGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, ExperimentGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetExperimentGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the Experiment model
+   */
+  readonly fields: ExperimentFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for Experiment.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__ExperimentClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the Experiment model
+   */
+  interface ExperimentFieldRefs {
+    readonly id: FieldRef<"Experiment", 'String'>
+    readonly name: FieldRef<"Experiment", 'String'>
+    readonly description: FieldRef<"Experiment", 'String'>
+    readonly isActive: FieldRef<"Experiment", 'Boolean'>
+    readonly splitA: FieldRef<"Experiment", 'Int'>
+    readonly createdAt: FieldRef<"Experiment", 'DateTime'>
+    readonly updatedAt: FieldRef<"Experiment", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * Experiment findUnique
+   */
+  export type ExperimentFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Experiment
+     */
+    select?: ExperimentSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Experiment
+     */
+    omit?: ExperimentOmit<ExtArgs> | null
+    /**
+     * Filter, which Experiment to fetch.
+     */
+    where: ExperimentWhereUniqueInput
+  }
+
+  /**
+   * Experiment findUniqueOrThrow
+   */
+  export type ExperimentFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Experiment
+     */
+    select?: ExperimentSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Experiment
+     */
+    omit?: ExperimentOmit<ExtArgs> | null
+    /**
+     * Filter, which Experiment to fetch.
+     */
+    where: ExperimentWhereUniqueInput
+  }
+
+  /**
+   * Experiment findFirst
+   */
+  export type ExperimentFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Experiment
+     */
+    select?: ExperimentSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Experiment
+     */
+    omit?: ExperimentOmit<ExtArgs> | null
+    /**
+     * Filter, which Experiment to fetch.
+     */
+    where?: ExperimentWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of Experiments to fetch.
+     */
+    orderBy?: ExperimentOrderByWithRelationInput | ExperimentOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for Experiments.
+     */
+    cursor?: ExperimentWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` Experiments from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` Experiments.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of Experiments.
+     */
+    distinct?: ExperimentScalarFieldEnum | ExperimentScalarFieldEnum[]
+  }
+
+  /**
+   * Experiment findFirstOrThrow
+   */
+  export type ExperimentFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Experiment
+     */
+    select?: ExperimentSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Experiment
+     */
+    omit?: ExperimentOmit<ExtArgs> | null
+    /**
+     * Filter, which Experiment to fetch.
+     */
+    where?: ExperimentWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of Experiments to fetch.
+     */
+    orderBy?: ExperimentOrderByWithRelationInput | ExperimentOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for Experiments.
+     */
+    cursor?: ExperimentWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` Experiments from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` Experiments.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of Experiments.
+     */
+    distinct?: ExperimentScalarFieldEnum | ExperimentScalarFieldEnum[]
+  }
+
+  /**
+   * Experiment findMany
+   */
+  export type ExperimentFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Experiment
+     */
+    select?: ExperimentSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Experiment
+     */
+    omit?: ExperimentOmit<ExtArgs> | null
+    /**
+     * Filter, which Experiments to fetch.
+     */
+    where?: ExperimentWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of Experiments to fetch.
+     */
+    orderBy?: ExperimentOrderByWithRelationInput | ExperimentOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing Experiments.
+     */
+    cursor?: ExperimentWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` Experiments from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` Experiments.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of Experiments.
+     */
+    distinct?: ExperimentScalarFieldEnum | ExperimentScalarFieldEnum[]
+  }
+
+  /**
+   * Experiment create
+   */
+  export type ExperimentCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Experiment
+     */
+    select?: ExperimentSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Experiment
+     */
+    omit?: ExperimentOmit<ExtArgs> | null
+    /**
+     * The data needed to create a Experiment.
+     */
+    data: XOR<ExperimentCreateInput, ExperimentUncheckedCreateInput>
+  }
+
+  /**
+   * Experiment createMany
+   */
+  export type ExperimentCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many Experiments.
+     */
+    data: ExperimentCreateManyInput | ExperimentCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * Experiment createManyAndReturn
+   */
+  export type ExperimentCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Experiment
+     */
+    select?: ExperimentSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the Experiment
+     */
+    omit?: ExperimentOmit<ExtArgs> | null
+    /**
+     * The data used to create many Experiments.
+     */
+    data: ExperimentCreateManyInput | ExperimentCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * Experiment update
+   */
+  export type ExperimentUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Experiment
+     */
+    select?: ExperimentSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Experiment
+     */
+    omit?: ExperimentOmit<ExtArgs> | null
+    /**
+     * The data needed to update a Experiment.
+     */
+    data: XOR<ExperimentUpdateInput, ExperimentUncheckedUpdateInput>
+    /**
+     * Choose, which Experiment to update.
+     */
+    where: ExperimentWhereUniqueInput
+  }
+
+  /**
+   * Experiment updateMany
+   */
+  export type ExperimentUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update Experiments.
+     */
+    data: XOR<ExperimentUpdateManyMutationInput, ExperimentUncheckedUpdateManyInput>
+    /**
+     * Filter which Experiments to update
+     */
+    where?: ExperimentWhereInput
+    /**
+     * Limit how many Experiments to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * Experiment updateManyAndReturn
+   */
+  export type ExperimentUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Experiment
+     */
+    select?: ExperimentSelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the Experiment
+     */
+    omit?: ExperimentOmit<ExtArgs> | null
+    /**
+     * The data used to update Experiments.
+     */
+    data: XOR<ExperimentUpdateManyMutationInput, ExperimentUncheckedUpdateManyInput>
+    /**
+     * Filter which Experiments to update
+     */
+    where?: ExperimentWhereInput
+    /**
+     * Limit how many Experiments to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * Experiment upsert
+   */
+  export type ExperimentUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Experiment
+     */
+    select?: ExperimentSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Experiment
+     */
+    omit?: ExperimentOmit<ExtArgs> | null
+    /**
+     * The filter to search for the Experiment to update in case it exists.
+     */
+    where: ExperimentWhereUniqueInput
+    /**
+     * In case the Experiment found by the `where` argument doesn't exist, create a new Experiment with this data.
+     */
+    create: XOR<ExperimentCreateInput, ExperimentUncheckedCreateInput>
+    /**
+     * In case the Experiment was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<ExperimentUpdateInput, ExperimentUncheckedUpdateInput>
+  }
+
+  /**
+   * Experiment delete
+   */
+  export type ExperimentDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Experiment
+     */
+    select?: ExperimentSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Experiment
+     */
+    omit?: ExperimentOmit<ExtArgs> | null
+    /**
+     * Filter which Experiment to delete.
+     */
+    where: ExperimentWhereUniqueInput
+  }
+
+  /**
+   * Experiment deleteMany
+   */
+  export type ExperimentDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which Experiments to delete
+     */
+    where?: ExperimentWhereInput
+    /**
+     * Limit how many Experiments to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * Experiment without action
+   */
+  export type ExperimentDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Experiment
+     */
+    select?: ExperimentSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Experiment
+     */
+    omit?: ExperimentOmit<ExtArgs> | null
+  }
+
+
+  /**
    * Enums
    */
 
@@ -10695,12 +11946,19 @@ export namespace Prisma {
     lastActive: 'lastActive',
     totalPlayTime: 'totalPlayTime',
     matchesPlayed: 'matchesPlayed',
+    matchesWon: 'matchesWon',
     preferredLanguage: 'preferredLanguage',
     explorerRatio: 'explorerRatio',
     playerProfile: 'playerProfile',
     popularitySensitivity: 'popularitySensitivity',
     returnIntent: 'returnIntent',
-    scheduleProfile: 'scheduleProfile'
+    scheduleProfile: 'scheduleProfile',
+    clusterId: 'clusterId',
+    churnScore: 'churnScore',
+    atRisk: 'atRisk',
+    temporalTag: 'temporalTag',
+    archetypeWeights: 'archetypeWeights',
+    collaborativeEmbedding: 'collaborativeEmbedding'
   };
 
   export type PlayerFeaturesScalarFieldEnum = (typeof PlayerFeaturesScalarFieldEnum)[keyof typeof PlayerFeaturesScalarFieldEnum]
@@ -10722,7 +11980,8 @@ export namespace Prisma {
     paceLabel: 'paceLabel',
     earlyAbandonRate: 'earlyAbandonRate',
     stickyFactor: 'stickyFactor',
-    viralityFactor: 'viralityFactor'
+    viralityFactor: 'viralityFactor',
+    collaborativeEmbedding: 'collaborativeEmbedding'
   };
 
   export type MapFeaturesScalarFieldEnum = (typeof MapFeaturesScalarFieldEnum)[keyof typeof MapFeaturesScalarFieldEnum]
@@ -10761,6 +12020,19 @@ export namespace Prisma {
   };
 
   export type DataQuarantineScalarFieldEnum = (typeof DataQuarantineScalarFieldEnum)[keyof typeof DataQuarantineScalarFieldEnum]
+
+
+  export const ExperimentScalarFieldEnum: {
+    id: 'id',
+    name: 'name',
+    description: 'description',
+    isActive: 'isActive',
+    splitA: 'splitA',
+    createdAt: 'createdAt',
+    updatedAt: 'updatedAt'
+  };
+
+  export type ExperimentScalarFieldEnum = (typeof ExperimentScalarFieldEnum)[keyof typeof ExperimentScalarFieldEnum]
 
 
   export const SortOrder: {
@@ -11100,12 +12372,19 @@ export namespace Prisma {
     lastActive?: DateTimeFilter<"PlayerFeatures"> | Date | string
     totalPlayTime?: FloatFilter<"PlayerFeatures"> | number
     matchesPlayed?: IntFilter<"PlayerFeatures"> | number
+    matchesWon?: IntFilter<"PlayerFeatures"> | number
     preferredLanguage?: StringFilter<"PlayerFeatures"> | string
     explorerRatio?: FloatNullableFilter<"PlayerFeatures"> | number | null
     playerProfile?: StringNullableFilter<"PlayerFeatures"> | string | null
     popularitySensitivity?: FloatNullableFilter<"PlayerFeatures"> | number | null
     returnIntent?: FloatNullableFilter<"PlayerFeatures"> | number | null
     scheduleProfile?: JsonNullableFilter<"PlayerFeatures">
+    clusterId?: StringNullableFilter<"PlayerFeatures"> | string | null
+    churnScore?: FloatNullableFilter<"PlayerFeatures"> | number | null
+    atRisk?: BoolFilter<"PlayerFeatures"> | boolean
+    temporalTag?: StringNullableFilter<"PlayerFeatures"> | string | null
+    archetypeWeights?: JsonNullableFilter<"PlayerFeatures">
+    collaborativeEmbedding?: JsonNullableFilter<"PlayerFeatures">
     user?: XOR<UserScalarRelationFilter, UserWhereInput>
   }
 
@@ -11114,12 +12393,19 @@ export namespace Prisma {
     lastActive?: SortOrder
     totalPlayTime?: SortOrder
     matchesPlayed?: SortOrder
+    matchesWon?: SortOrder
     preferredLanguage?: SortOrder
     explorerRatio?: SortOrderInput | SortOrder
     playerProfile?: SortOrderInput | SortOrder
     popularitySensitivity?: SortOrderInput | SortOrder
     returnIntent?: SortOrderInput | SortOrder
     scheduleProfile?: SortOrderInput | SortOrder
+    clusterId?: SortOrderInput | SortOrder
+    churnScore?: SortOrderInput | SortOrder
+    atRisk?: SortOrder
+    temporalTag?: SortOrderInput | SortOrder
+    archetypeWeights?: SortOrderInput | SortOrder
+    collaborativeEmbedding?: SortOrderInput | SortOrder
     user?: UserOrderByWithRelationInput
   }
 
@@ -11131,12 +12417,19 @@ export namespace Prisma {
     lastActive?: DateTimeFilter<"PlayerFeatures"> | Date | string
     totalPlayTime?: FloatFilter<"PlayerFeatures"> | number
     matchesPlayed?: IntFilter<"PlayerFeatures"> | number
+    matchesWon?: IntFilter<"PlayerFeatures"> | number
     preferredLanguage?: StringFilter<"PlayerFeatures"> | string
     explorerRatio?: FloatNullableFilter<"PlayerFeatures"> | number | null
     playerProfile?: StringNullableFilter<"PlayerFeatures"> | string | null
     popularitySensitivity?: FloatNullableFilter<"PlayerFeatures"> | number | null
     returnIntent?: FloatNullableFilter<"PlayerFeatures"> | number | null
     scheduleProfile?: JsonNullableFilter<"PlayerFeatures">
+    clusterId?: StringNullableFilter<"PlayerFeatures"> | string | null
+    churnScore?: FloatNullableFilter<"PlayerFeatures"> | number | null
+    atRisk?: BoolFilter<"PlayerFeatures"> | boolean
+    temporalTag?: StringNullableFilter<"PlayerFeatures"> | string | null
+    archetypeWeights?: JsonNullableFilter<"PlayerFeatures">
+    collaborativeEmbedding?: JsonNullableFilter<"PlayerFeatures">
     user?: XOR<UserScalarRelationFilter, UserWhereInput>
   }, "userId">
 
@@ -11145,12 +12438,19 @@ export namespace Prisma {
     lastActive?: SortOrder
     totalPlayTime?: SortOrder
     matchesPlayed?: SortOrder
+    matchesWon?: SortOrder
     preferredLanguage?: SortOrder
     explorerRatio?: SortOrderInput | SortOrder
     playerProfile?: SortOrderInput | SortOrder
     popularitySensitivity?: SortOrderInput | SortOrder
     returnIntent?: SortOrderInput | SortOrder
     scheduleProfile?: SortOrderInput | SortOrder
+    clusterId?: SortOrderInput | SortOrder
+    churnScore?: SortOrderInput | SortOrder
+    atRisk?: SortOrder
+    temporalTag?: SortOrderInput | SortOrder
+    archetypeWeights?: SortOrderInput | SortOrder
+    collaborativeEmbedding?: SortOrderInput | SortOrder
     _count?: PlayerFeaturesCountOrderByAggregateInput
     _avg?: PlayerFeaturesAvgOrderByAggregateInput
     _max?: PlayerFeaturesMaxOrderByAggregateInput
@@ -11166,12 +12466,19 @@ export namespace Prisma {
     lastActive?: DateTimeWithAggregatesFilter<"PlayerFeatures"> | Date | string
     totalPlayTime?: FloatWithAggregatesFilter<"PlayerFeatures"> | number
     matchesPlayed?: IntWithAggregatesFilter<"PlayerFeatures"> | number
+    matchesWon?: IntWithAggregatesFilter<"PlayerFeatures"> | number
     preferredLanguage?: StringWithAggregatesFilter<"PlayerFeatures"> | string
     explorerRatio?: FloatNullableWithAggregatesFilter<"PlayerFeatures"> | number | null
     playerProfile?: StringNullableWithAggregatesFilter<"PlayerFeatures"> | string | null
     popularitySensitivity?: FloatNullableWithAggregatesFilter<"PlayerFeatures"> | number | null
     returnIntent?: FloatNullableWithAggregatesFilter<"PlayerFeatures"> | number | null
     scheduleProfile?: JsonNullableWithAggregatesFilter<"PlayerFeatures">
+    clusterId?: StringNullableWithAggregatesFilter<"PlayerFeatures"> | string | null
+    churnScore?: FloatNullableWithAggregatesFilter<"PlayerFeatures"> | number | null
+    atRisk?: BoolWithAggregatesFilter<"PlayerFeatures"> | boolean
+    temporalTag?: StringNullableWithAggregatesFilter<"PlayerFeatures"> | string | null
+    archetypeWeights?: JsonNullableWithAggregatesFilter<"PlayerFeatures">
+    collaborativeEmbedding?: JsonNullableWithAggregatesFilter<"PlayerFeatures">
   }
 
   export type MapFeaturesWhereInput = {
@@ -11194,6 +12501,7 @@ export namespace Prisma {
     earlyAbandonRate?: FloatNullableFilter<"MapFeatures"> | number | null
     stickyFactor?: FloatNullableFilter<"MapFeatures"> | number | null
     viralityFactor?: FloatNullableFilter<"MapFeatures"> | number | null
+    collaborativeEmbedding?: JsonNullableFilter<"MapFeatures">
     map?: XOR<GameMapScalarRelationFilter, GameMapWhereInput>
   }
 
@@ -11214,6 +12522,7 @@ export namespace Prisma {
     earlyAbandonRate?: SortOrderInput | SortOrder
     stickyFactor?: SortOrderInput | SortOrder
     viralityFactor?: SortOrderInput | SortOrder
+    collaborativeEmbedding?: SortOrderInput | SortOrder
     map?: GameMapOrderByWithRelationInput
   }
 
@@ -11237,6 +12546,7 @@ export namespace Prisma {
     earlyAbandonRate?: FloatNullableFilter<"MapFeatures"> | number | null
     stickyFactor?: FloatNullableFilter<"MapFeatures"> | number | null
     viralityFactor?: FloatNullableFilter<"MapFeatures"> | number | null
+    collaborativeEmbedding?: JsonNullableFilter<"MapFeatures">
     map?: XOR<GameMapScalarRelationFilter, GameMapWhereInput>
   }, "mapId">
 
@@ -11257,6 +12567,7 @@ export namespace Prisma {
     earlyAbandonRate?: SortOrderInput | SortOrder
     stickyFactor?: SortOrderInput | SortOrder
     viralityFactor?: SortOrderInput | SortOrder
+    collaborativeEmbedding?: SortOrderInput | SortOrder
     _count?: MapFeaturesCountOrderByAggregateInput
     _avg?: MapFeaturesAvgOrderByAggregateInput
     _max?: MapFeaturesMaxOrderByAggregateInput
@@ -11284,6 +12595,7 @@ export namespace Prisma {
     earlyAbandonRate?: FloatNullableWithAggregatesFilter<"MapFeatures"> | number | null
     stickyFactor?: FloatNullableWithAggregatesFilter<"MapFeatures"> | number | null
     viralityFactor?: FloatNullableWithAggregatesFilter<"MapFeatures"> | number | null
+    collaborativeEmbedding?: JsonNullableWithAggregatesFilter<"MapFeatures">
   }
 
   export type SocialAffinityWhereInput = {
@@ -11466,6 +12778,70 @@ export namespace Prisma {
     payload?: JsonWithAggregatesFilter<"DataQuarantine">
     reason?: StringWithAggregatesFilter<"DataQuarantine"> | string
     quarantinedAt?: DateTimeWithAggregatesFilter<"DataQuarantine"> | Date | string
+  }
+
+  export type ExperimentWhereInput = {
+    AND?: ExperimentWhereInput | ExperimentWhereInput[]
+    OR?: ExperimentWhereInput[]
+    NOT?: ExperimentWhereInput | ExperimentWhereInput[]
+    id?: StringFilter<"Experiment"> | string
+    name?: StringFilter<"Experiment"> | string
+    description?: StringNullableFilter<"Experiment"> | string | null
+    isActive?: BoolFilter<"Experiment"> | boolean
+    splitA?: IntFilter<"Experiment"> | number
+    createdAt?: DateTimeFilter<"Experiment"> | Date | string
+    updatedAt?: DateTimeFilter<"Experiment"> | Date | string
+  }
+
+  export type ExperimentOrderByWithRelationInput = {
+    id?: SortOrder
+    name?: SortOrder
+    description?: SortOrderInput | SortOrder
+    isActive?: SortOrder
+    splitA?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type ExperimentWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    name?: string
+    AND?: ExperimentWhereInput | ExperimentWhereInput[]
+    OR?: ExperimentWhereInput[]
+    NOT?: ExperimentWhereInput | ExperimentWhereInput[]
+    description?: StringNullableFilter<"Experiment"> | string | null
+    isActive?: BoolFilter<"Experiment"> | boolean
+    splitA?: IntFilter<"Experiment"> | number
+    createdAt?: DateTimeFilter<"Experiment"> | Date | string
+    updatedAt?: DateTimeFilter<"Experiment"> | Date | string
+  }, "id" | "name">
+
+  export type ExperimentOrderByWithAggregationInput = {
+    id?: SortOrder
+    name?: SortOrder
+    description?: SortOrderInput | SortOrder
+    isActive?: SortOrder
+    splitA?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    _count?: ExperimentCountOrderByAggregateInput
+    _avg?: ExperimentAvgOrderByAggregateInput
+    _max?: ExperimentMaxOrderByAggregateInput
+    _min?: ExperimentMinOrderByAggregateInput
+    _sum?: ExperimentSumOrderByAggregateInput
+  }
+
+  export type ExperimentScalarWhereWithAggregatesInput = {
+    AND?: ExperimentScalarWhereWithAggregatesInput | ExperimentScalarWhereWithAggregatesInput[]
+    OR?: ExperimentScalarWhereWithAggregatesInput[]
+    NOT?: ExperimentScalarWhereWithAggregatesInput | ExperimentScalarWhereWithAggregatesInput[]
+    id?: StringWithAggregatesFilter<"Experiment"> | string
+    name?: StringWithAggregatesFilter<"Experiment"> | string
+    description?: StringNullableWithAggregatesFilter<"Experiment"> | string | null
+    isActive?: BoolWithAggregatesFilter<"Experiment"> | boolean
+    splitA?: IntWithAggregatesFilter<"Experiment"> | number
+    createdAt?: DateTimeWithAggregatesFilter<"Experiment"> | Date | string
+    updatedAt?: DateTimeWithAggregatesFilter<"Experiment"> | Date | string
   }
 
   export type UserCreateInput = {
@@ -11688,12 +13064,19 @@ export namespace Prisma {
     lastActive: Date | string
     totalPlayTime?: number
     matchesPlayed?: number
+    matchesWon?: number
     preferredLanguage?: string
     explorerRatio?: number | null
     playerProfile?: string | null
     popularitySensitivity?: number | null
     returnIntent?: number | null
     scheduleProfile?: NullableJsonNullValueInput | InputJsonValue
+    clusterId?: string | null
+    churnScore?: number | null
+    atRisk?: boolean
+    temporalTag?: string | null
+    archetypeWeights?: NullableJsonNullValueInput | InputJsonValue
+    collaborativeEmbedding?: NullableJsonNullValueInput | InputJsonValue
     user: UserCreateNestedOneWithoutPlayerFeaturesInput
   }
 
@@ -11702,24 +13085,38 @@ export namespace Prisma {
     lastActive: Date | string
     totalPlayTime?: number
     matchesPlayed?: number
+    matchesWon?: number
     preferredLanguage?: string
     explorerRatio?: number | null
     playerProfile?: string | null
     popularitySensitivity?: number | null
     returnIntent?: number | null
     scheduleProfile?: NullableJsonNullValueInput | InputJsonValue
+    clusterId?: string | null
+    churnScore?: number | null
+    atRisk?: boolean
+    temporalTag?: string | null
+    archetypeWeights?: NullableJsonNullValueInput | InputJsonValue
+    collaborativeEmbedding?: NullableJsonNullValueInput | InputJsonValue
   }
 
   export type PlayerFeaturesUpdateInput = {
     lastActive?: DateTimeFieldUpdateOperationsInput | Date | string
     totalPlayTime?: FloatFieldUpdateOperationsInput | number
     matchesPlayed?: IntFieldUpdateOperationsInput | number
+    matchesWon?: IntFieldUpdateOperationsInput | number
     preferredLanguage?: StringFieldUpdateOperationsInput | string
     explorerRatio?: NullableFloatFieldUpdateOperationsInput | number | null
     playerProfile?: NullableStringFieldUpdateOperationsInput | string | null
     popularitySensitivity?: NullableFloatFieldUpdateOperationsInput | number | null
     returnIntent?: NullableFloatFieldUpdateOperationsInput | number | null
     scheduleProfile?: NullableJsonNullValueInput | InputJsonValue
+    clusterId?: NullableStringFieldUpdateOperationsInput | string | null
+    churnScore?: NullableFloatFieldUpdateOperationsInput | number | null
+    atRisk?: BoolFieldUpdateOperationsInput | boolean
+    temporalTag?: NullableStringFieldUpdateOperationsInput | string | null
+    archetypeWeights?: NullableJsonNullValueInput | InputJsonValue
+    collaborativeEmbedding?: NullableJsonNullValueInput | InputJsonValue
     user?: UserUpdateOneRequiredWithoutPlayerFeaturesNestedInput
   }
 
@@ -11728,12 +13125,19 @@ export namespace Prisma {
     lastActive?: DateTimeFieldUpdateOperationsInput | Date | string
     totalPlayTime?: FloatFieldUpdateOperationsInput | number
     matchesPlayed?: IntFieldUpdateOperationsInput | number
+    matchesWon?: IntFieldUpdateOperationsInput | number
     preferredLanguage?: StringFieldUpdateOperationsInput | string
     explorerRatio?: NullableFloatFieldUpdateOperationsInput | number | null
     playerProfile?: NullableStringFieldUpdateOperationsInput | string | null
     popularitySensitivity?: NullableFloatFieldUpdateOperationsInput | number | null
     returnIntent?: NullableFloatFieldUpdateOperationsInput | number | null
     scheduleProfile?: NullableJsonNullValueInput | InputJsonValue
+    clusterId?: NullableStringFieldUpdateOperationsInput | string | null
+    churnScore?: NullableFloatFieldUpdateOperationsInput | number | null
+    atRisk?: BoolFieldUpdateOperationsInput | boolean
+    temporalTag?: NullableStringFieldUpdateOperationsInput | string | null
+    archetypeWeights?: NullableJsonNullValueInput | InputJsonValue
+    collaborativeEmbedding?: NullableJsonNullValueInput | InputJsonValue
   }
 
   export type PlayerFeaturesCreateManyInput = {
@@ -11741,24 +13145,38 @@ export namespace Prisma {
     lastActive: Date | string
     totalPlayTime?: number
     matchesPlayed?: number
+    matchesWon?: number
     preferredLanguage?: string
     explorerRatio?: number | null
     playerProfile?: string | null
     popularitySensitivity?: number | null
     returnIntent?: number | null
     scheduleProfile?: NullableJsonNullValueInput | InputJsonValue
+    clusterId?: string | null
+    churnScore?: number | null
+    atRisk?: boolean
+    temporalTag?: string | null
+    archetypeWeights?: NullableJsonNullValueInput | InputJsonValue
+    collaborativeEmbedding?: NullableJsonNullValueInput | InputJsonValue
   }
 
   export type PlayerFeaturesUpdateManyMutationInput = {
     lastActive?: DateTimeFieldUpdateOperationsInput | Date | string
     totalPlayTime?: FloatFieldUpdateOperationsInput | number
     matchesPlayed?: IntFieldUpdateOperationsInput | number
+    matchesWon?: IntFieldUpdateOperationsInput | number
     preferredLanguage?: StringFieldUpdateOperationsInput | string
     explorerRatio?: NullableFloatFieldUpdateOperationsInput | number | null
     playerProfile?: NullableStringFieldUpdateOperationsInput | string | null
     popularitySensitivity?: NullableFloatFieldUpdateOperationsInput | number | null
     returnIntent?: NullableFloatFieldUpdateOperationsInput | number | null
     scheduleProfile?: NullableJsonNullValueInput | InputJsonValue
+    clusterId?: NullableStringFieldUpdateOperationsInput | string | null
+    churnScore?: NullableFloatFieldUpdateOperationsInput | number | null
+    atRisk?: BoolFieldUpdateOperationsInput | boolean
+    temporalTag?: NullableStringFieldUpdateOperationsInput | string | null
+    archetypeWeights?: NullableJsonNullValueInput | InputJsonValue
+    collaborativeEmbedding?: NullableJsonNullValueInput | InputJsonValue
   }
 
   export type PlayerFeaturesUncheckedUpdateManyInput = {
@@ -11766,12 +13184,19 @@ export namespace Prisma {
     lastActive?: DateTimeFieldUpdateOperationsInput | Date | string
     totalPlayTime?: FloatFieldUpdateOperationsInput | number
     matchesPlayed?: IntFieldUpdateOperationsInput | number
+    matchesWon?: IntFieldUpdateOperationsInput | number
     preferredLanguage?: StringFieldUpdateOperationsInput | string
     explorerRatio?: NullableFloatFieldUpdateOperationsInput | number | null
     playerProfile?: NullableStringFieldUpdateOperationsInput | string | null
     popularitySensitivity?: NullableFloatFieldUpdateOperationsInput | number | null
     returnIntent?: NullableFloatFieldUpdateOperationsInput | number | null
     scheduleProfile?: NullableJsonNullValueInput | InputJsonValue
+    clusterId?: NullableStringFieldUpdateOperationsInput | string | null
+    churnScore?: NullableFloatFieldUpdateOperationsInput | number | null
+    atRisk?: BoolFieldUpdateOperationsInput | boolean
+    temporalTag?: NullableStringFieldUpdateOperationsInput | string | null
+    archetypeWeights?: NullableJsonNullValueInput | InputJsonValue
+    collaborativeEmbedding?: NullableJsonNullValueInput | InputJsonValue
   }
 
   export type MapFeaturesCreateInput = {
@@ -11790,6 +13215,7 @@ export namespace Prisma {
     earlyAbandonRate?: number | null
     stickyFactor?: number | null
     viralityFactor?: number | null
+    collaborativeEmbedding?: NullableJsonNullValueInput | InputJsonValue
     map: GameMapCreateNestedOneWithoutMapFeaturesInput
   }
 
@@ -11810,6 +13236,7 @@ export namespace Prisma {
     earlyAbandonRate?: number | null
     stickyFactor?: number | null
     viralityFactor?: number | null
+    collaborativeEmbedding?: NullableJsonNullValueInput | InputJsonValue
   }
 
   export type MapFeaturesUpdateInput = {
@@ -11828,6 +13255,7 @@ export namespace Prisma {
     earlyAbandonRate?: NullableFloatFieldUpdateOperationsInput | number | null
     stickyFactor?: NullableFloatFieldUpdateOperationsInput | number | null
     viralityFactor?: NullableFloatFieldUpdateOperationsInput | number | null
+    collaborativeEmbedding?: NullableJsonNullValueInput | InputJsonValue
     map?: GameMapUpdateOneRequiredWithoutMapFeaturesNestedInput
   }
 
@@ -11848,6 +13276,7 @@ export namespace Prisma {
     earlyAbandonRate?: NullableFloatFieldUpdateOperationsInput | number | null
     stickyFactor?: NullableFloatFieldUpdateOperationsInput | number | null
     viralityFactor?: NullableFloatFieldUpdateOperationsInput | number | null
+    collaborativeEmbedding?: NullableJsonNullValueInput | InputJsonValue
   }
 
   export type MapFeaturesCreateManyInput = {
@@ -11867,6 +13296,7 @@ export namespace Prisma {
     earlyAbandonRate?: number | null
     stickyFactor?: number | null
     viralityFactor?: number | null
+    collaborativeEmbedding?: NullableJsonNullValueInput | InputJsonValue
   }
 
   export type MapFeaturesUpdateManyMutationInput = {
@@ -11885,6 +13315,7 @@ export namespace Prisma {
     earlyAbandonRate?: NullableFloatFieldUpdateOperationsInput | number | null
     stickyFactor?: NullableFloatFieldUpdateOperationsInput | number | null
     viralityFactor?: NullableFloatFieldUpdateOperationsInput | number | null
+    collaborativeEmbedding?: NullableJsonNullValueInput | InputJsonValue
   }
 
   export type MapFeaturesUncheckedUpdateManyInput = {
@@ -11904,6 +13335,7 @@ export namespace Prisma {
     earlyAbandonRate?: NullableFloatFieldUpdateOperationsInput | number | null
     stickyFactor?: NullableFloatFieldUpdateOperationsInput | number | null
     viralityFactor?: NullableFloatFieldUpdateOperationsInput | number | null
+    collaborativeEmbedding?: NullableJsonNullValueInput | InputJsonValue
   }
 
   export type SocialAffinityCreateInput = {
@@ -12082,6 +13514,76 @@ export namespace Prisma {
     payload?: JsonNullValueInput | InputJsonValue
     reason?: StringFieldUpdateOperationsInput | string
     quarantinedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ExperimentCreateInput = {
+    id?: string
+    name: string
+    description?: string | null
+    isActive?: boolean
+    splitA?: number
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type ExperimentUncheckedCreateInput = {
+    id?: string
+    name: string
+    description?: string | null
+    isActive?: boolean
+    splitA?: number
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type ExperimentUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    description?: NullableStringFieldUpdateOperationsInput | string | null
+    isActive?: BoolFieldUpdateOperationsInput | boolean
+    splitA?: IntFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ExperimentUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    description?: NullableStringFieldUpdateOperationsInput | string | null
+    isActive?: BoolFieldUpdateOperationsInput | boolean
+    splitA?: IntFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ExperimentCreateManyInput = {
+    id?: string
+    name: string
+    description?: string | null
+    isActive?: boolean
+    splitA?: number
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type ExperimentUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    description?: NullableStringFieldUpdateOperationsInput | string | null
+    isActive?: BoolFieldUpdateOperationsInput | boolean
+    splitA?: IntFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ExperimentUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    description?: NullableStringFieldUpdateOperationsInput | string | null
+    isActive?: BoolFieldUpdateOperationsInput | boolean
+    splitA?: IntFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
   export type StringFilter<$PrismaModel = never> = {
@@ -12437,20 +13939,29 @@ export namespace Prisma {
     lastActive?: SortOrder
     totalPlayTime?: SortOrder
     matchesPlayed?: SortOrder
+    matchesWon?: SortOrder
     preferredLanguage?: SortOrder
     explorerRatio?: SortOrder
     playerProfile?: SortOrder
     popularitySensitivity?: SortOrder
     returnIntent?: SortOrder
     scheduleProfile?: SortOrder
+    clusterId?: SortOrder
+    churnScore?: SortOrder
+    atRisk?: SortOrder
+    temporalTag?: SortOrder
+    archetypeWeights?: SortOrder
+    collaborativeEmbedding?: SortOrder
   }
 
   export type PlayerFeaturesAvgOrderByAggregateInput = {
     totalPlayTime?: SortOrder
     matchesPlayed?: SortOrder
+    matchesWon?: SortOrder
     explorerRatio?: SortOrder
     popularitySensitivity?: SortOrder
     returnIntent?: SortOrder
+    churnScore?: SortOrder
   }
 
   export type PlayerFeaturesMaxOrderByAggregateInput = {
@@ -12458,11 +13969,16 @@ export namespace Prisma {
     lastActive?: SortOrder
     totalPlayTime?: SortOrder
     matchesPlayed?: SortOrder
+    matchesWon?: SortOrder
     preferredLanguage?: SortOrder
     explorerRatio?: SortOrder
     playerProfile?: SortOrder
     popularitySensitivity?: SortOrder
     returnIntent?: SortOrder
+    clusterId?: SortOrder
+    churnScore?: SortOrder
+    atRisk?: SortOrder
+    temporalTag?: SortOrder
   }
 
   export type PlayerFeaturesMinOrderByAggregateInput = {
@@ -12470,19 +13986,26 @@ export namespace Prisma {
     lastActive?: SortOrder
     totalPlayTime?: SortOrder
     matchesPlayed?: SortOrder
+    matchesWon?: SortOrder
     preferredLanguage?: SortOrder
     explorerRatio?: SortOrder
     playerProfile?: SortOrder
     popularitySensitivity?: SortOrder
     returnIntent?: SortOrder
+    clusterId?: SortOrder
+    churnScore?: SortOrder
+    atRisk?: SortOrder
+    temporalTag?: SortOrder
   }
 
   export type PlayerFeaturesSumOrderByAggregateInput = {
     totalPlayTime?: SortOrder
     matchesPlayed?: SortOrder
+    matchesWon?: SortOrder
     explorerRatio?: SortOrder
     popularitySensitivity?: SortOrder
     returnIntent?: SortOrder
+    churnScore?: SortOrder
   }
 
   export type FloatWithAggregatesFilter<$PrismaModel = never> = {
@@ -12581,6 +14104,7 @@ export namespace Prisma {
     earlyAbandonRate?: SortOrder
     stickyFactor?: SortOrder
     viralityFactor?: SortOrder
+    collaborativeEmbedding?: SortOrder
   }
 
   export type MapFeaturesAvgOrderByAggregateInput = {
@@ -12741,6 +14265,44 @@ export namespace Prisma {
     timestamp?: SortOrder
     reason?: SortOrder
     quarantinedAt?: SortOrder
+  }
+
+  export type ExperimentCountOrderByAggregateInput = {
+    id?: SortOrder
+    name?: SortOrder
+    description?: SortOrder
+    isActive?: SortOrder
+    splitA?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type ExperimentAvgOrderByAggregateInput = {
+    splitA?: SortOrder
+  }
+
+  export type ExperimentMaxOrderByAggregateInput = {
+    id?: SortOrder
+    name?: SortOrder
+    description?: SortOrder
+    isActive?: SortOrder
+    splitA?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type ExperimentMinOrderByAggregateInput = {
+    id?: SortOrder
+    name?: SortOrder
+    description?: SortOrder
+    isActive?: SortOrder
+    splitA?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type ExperimentSumOrderByAggregateInput = {
+    splitA?: SortOrder
   }
 
   export type RawEventCreateNestedManyWithoutUserInput = {
@@ -13423,24 +14985,38 @@ export namespace Prisma {
     lastActive: Date | string
     totalPlayTime?: number
     matchesPlayed?: number
+    matchesWon?: number
     preferredLanguage?: string
     explorerRatio?: number | null
     playerProfile?: string | null
     popularitySensitivity?: number | null
     returnIntent?: number | null
     scheduleProfile?: NullableJsonNullValueInput | InputJsonValue
+    clusterId?: string | null
+    churnScore?: number | null
+    atRisk?: boolean
+    temporalTag?: string | null
+    archetypeWeights?: NullableJsonNullValueInput | InputJsonValue
+    collaborativeEmbedding?: NullableJsonNullValueInput | InputJsonValue
   }
 
   export type PlayerFeaturesUncheckedCreateWithoutUserInput = {
     lastActive: Date | string
     totalPlayTime?: number
     matchesPlayed?: number
+    matchesWon?: number
     preferredLanguage?: string
     explorerRatio?: number | null
     playerProfile?: string | null
     popularitySensitivity?: number | null
     returnIntent?: number | null
     scheduleProfile?: NullableJsonNullValueInput | InputJsonValue
+    clusterId?: string | null
+    churnScore?: number | null
+    atRisk?: boolean
+    temporalTag?: string | null
+    archetypeWeights?: NullableJsonNullValueInput | InputJsonValue
+    collaborativeEmbedding?: NullableJsonNullValueInput | InputJsonValue
   }
 
   export type PlayerFeaturesCreateOrConnectWithoutUserInput = {
@@ -13560,24 +15136,38 @@ export namespace Prisma {
     lastActive?: DateTimeFieldUpdateOperationsInput | Date | string
     totalPlayTime?: FloatFieldUpdateOperationsInput | number
     matchesPlayed?: IntFieldUpdateOperationsInput | number
+    matchesWon?: IntFieldUpdateOperationsInput | number
     preferredLanguage?: StringFieldUpdateOperationsInput | string
     explorerRatio?: NullableFloatFieldUpdateOperationsInput | number | null
     playerProfile?: NullableStringFieldUpdateOperationsInput | string | null
     popularitySensitivity?: NullableFloatFieldUpdateOperationsInput | number | null
     returnIntent?: NullableFloatFieldUpdateOperationsInput | number | null
     scheduleProfile?: NullableJsonNullValueInput | InputJsonValue
+    clusterId?: NullableStringFieldUpdateOperationsInput | string | null
+    churnScore?: NullableFloatFieldUpdateOperationsInput | number | null
+    atRisk?: BoolFieldUpdateOperationsInput | boolean
+    temporalTag?: NullableStringFieldUpdateOperationsInput | string | null
+    archetypeWeights?: NullableJsonNullValueInput | InputJsonValue
+    collaborativeEmbedding?: NullableJsonNullValueInput | InputJsonValue
   }
 
   export type PlayerFeaturesUncheckedUpdateWithoutUserInput = {
     lastActive?: DateTimeFieldUpdateOperationsInput | Date | string
     totalPlayTime?: FloatFieldUpdateOperationsInput | number
     matchesPlayed?: IntFieldUpdateOperationsInput | number
+    matchesWon?: IntFieldUpdateOperationsInput | number
     preferredLanguage?: StringFieldUpdateOperationsInput | string
     explorerRatio?: NullableFloatFieldUpdateOperationsInput | number | null
     playerProfile?: NullableStringFieldUpdateOperationsInput | string | null
     popularitySensitivity?: NullableFloatFieldUpdateOperationsInput | number | null
     returnIntent?: NullableFloatFieldUpdateOperationsInput | number | null
     scheduleProfile?: NullableJsonNullValueInput | InputJsonValue
+    clusterId?: NullableStringFieldUpdateOperationsInput | string | null
+    churnScore?: NullableFloatFieldUpdateOperationsInput | number | null
+    atRisk?: BoolFieldUpdateOperationsInput | boolean
+    temporalTag?: NullableStringFieldUpdateOperationsInput | string | null
+    archetypeWeights?: NullableJsonNullValueInput | InputJsonValue
+    collaborativeEmbedding?: NullableJsonNullValueInput | InputJsonValue
   }
 
   export type SocialAffinityUpsertWithWhereUniqueWithoutUser1Input = {
@@ -13665,6 +15255,7 @@ export namespace Prisma {
     earlyAbandonRate?: number | null
     stickyFactor?: number | null
     viralityFactor?: number | null
+    collaborativeEmbedding?: NullableJsonNullValueInput | InputJsonValue
   }
 
   export type MapFeaturesUncheckedCreateWithoutMapInput = {
@@ -13683,6 +15274,7 @@ export namespace Prisma {
     earlyAbandonRate?: number | null
     stickyFactor?: number | null
     viralityFactor?: number | null
+    collaborativeEmbedding?: NullableJsonNullValueInput | InputJsonValue
   }
 
   export type MapFeaturesCreateOrConnectWithoutMapInput = {
@@ -13739,6 +15331,7 @@ export namespace Prisma {
     earlyAbandonRate?: NullableFloatFieldUpdateOperationsInput | number | null
     stickyFactor?: NullableFloatFieldUpdateOperationsInput | number | null
     viralityFactor?: NullableFloatFieldUpdateOperationsInput | number | null
+    collaborativeEmbedding?: NullableJsonNullValueInput | InputJsonValue
   }
 
   export type MapFeaturesUncheckedUpdateWithoutMapInput = {
@@ -13757,6 +15350,7 @@ export namespace Prisma {
     earlyAbandonRate?: NullableFloatFieldUpdateOperationsInput | number | null
     stickyFactor?: NullableFloatFieldUpdateOperationsInput | number | null
     viralityFactor?: NullableFloatFieldUpdateOperationsInput | number | null
+    collaborativeEmbedding?: NullableJsonNullValueInput | InputJsonValue
   }
 
   export type FatiguedMapUpsertWithWhereUniqueWithoutMapInput = {

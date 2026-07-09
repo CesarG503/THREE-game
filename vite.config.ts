@@ -12,6 +12,15 @@ export default defineConfig({
       '@': clientRoot
     }
   },
+  server: {
+    proxy: {
+      '/api': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+        ws: false,
+      },
+    },
+  },
   build: {
     outDir: 'dist',
     emptyOutDir: true,

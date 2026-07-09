@@ -173,58 +173,52 @@ export function renderLobby(router: Router): () => void {
 		modal.appendChild(header);
 
 		const content = createElement("div", "vp-modal-content");
-		
-		const label = createElement("label", "vp-label", "Seleccionar Región");
-		const select = createElement("select", "vp-select") as HTMLSelectElement;
-		
-		const regions = [
-			{ code: "us-east", name: "EE.UU. Este (Virginia)" },
-			{ code: "eu-west", name: "Europa Oeste (Fráncfort)" },
-			{ code: "sa-east", name: "Sudamérica Este (São Paulo)" },
-			{ code: "asia-east", name: "Asia Este (Tokio)" },
-		];
-		
-		const savedRegion = localStorage.getItem("vp-preferred-region") || "us-east";
-		
-		regions.forEach((r) => {
-			const option = document.createElement("option");
-			option.value = r.code;
-			option.text = r.name;
-			if (r.code === savedRegion) option.selected = true;
-			select.appendChild(option);
-		});
-		
-		label.appendChild(select);
-		content.appendChild(label);
-		
-		const ewtDisplay = createElement("div", "vp-mm-ewt-display");
-		const ewtLabel = createElement("span", "", "Tiempo estimado:");
-		const ewtValue = createElement("span", "vp-mm-ewt-val", "Cargando...");
-		ewtDisplay.appendChild(ewtLabel);
-		ewtDisplay.appendChild(ewtValue);
-		content.appendChild(ewtDisplay);
 
-		const updateEWT = () => {
-			const region = select.value;
-			localStorage.setItem("vp-preferred-region", region);
-			
-			fetch(`/api/matchmaker/ewt?region=${region}`)
-				.then((res) => res.json())
-				.then((data) => {
-					ewtValue.textContent = data.estimatedWaitRange || "30-45s";
-				})
-				.catch(() => {
-					ewtValue.textContent = "30-45s";
-				});
+		// ── Region auto-detection ─────────────────────────────────────────────
+		const REGION_CANDIDATES = [
+			{ code: "us-east",   name: "EE.UU. Este" },
+			{ code: "sa-east",   name: "Sudamérica" },
+			{ code: "eu-west",   name: "Europa" },
+			{ code: "asia-east", name: "Asia" },
+		];
+
+		/**
+		 * Detects the best region by racing EWT requests and picking the fastest.
+		 * Falls back to the last saved preference or "sa-east" for latam users.
+		 */
+		const detectBestRegion = async (): Promise<string> => {
+			const saved = localStorage.getItem("vp-preferred-region");
+			try {
+				const results = await Promise.all(
+					REGION_CANDIDATES.map(async (r) => {
+						const t0 = performance.now();
+						await fetch(`/api/matchmaker/ewt?region=${r.code}`);
+						return { code: r.code, latency: performance.now() - t0 };
+					}),
+				);
+				results.sort((a, b) => a.latency - b.latency);
+				const best = results[0]!.code;
+				localStorage.setItem("vp-preferred-region", best);
+				return best;
+			} catch {
+				return saved || "sa-east";
+			}
 		};
 
-		select.onchange = updateEWT;
-		updateEWT();
-		
-		const actionBtn = createButton("vp-primary-btn", "Buscar Partida", () => {
-			startSearch(select.value);
-		});
+		// Show a loading state while detecting region
+		const detectingMsg = createElement("div", "vp-mm-ewt-display", "🌐 Detectando región óptima...");
+		content.appendChild(detectingMsg);
+
+		const actionBtn = createButton("vp-primary-btn", "Buscar Partida", () => {});
+		actionBtn.disabled = true;
 		content.appendChild(actionBtn);
+
+		detectBestRegion().then((bestRegion) => {
+			const regionName = REGION_CANDIDATES.find(r => r.code === bestRegion)?.name ?? bestRegion;
+			detectingMsg.textContent = `📡 Región detectada: ${regionName}`;
+			actionBtn.disabled = false;
+			actionBtn.onclick = () => startSearch(bestRegion);
+		});
 		
 		modal.appendChild(content);
 		overlay.appendChild(modal);

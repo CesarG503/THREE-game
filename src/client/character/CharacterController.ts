@@ -96,6 +96,11 @@ export class CharacterController {
 
     // Settings
     this.speed = 10;
+    this.runSpeed = 15;
+    this.staminaMax = 5.0;
+    this.stamina = 5.0;
+    this.isRunning = false;
+    this.runningIgnoresShift = false;
     this.jumpForce = 20;
     this.grounded = false;
     this.verticalVelocity = 0;
@@ -588,7 +593,7 @@ export class CharacterController {
         const hasInput = moveDir.lengthSq() > 0;
         this.glbModel.update(dt, hasInput);
         this.polygonModel.update(dt, hasInput);
-        this.polygonModelSkin.update(dt, hasInput, input.keys.crouch, input.keys.attack, false, this.verticalVelocity);
+        this.polygonModelSkin.update(dt, hasInput, input.keys.crouch, input.keys.attack, false, this.verticalVelocity, false, false, false);
         if (this.particleSystem) this.particleSystem.update(dt);
 
         return;
@@ -610,6 +615,47 @@ export class CharacterController {
     const desiredTranslation = new THREE.Vector3();
     const hasInput = moveDir.lengthSq() > 0;
 
+    // Handle Sprinting & Crouch input overrides
+    if (input.doubleShiftTapped) {
+      if (hasInput && this.stamina > 0 && !this.isRunning) {
+        this.isRunning = true;
+        this.runningIgnoresShift = true;
+      } else {
+        this.isRunning = false;
+      }
+      input.doubleShiftTapped = false;
+    }
+
+    if (!input.keys.crouch) {
+      this.runningIgnoresShift = false;
+    }
+
+    if (this.isRunning && input.keys.crouch && !this.runningIgnoresShift) {
+      this.isRunning = false;
+    }
+
+    if (!hasInput || this.stamina <= 0) {
+      this.isRunning = false;
+    }
+
+    // Stamina consumption / regeneration
+    if (this.isRunning) {
+      this.stamina = Math.max(0, this.stamina - dt);
+    } else {
+      this.stamina = Math.min(this.staminaMax, this.stamina + dt * (this.staminaMax / 4));
+    }
+
+    this.emit("staminaChanged", { current: this.stamina, max: this.staminaMax });
+
+    const isCrouchingActive = input.keys.crouch && !this.isRunning;
+
+    let currentSpeed = this.speed;
+    if (this.isRunning) {
+      currentSpeed = this.runSpeed;
+    } else if (isCrouchingActive) {
+      currentSpeed = this.speed / 2;
+    }
+
     const shouldAimAlign = this.cameraController && (this.cameraController.isFirstPerson || this.isHoldingAimWeapon());
 
     if (hasInput && this.cameraController) {
@@ -622,7 +668,7 @@ export class CharacterController {
         .projectOnPlane(up);
 
       if (desiredTranslation.lengthSq() > 0.0001) {
-        desiredTranslation.normalize().multiplyScalar(this.speed * dt);
+        desiredTranslation.normalize().multiplyScalar(currentSpeed * dt);
       }
 
       if (shouldAimAlign) {
@@ -657,11 +703,11 @@ export class CharacterController {
 
     const isSuperman = isUsingJetpackCameraDir || isUsingJetpackShiftFlight;
     const noPitchTilt = !!isUsingJetpackCameraDir;
-    const visualCrouch = input.keys.crouch && !isSuperman;
+    const visualCrouch = isCrouchingActive && !isSuperman;
 
     this.glbModel.update(dt, hasInput);
     this.polygonModel.update(dt, hasInput);
-    this.polygonModelSkin.update(dt, hasInput, visualCrouch, input.keys.attack, isGrounded, this.verticalVelocity, isSuperman, noPitchTilt);
+    this.polygonModelSkin.update(dt, hasInput, visualCrouch, input.keys.attack, isGrounded, this.verticalVelocity, isSuperman, noPitchTilt, this.isRunning);
 
     if (this.particleSystem) this.particleSystem.update(dt);
 
@@ -1088,6 +1134,13 @@ export class CharacterController {
 
   setStats(stats: Partial<CharacterStats & JumpConfig & FlightConfig & { playerCollision: PlayerCollisionMode; gravityOrientation: GravityOrientation; gravityTransitionDuration: number }>) {
     if (stats.speed !== undefined) this.speed = stats.speed;
+    if (stats.runSpeed !== undefined) {
+      this.runSpeed = Math.max(stats.speed ?? this.speed, stats.runSpeed);
+    }
+    if (stats.staminaMax !== undefined) {
+      this.staminaMax = stats.staminaMax;
+      this.stamina = stats.staminaMax;
+    }
     if (stats.jumpForce !== undefined) this.jumpForce = stats.jumpForce;
     if (stats.maxHealth !== undefined) {
       this.maxHealth = stats.maxHealth;

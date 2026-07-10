@@ -10,6 +10,7 @@ export class StylizedAnimationSystem implements IAnimationSystem {
     return [
       { name: "Respiración (Idle)", description: "El cuerpo entero respira de forma suave y las extremidades flotan de forma natural." },
       { name: "Caminar Bouncy (Walk)", description: "Balanceo lateral de cadera, rotación de hombros y bote vertical al dar pasos." },
+      { name: "Correr Atlético (Run)", description: "Inclinación profunda del cuerpo, codos flexionados e intensa oscilación de hombros y caderas." },
       { name: "Agacharse Sigiloso (Crouch)", description: "Inclinación aerodinámica y flexión natural de rodillas." },
       { name: "Ataque Dinámico (Swing)", description: "Golpe rápido que inclina el torso hacia el impacto." },
       { name: "Vuelo Acrobático (Superman)", description: "Vuelo dinámico con pequeños sways según el giro de la cabeza." },
@@ -44,7 +45,7 @@ export class StylizedAnimationSystem implements IAnimationSystem {
     const breatheBob = Math.sin(timeSec * 2.0) * 0.015;
     const breatheRot = Math.cos(timeSec * 2.0) * 0.01;
 
-    const walkSpeed = isCrouching ? 5 : 10;
+    const walkSpeed = isCrouching ? 5 : (state.isRunning ? 14 : 10);
     const walkTime = timeSec * walkSpeed;
 
     let bounceAmount = 0;
@@ -53,11 +54,17 @@ export class StylizedAnimationSystem implements IAnimationSystem {
 
     if (isMoving && !isSuperman && isGrounded) {
       // Bob up and down twice per leg swing cycle (each step bounces the body/head)
-      bounceAmount = (isCrouching ? 0.012 : 0.038) * Math.cos(walkTime * 2);
-      // Nod head slightly forward/backward during walking
-      headBobX = Math.abs(Math.sin(walkTime)) * 0.045;
+      bounceAmount = state.isRunning
+        ? 0.055 * Math.cos(walkTime * 2)
+        : (isCrouching ? 0.012 : 0.038) * Math.cos(walkTime * 2);
+      // Nod head slightly forward/backward during walking/running
+      headBobX = state.isRunning
+        ? Math.abs(Math.sin(walkTime)) * 0.075
+        : Math.abs(Math.sin(walkTime)) * 0.045;
       // Sway head side-to-side with steps
-      headSwayZ = Math.sin(walkTime) * 0.04;
+      headSwayZ = state.isRunning
+        ? Math.sin(walkTime) * 0.08
+        : Math.sin(walkTime) * 0.04;
     } else if (!isMoving) {
       // Subtle sway during idle breathing
       headSwayZ = Math.sin(timeSec) * 0.012;
@@ -124,7 +131,7 @@ export class StylizedAnimationSystem implements IAnimationSystem {
 
     let targetBodyRotX = isCrouching ? 0.35 : 0;
     if (isMoving && !isSuperman && isGrounded) {
-      targetBodyRotX += 0.1; // lean forward when moving
+      targetBodyRotX += state.isRunning ? 0.28 : 0.1; // lean forward when moving/running
     }
     parts.body.rotation.x = THREE.MathUtils.lerp(parts.body.rotation.x, targetBodyRotX, lerpSpeed);
 
@@ -174,24 +181,25 @@ export class StylizedAnimationSystem implements IAnimationSystem {
       let bodyRotY = 0;
 
       if (isMoving) {
-        const speed = isCrouching ? 5 : 10;
+        const speed = isCrouching ? 5 : (state.isRunning ? 14 : 10);
         const walkTime = timeSec * speed;
         const sinVal = Math.sin(walkTime);
         const cosVal = Math.cos(walkTime);
 
-        // Stylized swing
-        baseRArmX = sinVal * 0.9;
-        baseLArmX = -sinVal * 0.9;
-        baseRLegX = -sinVal * 0.9;
-        baseLLegX = sinVal * 0.9;
+        // Stylized swing (wider swing when running)
+        const swingScale = state.isRunning ? 1.25 : 0.9;
+        baseRArmX = sinVal * swingScale;
+        baseLArmX = -sinVal * swingScale;
+        baseRLegX = -sinVal * swingScale;
+        baseLLegX = sinVal * swingScale;
 
         // Spread arms slightly outward when running
-        baseRArmZ = 0.1;
-        baseLArmZ = -0.1;
+        baseRArmZ = state.isRunning ? 0.18 : 0.1;
+        baseLArmZ = state.isRunning ? -0.18 : -0.1;
 
         // Hip sway and body rotation (wobble/swing)
-        bodySwayZ = sinVal * 0.11; // Increased for more wobble/sway
-        bodyRotY = cosVal * 0.12;  // Torso twist during steps
+        bodySwayZ = sinVal * (state.isRunning ? 0.16 : 0.11);
+        bodyRotY = cosVal * (state.isRunning ? 0.18 : 0.12);
 
         if (isCrouching) {
           baseRArmX += 0.2;

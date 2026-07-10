@@ -441,8 +441,9 @@ export function animate(this: any) {
 				this._netAttackLatch = true;
 			}
 
+			const isRunning = this.character.characterController ? this.character.characterController.isRunning : false;
 			const isMoving = this.inputManager ? (this.inputManager.keys.forward || this.inputManager.keys.backward || this.inputManager.keys.left || this.inputManager.keys.right) : false;
-			const isCrouching = this.inputManager ? this.inputManager.keys.crouch : false;
+			const isCrouching = this.inputManager ? (this.inputManager.keys.crouch && !isRunning) : false;
 			const isAttacking = this.inputManager ? this.inputManager.keys.attack : false;
 			const isGrounded = this.character.characterController ? this.character.characterController.computedGrounded() : true;
 
@@ -460,6 +461,7 @@ export function animate(this: any) {
 				roleVisual: this.character.roleVisual || null,
 				isMoving: isMoving,
 				isCrouching: isCrouching,
+				isRunning: isRunning,
 				isAttacking: sendAttacking,
 				isGrounded: isGrounded,
 				verticalVelocity: this.character.verticalVelocity || 0,

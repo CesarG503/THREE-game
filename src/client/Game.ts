@@ -438,6 +438,9 @@ export class Game {
 		this.character.on("healthChanged", (data: any) => {
 			this.hud.updateHealth(data.current, data.max);
 		});
+		this.character.on("staminaChanged", (data: any) => {
+			this.hud.updateStamina(data.current, data.max);
+		});
 		this.character.on("jumpChanged", (data: any) => {
 			this.hud.updateJump(data.current, data.max);
 			if (data.type === "air-jump" && this.networkManager) {

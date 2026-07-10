@@ -433,7 +433,28 @@ export class PlayerConfigPanel {
         statsCol.innerHTML = "<h4 style='color:#aaa; border-bottom:1px solid #444;'>Estadísticas Base</h4>";
 
         this.createStatControl(statsCol, "Vida Total", 'maxHealth', profile, 1, 1000);
-        this.createStatControl(statsCol, "Velocidad Movimiento", 'speed', profile, 1, 50);
+        
+        // Walk speed control with validation that runSpeed >= speed
+        this.createStatControl(statsCol, "Velocidad Movimiento", 'speed', profile, 1, 50, (newSpeed) => {
+            const currentRunSpeed = profile.runSpeed !== undefined ? profile.runSpeed : (profile.speed || 10) * 1.5;
+            if (currentRunSpeed < newSpeed) {
+                this.manager.updateProfile(profile.id, { runSpeed: newSpeed });
+                this.renderContent(); // Re-render to show matching speeds
+            }
+        });
+
+        // Run speed control with validation that runSpeed >= speed
+        this.createStatControl(statsCol, "Velocidad al correr", 'runSpeed', profile, 1, 60, (newRunSpeed) => {
+            const currentSpeed = profile.speed || 10;
+            if (newRunSpeed < currentSpeed) {
+                this.manager.updateProfile(profile.id, { runSpeed: currentSpeed });
+                this.renderContent(); // Re-render to enforce constraint
+            }
+        });
+
+        // Stamina Max control
+        this.createStatControl(statsCol, "Tiempo de correr (Estamina)", 'staminaMax', profile, 1, 30);
+
         this.createStatControl(statsCol, "Fuerza de Salto", 'jumpForce', profile, 0, 50);
         // Multi-Jump Control (Conditional)
         const multiJumpControl = this.createStatControl(statsCol, "Saltos en el Aire", 'maxMultiJumps', profile, 0, 10);
@@ -1119,13 +1140,18 @@ export class PlayerConfigPanel {
         this.contentArea.appendChild(grid);
     }
 
-    createStatControl(container, label, key, profile, min, max) {
+    createStatControl(container, label, key, profile, min, max, onChange?: (val: number) => void) {
         const wrap = document.createElement('div');
         wrap.style.marginBottom = "15px";
 
         const render = () => {
             wrap.innerHTML = "";
             const mode = (profile.statModes && profile.statModes[key]) || 'standard';
+            // Set default value if undefined in old profile
+            if (profile[key] === undefined) {
+                if (key === 'runSpeed') profile[key] = (profile.speed || 10) * 1.5;
+                else if (key === 'staminaMax') profile[key] = 5.0;
+            }
             const value = profile[key];
 
             const header = document.createElement('div');
@@ -1154,6 +1180,7 @@ export class PlayerConfigPanel {
                     if (v > max) v = max;
                     if (v < min) v = min;
                     this.manager.updateProfile(profile.id, { [key]: v });
+                    if (onChange) onChange(v);
                 } else {
                     this.manager.updateProfile(profile.id, { statModes: profile.statModes });
                 }
@@ -1189,6 +1216,7 @@ export class PlayerConfigPanel {
                         if (n > max) n = max;
 
                         this.manager.updateProfile(profile.id, { [key]: n });
+                        if (onChange) onChange(n);
                         render();
                     };
 
@@ -1217,6 +1245,7 @@ export class PlayerConfigPanel {
                     const v = parseFloat(e.target.value);
                     valDisp.textContent = v;
                     this.manager.updateProfile(profile.id, { [key]: v });
+                    if (onChange) onChange(v);
                 };
                 wrap.appendChild(range);
 
@@ -1227,7 +1256,9 @@ export class PlayerConfigPanel {
                 input.value = value;
                 input.style.cssText = "width: 80px; background:#222; color:#0f0; border:1px solid #555; padding:5px; text-align:right;";
                 input.onchange = (e) => {
-                    this.manager.updateProfile(profile.id, { [key]: parseFloat(e.target.value) });
+                    const v = parseFloat(e.target.value);
+                    this.manager.updateProfile(profile.id, { [key]: v });
+                    if (onChange) onChange(v);
                 };
                 input.onkeydown = (e) => { if (e.key === 'e' || e.key === 'E') e.stopPropagation(); };
 

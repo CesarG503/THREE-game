@@ -10,6 +10,7 @@ export class ClassicAnimationSystem implements IAnimationSystem {
     return [
       { name: "Espera (Idle)", description: "Balanceo suave de los brazos al estar quieto." },
       { name: "Caminar (Walk)", description: "Movimiento oscilatorio alternado de brazos y piernas." },
+      { name: "Correr (Sprint)", description: "Marcha acelerada con mayor oscilación al correr." },
       { name: "Agacharse (Crouch)", description: "Inclinación del cuerpo hacia adelante y flexión." },
       { name: "Ataque (Swing/Punch)", description: "Movimiento rápido de golpe con los brazos." },
       { name: "Vuelo (Superman)", description: "Postura horizontal de vuelo estilo Superman." },
@@ -138,7 +139,7 @@ export class ClassicAnimationSystem implements IAnimationSystem {
       let baseLArmZ = 0;
 
       if (isMoving) {
-        const speed = isCrouching ? 5 : 10;
+        const speed = isCrouching ? 5 : (state.isRunning ? 14 : 10);
         const time = (Date.now() / 1000) * speed;
         const sinVal = Math.sin(time);
 

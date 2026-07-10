@@ -9,6 +9,7 @@ export interface InputState {
 	crouch: boolean;
 	attack: boolean;
 	aim: boolean;
+	run?: boolean;
 }
 
 export interface InputBinding {

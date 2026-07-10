@@ -582,7 +582,8 @@ export class PolygonModelSkin implements ICharacterModel {
     isGrounded = true,
     verticalVelocity = 0,
     isSuperman = false,
-    noPitchTilt = false
+    noPitchTilt = false,
+    isRunning = false
   ) {
     this.isSuperman = isSuperman;
     if (!this.model || !this.isVisible) return;
@@ -638,7 +639,8 @@ export class PolygonModelSkin implements ICharacterModel {
       heldItem: this.heldItem,
       isFirstPerson: this.isFirstPerson,
       jumpAnimationType: this.jumpAnimationType,
-      fallAnimationType: this.fallAnimationType
+      fallAnimationType: this.fallAnimationType,
+      isRunning
     };
 
     const parts: LimbParts = {
@@ -668,14 +670,14 @@ export class PolygonModelSkin implements ICharacterModel {
       if (this.isHoldingWeapon) {
         if (this.currentWeaponHand === "right") {
           rArmBend = 0.35; // slightly bent for natural weapon holding
-          lArmBend = Math.max(0, -this.leftArmGroup.rotation.x) * 0.8;
+          lArmBend = isRunning ? (0.55 + Math.max(0, -this.leftArmGroup.rotation.x) * 0.5) : (Math.max(0, -this.leftArmGroup.rotation.x) * 0.8);
         } else {
           lArmBend = 0.35;
-          rArmBend = Math.max(0, -this.rightArmGroup.rotation.x) * 0.8;
+          rArmBend = isRunning ? (0.55 + Math.max(0, -this.rightArmGroup.rotation.x) * 0.5) : (Math.max(0, -this.rightArmGroup.rotation.x) * 0.8);
         }
       } else {
-        rArmBend = Math.max(0, -this.rightArmGroup.rotation.x) * 0.8;
-        lArmBend = Math.max(0, -this.leftArmGroup.rotation.x) * 0.8;
+        rArmBend = isRunning ? (0.55 + Math.max(0, -this.rightArmGroup.rotation.x) * 0.5) : (Math.max(0, -this.rightArmGroup.rotation.x) * 0.8);
+        lArmBend = isRunning ? (0.55 + Math.max(0, -this.leftArmGroup.rotation.x) * 0.5) : (Math.max(0, -this.leftArmGroup.rotation.x) * 0.8);
       }
 
       if (!isGrounded && !isSuperman) {
@@ -684,8 +686,8 @@ export class PolygonModelSkin implements ICharacterModel {
         lLegBend = 0.45;
       } else {
         // Bend knees when leg swings forward
-        rLegBend = Math.max(0, -this.rightLegGroup.rotation.x) * 1.2;
-        lLegBend = Math.max(0, -this.leftLegGroup.rotation.x) * 1.2;
+        rLegBend = isRunning ? (0.35 + Math.max(0, -this.rightLegGroup.rotation.x) * 1.4) : (Math.max(0, -this.rightLegGroup.rotation.x) * 1.2);
+        lLegBend = isRunning ? (0.35 + Math.max(0, -this.leftLegGroup.rotation.x) * 1.4) : (Math.max(0, -this.leftLegGroup.rotation.x) * 1.2);
       }
 
       // Apply bending to main meshes and outer layers

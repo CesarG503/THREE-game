@@ -8,6 +8,57 @@ const DEFAULT_VISUAL_RULE = {
     aura: "soft"
 };
 
+export function ensureStaminaHUDDefaults(hudSettings: any) {
+    if (!hudSettings) return;
+
+    if (hudSettings.showStamina === undefined) {
+        hudSettings.showStamina = true;
+    }
+    if (hudSettings.staminaStyle === undefined) {
+        hudSettings.staminaStyle = 'bar';
+    }
+    if (!hudSettings.staminaPos) {
+        hudSettings.staminaPos = {
+            left: "33.69%",
+            top: "94.77%"
+        };
+    }
+    if (hudSettings.staminaShowText === undefined) {
+        hudSettings.staminaShowText = false;
+    }
+    if (hudSettings.staminaOrientation === undefined) {
+        hudSettings.staminaOrientation = "horizontal";
+    }
+    if (hudSettings.staminaWidth === undefined) {
+        hudSettings.staminaWidth = 277;
+    }
+    if (hudSettings.staminaHeight === undefined) {
+        hudSettings.staminaHeight = 5;
+    }
+
+    if (hudSettings.layerOrder && !hudSettings.layerOrder.includes('stamina')) {
+        const idx = hudSettings.layerOrder.indexOf('inventory');
+        if (idx !== -1) {
+            hudSettings.layerOrder.splice(idx, 0, 'stamina');
+        } else {
+            hudSettings.layerOrder.push('stamina');
+        }
+    }
+
+    if (!hudSettings.hudAnchors) {
+        hudSettings.hudAnchors = {};
+    }
+    if (!hudSettings.hudAnchors.stamina) {
+        hudSettings.hudAnchors.stamina = {
+            parentId: "inventory",
+            pos: {
+                left: "5.912%",
+                top: "63.000%"
+            }
+        };
+    }
+}
+
 export class PlayerConfigManager {
     game: any;
     profiles: any[];
@@ -22,6 +73,8 @@ export class PlayerConfigManager {
                 name: "ADMIN tester",
                 maxHealth: 1000,
                 speed: 20,
+                runSpeed: 30,
+                staminaMax: 5.0,
                 jumpForce: 10,
                 respawns: -1,
                 color: "#ff0000",
@@ -61,6 +114,16 @@ export class PlayerConfigManager {
                     jumpOrientation: "horizontal",
                     jumpWidth: 277,
                     jumpHeight: 5,
+                    showStamina: true,
+                    staminaStyle: "bar",
+                    staminaPos: {
+                        left: "33.69%",
+                        top: "94.77%"
+                    },
+                    staminaShowText: false,
+                    staminaOrientation: "horizontal",
+                    staminaWidth: 277,
+                    staminaHeight: 5,
                     showInventory: true,
                     inventorySlots: 9,
                     inventoryPos: {
@@ -75,6 +138,7 @@ export class PlayerConfigManager {
                     layerOrder: [
                         "health",
                         "jump",
+                        "stamina",
                         "inventory"
                     ],
                     inventoryContainerWidth: 592,
@@ -85,6 +149,13 @@ export class PlayerConfigManager {
                             pos: {
                                 left: "5.912%",
                                 top: "73.620%"
+                            }
+                        },
+                        stamina: {
+                            parentId: "inventory",
+                            pos: {
+                                left: "5.912%",
+                                top: "63.000%"
                             }
                         },
                         health: {
@@ -110,6 +181,8 @@ export class PlayerConfigManager {
                 name: "Jugador Estándar",
                 maxHealth: 100,
                 speed: 10,
+                runSpeed: 15,
+                staminaMax: 5.0,
                 jumpForce: 10,
                 respawns: -1,
                 color: "#ffffff",
@@ -149,6 +222,16 @@ export class PlayerConfigManager {
                     jumpOrientation: "horizontal",
                     jumpWidth: 277,
                     jumpHeight: 5,
+                    showStamina: true,
+                    staminaStyle: "bar",
+                    staminaPos: {
+                        left: "33.69%",
+                        top: "94.77%"
+                    },
+                    staminaShowText: false,
+                    staminaOrientation: "horizontal",
+                    staminaWidth: 277,
+                    staminaHeight: 5,
                     showInventory: true,
                     inventorySlots: 9,
                     inventoryPos: {
@@ -163,6 +246,7 @@ export class PlayerConfigManager {
                     layerOrder: [
                         "health",
                         "jump",
+                        "stamina",
                         "inventory"
                     ],
                     inventoryContainerWidth: 592,
@@ -173,6 +257,13 @@ export class PlayerConfigManager {
                             pos: {
                                 left: "5.912%",
                                 top: "73.620%"
+                            }
+                        },
+                        stamina: {
+                            parentId: "inventory",
+                            pos: {
+                                left: "5.912%",
+                                top: "63.000%"
                             }
                         },
                         health: {
@@ -222,6 +313,8 @@ export class PlayerConfigManager {
             name: name || "Nuevo Perfil",
             maxHealth: 100,
             speed: 10,
+            runSpeed: 15,
+            staminaMax: 5.0,
             jumpForce: 10,
             respawns: -1,
             color: "#" + Math.floor(Math.random() * 16777215).toString(16),
@@ -264,6 +357,16 @@ export class PlayerConfigManager {
                 jumpOrientation: "horizontal",
                 jumpWidth: 277,
                 jumpHeight: 5,
+                showStamina: true,
+                staminaStyle: "bar",
+                staminaPos: {
+                    left: "33.69%",
+                    top: "94.77%"
+                },
+                staminaShowText: false,
+                staminaOrientation: "horizontal",
+                staminaWidth: 277,
+                staminaHeight: 5,
                 showInventory: true,
                 inventorySlots: 9,
                 inventoryPos: {
@@ -278,6 +381,7 @@ export class PlayerConfigManager {
                 layerOrder: [
                     "health",
                     "jump",
+                    "stamina",
                     "inventory"
                 ],
                 inventoryContainerWidth: 592,
@@ -288,6 +392,13 @@ export class PlayerConfigManager {
                         pos: {
                             left: "5.912%",
                             top: "73.620%"
+                        }
+                    },
+                    stamina: {
+                        parentId: "inventory",
+                        pos: {
+                            left: "5.912%",
+                            top: "63.000%"
                         }
                     },
                     health: {
@@ -415,6 +526,8 @@ export class PlayerConfigManager {
         if (character.setStats) {
             character.setStats({
                 speed: profile.speed,
+                runSpeed: profile.runSpeed !== undefined ? profile.runSpeed : (profile.speed || 10) * 1.5,
+                staminaMax: profile.staminaMax !== undefined ? profile.staminaMax : 5.0,
                 jumpForce: profile.jumpForce,
                 maxHealth: profile.maxHealth,
                 respawns: profile.respawns,
@@ -440,6 +553,9 @@ export class PlayerConfigManager {
             if (character.maxMultiJumps !== undefined) {
                 const jumpsLeft = character.maxMultiJumps - (character.jumpCount || 0);
                 this.game.hud.updateJump(jumpsLeft, character.maxMultiJumps);
+            }
+            if (character.staminaMax !== undefined) {
+                this.game.hud.updateStamina(character.stamina, character.staminaMax);
             }
         }
 
@@ -482,18 +598,34 @@ export class PlayerConfigManager {
     loadData(data: any) {
         if (!data) return;
         if (data.profiles) {
-            this.profiles = data.profiles.map((profile: any) => ({
-                skinMode: "player",
-                skinUrl: DEFAULT_POLYGON_SKIN_URL,
-                skinAssetId: null,
-                roleVisual: createRoleVisual(),
-                gravityOrientation: "down",
-                gravityTransitionDuration: 0.65,
-                cameraMode: "third-person-collision",
-                animationStyle: "classic",
-                limbBending: "none",
-                ...profile
-            }));
+            this.profiles = data.profiles.map((profile: any) => {
+                const merged = {
+                    skinMode: "player",
+                    skinUrl: DEFAULT_POLYGON_SKIN_URL,
+                    skinAssetId: null,
+                    roleVisual: createRoleVisual(),
+                    gravityOrientation: "down",
+                    gravityTransitionDuration: 0.65,
+                    cameraMode: "third-person-collision",
+                    animationStyle: "classic",
+                    limbBending: "none",
+                    ...profile
+                };
+                
+                // Ensure stamina HUD settings defaults are initialized
+                if (!merged.hudSettings) {
+                    merged.hudSettings = {};
+                }
+                ensureStaminaHUDDefaults(merged.hudSettings);
+
+                if (merged.runSpeed === undefined) {
+                    merged.runSpeed = (merged.speed || 10) * 1.5;
+                }
+                if (merged.staminaMax === undefined) {
+                    merged.staminaMax = 5.0;
+                }
+                return merged;
+            });
         }
         if (data.assignments) {
             this.assignments = data.assignments;

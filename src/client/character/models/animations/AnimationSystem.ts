@@ -32,6 +32,7 @@ export interface AnimationState {
   isFirstPerson: boolean;
   jumpAnimationType: string;
   fallAnimationType: string;
+  isRunning?: boolean;
 }
 
 export interface AnimationInfo {

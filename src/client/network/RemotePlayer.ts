@@ -375,6 +375,7 @@ export class RemotePlayer {
                                this.currentWeaponInstance.pointerFollowEnabled && 
                                !this.currentWeaponInstance.shiftFlightEnabled);
         const visualCrouch = !!(this.state.isCrouching && !isSuperman);
+        const isRunning = !!this.state.isRunning;
 
         this.polygonModelSkin.update(
             dt,
@@ -384,7 +385,8 @@ export class RemotePlayer {
             (this.state.isGrounded !== undefined ? this.state.isGrounded : true),
             this.state.verticalVelocity || 0,
             isSuperman,
-            noPitchTilt
+            noPitchTilt,
+            isRunning
         );
         if (this.currentWeaponInstance && typeof this.currentWeaponInstance.updateAnim === "function") {
             this.currentWeaponInstance.updateAnim(dt, 0);

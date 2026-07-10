@@ -19,6 +19,57 @@ import {
     scalePixelPosition
 } from './modules/HUDResponsiveUtils'
 
+function ensureStaminaHUDDefaults(hudSettings: any) {
+    if (!hudSettings) return;
+
+    if (hudSettings.showStamina === undefined) {
+        hudSettings.showStamina = true;
+    }
+    if (hudSettings.staminaStyle === undefined) {
+        hudSettings.staminaStyle = 'bar';
+    }
+    if (!hudSettings.staminaPos) {
+        hudSettings.staminaPos = {
+            left: "33.69%",
+            top: "94.77%"
+        };
+    }
+    if (hudSettings.staminaShowText === undefined) {
+        hudSettings.staminaShowText = false;
+    }
+    if (hudSettings.staminaOrientation === undefined) {
+        hudSettings.staminaOrientation = "horizontal";
+    }
+    if (hudSettings.staminaWidth === undefined) {
+        hudSettings.staminaWidth = 277;
+    }
+    if (hudSettings.staminaHeight === undefined) {
+        hudSettings.staminaHeight = 5;
+    }
+
+    if (hudSettings.layerOrder && !hudSettings.layerOrder.includes('stamina')) {
+        const idx = hudSettings.layerOrder.indexOf('inventory');
+        if (idx !== -1) {
+            hudSettings.layerOrder.splice(idx, 0, 'stamina');
+        } else {
+            hudSettings.layerOrder.push('stamina');
+        }
+    }
+
+    if (!hudSettings.hudAnchors) {
+        hudSettings.hudAnchors = {};
+    }
+    if (!hudSettings.hudAnchors.stamina) {
+        hudSettings.hudAnchors.stamina = {
+            parentId: "inventory",
+            pos: {
+                left: "5.912%",
+                top: "63.000%"
+            }
+        };
+    }
+}
+
 export class HUDConfigPanel {
     constructor(game, manager, onClose) {
         this.game = game;
@@ -41,6 +92,7 @@ export class HUDConfigPanel {
     open(profile) {
         this.profile = profile;
         this.tempSettings = JSON.parse(JSON.stringify(profile.hudSettings || {}));
+        ensureStaminaHUDDefaults(this.tempSettings);
         this.selectedId = 'health'; // Default selection
         this.selectedPropertyTab = 'style';
         this.previewBackdropEnabled = false;
@@ -66,6 +118,15 @@ export class HUDConfigPanel {
         if (this.tempSettings.jumpHeight === undefined) this.tempSettings.jumpHeight = 8;
         if (this.tempSettings.jumpOrientation === undefined) this.tempSettings.jumpOrientation = 'horizontal';
         if (this.tempSettings.jumpShowText === undefined) this.tempSettings.jumpShowText = false;
+
+        // Stamina
+        if (this.tempSettings.showStamina === undefined) this.tempSettings.showStamina = true;
+        if (this.tempSettings.staminaStyle === undefined) this.tempSettings.staminaStyle = 'bar';
+        if (!this.tempSettings.staminaPos) this.tempSettings.staminaPos = { top: '85%', left: '5%' };
+        if (this.tempSettings.staminaWidth === undefined) this.tempSettings.staminaWidth = 200;
+        if (this.tempSettings.staminaHeight === undefined) this.tempSettings.staminaHeight = 8;
+        if (this.tempSettings.staminaOrientation === undefined) this.tempSettings.staminaOrientation = 'horizontal';
+        if (this.tempSettings.staminaShowText === undefined) this.tempSettings.staminaShowText = false;
 
         // Inventory
         if (this.tempSettings.showInventory === undefined) this.tempSettings.showInventory = true;
@@ -266,7 +327,7 @@ export class HUDConfigPanel {
     renderSidebar() {
         this.sidebar.innerHTML = '';
         const activeGroups = getActiveFarmingGroups(this.game);
-        const order = [...(this.tempSettings.layerOrder || ['health', 'jump', 'inventory'])];
+        const order = [...(this.tempSettings.layerOrder || ['health', 'jump', 'stamina', 'inventory'])];
         activeGroups.forEach(g => {
             const id = "fz_" + g.groupId;
             if (!order.includes(id)) {
@@ -276,7 +337,7 @@ export class HUDConfigPanel {
         // Ensure layerOrder is initialized if missing
         if (!this.tempSettings.layerOrder) this.tempSettings.layerOrder = order;
 
-        const labels = { 'health': 'Salud', 'jump': 'Salto', 'inventory': 'Inventario' };
+        const labels = { 'health': 'Salud', 'jump': 'Salto', 'stamina': 'Estamina', 'inventory': 'Inventario' };
         const items = order.map(id => {
             if (id.startsWith("fz_")) {
                 const gId = id.substring(3);
@@ -363,7 +424,7 @@ export class HUDConfigPanel {
             // Vis Checkbox (Stop propagation so we don't select row when checking)
             const check = document.createElement('input');
             check.type = "checkbox";
-            const vKey = item.id.startsWith("fz_") ? "show_" + item.id : (item.id === 'health' ? 'showHealth' : (item.id === 'jump' ? 'showJump' : 'showInventory'));
+            const vKey = item.id.startsWith("fz_") ? "show_" + item.id : (item.id === 'health' ? 'showHealth' : (item.id === 'jump' ? 'showJump' : (item.id === 'stamina' ? 'showStamina' : 'showInventory')));
             if (this.tempSettings[vKey] === undefined) {
                 this.tempSettings[vKey] = true;
             }
@@ -434,7 +495,7 @@ export class HUDConfigPanel {
             return;
         }
 
-        const title = type === 'health' ? "Salud (Vida)" : (type === 'jump' ? "Salto (Carga)" : "Inventario");
+        const title = type === 'health' ? "Salud (Vida)" : (type === 'jump' ? "Salto (Carga)" : (type === 'stamina' ? "Estamina (Correr)" : "Inventario"));
 
         // Re-use logic from createSection but adapt to just render one
         this.createSection(body, title, type);
@@ -905,7 +966,7 @@ export class HUDConfigPanel {
 
         const visCheck = document.createElement('input');
         visCheck.type = "checkbox";
-        const vKey = type === 'health' ? 'showHealth' : (type === 'jump' ? 'showJump' : 'showInventory');
+        const vKey = type === 'health' ? 'showHealth' : (type === 'jump' ? 'showJump' : (type === 'stamina' ? 'showStamina' : 'showInventory'));
         visCheck.checked = this.tempSettings[vKey];
         visCheck.onchange = (e) => {
             this.tempSettings[vKey] = e.target.checked;
@@ -922,7 +983,7 @@ export class HUDConfigPanel {
         sec.appendChild(visRow);
 
         // Style / Options
-        if (type === 'health' || type === 'jump') {
+        if (type === 'health' || type === 'jump' || type === 'stamina') {
             const prefix = type;
 
             // 1. Style
@@ -934,7 +995,7 @@ export class HUDConfigPanel {
             sec.appendChild(styleLabel);
 
             const styles = type === 'health' ? ['bar', 'hearts', 'text'] : ['bar', 'circle'];
-            const styleTexts = type === 'health' ? ['Barra Clásica', 'Corazones', 'Texto Simple'] : ['Barra de Estamina', 'Círculo de Carga'];
+            const styleTexts = type === 'health' ? ['Barra Clásica', 'Corazones', 'Texto Simple'] : (type === 'jump' ? ['Barra de Salto', 'Círculo de Salto'] : ['Barra de Estamina', 'Círculo de Estamina']);
 
             const styleSel = this.createSelect(styles, styleTexts, this.tempSettings[prefix + 'Style'], (v) => {
                 this.tempSettings[prefix + 'Style'] = v;
@@ -1359,7 +1420,7 @@ export class HUDConfigPanel {
         this.layoutSystem.clearElements();
 
         const activeGroups = getActiveFarmingGroups(this.game);
-        const layerOrder = [...(this.tempSettings.layerOrder || ['health', 'jump', 'inventory'])];
+        const layerOrder = [...(this.tempSettings.layerOrder || ['health', 'jump', 'stamina', 'inventory'])];
         activeGroups.forEach(g => {
             const id = "fz_" + g.groupId;
             if (!layerOrder.includes(id)) {
@@ -1372,6 +1433,7 @@ export class HUDConfigPanel {
             const id = layerOrder[i];
             if (id === 'health' && this.tempSettings.showHealth) this.renderPreviewHealth();
             else if (id === 'jump' && this.tempSettings.showJump) this.renderPreviewJump();
+            else if (id === 'stamina' && this.tempSettings.showStamina) this.renderPreviewStamina();
             else if (id === 'inventory' && this.tempSettings.showInventory) this.renderPreviewInventory();
             else if (id.startsWith("fz_")) {
                 const gId = id.substring(3);
@@ -1412,6 +1474,7 @@ export class HUDConfigPanel {
     getHudPosKey(id) {
         if (id === 'health') return 'healthPos';
         if (id === 'jump') return 'jumpPos';
+        if (id === 'stamina') return 'staminaPos';
         if (id === 'inventory') return 'inventoryPos';
         if (id.startsWith('fz_')) return `pos_fz_${id.substring(3)}`;
         return `${id}Pos`;
@@ -1437,7 +1500,7 @@ export class HUDConfigPanel {
     }
 
     getResolvedLayerOrder() {
-        const layerOrder = [...(this.tempSettings.layerOrder || ['health', 'jump', 'inventory'])];
+        const layerOrder = [...(this.tempSettings.layerOrder || ['health', 'jump', 'stamina', 'inventory'])];
         this.getRenderedHudIds().forEach(id => {
             if (!layerOrder.includes(id)) layerOrder.push(id);
         });
@@ -1833,6 +1896,52 @@ export class HUDConfigPanel {
 
         this.layoutSystem.registerElement(el, 'jump', this.tempSettings.jumpPos, (newPos) => {
             this.tempSettings.jumpPos = newPos;
+        });
+    }
+
+    renderPreviewStamina() {
+        const el = document.createElement('div');
+        el.dataset.hudId = 'stamina';
+        el.style.cssText = `display: flex; align-items: center;`;
+
+        // Orientation
+        if (this.tempSettings.staminaOrientation === 'vertical') {
+            el.style.flexDirection = 'column-reverse';
+        } else {
+            el.style.flexDirection = 'row';
+        }
+
+        if (this.tempSettings.staminaStyle === 'bar') {
+            const w = fitLength(this.tempSettings.staminaWidth || 200, this.previewContainer, 'x', 2);
+            const h = fitLength(this.tempSettings.staminaHeight || 8, this.previewContainer, 'y', 1);
+            const isVert = this.tempSettings.staminaOrientation === 'vertical';
+            const fillDir = isVert ? 'to top' : '90deg';
+            const showText = this.tempSettings.staminaShowText && w >= 32 && h >= 8;
+            const fontSize = clamp(Math.round(Math.min(w, h) / 1.5), 6, 18);
+
+            el.innerHTML = `
+                <div style="width: ${w}px; height: ${h}px; background: rgba(0,0,0,0.7); border-radius: ${Math.min(w, h) / 2}px; position:relative; overflow:hidden; box-sizing:border-box;">
+                    <div style="width: 100%; height: 100%; background: linear-gradient(${fillDir}, #ffcc00, #ff8800); clip-path: inset(${isVert ? '30% 0 0 0' : '0 30% 0 0'});"></div>
+                    ${showText ?
+                    `<div style="position:absolute; top:0; left:0; width:100%; height:100%; display:flex; align-items:center; justify-content:center; color:white; font-size:${fontSize}px; font-weight:bold; text-shadow:1px 1px 1px black;">80%</div>`
+                    : ''}
+                </div>
+            `;
+        } else if (this.tempSettings.staminaStyle === 'circle') {
+            const size = scaleHUDValue(50, this.previewContainer, 34, 50);
+            el.innerHTML = `<div style="width:${size}px; height:${size}px; border:3px solid #ffcc00; border-radius:50%; position:relative;">
+                <div style="position:absolute; bottom:0; left:0; width:100%; height:60%; background:#ffcc00; border-radius:0 0 50% 50%;"></div>
+            </div>`;
+        }
+
+        this.contentWrapper.appendChild(el);
+
+        if (this.tempSettings.staminaStyle === 'bar') {
+            this.makeResizable(el, 'stamina');
+        }
+
+        this.layoutSystem.registerElement(el, 'stamina', this.tempSettings.staminaPos, (newPos) => {
+            this.tempSettings.staminaPos = newPos;
         });
     }
 

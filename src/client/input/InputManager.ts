@@ -5,6 +5,8 @@ export class InputManager {
   isPaused: boolean;
   enabled: boolean;
   options: Required<InputManagerOptions>;
+  lastShiftTime: number = 0;
+  doubleShiftTapped: boolean = false;
 
   constructor(options: InputManagerOptions = {}) {
     this.keys = {
@@ -15,7 +17,8 @@ export class InputManager {
       jump: false,
       crouch: false,
       attack: false,
-      aim: false
+      aim: false,
+      run: false
     };
 
     this.isPaused = false;
@@ -58,6 +61,8 @@ export class InputManager {
     this.keys.crouch = false;
     this.keys.attack = false;
     this.keys.aim = false;
+    if (this.keys.run !== undefined) this.keys.run = false;
+    this.doubleShiftTapped = false;
   }
 
   onKeyDown(event: KeyboardEvent) {
@@ -80,6 +85,13 @@ export class InputManager {
         this.keys.jump = true;
         break;
       case "ShiftLeft":
+        if (!this.keys.crouch) {
+          const now = Date.now();
+          if (now - this.lastShiftTime < 300) {
+            this.doubleShiftTapped = true;
+          }
+          this.lastShiftTime = now;
+        }
         this.keys.crouch = true;
         break;
     }

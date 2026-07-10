@@ -1,8 +1,8 @@
 import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
-import { GLBModel } from "../character/models/GLBModel";
-import { PolygonModel } from "../character/models/PolygonModel";
-import { PolygonModelSkin } from "../character/models/PolygonModelSkin";
+import { GLBModel } from "../character/models/glb/GLBModel";
+import { PolygonModel } from "../character/models/polygon/PolygonModel";
+import { PolygonModelSkin } from "../character/models/polygon/PolygonModelSkin";
 import { GunItem } from "../items/GunItem";
 import { WEAPONS_CONFIG } from "../items/WeaponSettings";
 import { PelotaItem } from "../items/PelotaItem";

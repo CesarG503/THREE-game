@@ -3,6 +3,7 @@
 import { HUDConfigPanel } from './HUDConfigPanel'
 import { uploadAsset } from '../platform/api'
 import { GRAVITY_ORIENTATION_OPTIONS } from '../utils/GravityOrientation'
+import { AnimationRegistry } from '../character/models/animations/AnimationSystem'
 
 const DEFAULT_POLYGON_SKIN_URL = "https://raw.githubusercontent.com/InventivetalentDev/minecraft-assets/1.19.3/assets/minecraft/textures/entity/player/wide/steve.png"
 
@@ -842,22 +843,79 @@ export class PlayerConfigPanel {
 
         // --- ANIMATIONS SECTION ---
         const animHeader = document.createElement('h4');
-        animHeader.textContent = "Animaciones";
+        animHeader.textContent = "Sistemas de Animación";
         animHeader.style.cssText = "color:#aaa; border-bottom:1px solid #444;";
         extraCol.appendChild(animHeader);
 
         const animContainer = document.createElement('div');
         animContainer.style.marginBottom = "15px";
 
+        // Animation System Selector
+        const systemLabel = document.createElement('label');
+        systemLabel.textContent = "Estilo de Animación";
+        systemLabel.style.display = "block";
+        systemLabel.style.color = "#ddd";
+        systemLabel.style.marginBottom = "5px";
+        animContainer.appendChild(systemLabel);
+
+        const systemSelect = document.createElement('select');
+        systemSelect.style.cssText = "background:#333; color:white; padding:5px; border:1px solid #555; width: 100%; box-sizing: border-box; margin-bottom: 10px;";
+        
+        const systems = AnimationRegistry.list();
+        systems.forEach(sys => {
+            const o = document.createElement('option');
+            o.value = sys.id;
+            o.textContent = sys.name;
+            if ((profile.animationStyle || 'classic') === sys.id) o.selected = true;
+            systemSelect.appendChild(o);
+        });
+
+        systemSelect.onchange = (e) => {
+            this.manager.updateProfile(profile.id, { animationStyle: e.target.value });
+            this.render(); // Re-render to update the list of animations
+        };
+        animContainer.appendChild(systemSelect);
+
+        // Limb Bending Selector
+        const bendingLabel = document.createElement('label');
+        bendingLabel.textContent = "Flexibilidad de Extremidades (Brazos/Piernas)";
+        bendingLabel.style.display = "block";
+        bendingLabel.style.color = "#ddd";
+        bendingLabel.style.marginBottom = "5px";
+        animContainer.appendChild(bendingLabel);
+
+        const bendingSelect = document.createElement('select');
+        bendingSelect.style.cssText = "background:#333; color:white; padding:5px; border:1px solid #555; width: 100%; box-sizing: border-box; margin-bottom: 10px;";
+
+        const bendingOptions = [
+            { v: 'none', t: "Rígida (Estilo Minecraft)" },
+            { v: 'jelly', t: "Gelatina (Dobleces en Curva)" },
+            { v: 'joint', t: "Articulada (Codos/Rodillas)" }
+        ];
+
+        bendingOptions.forEach(opt => {
+            const o = document.createElement('option');
+            o.value = opt.v;
+            o.textContent = opt.t;
+            if ((profile.limbBending || 'none') === opt.v) o.selected = true;
+            bendingSelect.appendChild(o);
+        });
+
+        bendingSelect.onchange = (e) => {
+            this.manager.updateProfile(profile.id, { limbBending: e.target.value });
+        };
+        animContainer.appendChild(bendingSelect);
+
+        // Jump Animation
         const jumpAnimLabel = document.createElement('label');
-        jumpAnimLabel.textContent = "Animación de Salto";
+        jumpAnimLabel.textContent = "Giro / Modificador de Salto (Jump)";
         jumpAnimLabel.style.display = "block";
         jumpAnimLabel.style.color = "#ddd";
         jumpAnimLabel.style.marginBottom = "5px";
         animContainer.appendChild(jumpAnimLabel);
 
         const jumpAnimSelect = document.createElement('select');
-        jumpAnimSelect.style.cssText = "background:#333; color:white; padding:5px; border:1px solid #555; width: 100%; box-sizing: border-box;";
+        jumpAnimSelect.style.cssText = "background:#333; color:white; padding:5px; border:1px solid #555; width: 100%; box-sizing: border-box; margin-bottom: 10px;";
 
         const jumpOptions = [
             { v: 'none', t: "Ninguna" },
@@ -872,7 +930,6 @@ export class PlayerConfigPanel {
             jumpAnimSelect.appendChild(o);
         });
 
-        // Default to flip if undefined
         if (!profile.jumpAnimationType) {
             jumpAnimSelect.value = 'flip';
         }
@@ -880,20 +937,18 @@ export class PlayerConfigPanel {
         jumpAnimSelect.onchange = (e) => {
             this.manager.updateProfile(profile.id, { jumpAnimationType: e.target.value });
         };
-
         animContainer.appendChild(jumpAnimSelect);
 
         // Fall Animation
         const fallAnimLabel = document.createElement('label');
-        fallAnimLabel.textContent = "Animación de Caída";
+        fallAnimLabel.textContent = "Giro / Modificador de Caída (Fall)";
         fallAnimLabel.style.display = "block";
         fallAnimLabel.style.color = "#ddd";
-        fallAnimLabel.style.marginTop = "10px";
         fallAnimLabel.style.marginBottom = "5px";
         animContainer.appendChild(fallAnimLabel);
 
         const fallAnimSelect = document.createElement('select');
-        fallAnimSelect.style.cssText = "background:#333; color:white; padding:5px; border:1px solid #555; width: 100%; box-sizing: border-box;";
+        fallAnimSelect.style.cssText = "background:#333; color:white; padding:5px; border:1px solid #555; width: 100%; box-sizing: border-box; margin-bottom: 15px;";
 
         const fallOptions = [
             { v: 'none', t: "Ninguna" },
@@ -908,7 +963,6 @@ export class PlayerConfigPanel {
             fallAnimSelect.appendChild(o);
         });
 
-        // Default to none if undefined
         if (!profile.fallAnimationType) {
             fallAnimSelect.value = 'none';
         }
@@ -916,8 +970,26 @@ export class PlayerConfigPanel {
         fallAnimSelect.onchange = (e) => {
             this.manager.updateProfile(profile.id, { fallAnimationType: e.target.value });
         };
-
         animContainer.appendChild(fallAnimSelect);
+
+        // Display list of existing animations in the active system
+        const listLabel = document.createElement('label');
+        listLabel.textContent = "Lista de Animaciones Disponibles";
+        listLabel.style.cssText = "display:block; color:#888; font-size:12px; margin-bottom:5px; font-weight:bold;";
+        animContainer.appendChild(listLabel);
+
+        const listWrap = document.createElement('div');
+        listWrap.style.cssText = "background:#1a1a1a; border:1px solid #444; border-radius:4px; padding:10px; max-height:150px; overflow-y:auto; font-size:11px; line-height: 1.4;";
+        
+        const activeSystem = AnimationRegistry.get(profile.animationStyle || 'classic') || AnimationRegistry.get('classic')!;
+        const systemAnims = activeSystem.getAnimations();
+        systemAnims.forEach(anim => {
+            const item = document.createElement('div');
+            item.style.marginBottom = "6px";
+            item.innerHTML = `<span style="color:#63d9ff; font-weight:bold;">${anim.name}:</span> <span style="color:#ddd;">${anim.description}</span>`;
+            listWrap.appendChild(item);
+        });
+        animContainer.appendChild(listWrap);
 
         extraCol.appendChild(animContainer);
 

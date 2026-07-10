@@ -1,8 +1,8 @@
 import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
-import { GLBModel } from "./models/GLBModel";
-import { PolygonModel } from "./models/PolygonModel";
-import { PolygonModelSkin } from "./models/PolygonModelSkin";
+import { GLBModel } from "./models/glb/GLBModel";
+import { PolygonModel } from "./models/polygon/PolygonModel";
+import { PolygonModelSkin } from "./models/polygon/PolygonModelSkin";
 import { ParticleSystem } from "../effects/ParticleSystem";
 import { InputManager } from "../input/InputManager";
 import type { CharacterStats, JumpConfig, FlightConfig, PlayerCollisionMode, RemotePlayerState } from "../types";

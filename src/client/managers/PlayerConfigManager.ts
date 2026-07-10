@@ -29,6 +29,8 @@ export class PlayerConfigManager {
                 maxMultiJumps: 1,
                 jumpAnimationType: "none",
                 fallAnimationType: "none",
+                animationStyle: "classic",
+                limbBending: "none",
                 playerCollision: "push",
                 gravityOrientation: "down",
                 gravityTransitionDuration: 0.65,
@@ -115,6 +117,8 @@ export class PlayerConfigManager {
                 maxMultiJumps: 1,
                 jumpAnimationType: "none",
                 fallAnimationType: "none",
+                animationStyle: "classic",
+                limbBending: "none",
                 playerCollision: "push",
                 gravityOrientation: "down",
                 gravityTransitionDuration: 0.65,
@@ -225,6 +229,8 @@ export class PlayerConfigManager {
             maxMultiJumps: 1,
             jumpAnimationType: "none",
             fallAnimationType: "none",
+            animationStyle: "classic",
+            limbBending: "none",
             playerCollision: "push",
             gravityOrientation: "down",
             gravityTransitionDuration: 0.65,
@@ -447,6 +453,15 @@ export class PlayerConfigManager {
             character.polygonModelSkin.setSkinUrl(skinUrl);
         }
 
+        if (character.polygonModelSkin) {
+            if (character.polygonModelSkin.setAnimationStyle) {
+                character.polygonModelSkin.setAnimationStyle(profile.animationStyle || "classic");
+            }
+            if (character.polygonModelSkin.setLimbBending) {
+                character.polygonModelSkin.setLimbBending(profile.limbBending || "none");
+            }
+        }
+
         character.roleVisual = normalizeRoleVisual(profile.roleVisual);
         if (character.polygonModelSkin && character.polygonModelSkin.setRoleVisual) {
             character.polygonModelSkin.setRoleVisual(character.roleVisual.sameRole);
@@ -475,6 +490,8 @@ export class PlayerConfigManager {
                 gravityOrientation: "down",
                 gravityTransitionDuration: 0.65,
                 cameraMode: "third-person-collision",
+                animationStyle: "classic",
+                limbBending: "none",
                 ...profile
             }));
         }

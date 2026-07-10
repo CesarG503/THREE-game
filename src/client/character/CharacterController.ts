@@ -97,6 +97,7 @@ export class CharacterController {
     // Settings
     this.speed = 10;
     this.runSpeed = 15;
+    this.crouchSpeed = 5.0;
     this.staminaMax = 5.0;
     this.stamina = 5.0;
     this.isRunning = false;
@@ -653,7 +654,7 @@ export class CharacterController {
     if (this.isRunning) {
       currentSpeed = this.runSpeed;
     } else if (isCrouchingActive) {
-      currentSpeed = this.speed / 2;
+      currentSpeed = this.crouchSpeed !== undefined ? this.crouchSpeed : this.speed / 2;
     }
 
     const shouldAimAlign = this.cameraController && (this.cameraController.isFirstPerson || this.isHoldingAimWeapon());
@@ -1136,6 +1137,9 @@ export class CharacterController {
     if (stats.speed !== undefined) this.speed = stats.speed;
     if (stats.runSpeed !== undefined) {
       this.runSpeed = Math.max(stats.speed ?? this.speed, stats.runSpeed);
+    }
+    if (stats.crouchSpeed !== undefined) {
+      this.crouchSpeed = Math.min(stats.speed ?? this.speed, stats.crouchSpeed);
     }
     if (stats.staminaMax !== undefined) {
       this.staminaMax = stats.staminaMax;

@@ -24,6 +24,7 @@ export interface ICharacterModel {
 export interface CharacterStats {
     speed: number;
     runSpeed?: number;
+    crouchSpeed?: number;
     staminaMax?: number;
     jumpForce: number;
     maxHealth: number;

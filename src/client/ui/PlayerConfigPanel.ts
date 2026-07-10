@@ -433,14 +433,27 @@ export class PlayerConfigPanel {
         statsCol.innerHTML = "<h4 style='color:#aaa; border-bottom:1px solid #444;'>Estadísticas Base</h4>";
 
         this.createStatControl(statsCol, "Vida Total", 'maxHealth', profile, 1, 1000);
-        
-        // Walk speed control with validation that runSpeed >= speed
+
+        // Walk speed control with validation that runSpeed >= speed and crouchSpeed <= speed
         this.createStatControl(statsCol, "Velocidad Movimiento", 'speed', profile, 1, 50, (newSpeed) => {
             const currentRunSpeed = profile.runSpeed !== undefined ? profile.runSpeed : (profile.speed || 10) * 1.5;
             if (currentRunSpeed < newSpeed) {
                 this.manager.updateProfile(profile.id, { runSpeed: newSpeed });
-                this.renderContent(); // Re-render to show matching speeds
             }
+            const currentCrouchSpeed = profile.crouchSpeed !== undefined ? profile.crouchSpeed : (profile.speed || 10) * 0.5;
+            if (currentCrouchSpeed > newSpeed) {
+                this.manager.updateProfile(profile.id, { crouchSpeed: newSpeed });
+            }
+            this.renderContent(); // Re-render to show matching speeds
+        });
+
+        // Crouch speed control with validation that crouchSpeed <= speed
+        this.createStatControl(statsCol, "Velocidad al agacharse", 'crouchSpeed', profile, 0.5, 30, (newCrouchSpeed) => {
+            const currentSpeed = profile.speed || 10;
+            if (newCrouchSpeed > currentSpeed) {
+                this.manager.updateProfile(profile.id, { crouchSpeed: currentSpeed });
+            }
+            this.renderContent(); // Re-render to enforce constraint
         });
 
         // Run speed control with validation that runSpeed >= speed
@@ -448,8 +461,8 @@ export class PlayerConfigPanel {
             const currentSpeed = profile.speed || 10;
             if (newRunSpeed < currentSpeed) {
                 this.manager.updateProfile(profile.id, { runSpeed: currentSpeed });
-                this.renderContent(); // Re-render to enforce constraint
             }
+            this.renderContent(); // Re-render to enforce constraint
         });
 
         // Stamina Max control
@@ -1150,6 +1163,7 @@ export class PlayerConfigPanel {
             // Set default value if undefined in old profile
             if (profile[key] === undefined) {
                 if (key === 'runSpeed') profile[key] = (profile.speed || 10) * 1.5;
+                else if (key === 'crouchSpeed') profile[key] = (profile.speed || 10) * 0.5;
                 else if (key === 'staminaMax') profile[key] = 5.0;
             }
             const value = profile[key];

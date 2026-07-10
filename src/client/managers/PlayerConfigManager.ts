@@ -74,6 +74,7 @@ export class PlayerConfigManager {
                 maxHealth: 1000,
                 speed: 20,
                 runSpeed: 30,
+                crouchSpeed: 10,
                 staminaMax: 5.0,
                 jumpForce: 10,
                 respawns: -1,
@@ -182,6 +183,7 @@ export class PlayerConfigManager {
                 maxHealth: 100,
                 speed: 10,
                 runSpeed: 15,
+                crouchSpeed: 5,
                 staminaMax: 5.0,
                 jumpForce: 10,
                 respawns: -1,
@@ -314,6 +316,7 @@ export class PlayerConfigManager {
             maxHealth: 100,
             speed: 10,
             runSpeed: 15,
+            crouchSpeed: 5,
             staminaMax: 5.0,
             jumpForce: 10,
             respawns: -1,
@@ -527,6 +530,7 @@ export class PlayerConfigManager {
             character.setStats({
                 speed: profile.speed,
                 runSpeed: profile.runSpeed !== undefined ? profile.runSpeed : (profile.speed || 10) * 1.5,
+                crouchSpeed: profile.crouchSpeed !== undefined ? profile.crouchSpeed : (profile.speed || 10) * 0.5,
                 staminaMax: profile.staminaMax !== undefined ? profile.staminaMax : 5.0,
                 jumpForce: profile.jumpForce,
                 maxHealth: profile.maxHealth,
@@ -620,6 +624,9 @@ export class PlayerConfigManager {
 
                 if (merged.runSpeed === undefined) {
                     merged.runSpeed = (merged.speed || 10) * 1.5;
+                }
+                if (merged.crouchSpeed === undefined) {
+                    merged.crouchSpeed = (merged.speed || 10) * 0.5;
                 }
                 if (merged.staminaMax === undefined) {
                     merged.staminaMax = 5.0;

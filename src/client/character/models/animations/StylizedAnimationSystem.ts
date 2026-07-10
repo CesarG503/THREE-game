@@ -2,6 +2,13 @@ import * as THREE from "three";
 import { AnimationRegistry } from "./AnimationSystem";
 import type { IAnimationSystem, LimbParts, AnimationState, AnimationInfo } from "./AnimationSystem";
 
+function lerpAngle(current: number, target: number, alpha: number): number {
+  let diff = target - current;
+  diff = Math.atan2(Math.sin(diff), Math.cos(diff));
+  return current + diff * alpha;
+}
+
+
 export class StylizedAnimationSystem implements IAnimationSystem {
   id = "stylized";
   name = "Estilizada / Fluida";
@@ -28,6 +35,49 @@ export class StylizedAnimationSystem implements IAnimationSystem {
     const isSuperman = state.isSuperman;
     const noPitchTilt = state.noPitchTilt;
 
+    // Track grounded transition to toggle jump side alternation & check hard landing
+    if (model.lastGrounded === undefined) {
+      model.lastGrounded = true;
+      model.jumpSideIndex = 0;
+      model.currentAirTime = 0;
+      model.landingRecoveryTime = 0;
+    }
+
+    if (!isGrounded) {
+      model.currentAirTime = (model.currentAirTime || 0) + dt;
+    } else {
+      if (model.currentAirTime > 5.0) { // Hard landing after 5s air time
+        model.landingRecoveryTime = 0.45;
+      }
+      model.currentAirTime = 0;
+    }
+
+    if (isGrounded && !model.lastGrounded) {
+      model.lastGrounded = true;
+    } else if (!isGrounded && model.lastGrounded) {
+      model.jumpSideIndex = (model.jumpSideIndex === 0) ? 1 : 0;
+      model.lastGrounded = false;
+    }
+
+    const sideMult = (model.jumpSideIndex === 1) ? -1 : 1;
+
+    let isRecovering = false;
+    let recoveryFactor = 0;
+    if (model.landingRecoveryTime > 0) {
+      model.landingRecoveryTime -= dt;
+      if (model.landingRecoveryTime < 0) model.landingRecoveryTime = 0;
+      recoveryFactor = model.landingRecoveryTime / 0.45;
+      isRecovering = true;
+    }
+
+    const jumpAnim = state.jumpAnimationType || "flip";
+    const fallAnim = state.fallAnimationType || "none";
+    const isFlipping = !isGrounded && (
+      (jumpAnim === "flip") ||
+      (fallAnim === "flip" && model.airTime > 0.5)
+    );
+    const isJumpingOrFalling = !isGrounded && !isSuperman && !isFlipping;
+
     const attackLerpSpeed = 15 * dt;
     const targetWeight = isAttacking && !state.isHoldingWeapon ? 1.0 : 0.0;
     model.attackWeight = THREE.MathUtils.lerp(model.attackWeight, targetWeight, attackLerpSpeed);
@@ -45,18 +95,25 @@ export class StylizedAnimationSystem implements IAnimationSystem {
     const breatheBob = Math.sin(timeSec * 2.0) * 0.015;
     const breatheRot = Math.cos(timeSec * 2.0) * 0.01;
 
-    const walkSpeed = isCrouching ? 5 : (state.isRunning ? 14 : 10);
-    const walkTime = timeSec * walkSpeed;
+    if (isMoving) {
+      model.moveDuration = (model.moveDuration || 0) + dt;
+    } else {
+      model.moveDuration = 0;
+    }
 
-    let bounceAmount = 0;
+    const rampTime = state.isRunning ? 0.25 : 0.4;
+    const rampT = Math.min(model.moveDuration / rampTime, 1.0);
+    const speedFactor = isMoving ? (0.15 + 0.85 * (rampT * rampT)) : 0;
+
+    const walkSpeed = isCrouching ? 5 : (state.isRunning ? 14 : 10);
+    model.walkTime = (model.walkTime || 0) + dt * walkSpeed * speedFactor;
+    const walkTime = model.walkTime;
+
+    let verticalBob = 0;
     let headBobX = 0;
     let headSwayZ = 0;
 
     if (isMoving && !isSuperman && isGrounded) {
-      // Bob up and down twice per leg swing cycle (each step bounces the body/head)
-      bounceAmount = state.isRunning
-        ? 0.055 * Math.cos(walkTime * 2)
-        : (isCrouching ? 0.012 : 0.038) * Math.cos(walkTime * 2);
       // Nod head slightly forward/backward during walking/running
       headBobX = state.isRunning
         ? Math.abs(Math.sin(walkTime)) * 0.075
@@ -65,18 +122,25 @@ export class StylizedAnimationSystem implements IAnimationSystem {
       headSwayZ = state.isRunning
         ? Math.sin(walkTime) * 0.08
         : Math.sin(walkTime) * 0.04;
+      // Unified vertical bob (hop) for the entire character
+      const bobAmplitude = state.isRunning ? 0.07 : 0.03;
+      // -cos(walkTime * 2) is lowest at 0 and PI (landing), highest at PI/2 and 3PI/2 (hop)
+      verticalBob = -Math.cos(walkTime * 2) * bobAmplitude;
     } else if (!isMoving) {
       // Subtle sway during idle breathing
       headSwayZ = Math.sin(timeSec) * 0.012;
+      // Breathing vertical bob
+      verticalBob = breatheBob;
     }
 
-    const targetHeadY = 1.3 - crouchOffset + (isMoving ? bounceAmount : breatheBob);
-    const targetBodyY = 1.3 - 6 * pixelScale - crouchOffset + (isMoving ? bounceAmount * 0.75 : breatheBob * 0.5);
+    const targetHeadY = 1.3 - crouchOffset + verticalBob;
+    const targetBodyY = 1.3 - 6 * pixelScale - crouchOffset + (isMoving ? verticalBob * 0.8 : breatheBob * 0.5);
 
     let targetRArmX = 4 * pixelScale + 2 * pixelScale;
     let targetLArmX = -4 * pixelScale - 2 * pixelScale;
-    let targetRArmY = 1.3 - 2 * pixelScale - crouchOffset + (isMoving ? bounceAmount * 0.75 : 0);
-    let targetLArmY = 1.3 - 2 * pixelScale - crouchOffset + (isMoving ? bounceAmount * 0.75 : 0);
+    const targetArmBob = isMoving ? verticalBob * 0.8 : 0;
+    let targetRArmY = 1.3 - 2 * pixelScale - crouchOffset + targetArmBob;
+    let targetLArmY = 1.3 - 2 * pixelScale - crouchOffset + targetArmBob;
     let targetRArmZ = 0;
     let targetLArmZ = 0;
 
@@ -107,12 +171,10 @@ export class StylizedAnimationSystem implements IAnimationSystem {
     }
 
     const baseLegY = 1.3 - 12 * pixelScale;
-    let targetLegY = baseLegY - legCrouchOffset;
-
-    // Apply vertical bounce to legs to follow hip bobbing
-    if (isMoving && !isSuperman && isGrounded) {
-      targetLegY += bounceAmount * 0.45;
-    }
+    let targetRLegY = baseLegY - legCrouchOffset + verticalBob;
+    let targetLLegY = baseLegY - legCrouchOffset + verticalBob;
+    let targetRLegZ = 0;
+    let targetLLegZ = 0;
 
     const lerpSpeed = 10 * dt;
 
@@ -126,16 +188,31 @@ export class StylizedAnimationSystem implements IAnimationSystem {
     parts.rightArmGroup.position.z = THREE.MathUtils.lerp(parts.rightArmGroup.position.z, targetRArmZ, lerpSpeed);
     parts.leftArmGroup.position.z = THREE.MathUtils.lerp(parts.leftArmGroup.position.z, targetLArmZ, lerpSpeed);
 
-    parts.rightLegGroup.position.y = THREE.MathUtils.lerp(parts.rightLegGroup.position.y, targetLegY, lerpSpeed);
-    parts.leftLegGroup.position.y = THREE.MathUtils.lerp(parts.leftLegGroup.position.y, targetLegY, lerpSpeed);
+    parts.rightLegGroup.position.y = THREE.MathUtils.lerp(parts.rightLegGroup.position.y, targetRLegY, lerpSpeed);
+    parts.leftLegGroup.position.y = THREE.MathUtils.lerp(parts.leftLegGroup.position.y, targetLLegY, lerpSpeed);
+    parts.rightLegGroup.position.z = THREE.MathUtils.lerp(parts.rightLegGroup.position.z, targetRLegZ, lerpSpeed);
+    parts.leftLegGroup.position.z = THREE.MathUtils.lerp(parts.leftLegGroup.position.z, targetLLegZ, lerpSpeed);
 
     let targetBodyRotX = isCrouching ? 0.35 : 0;
-    if (isMoving && !isSuperman && isGrounded) {
+    if (isJumpingOrFalling) {
+      const airSec = (model.airTime || 0) + (Date.now() / 1000);
+      targetBodyRotX = -0.25 + Math.sin(airSec * 6) * 0.09;
+    } else if (isMoving && !isSuperman && isGrounded) {
       targetBodyRotX += state.isRunning ? 0.28 : 0.1; // lean forward when moving/running
     }
+
+    if (isRecovering) {
+      const deepBendX = -0.45;
+      targetBodyRotX = THREE.MathUtils.lerp(targetBodyRotX, deepBendX, recoveryFactor);
+    }
+
     parts.body.rotation.x = THREE.MathUtils.lerp(parts.body.rotation.x, targetBodyRotX, lerpSpeed);
 
-    const targetHeadRotX = targetBodyRotX - (state.targetHeadPitch || 0) + (isMoving ? headBobX : breatheRot);
+    let targetHeadRotX = targetBodyRotX - (state.targetHeadPitch || 0) + (isMoving ? headBobX : breatheRot);
+    if (isJumpingOrFalling) {
+      // Compensate for body pitch rotation so head looks straight forward (relative to world)
+      targetHeadRotX = -targetBodyRotX - (state.targetHeadPitch || 0);
+    }
     parts.headGroup.rotation.x = THREE.MathUtils.lerp(parts.headGroup.rotation.x, targetHeadRotX, lerpSpeed * 2.0);
     parts.headGroup.rotation.z = THREE.MathUtils.lerp(parts.headGroup.rotation.z, headSwayZ, lerpSpeed);
 
@@ -164,8 +241,10 @@ export class StylizedAnimationSystem implements IAnimationSystem {
       parts.leftArmGroup.rotation.y = THREE.MathUtils.lerp(parts.leftArmGroup.rotation.y, 0, 10 * dt);
       parts.rightArmGroup.rotation.y = THREE.MathUtils.lerp(parts.rightArmGroup.rotation.y, 0, 10 * dt);
 
-      parts.leftLegGroup.rotation.x = THREE.MathUtils.lerp(parts.leftLegGroup.rotation.x, 0.05, 10 * dt);
-      parts.rightLegGroup.rotation.x = THREE.MathUtils.lerp(parts.rightLegGroup.rotation.x, -0.05, 10 * dt);
+      parts.leftLegGroup.rotation.x = lerpAngle(parts.leftLegGroup.rotation.x, 0.05, 10 * dt);
+      parts.rightLegGroup.rotation.x = lerpAngle(parts.rightLegGroup.rotation.x, -0.05, 10 * dt);
+      parts.leftLegGroup.rotation.z = THREE.MathUtils.lerp(parts.leftLegGroup.rotation.z, 0, 10 * dt);
+      parts.rightLegGroup.rotation.z = THREE.MathUtils.lerp(parts.rightLegGroup.rotation.z, 0, 10 * dt);
 
       parts.body.rotation.y = THREE.MathUtils.lerp(parts.body.rotation.y, 0, 10 * dt);
       parts.upperBodyGroup.rotation.y = THREE.MathUtils.lerp(parts.upperBodyGroup.rotation.y, 0, 10 * dt);
@@ -175,29 +254,69 @@ export class StylizedAnimationSystem implements IAnimationSystem {
       let baseLArmX = 0;
       let baseRLegX = 0;
       let baseLLegX = 0;
+      let baseRLegZ = 0;
+      let baseLLegZ = 0;
       let baseRArmZ = 0;
       let baseLArmZ = 0;
       let bodySwayZ = 0;
       let bodyRotY = 0;
+      let bodyPitchX = targetBodyRotX;
 
-      if (isMoving) {
-        const speed = isCrouching ? 5 : (state.isRunning ? 14 : 10);
-        const walkTime = timeSec * speed;
-        const sinVal = Math.sin(walkTime);
-        const cosVal = Math.cos(walkTime);
+      if (isJumpingOrFalling) {
+        // Dynamic aerial pose (one arm forward, one arm backward, cycling leg separation)
+        const airSec = (model.airTime || 0) + (Date.now() / 1000);
+        const searchCycle = Math.sin(airSec * 5.0);
+        const flailX = Math.sin(airSec * 12) * 0.08;
+        const flailZ = Math.cos(airSec * 10) * 0.06;
+
+        // One arm forward, one arm backward with flailing, alternating side on each jump instance
+        baseLArmX = (-0.2 - 0.6 * sideMult) + searchCycle * 0.15 + flailX;
+        baseRArmX = (-0.2 + 0.6 * sideMult) - searchCycle * 0.15 + flailX;
+        baseLArmZ = -0.38 - flailZ;
+        baseRArmZ = 0.38 + flailZ;
+
+        // Pull legs up with dynamic scissor/separation (one forward, one backward, alternating side)
+        baseRLegX = (-0.55 * sideMult) + searchCycle * 0.2 + flailX;
+        baseLLegX = (0.55 * sideMult) - searchCycle * 0.2 - flailX;
+
+        // Increased body swaying (rocking roll/yaw)
+        bodySwayZ = Math.sin(airSec * 5) * 0.08 * sideMult;
+        bodyRotY = Math.cos(airSec * 5) * 0.08 * sideMult;
+      } else if (isMoving) {
+        // Elliptical joint translation to simulate turbine/wheel stepping path
+        const radiusZ = state.isRunning ? 0.18 : 0.10;
+        const radiusY = state.isRunning ? 0.10 : 0.05;
+
+        targetRLegZ = -radiusZ * Math.sin(walkTime);
+        targetLLegZ = radiusZ * Math.sin(walkTime);
+
+        targetRLegY += radiusY * Math.cos(walkTime);
+        targetLLegY -= radiusY * Math.cos(walkTime);
+
+        // Normal leg swing (pitch rotation back and forth, no 360-degree spin)
+        const swingScale = state.isRunning ? 0.65 : 0.45;
+        baseRLegX = swingScale * Math.sin(walkTime);
+        baseLLegX = -swingScale * Math.sin(walkTime);
+
+        // Outward leg tilt when they swing upwards to avoid torso collision
+        const rLegCos = Math.cos(walkTime);
+        const lLegCos = Math.cos(walkTime + Math.PI);
+        const outwardTilt = state.isRunning ? 0.35 : 0.22;
+        baseRLegZ = outwardTilt * Math.max(0, -rLegCos);
+        baseLLegZ = -outwardTilt * Math.max(0, -lLegCos);
 
         // Stylized swing (wider swing when running)
-        const swingScale = state.isRunning ? 1.25 : 0.9;
-        baseRArmX = sinVal * swingScale;
-        baseLArmX = -sinVal * swingScale;
-        baseRLegX = -sinVal * swingScale;
-        baseLLegX = sinVal * swingScale;
+        const armSwingScale = state.isRunning ? 1.25 : 0.85;
+        baseRArmX = Math.sin(walkTime) * armSwingScale;
+        baseLArmX = -Math.sin(walkTime) * armSwingScale;
 
         // Spread arms slightly outward when running
         baseRArmZ = state.isRunning ? 0.18 : 0.1;
         baseLArmZ = state.isRunning ? -0.18 : -0.1;
 
         // Hip sway and body rotation (wobble/swing)
+        const sinVal = Math.sin(walkTime);
+        const cosVal = Math.cos(walkTime);
         bodySwayZ = sinVal * (state.isRunning ? 0.16 : 0.11);
         bodyRotY = cosVal * (state.isRunning ? 0.18 : 0.12);
 
@@ -218,12 +337,28 @@ export class StylizedAnimationSystem implements IAnimationSystem {
         }
       }
 
-      const animLerp = 0.2;
-      parts.rightLegGroup.rotation.x = THREE.MathUtils.lerp(parts.rightLegGroup.rotation.x, baseRLegX, animLerp);
-      parts.leftLegGroup.rotation.x = THREE.MathUtils.lerp(parts.leftLegGroup.rotation.x, baseLLegX, animLerp);
+      if (isRecovering) {
+        // Blend in hard landing recovery impact pose (deep knee flexion)
+        const deepLimbX = 0.4;  // Knees bend on impact
 
-      // Body roll/sway
+        bodyPitchX = THREE.MathUtils.lerp(bodyPitchX, -0.45, recoveryFactor);
+        baseRLegX = THREE.MathUtils.lerp(baseRLegX, deepLimbX, recoveryFactor);
+        baseLLegX = THREE.MathUtils.lerp(baseLLegX, deepLimbX, recoveryFactor);
+        baseLArmX = THREE.MathUtils.lerp(baseLArmX, 0.35, recoveryFactor);
+        baseRArmX = THREE.MathUtils.lerp(baseRArmX, 0.35, recoveryFactor);
+        baseLArmZ = THREE.MathUtils.lerp(baseLArmZ, -0.25, recoveryFactor);
+        baseRArmZ = THREE.MathUtils.lerp(baseRArmZ, 0.25, recoveryFactor);
+      }
+
+      const animLerp = 0.2;
+      parts.rightLegGroup.rotation.x = lerpAngle(parts.rightLegGroup.rotation.x, baseRLegX, animLerp);
+      parts.leftLegGroup.rotation.x = lerpAngle(parts.leftLegGroup.rotation.x, baseLLegX, animLerp);
+      parts.rightLegGroup.rotation.z = THREE.MathUtils.lerp(parts.rightLegGroup.rotation.z, baseRLegZ, animLerp);
+      parts.leftLegGroup.rotation.z = THREE.MathUtils.lerp(parts.leftLegGroup.rotation.z, baseLLegZ, animLerp);
+
+      // Body roll/sway/pitch
       parts.body.rotation.z = THREE.MathUtils.lerp(parts.body.rotation.z, bodySwayZ, animLerp);
+      parts.body.rotation.x = THREE.MathUtils.lerp(parts.body.rotation.x, bodyPitchX, animLerp);
 
       if (model.attackWeight > 0.01) {
         const blend = model.attackWeight;
@@ -326,7 +461,7 @@ export class StylizedAnimationSystem implements IAnimationSystem {
           const initialZ = 2 * pixelScale;
 
           parts.heldItemMesh.position.z = initialZ - reloadZ - recoil;
-          parts.heldItemMesh.rotation.x = state.heldItem.isReloading ? -Math.PI / 2 - reloadZ * 3 : -Math.PI / 2;
+          parts.heldItemMesh.rotation.x = state.heldItem.isReloading ? Math.PI / 2 - reloadZ * 3 : Math.PI / 2;
         }
 
         const aimTwist = state.currentWeaponHand === "left" ? 0.2 : -0.2;
@@ -366,8 +501,10 @@ export class StylizedAnimationSystem implements IAnimationSystem {
         parts.leftArmGroup.rotation.z = THREE.MathUtils.lerp(parts.leftArmGroup.rotation.z, -0.1, jumpLerp);
         parts.rightArmGroup.rotation.x = THREE.MathUtils.lerp(parts.rightArmGroup.rotation.x, -0.5, jumpLerp);
         parts.leftArmGroup.rotation.x = THREE.MathUtils.lerp(parts.leftArmGroup.rotation.x, -0.5, jumpLerp);
-        parts.rightLegGroup.rotation.x = THREE.MathUtils.lerp(parts.rightLegGroup.rotation.x, 0.5, jumpLerp);
-        parts.leftLegGroup.rotation.x = THREE.MathUtils.lerp(parts.leftLegGroup.rotation.x, 0.5, jumpLerp);
+        parts.rightLegGroup.rotation.x = lerpAngle(parts.rightLegGroup.rotation.x, 0.5, jumpLerp);
+        parts.leftLegGroup.rotation.x = lerpAngle(parts.leftLegGroup.rotation.x, 0.5, jumpLerp);
+        parts.rightLegGroup.rotation.z = THREE.MathUtils.lerp(parts.rightLegGroup.rotation.z, 0, jumpLerp);
+        parts.leftLegGroup.rotation.z = THREE.MathUtils.lerp(parts.leftLegGroup.rotation.z, 0, jumpLerp);
 
         parts.pivotGroup.rotation.x -= 10 * dt;
       } else {

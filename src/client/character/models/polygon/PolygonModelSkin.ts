@@ -561,7 +561,7 @@ export class PolygonModelSkin implements ICharacterModel {
       this.heldItemMesh = mesh;
       const pixelScale = (1 / 16) * 0.9;
       mesh.position.set(0, -10 * pixelScale, 2 * pixelScale);
-      mesh.rotation.set(Math.PI / 2, 1.5, Math.PI);
+      mesh.rotation.set(Math.PI / 2, 1.5, 0);
 
       const intendedHand = item.equippedHand || "right";
       this.currentWeaponHand = intendedHand === "left" ? "right" : "left";
@@ -666,39 +666,58 @@ export class PolygonModelSkin implements ICharacterModel {
       let rLegBend = 0;
       let lLegBend = 0;
 
+      // Helper function to calculate elbow bending based on physical arm rotation
+      const getArmBendVal = (armRotX: number) => {
+        // Base flex for running / standing
+        const base = isRunning ? 0.4 : 0.15;
+        // Elbow bends more when the arm swings forward (negative rotation X) or backward (positive rotation X)
+        if (armRotX < 0) {
+          return base + (-armRotX) * 0.65;
+        } else {
+          return base + armRotX * 0.35;
+        }
+      };
+
       // Compute bending angles from actual rotation states
       if (this.isHoldingWeapon) {
         if (this.currentWeaponHand === "right") {
-          rArmBend = 0.35; // slightly bent for natural weapon holding
-          lArmBend = isRunning ? (0.55 + Math.max(0, -this.leftArmGroup.rotation.x) * 0.5) : (Math.max(0, -this.leftArmGroup.rotation.x) * 0.8);
+          rArmBend = 0.3; // slightly bent for weapon holding
+          lArmBend = getArmBendVal(this.leftArmGroup.rotation.x);
         } else {
-          lArmBend = 0.35;
-          rArmBend = isRunning ? (0.55 + Math.max(0, -this.rightArmGroup.rotation.x) * 0.5) : (Math.max(0, -this.rightArmGroup.rotation.x) * 0.8);
+          lArmBend = 0.3;
+          rArmBend = getArmBendVal(this.rightArmGroup.rotation.x);
         }
       } else {
-        rArmBend = isRunning ? (0.55 + Math.max(0, -this.rightArmGroup.rotation.x) * 0.5) : (Math.max(0, -this.rightArmGroup.rotation.x) * 0.8);
-        lArmBend = isRunning ? (0.55 + Math.max(0, -this.leftArmGroup.rotation.x) * 0.5) : (Math.max(0, -this.leftArmGroup.rotation.x) * 0.8);
+        rArmBend = getArmBendVal(this.rightArmGroup.rotation.x);
+        lArmBend = getArmBendVal(this.leftArmGroup.rotation.x);
       }
 
+      // Add a slight extra mid-air elbow flex
       if (!isGrounded && !isSuperman) {
-        // Bend knees slightly in midair
-        rLegBend = 0.45;
-        lLegBend = 0.45;
+        rArmBend += 0.2;
+        lArmBend += 0.2;
+      }
+
+      // Knee bending calculation (knees bend backward, positive angle)
+      if (!isGrounded && !isSuperman) {
+        // Knees bend dynamically in mid-air following scissor swing
+        rLegBend = 0.2 + Math.abs(this.rightLegGroup.rotation.x) * 0.55;
+        lLegBend = 0.2 + Math.abs(this.leftLegGroup.rotation.x) * 0.55;
       } else {
-        // Bend knees when leg swings forward
-        rLegBend = isRunning ? (0.35 + Math.max(0, -this.rightLegGroup.rotation.x) * 1.4) : (Math.max(0, -this.rightLegGroup.rotation.x) * 1.2);
-        lLegBend = isRunning ? (0.35 + Math.max(0, -this.leftLegGroup.rotation.x) * 1.4) : (Math.max(0, -this.leftLegGroup.rotation.x) * 1.2);
+        // Knees bend when swinging on the ground
+        rLegBend = isRunning ? (0.25 + Math.abs(this.rightLegGroup.rotation.x) * 1.1) : (Math.abs(this.rightLegGroup.rotation.x) * 0.95);
+        lLegBend = isRunning ? (0.25 + Math.abs(this.leftLegGroup.rotation.x) * 1.1) : (Math.abs(this.leftLegGroup.rotation.x) * 0.95);
       }
 
-      // Apply bending to main meshes and outer layers
-      LimbBender.bend(this.rightArm, this.limbBending, rArmBend);
+      // Apply bending: codos doblan para adelante (negative angle), rodillas doblan para atras (positive angle)
+      LimbBender.bend(this.rightArm, this.limbBending, -rArmBend);
       if (this.rightArmGroup.children[1] instanceof THREE.Mesh) {
-        LimbBender.bend(this.rightArmGroup.children[1], this.limbBending, rArmBend);
+        LimbBender.bend(this.rightArmGroup.children[1], this.limbBending, -rArmBend);
       }
 
-      LimbBender.bend(this.leftArm, this.limbBending, lArmBend);
+      LimbBender.bend(this.leftArm, this.limbBending, -lArmBend);
       if (this.leftArmGroup.children[1] instanceof THREE.Mesh) {
-        LimbBender.bend(this.leftArmGroup.children[1], this.limbBending, lArmBend);
+        LimbBender.bend(this.leftArmGroup.children[1], this.limbBending, -lArmBend);
       }
 
       LimbBender.bend(this.rightLeg, this.limbBending, rLegBend);
@@ -709,6 +728,13 @@ export class PolygonModelSkin implements ICharacterModel {
       LimbBender.bend(this.leftLeg, this.limbBending, lLegBend);
       if (this.leftLegGroup.children[1] instanceof THREE.Mesh) {
         LimbBender.bend(this.leftLegGroup.children[1], this.limbBending, lLegBend);
+      }
+
+      // Keep default held item position/rotation so it behaves exactly like rigid mode
+      if (this.heldItemMesh) {
+        const pixelScale = (1 / 16) * 0.9;
+        this.heldItemMesh.position.set(0, -10 * pixelScale, 2 * pixelScale);
+        this.heldItemMesh.rotation.set(Math.PI / 2, 1.5, 0);
       }
     } else {
       // Restore standard rigid shape if bending style was switched off
@@ -730,6 +756,13 @@ export class PolygonModelSkin implements ICharacterModel {
       LimbBender.bend(this.leftLeg, "none", 0);
       if (this.leftLegGroup.children[1] instanceof THREE.Mesh) {
         LimbBender.bend(this.leftLegGroup.children[1], "none", 0);
+      }
+
+      // Restore default held item position/rotation if no bending
+      if (this.heldItemMesh) {
+        const pixelScale = (1 / 16) * 0.9;
+        this.heldItemMesh.position.set(0, -10 * pixelScale, 2 * pixelScale);
+        this.heldItemMesh.rotation.set(Math.PI / 2, 1.5, 0);
       }
     }
   }

@@ -268,7 +268,7 @@ export class ClassicAnimationSystem implements IAnimationSystem {
           const initialZ = 2 * pixelScale;
 
           parts.heldItemMesh.position.z = initialZ - reloadZ - recoil;
-          parts.heldItemMesh.rotation.x = state.heldItem.isReloading ? -Math.PI / 2 - reloadZ * 3 : -Math.PI / 2;
+          parts.heldItemMesh.rotation.x = state.heldItem.isReloading ? Math.PI / 2 - reloadZ * 3 : -Math.PI / 2;
         }
 
         const aimTwist = state.currentWeaponHand === "left" ? 0.2 : -0.2;

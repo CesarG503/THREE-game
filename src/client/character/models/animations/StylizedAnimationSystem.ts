@@ -123,7 +123,7 @@ export class StylizedAnimationSystem implements IAnimationSystem {
         ? Math.sin(walkTime) * 0.08
         : Math.sin(walkTime) * 0.04;
       // Unified vertical bob (hop) for the entire character
-      const bobAmplitude = state.isRunning ? 0.07 : 0.03;
+      const bobAmplitude = state.isRunning ? 0.15 : 0.07;
       // -cos(walkTime * 2) is lowest at 0 and PI (landing), highest at PI/2 and 3PI/2 (hop)
       verticalBob = -Math.cos(walkTime * 2) * bobAmplitude;
     } else if (!isMoving) {
@@ -283,9 +283,9 @@ export class StylizedAnimationSystem implements IAnimationSystem {
         bodySwayZ = Math.sin(airSec * 5) * 0.08 * sideMult;
         bodyRotY = Math.cos(airSec * 5) * 0.08 * sideMult;
       } else if (isMoving) {
-        // Elliptical joint translation to simulate turbine/wheel stepping path
-        const radiusZ = state.isRunning ? 0.18 : 0.10;
-        const radiusY = state.isRunning ? 0.10 : 0.05;
+        // Elliptical joint translation to simulate turbine/wheel stepping path (amplified for windmill effect)
+        const radiusZ = state.isRunning ? 0.30 : 0.18;
+        const radiusY = state.isRunning ? 0.18 : 0.09;
 
         targetRLegZ = -radiusZ * Math.sin(walkTime);
         targetLLegZ = radiusZ * Math.sin(walkTime);
@@ -293,17 +293,14 @@ export class StylizedAnimationSystem implements IAnimationSystem {
         targetRLegY += radiusY * Math.cos(walkTime);
         targetLLegY -= radiusY * Math.cos(walkTime);
 
-        // Normal leg swing (pitch rotation back and forth, no 360-degree spin)
-        const swingScale = state.isRunning ? 0.65 : 0.45;
+        // Normal leg swing (pitch rotation back and forth, no 360-degree spin - wider swing scale)
+        const swingScale = state.isRunning ? 0.85 : 0.55;
         baseRLegX = swingScale * Math.sin(walkTime);
         baseLLegX = -swingScale * Math.sin(walkTime);
 
-        // Outward leg tilt when they swing upwards to avoid torso collision
-        const rLegCos = Math.cos(walkTime);
-        const lLegCos = Math.cos(walkTime + Math.PI);
-        const outwardTilt = state.isRunning ? 0.35 : 0.22;
-        baseRLegZ = outwardTilt * Math.max(0, -rLegCos);
-        baseLLegZ = -outwardTilt * Math.max(0, -lLegCos);
+        // Legs move in a straight line forward/backward - no side-to-side sway
+        baseRLegZ = 0;
+        baseLLegZ = 0;
 
         // Stylized swing (wider swing when running)
         const armSwingScale = state.isRunning ? 1.25 : 0.85;

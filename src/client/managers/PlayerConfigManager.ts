@@ -75,6 +75,7 @@ export class PlayerConfigManager {
                 speed: 20,
                 runSpeed: 30,
                 crouchSpeed: 10,
+                independentSpeeds: false,
                 staminaMax: 5.0,
                 jumpForce: 10,
                 respawns: -1,
@@ -184,6 +185,7 @@ export class PlayerConfigManager {
                 speed: 10,
                 runSpeed: 15,
                 crouchSpeed: 5,
+                independentSpeeds: false,
                 staminaMax: 5.0,
                 jumpForce: 10,
                 respawns: -1,
@@ -317,6 +319,7 @@ export class PlayerConfigManager {
             speed: 10,
             runSpeed: 15,
             crouchSpeed: 5,
+            independentSpeeds: false,
             staminaMax: 5.0,
             jumpForce: 10,
             respawns: -1,
@@ -531,6 +534,7 @@ export class PlayerConfigManager {
                 speed: profile.speed,
                 runSpeed: profile.runSpeed !== undefined ? profile.runSpeed : (profile.speed || 10) * 1.5,
                 crouchSpeed: profile.crouchSpeed !== undefined ? profile.crouchSpeed : (profile.speed || 10) * 0.5,
+                independentSpeeds: !!profile.independentSpeeds,
                 staminaMax: profile.staminaMax !== undefined ? profile.staminaMax : 5.0,
                 jumpForce: profile.jumpForce,
                 maxHealth: profile.maxHealth,
@@ -627,6 +631,9 @@ export class PlayerConfigManager {
                 }
                 if (merged.crouchSpeed === undefined) {
                     merged.crouchSpeed = (merged.speed || 10) * 0.5;
+                }
+                if (merged.independentSpeeds === undefined) {
+                    merged.independentSpeeds = false;
                 }
                 if (merged.staminaMax === undefined) {
                     merged.staminaMax = 5.0;

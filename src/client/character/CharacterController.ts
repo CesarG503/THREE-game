@@ -98,6 +98,7 @@ export class CharacterController {
     this.speed = 10;
     this.runSpeed = 15;
     this.crouchSpeed = 5.0;
+    this.independentSpeeds = false;
     this.staminaMax = 5.0;
     this.stamina = 5.0;
     this.isRunning = false;
@@ -1134,12 +1135,13 @@ export class CharacterController {
   }
 
   setStats(stats: Partial<CharacterStats & JumpConfig & FlightConfig & { playerCollision: PlayerCollisionMode; gravityOrientation: GravityOrientation; gravityTransitionDuration: number }>) {
+    if (stats.independentSpeeds !== undefined) this.independentSpeeds = stats.independentSpeeds;
     if (stats.speed !== undefined) this.speed = stats.speed;
     if (stats.runSpeed !== undefined) {
-      this.runSpeed = Math.max(stats.speed ?? this.speed, stats.runSpeed);
+      this.runSpeed = this.independentSpeeds ? stats.runSpeed : Math.max(stats.speed ?? this.speed, stats.runSpeed);
     }
     if (stats.crouchSpeed !== undefined) {
-      this.crouchSpeed = Math.min(stats.speed ?? this.speed, stats.crouchSpeed);
+      this.crouchSpeed = this.independentSpeeds ? stats.crouchSpeed : Math.min(stats.speed ?? this.speed, stats.crouchSpeed);
     }
     if (stats.staminaMax !== undefined) {
       this.staminaMax = stats.staminaMax;

@@ -436,37 +436,64 @@ export class PlayerConfigPanel {
 
         // Walk speed control with validation that runSpeed >= speed and crouchSpeed <= speed
         this.createStatControl(statsCol, "Velocidad Movimiento", 'speed', profile, 1, 50, (newSpeed) => {
-            const currentRunSpeed = profile.runSpeed !== undefined ? profile.runSpeed : (profile.speed || 10) * 1.5;
-            if (currentRunSpeed < newSpeed) {
-                this.manager.updateProfile(profile.id, { runSpeed: newSpeed });
-            }
-            const currentCrouchSpeed = profile.crouchSpeed !== undefined ? profile.crouchSpeed : (profile.speed || 10) * 0.5;
-            if (currentCrouchSpeed > newSpeed) {
-                this.manager.updateProfile(profile.id, { crouchSpeed: newSpeed });
+            if (!profile.independentSpeeds) {
+                const currentRunSpeed = profile.runSpeed !== undefined ? profile.runSpeed : (profile.speed || 10) * 1.5;
+                if (currentRunSpeed < newSpeed) {
+                    this.manager.updateProfile(profile.id, { runSpeed: newSpeed });
+                }
+                const currentCrouchSpeed = profile.crouchSpeed !== undefined ? profile.crouchSpeed : (profile.speed || 10) * 0.5;
+                if (currentCrouchSpeed > newSpeed) {
+                    this.manager.updateProfile(profile.id, { crouchSpeed: newSpeed });
+                }
             }
             this.renderContent(); // Re-render to show matching speeds
         });
 
         // Crouch speed control with validation that crouchSpeed <= speed
         this.createStatControl(statsCol, "Velocidad al agacharse", 'crouchSpeed', profile, 0.5, 30, (newCrouchSpeed) => {
-            const currentSpeed = profile.speed || 10;
-            if (newCrouchSpeed > currentSpeed) {
-                this.manager.updateProfile(profile.id, { crouchSpeed: currentSpeed });
+            if (!profile.independentSpeeds) {
+                const currentSpeed = profile.speed || 10;
+                if (newCrouchSpeed > currentSpeed) {
+                    this.manager.updateProfile(profile.id, { crouchSpeed: currentSpeed });
+                }
             }
             this.renderContent(); // Re-render to enforce constraint
         });
 
         // Run speed control with validation that runSpeed >= speed
         this.createStatControl(statsCol, "Velocidad al correr", 'runSpeed', profile, 1, 60, (newRunSpeed) => {
-            const currentSpeed = profile.speed || 10;
-            if (newRunSpeed < currentSpeed) {
-                this.manager.updateProfile(profile.id, { runSpeed: currentSpeed });
+            if (!profile.independentSpeeds) {
+                const currentSpeed = profile.speed || 10;
+                if (newRunSpeed < currentSpeed) {
+                    this.manager.updateProfile(profile.id, { runSpeed: currentSpeed });
+                }
             }
             this.renderContent(); // Re-render to enforce constraint
         });
 
         // Stamina Max control
         this.createStatControl(statsCol, "Tiempo de correr (Estamina)", 'staminaMax', profile, 1, 30);
+
+        // Independent Speeds Toggle Checkbox
+        const indyRow = document.createElement('div');
+        indyRow.style.cssText = "margin: 15px 0 5px 0; display: flex; align-items: center; gap: 10px;";
+        const indyCheck = document.createElement('input');
+        indyCheck.type = "checkbox";
+        indyCheck.id = "independent-speeds-toggle";
+        indyCheck.checked = !!profile.independentSpeeds;
+        indyCheck.onchange = (e) => {
+            this.manager.updateProfile(profile.id, { independentSpeeds: e.target.checked });
+            this.renderContent();
+        };
+        const indyLabel = document.createElement('label');
+        indyLabel.htmlFor = "independent-speeds-toggle";
+        indyLabel.textContent = "Desvincular Velocidades (Independientes)";
+        indyLabel.style.color = "#ccc";
+        indyLabel.style.fontSize = "12px";
+        indyLabel.style.cursor = "pointer";
+        indyRow.appendChild(indyCheck);
+        indyRow.appendChild(indyLabel);
+        statsCol.appendChild(indyRow);
 
         this.createStatControl(statsCol, "Fuerza de Salto", 'jumpForce', profile, 0, 50);
         // Multi-Jump Control (Conditional)
@@ -1259,6 +1286,11 @@ export class PlayerConfigPanel {
                     const v = parseFloat(e.target.value);
                     valDisp.textContent = v;
                     this.manager.updateProfile(profile.id, { [key]: v });
+                    // Apply immediately in-game without re-rendering editor to avoid breaking drag focus
+                    this.manager.applyConfiguration();
+                };
+                range.onchange = (e) => {
+                    const v = parseFloat(e.target.value);
                     if (onChange) onChange(v);
                 };
                 wrap.appendChild(range);

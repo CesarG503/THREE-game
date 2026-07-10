@@ -414,6 +414,10 @@ export class Game {
 					const pos = new THREE.Vector3(data.x, data.y, data.z);
 					this.character.particleSystem.spawnJumpEffect(pos);
 				}
+				const remotePlayer = this.networkManager?.remotePlayers?.get(playerId);
+				if (remotePlayer && remotePlayer.polygonModelSkin) {
+					remotePlayer.polygonModelSkin.triggerAirJump?.();
+				}
 			}
 		};
 

@@ -235,6 +235,14 @@ export class RemotePlayer {
             this.polygonModelSkin.setJumpAnimationType(state.jumpAnimationType);
         }
 
+        if (state.animationStyle !== undefined) {
+            this.polygonModelSkin.setAnimationStyle(state.animationStyle);
+        }
+
+        if (state.limbBending !== undefined) {
+            this.polygonModelSkin.setLimbBending(state.limbBending);
+        }
+
         if (state.equippedWeapon !== this.equippedWeaponName || state.equippedHand !== this.equippedHandName) {
             const weaponChanged = state.equippedWeapon !== this.equippedWeaponName;
             this.equippedWeaponName = state.equippedWeapon;

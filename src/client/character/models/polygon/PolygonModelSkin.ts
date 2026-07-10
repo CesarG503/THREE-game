@@ -48,6 +48,7 @@ export class PolygonModelSkin implements ICharacterModel {
   // New configuration options
   animationStyle: string;
   limbBending: "none" | "jelly" | "joint";
+  airJumpTriggered: boolean;
 
   constructor(scene: THREE.Scene, isLocal = true) {
     this.scene = scene;
@@ -98,6 +99,7 @@ export class PolygonModelSkin implements ICharacterModel {
     // Default animation and bending configurations
     this.animationStyle = "classic";
     this.limbBending = "none";
+    this.airJumpTriggered = false;
 
     this.initLoader();
     this.createModel();
@@ -114,6 +116,10 @@ export class PolygonModelSkin implements ICharacterModel {
 
   setLimbBending(bending: "none" | "jelly" | "joint") {
     this.limbBending = bending || "none";
+  }
+
+  triggerAirJump() {
+    this.airJumpTriggered = true;
   }
 
   createModel() {

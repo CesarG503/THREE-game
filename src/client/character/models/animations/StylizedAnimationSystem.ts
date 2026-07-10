@@ -59,6 +59,12 @@ export class StylizedAnimationSystem implements IAnimationSystem {
       model.lastGrounded = false;
     }
 
+    if (model.airJumpTriggered) {
+      model.jumpSideIndex = (model.jumpSideIndex === 0) ? 1 : 0;
+      parts.pivotGroup.rotation.x = 0;
+      model.airJumpTriggered = false;
+    }
+
     const sideMult = (model.jumpSideIndex === 1) ? -1 : 1;
 
     let isRecovering = false;

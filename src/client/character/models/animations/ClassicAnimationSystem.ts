@@ -289,6 +289,11 @@ export class ClassicAnimationSystem implements IAnimationSystem {
       }
     }
 
+    if (model.airJumpTriggered) {
+      parts.pivotGroup.rotation.x = 0;
+      model.airJumpTriggered = false;
+    }
+
     if (!isSuperman) {
       const jumpAnim = state.jumpAnimationType || "flip";
       const fallAnim = state.fallAnimationType || "none";

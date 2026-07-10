@@ -895,6 +895,7 @@ export class CharacterController {
           this.verticalVelocity = this.jumpForce;
           this.jumpCount++;
           console.log(`Multi-Jump: ${this.jumpCount}/${this.maxMultiJumps}`);
+          this.polygonModelSkin?.triggerAirJump?.();
 
           this.emit("jumpChanged", {
             current: this.maxMultiJumps - this.jumpCount,

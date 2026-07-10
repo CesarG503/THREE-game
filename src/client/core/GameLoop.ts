@@ -441,11 +441,11 @@ export function animate(this: any) {
 				this._netAttackLatch = true;
 			}
 
-			const isRunning = this.character.characterController ? this.character.characterController.isRunning : false;
+			const isRunning = this.character ? this.character.isRunning : false;
 			const isMoving = this.inputManager ? (this.inputManager.keys.forward || this.inputManager.keys.backward || this.inputManager.keys.left || this.inputManager.keys.right) : false;
 			const isCrouching = this.inputManager ? (this.inputManager.keys.crouch && !isRunning) : false;
 			const isAttacking = this.inputManager ? this.inputManager.keys.attack : false;
-			const isGrounded = this.character.characterController ? this.character.characterController.computedGrounded() : true;
+			const isGrounded = this.character ? this.character.grounded : true;
 
 			const sendAttacking = isAttacking || this._netAttackLatch;
 
@@ -469,6 +469,8 @@ export function animate(this: any) {
 				equippedWeapon: equippedWeapon,
 				equippedHand: equippedHand,
 				jumpAnimationType: this.character.polygonModelSkin ? this.character.polygonModelSkin.jumpAnimationType : "none",
+				animationStyle: this.character.polygonModelSkin ? this.character.polygonModelSkin.animationStyle : "classic",
+				limbBending: this.character.polygonModelSkin ? this.character.polygonModelSkin.limbBending : "none",
 				playerCollision: this.character.playerCollision || "push",
 				headPitch: this.character.headPitch || 0,
 				headYaw: this.character.headYaw || 0,

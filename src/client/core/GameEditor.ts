@@ -683,8 +683,8 @@ export function updateCollisionLogic(this: any, dt: number) {
 	if (!this.character) return;
 	const charPos = this.character.getPosition();
 	const charBox = new THREE.Box3().setFromCenterAndSize(
-		charPos.clone().add(new THREE.Vector3(0, 1, 0)),
-		new THREE.Vector3(0.8, 1.8, 0.8)
+		charPos.clone().add(new THREE.Vector3(0, 0.82, 0)),
+		new THREE.Vector3(0.8, 1.85, 0.8)
 	);
 
 	this.sceneManager.scene.children.forEach((obj: any) => {

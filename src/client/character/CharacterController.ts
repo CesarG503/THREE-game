@@ -159,7 +159,7 @@ export class CharacterController {
     this.gravityContactPreserveTime = 0;
     this.capsuleHalfHeight = 0.5;
     this.capsuleRadius = 0.4;
-    this.capsuleCenterOffset = 0.9;
+    this.capsuleCenterOffset = 0.82;
 
     this.initPhysics();
     this.particleSystem = new ParticleSystem(scene);
@@ -271,7 +271,7 @@ export class CharacterController {
     const colliderDesc = RAPIER.ColliderDesc.capsule(this.capsuleHalfHeight, this.capsuleRadius).setTranslation(0, this.capsuleCenterOffset, 0);
     this.collider = this.world.createCollider(colliderDesc, this.rigidBody);
 
-    this.characterController = this.world.createCharacterController(0.1);
+    this.characterController = this.world.createCharacterController(0.02);
     this.characterController.enableAutostep(0.6, 0.25, true);
     this.characterController.enableSnapToGround(0.5);
     this.characterController.setApplyImpulsesToDynamicBodies(true);

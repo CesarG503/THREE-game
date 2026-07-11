@@ -27,6 +27,7 @@ export interface CharacterStats {
     crouchSpeed?: number;
     independentSpeeds?: boolean;
     staminaMax?: number;
+    runRequireFullStamina?: boolean;
     jumpForce: number;
     maxHealth: number;
     respawns: number;

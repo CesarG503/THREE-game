@@ -474,6 +474,26 @@ export class PlayerConfigPanel {
         // Stamina Max control
         this.createStatControl(statsCol, "Tiempo de correr (Estamina)", 'staminaMax', profile, 1, 30);
 
+        // Run Cooldown Until Full Toggle Checkbox
+        const runStaminaRow = document.createElement('div');
+        runStaminaRow.style.cssText = "margin: 5px 0 15px 0; display: flex; align-items: center; gap: 10px;";
+        const runStaminaCheck = document.createElement('input');
+        runStaminaCheck.type = "checkbox";
+        runStaminaCheck.id = "run-stamina-full-toggle";
+        runStaminaCheck.checked = !!profile.runRequireFullStamina;
+        runStaminaCheck.onchange = (e) => {
+            this.manager.updateProfile(profile.id, { runRequireFullStamina: e.target.checked });
+        };
+        const runStaminaLabel = document.createElement('label');
+        runStaminaLabel.htmlFor = "run-stamina-full-toggle";
+        runStaminaLabel.textContent = "Volver a correr hasta que se llene la barra";
+        runStaminaLabel.style.color = "#ccc";
+        runStaminaLabel.style.fontSize = "12px";
+        runStaminaLabel.style.cursor = "pointer";
+        runStaminaRow.appendChild(runStaminaCheck);
+        runStaminaRow.appendChild(runStaminaLabel);
+        statsCol.appendChild(runStaminaRow);
+
         // Independent Speeds Toggle Checkbox
         const indyRow = document.createElement('div');
         indyRow.style.cssText = "margin: 15px 0 5px 0; display: flex; align-items: center; gap: 10px;";

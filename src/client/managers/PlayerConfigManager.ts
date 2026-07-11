@@ -77,6 +77,7 @@ export class PlayerConfigManager {
                 crouchSpeed: 10,
                 independentSpeeds: false,
                 staminaMax: 5.0,
+                runRequireFullStamina: true,
                 jumpForce: 10,
                 respawns: -1,
                 color: "#ff0000",
@@ -187,6 +188,7 @@ export class PlayerConfigManager {
                 crouchSpeed: 5,
                 independentSpeeds: false,
                 staminaMax: 5.0,
+                runRequireFullStamina: true,
                 jumpForce: 10,
                 respawns: -1,
                 color: "#ffffff",
@@ -321,6 +323,7 @@ export class PlayerConfigManager {
             crouchSpeed: 5,
             independentSpeeds: false,
             staminaMax: 5.0,
+            runRequireFullStamina: true,
             jumpForce: 10,
             respawns: -1,
             color: "#" + Math.floor(Math.random() * 16777215).toString(16),
@@ -448,13 +451,13 @@ export class PlayerConfigManager {
         const profile = this.getProfile(id);
         if (profile) {
             Object.assign(profile, data);
-            
+
             // Only apply configuration if the modified profile is the currently active one
             const currentActiveProfile = this.getCurrentProfile();
             if (currentActiveProfile && currentActiveProfile.id === id) {
                 this.applyConfiguration();
             }
-            
+
             this.broadcastUpdate();
         }
     }
@@ -536,6 +539,7 @@ export class PlayerConfigManager {
                 crouchSpeed: profile.crouchSpeed !== undefined ? profile.crouchSpeed : (profile.speed || 10) * 0.5,
                 independentSpeeds: !!profile.independentSpeeds,
                 staminaMax: profile.staminaMax !== undefined ? profile.staminaMax : 5.0,
+                runRequireFullStamina: !!profile.runRequireFullStamina,
                 jumpForce: profile.jumpForce,
                 maxHealth: profile.maxHealth,
                 respawns: profile.respawns,
@@ -619,7 +623,7 @@ export class PlayerConfigManager {
                     limbBending: "none",
                     ...profile
                 };
-                
+
                 // Ensure stamina HUD settings defaults are initialized
                 if (!merged.hudSettings) {
                     merged.hudSettings = {};
@@ -637,6 +641,9 @@ export class PlayerConfigManager {
                 }
                 if (merged.staminaMax === undefined) {
                     merged.staminaMax = 5.0;
+                }
+                if (merged.runRequireFullStamina === undefined) {
+                    merged.runRequireFullStamina = true;
                 }
                 return merged;
             });

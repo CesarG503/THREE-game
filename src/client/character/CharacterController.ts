@@ -78,6 +78,8 @@ export class CharacterController {
   capsuleHalfHeight: number;
   capsuleRadius: number;
   capsuleCenterOffset: number;
+  runRequireFullStamina: boolean;
+  staminaNeedsFullCharge: boolean;
 
 
   constructor(scene: THREE.Scene, world: RAPIER.World, camera: THREE.Camera, cameraController: any) {
@@ -101,6 +103,8 @@ export class CharacterController {
     this.independentSpeeds = false;
     this.staminaMax = 5.0;
     this.stamina = 5.0;
+    this.runRequireFullStamina = true;
+    this.staminaNeedsFullCharge = false;
     this.isRunning = false;
     this.runningIgnoresShift = false;
     this.jumpForce = 20;
@@ -617,11 +621,15 @@ export class CharacterController {
     const desiredTranslation = new THREE.Vector3();
     const hasInput = moveDir.lengthSq() > 0;
 
+    const wasRunning = this.isRunning;
+
     // Handle Sprinting & Crouch input overrides
     if (input.doubleShiftTapped) {
       if (hasInput && this.stamina > 0 && !this.isRunning) {
-        this.isRunning = true;
-        this.runningIgnoresShift = true;
+        if (!this.runRequireFullStamina || !this.staminaNeedsFullCharge) {
+          this.isRunning = true;
+          this.runningIgnoresShift = true;
+        }
       } else {
         this.isRunning = false;
       }
@@ -640,11 +648,20 @@ export class CharacterController {
       this.isRunning = false;
     }
 
+    // If we stopped running, mark that we need a full charge to run again
+    if (wasRunning && !this.isRunning) {
+      this.staminaNeedsFullCharge = true;
+    }
+
     // Stamina consumption / regeneration
     if (this.isRunning) {
       this.stamina = Math.max(0, this.stamina - dt);
     } else {
       this.stamina = Math.min(this.staminaMax, this.stamina + dt * (this.staminaMax / 4));
+    }
+
+    if (this.stamina >= this.staminaMax) {
+      this.staminaNeedsFullCharge = false;
     }
 
     this.emit("staminaChanged", { current: this.stamina, max: this.staminaMax });
@@ -1147,6 +1164,13 @@ export class CharacterController {
     if (stats.staminaMax !== undefined) {
       this.staminaMax = stats.staminaMax;
       this.stamina = stats.staminaMax;
+      this.staminaNeedsFullCharge = false;
+    }
+    if (stats.runRequireFullStamina !== undefined) {
+      this.runRequireFullStamina = stats.runRequireFullStamina;
+      if (!this.runRequireFullStamina) {
+        this.staminaNeedsFullCharge = false;
+      }
     }
     if (stats.jumpForce !== undefined) this.jumpForce = stats.jumpForce;
     if (stats.maxHealth !== undefined) {

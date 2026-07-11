@@ -4,6 +4,7 @@ import { LogicSequenceEditor } from "../ui/LogicSequenceEditor";
 import { InteractiveCollisionLogic } from "../ui/logic_items/InteractiveCollisionLogic";
 import { TargetLogic } from "../ui/logic_items/TargetLogic";
 import { DianaLogic } from "../ui/logic_items/DianaLogic";
+import { DamageLogic } from "../ui/logic_items/DamageLogic";
 import { PlayerConfigManager } from "./PlayerConfigManager";
 import { getActiveFarmingGroups } from "../ui/GameHUD";
 import { WaypointTransformGizmo } from "../editor/WaypointTransformGizmo";
@@ -39,6 +40,7 @@ export class LogicSystem {
 	interactiveCollisionLogic: any;
 	targetLogic: any;
 	dianaLogic: any;
+	damageLogic: any;
 	waypointGizmo: any;
 	selectedWaypoint: any;
 	waypointPanel: HTMLElement | null;
@@ -54,6 +56,7 @@ export class LogicSystem {
 		this.interactiveCollisionLogic = new InteractiveCollisionLogic(game, this);
 		this.targetLogic = new TargetLogic(game, this);
 		this.dianaLogic = new DianaLogic();
+		this.damageLogic = new DamageLogic();
 		this.selectedWaypoint = null;
 		this.waypointPanel = null;
 		this.waypointNavIndex = -1;
@@ -733,8 +736,10 @@ export class LogicSystem {
 					const isCameraPanel = child.userData.mapObjectType === "camera_panel";
 					const isInteractiveZone = ["impulse_jump", "impulse_lateral", "gravity_pad", "farming_zone", "gravity_sphere"].includes(child.userData.mapObjectType);
 					const hasWaypoints = this.hasMovementLogic(child);
+					const isDamageController = child.userData.mapObjectType === "damage_controller";
+					const hasDamage = child.userData.logicProperties?.enableDamage === true;
 
-					if (isSpawn || isButton || isCollision || isTarget || isLogicCamera || isCameraPanel || isInteractiveZone || hasWaypoints) {
+					if (isSpawn || isButton || isCollision || isTarget || isLogicCamera || isCameraPanel || isInteractiveZone || hasWaypoints || isDamageController || hasDamage) {
 						logicObjects.push(child);
 					}
 				}
@@ -854,6 +859,18 @@ export class LogicSystem {
 
 		if (object.userData.mapObjectType === "farming_zone") {
 			this.renderFarmingZoneUI(container, object, props);
+		}
+
+		// Render damage logic options for any object
+		if (this.damageLogic) {
+			this.damageLogic.render(container, props, (key: string, value: any) => {
+				props[key] = value;
+				this.broadcastObjectLogicUpdate(object);
+				if (refreshCallback) refreshCallback();
+				if (key === "enableDamage" || key === "enableKnockback") {
+					this.renderPanel(container, object, refreshCallback);
+				}
+			});
 		}
 	}
 
@@ -1546,6 +1563,11 @@ export class LogicSystem {
 			this.updateGameLogic(dt);
 		}
 
+		// Dynamically update accumulated damage display if panel is showing
+		if (this.editingObject && this.damageLogic && this.editingObject.userData.logicProperties) {
+			this.damageLogic.updateAccumulatedDamageDisplay(this.editingObject.userData.logicProperties);
+		}
+
 		if (!this.isEditingMap || !this.editingObject) return;
 
 		if (this.toolbar.activeTool === "waypoint") {
@@ -1801,6 +1823,7 @@ export class LogicSystem {
 			case "interaction_button": return "Botones Interactivos";
 			case "target": return "Diana Interactiva";
 			case "movement_controller": return "Animador";
+			case "damage_controller": return "Controlador de Daño";
 			case "interactive_collision": return "Colisión Interactiva";
 			case "logic_camera": return "Camara";
 			case "camera_panel": return "Panel de Camaras";

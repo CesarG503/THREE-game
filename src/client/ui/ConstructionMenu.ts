@@ -239,6 +239,31 @@ export class ConstructionMenu {
         };
         this.logicItems.push(mover);
 
+        // Damage Controller
+        const damageCtrl = new MapObjectItem(
+            "damage_controller",
+            "Controlador de Daño",
+            "damage_controller",
+            "",
+            0xFF3333,
+            { x: 0.5, y: 0.5, z: 0.5 }
+        );
+        damageCtrl.logicProperties = {
+            name: "Controlador de Daño",
+            enableDamage: true,
+            damage: 10,
+            instantKill: false,
+            percentDamage: 0,
+            maxDamage: 100,
+            damageStopLimit: 0,
+            damageCooldown: 1.0,
+            accumulatedDamage: 0,
+            enableKnockback: false,
+            knockbackForce: 15,
+            knockbackDirection: "automatic"
+        };
+        this.logicItems.push(damageCtrl);
+
         // Interaction Button
         const button = new MapObjectItem(
             "button",
@@ -2314,7 +2339,7 @@ renderLogicLibraryGrid(container) {
         const groups = [
             {
                 title: "Bases y Señales",
-                types: ["spawn_point", "movement_controller", "interaction_button", "interactive_collision", "target", "gravity_sphere"]
+                types: ["spawn_point", "movement_controller", "interaction_button", "interactive_collision", "target", "gravity_sphere", "damage_controller"]
             },
             {
                 title: "Camaras",
@@ -4229,7 +4254,7 @@ renderLogicLibraryGrid(container) {
     updateLogicControls(baseItem) {
         this.editorLogicControlsContainer.innerHTML = "";
 
-        const logicTypes = ["spawn_point", "movement_controller", "interaction_button", "interactive_collision", "target", "impulse_jump", "impulse_lateral", "gravity_pad", "farming_zone", "gravity_sphere", "logic_camera", "camera_panel"];
+        const logicTypes = ["spawn_point", "movement_controller", "interaction_button", "interactive_collision", "target", "impulse_jump", "impulse_lateral", "gravity_pad", "farming_zone", "gravity_sphere", "logic_camera", "camera_panel", "damage_controller"];
         if (!logicTypes.includes(baseItem.type) && !baseItem.logicProperties) {
             this.editorLogicControlsContainer.style.display = "none";
             return;
@@ -4256,6 +4281,23 @@ renderLogicLibraryGrid(container) {
             this.createLogicDraftInput(this.editorLogicControlsContainer, "Velocidad:", "speed", "number", 2.0);
             this.createLogicDraftInput(this.editorLogicControlsContainer, "Bucle Infinito:", "loop", "boolean", true);
             this.createLogicDraftInput(this.editorLogicControlsContainer, "Activo al Inicio:", "active", "boolean", true);
+        } else if (type === "damage_controller") {
+            this.createLogicDraftInput(this.editorLogicControlsContainer, "Nombre:", "name", "text", "Controlador de Daño");
+            this.createLogicDraftInput(this.editorLogicControlsContainer, "Habilitar Daño:", "enableDamage", "boolean", true);
+            this.createLogicDraftInput(this.editorLogicControlsContainer, "Daño Base:", "damage", "number", 10);
+            this.createLogicDraftInput(this.editorLogicControlsContainer, "Daño Porcentual (%):", "percentDamage", "number", 0);
+            this.createLogicDraftInput(this.editorLogicControlsContainer, "Muerte Instantánea:", "instantKill", "boolean", false);
+            this.createLogicDraftInput(this.editorLogicControlsContainer, "Límite Máximo Daño:", "maxDamage", "number", 100);
+            this.createLogicDraftInput(this.editorLogicControlsContainer, "Límite Daño Acumulado (Stop):", "damageStopLimit", "number", 0);
+            this.createLogicDraftInput(this.editorLogicControlsContainer, "Intervalo Cooldown (s):", "damageCooldown", "number", 1.0);
+            this.createLogicDraftInput(this.editorLogicControlsContainer, "Retroceso (Knockback):", "enableKnockback", "boolean", false);
+            this.createLogicDraftInput(this.editorLogicControlsContainer, "Fuerza Retroceso:", "knockbackForce", "number", 15);
+            this.createLogicDraftSelect(this.editorLogicControlsContainer, "Dirección Retroceso:", "knockbackDirection", [
+                { value: "automatic", label: "Automático" },
+                { value: "upward", label: "Solo hacia Arriba" },
+                { value: "away", label: "Alejar del centro" },
+                { value: "backward", label: "Empujar hacia atrás" }
+            ], "automatic");
         } else if (type === "interaction_button") {
             this.createLogicDraftInput(this.editorLogicControlsContainer, "Tiempo Retener (s):", "holdTime", "number", 1.0);
             this.createLogicDraftInput(this.editorLogicControlsContainer, "Un Solo Uso:", "oneShot", "boolean", false);
@@ -4821,6 +4863,8 @@ renderLogicLibraryGrid(container) {
                     (Array.isArray(obj.userData.logicProperties.sequences) && obj.userData.logicProperties.sequences.length > 0))
             ) {
                 type = "movement_object";
+            } else if (obj.userData.mapObjectType === "damage_controller" || (obj.userData.logicProperties && obj.userData.logicProperties.enableDamage === true)) {
+                type = "damage_controller";
             } else {
                 // Fallback to base type if it has some other unknown logic
                 type = obj.userData.mapObjectType || "Desconocido";

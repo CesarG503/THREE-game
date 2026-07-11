@@ -245,6 +245,49 @@ export function useCurrentItem(this: any, isRightClickOrItem: any = false) {
 		}
 	}
 
+	if (item.type === "damage_controller" && this.placementManager) {
+		const raycaster = new THREE.Raycaster();
+		raycaster.setFromCamera(new THREE.Vector2(0, 0), this.sceneManager.camera);
+		const intersects = raycaster.intersectObjects(this.sceneManager.scene.children, true);
+
+		const hit = intersects.find((h: any) => h.object.userData && h.object.userData.isEditableMapObject);
+
+		if (hit) {
+			const targetObj = hit.object;
+
+			if (!targetObj.userData.logicProperties) targetObj.userData.logicProperties = {};
+			const logicProps = targetObj.userData.logicProperties;
+
+			if (!logicProps.enableDamage) {
+				const dmgDefaults = item.logicProperties || {};
+				logicProps.name = targetObj.userData.name || targetObj.userData.mapObjectType;
+				logicProps.enableDamage = true;
+				logicProps.damage = dmgDefaults.damage !== undefined ? dmgDefaults.damage : 10;
+				logicProps.instantKill = !!dmgDefaults.instantKill;
+				logicProps.percentDamage = dmgDefaults.percentDamage !== undefined ? dmgDefaults.percentDamage : 0;
+				logicProps.maxDamage = dmgDefaults.maxDamage !== undefined ? dmgDefaults.maxDamage : 100;
+				logicProps.damageStopLimit = dmgDefaults.damageStopLimit !== undefined ? dmgDefaults.damageStopLimit : 0;
+				logicProps.damageCooldown = dmgDefaults.damageCooldown !== undefined ? dmgDefaults.damageCooldown : 1.0;
+				logicProps.accumulatedDamage = dmgDefaults.accumulatedDamage !== undefined ? dmgDefaults.accumulatedDamage : 0;
+				logicProps.enableKnockback = !!dmgDefaults.enableKnockback;
+				logicProps.knockbackForce = dmgDefaults.knockbackForce !== undefined ? dmgDefaults.knockbackForce : 15;
+				logicProps.knockbackDirection = dmgDefaults.knockbackDirection || "automatic";
+
+				alert("Controlador de Daño aplicado a: " + (targetObj.userData.name || "Objeto"));
+				if (this.placementManager && this.placementManager.ghostLabelSprite) {
+					this.placementManager.updateLabelSprite(this.placementManager.ghostLabelSprite, "Aplicado!", "#00FF00");
+				}
+			} else {
+				alert("Este objeto ya tiene controlador de daño.");
+				if (this.placementManager && this.placementManager.ghostLabelSprite) {
+					this.placementManager.updateLabelSprite(this.placementManager.ghostLabelSprite, "Aplicado!", "#00FF00");
+				}
+			}
+
+			return;
+		}
+	}
+
 	const context = {
 		scene: this.sceneManager.scene,
 		world: this.world,
@@ -681,6 +724,115 @@ export function updateCollisionLogic(this: any, dt: number) {
 				}
 			} else if (!intersects && props._isInside) {
 				props._isInside = false;
+			}
+		}
+
+		// Damage Controller logic for ANY object that has enableDamage
+		if (obj.userData && obj.userData.logicProperties && obj.userData.logicProperties.enableDamage === true) {
+			const props = obj.userData.logicProperties;
+			const objBox = new THREE.Box3().setFromObject(obj);
+			const intersects = charBox.intersectsBox(objBox);
+
+			if (intersects && this.character && !this.character.isDead) {
+				const now = this.clock ? this.clock.getElapsedTime() : performance.now() / 1000;
+				if (props._lastDamageTime === undefined) props._lastDamageTime = 0;
+
+				if (now - props._lastDamageTime >= (props.damageCooldown ?? 1.0)) {
+					// Check if we hit the stop limit
+					const damageStopLimit = Number(props.damageStopLimit ?? 0);
+					const accumulatedDamage = Number(props.accumulatedDamage ?? 0);
+
+					if (damageStopLimit <= 0 || accumulatedDamage < damageStopLimit) {
+						// Determine damage
+						let finalDamage = 0;
+						if (props.instantKill) {
+							finalDamage = this.character.maxHealth;
+						} else {
+							const baseDamage = Number(props.damage ?? 10);
+							const percentDamage = Number(props.percentDamage ?? 0);
+							const percentVal = (percentDamage / 100) * this.character.maxHealth;
+							finalDamage = baseDamage + percentVal;
+
+							const maxDamage = Number(props.maxDamage ?? 100);
+							if (finalDamage > maxDamage) {
+								finalDamage = maxDamage;
+							}
+						}
+
+						finalDamage = Math.round(finalDamage);
+
+						if (finalDamage > 0) {
+							// Apply damage to player
+							this.character.takeDamage(finalDamage);
+							props._lastDamageTime = now;
+
+							// Spawn floating text
+							if (this.floatingTextManager) {
+								const hitPosVec = this.character.getPosition().clone().add(new THREE.Vector3(0, 1.5, 0));
+								this.floatingTextManager.spawnText(`-${finalDamage}`, hitPosVec, "#FF3333", 2.0);
+							}
+
+							// Add to internal accumulator
+							props.accumulatedDamage = accumulatedDamage + finalDamage;
+							console.log(`[DamageController] Object ${obj.userData.uuid} dealt ${finalDamage} damage. Accumulated: ${props.accumulatedDamage}`);
+						}
+
+						// Apply knockback
+						if (props.enableKnockback) {
+							let knockbackDir = new THREE.Vector3(0, 1, 0); // Default upward
+							const kbType = props.knockbackDirection || "automatic";
+
+							if (kbType === "automatic") {
+								const charCenter = this.character.getPosition().clone().add(new THREE.Vector3(0, 0.9, 0));
+								const localPos = obj.worldToLocal(charCenter.clone());
+								const dims = obj.userData.originalScale || { x: 1, y: 1, z: 1 };
+								
+								// Calculate ratios along local axes to find closest face
+								const rx = localPos.x / (dims.x / 2 || 0.5);
+								const ry = localPos.y / (dims.y / 2 || 0.5);
+								const rz = localPos.z / (dims.z / 2 || 0.5);
+
+								const absX = Math.abs(rx);
+								const absY = Math.abs(ry);
+								const absZ = Math.abs(rz);
+
+								const localNormal = new THREE.Vector3();
+								if (absY >= absX && absY >= absZ) {
+									localNormal.set(0, ry > 0 ? 1 : -1, 0);
+								} else if (absX >= absY && absX >= absZ) {
+									localNormal.set(rx > 0 ? 1 : -1, 0, 0);
+								} else {
+									localNormal.set(0, 0, rz > 0 ? 1 : -1);
+								}
+								knockbackDir.copy(localNormal).applyQuaternion(obj.quaternion).normalize();
+							} else if (kbType === "upward") {
+								const charUp = (typeof this.character.getGravityUpVector === "function") 
+									? this.character.getGravityUpVector() 
+									: new THREE.Vector3(0, 1, 0);
+								knockbackDir.copy(charUp);
+							} else if (kbType === "away") {
+								const center = new THREE.Vector3();
+								objBox.getCenter(center);
+								knockbackDir.copy(this.character.getPosition()).sub(center).normalize();
+								if (knockbackDir.lengthSq() < 0.001) {
+									knockbackDir.set(0, 1, 0);
+								}
+							} else if (kbType === "backward") {
+								const cameraDir = new THREE.Vector3();
+								if (this.cameraController && this.cameraController.camera) {
+									this.cameraController.camera.getWorldDirection(cameraDir);
+								} else {
+									cameraDir.set(0, 0, -1);
+								}
+								knockbackDir.copy(cameraDir).multiplyScalar(-1).normalize();
+							}
+
+							const force = knockbackDir.clone().multiplyScalar(props.knockbackForce ?? 15);
+							this.character.applyImpulse(force);
+							console.log(`[DamageController] Applied knockback force:`, force);
+						}
+					}
+				}
 			}
 		}
 	});

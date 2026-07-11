@@ -10,6 +10,7 @@ import { EventSubscriptionLogic } from "./EventSubscriptionLogic"
 import { DianaLogic } from "./DianaLogic"
 import { LogicCameraLogic } from "./LogicCameraLogic"
 import { CameraPanelLogic } from "./CameraPanelLogic"
+import { DamageLogic } from "./DamageLogic"
 
 export class LogicItemsManager {
     constructor(game = null, logicSystem = null) {
@@ -27,7 +28,8 @@ export class LogicItemsManager {
             new DianaLogic(),
             new LogicCameraLogic(),
             new CameraPanelLogic(game, logicSystem),
-            new EventSubscriptionLogic()
+            new EventSubscriptionLogic(),
+            new DamageLogic()
         ]
     }
 

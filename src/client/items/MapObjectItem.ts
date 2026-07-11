@@ -140,6 +140,18 @@ export class MapObjectItem extends Item {
 
       ctx.textAlign = "center";
       ctx.fillText("MOV", 32, 48);
+    } else if (this.type === "damage_controller") {
+      ctx.fillStyle = "#ef4444";
+      ctx.beginPath();
+      ctx.arc(32, 32, 24, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = "white";
+      ctx.font = "bold 14px Arial";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("DMG", 32, 32);
     } else if (this.type === "interaction_button") {
       ctx.fillStyle = "#555";
       ctx.fillRect(16, 40, 32, 16);
@@ -423,7 +435,7 @@ export class MapObjectItem extends Item {
       }
     }
 
-    if (context.isRightClick && this.type !== "movement_controller") {
+    if (context.isRightClick && this.type !== "movement_controller" && this.type !== "damage_controller") {
       return false;
     }
 
@@ -488,6 +500,46 @@ export class MapObjectItem extends Item {
           alert(`Transformado en Objeto Móvil: ${target.userData.mapObjectType}`);
         } else {
           alert(`Este objeto ya tiene lógica de movimiento.`);
+        }
+
+        return true;
+      }
+      return false;
+    }
+
+    if (this.type === "damage_controller") {
+      const raycaster = new THREE.Raycaster();
+      raycaster.set(context.origin, context.direction);
+
+      const intersects = raycaster.intersectObjects(context.scene.children, true);
+      const hit = intersects.find((h: any) => h.object.userData && h.object.userData.isEditableMapObject);
+
+      if (hit) {
+        const target = hit.object;
+
+        if (!target.userData.logicProperties) {
+          target.userData.logicProperties = {};
+        }
+
+        const logicProps = target.userData.logicProperties;
+        if (!logicProps.enableDamage) {
+          const dmgDefaults = this.logicProperties || {};
+          logicProps.name = target.userData.name || target.userData.mapObjectType;
+          logicProps.enableDamage = true;
+          logicProps.damage = dmgDefaults.damage !== undefined ? dmgDefaults.damage : 10;
+          logicProps.instantKill = !!dmgDefaults.instantKill;
+          logicProps.percentDamage = dmgDefaults.percentDamage !== undefined ? dmgDefaults.percentDamage : 0;
+          logicProps.maxDamage = dmgDefaults.maxDamage !== undefined ? dmgDefaults.maxDamage : 100;
+          logicProps.damageStopLimit = dmgDefaults.damageStopLimit !== undefined ? dmgDefaults.damageStopLimit : 0;
+          logicProps.damageCooldown = dmgDefaults.damageCooldown !== undefined ? dmgDefaults.damageCooldown : 1.0;
+          logicProps.accumulatedDamage = dmgDefaults.accumulatedDamage !== undefined ? dmgDefaults.accumulatedDamage : 0;
+          logicProps.enableKnockback = !!dmgDefaults.enableKnockback;
+          logicProps.knockbackForce = dmgDefaults.knockbackForce !== undefined ? dmgDefaults.knockbackForce : 15;
+          logicProps.knockbackDirection = dmgDefaults.knockbackDirection || "automatic";
+
+          alert(`Controlador de Daño aplicado a: ${target.userData.name || target.userData.mapObjectType}`);
+        } else {
+          alert(`Este objeto ya tiene el controlador de daño habilitado.`);
         }
 
         return true;
@@ -633,20 +685,26 @@ export class MapObjectItem extends Item {
       object3D.add(arrow);
 
       collidersDesc.push(col);
-    } else if (this.type === "movement_controller") {
+    } else if (this.type === "movement_controller" || this.type === "damage_controller") {
       const geometry = new THREE.SphereGeometry(this.scale.x, 16, 16);
       const material = new THREE.MeshStandardMaterial({
-        color: this.color,
+        color: this.color || (this.type === "damage_controller" ? 0xff3333 : 0x00FFFF),
         transparent: true,
         opacity: 0.7,
         wireframe: true
       });
       object3D = new THREE.Mesh(geometry, material);
 
-      const core = new THREE.Mesh(new THREE.BoxGeometry(this.scale.x, this.scale.x, this.scale.x), new THREE.MeshBasicMaterial({ color: 0xffffff }));
+      const core = new THREE.Mesh(
+        new THREE.BoxGeometry(this.scale.x, this.scale.x, this.scale.x),
+        new THREE.MeshBasicMaterial({ color: this.type === "damage_controller" ? 0xff3333 : 0xffffff })
+      );
       object3D.add(core);
 
       const col = RAPIER.ColliderDesc.ball(this.scale.x);
+      if (this.type === "damage_controller") {
+        col.setSensor(true);
+      }
       collidersDesc.push(col);
     } else if (this.type === "interaction_button") {
       const group = new THREE.Group();

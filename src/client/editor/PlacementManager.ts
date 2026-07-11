@@ -1048,6 +1048,60 @@ export class PlacementManager {
 
                 this.lastValidPosition = hit.point;
                 return hit.point;
+            } else if (item.type === "damage_controller") {
+                const isTargetObject = hit.object.userData && hit.object.userData.isEditableMapObject;
+
+                if (!isTargetObject) {
+                    this.placementGhost.visible = false;
+                    this.lastValidPosition = null;
+                    return null;
+                }
+
+                this.placementGhost.visible = true;
+
+                // 1. Match Target Size
+                const targetBox = new THREE.Box3().setFromObject(hit.object);
+                const targetSize = new THREE.Vector3();
+                targetBox.getSize(targetSize);
+                const targetCenter = new THREE.Vector3();
+                targetBox.getCenter(targetCenter);
+
+                this.ghostBaseMat.visible = true;
+                this.ghostArrow.visible = false;
+                if (this.ghostRampMesh) this.ghostRampMesh.visible = false;
+                if (this.ghostStairsGroup) this.ghostStairsGroup.visible = false;
+                if (this.ghostLadderGroup) this.ghostLadderGroup.visible = false;
+
+                // Use Box Mesh for highlight
+                this.ghostBoxMesh.visible = true;
+                this.ghostBoxMesh.scale.copy(targetSize);
+
+                // Color Red for Damage Logic Highlighting
+                this.ghostBaseMat.color.setHex(0xff3333);
+                this.ghostBaseMat.opacity = 0.5;
+
+                // Position at Center of Target
+                this.placementGhost.position.copy(targetCenter);
+                this.placementGhost.rotation.set(0, 0, 0);
+                this.placementGhost.quaternion.copy(hit.object.quaternion);
+
+                // 2. Text Label
+                if (!this.ghostLabelSprite) {
+                    this.ghostLabelSprite = this.createLabelSprite("Aplicar", "#FFFF00");
+                    this.placementGhost.add(this.ghostLabelSprite);
+                }
+                this.ghostLabelSprite.visible = true;
+                this.ghostLabelSprite.position.set(0, targetSize.y / 2 + 0.5, 0); // Above object
+
+                // Update text
+                const logicProps = hit.object.userData.logicProperties;
+                const hasLogic = logicProps && logicProps.enableDamage === true;
+                const txt = hasLogic ? "Aplicado!" : "Aplicar Daño";
+                const col = hasLogic ? "#00FF00" : "#ffaa00";
+                this.updateLabelSprite(this.ghostLabelSprite, txt, col);
+
+                this.lastValidPosition = hit.point;
+                return hit.point;
             } else if (item.type === "ladder") {
                 // --- LADDER WALL LOGIC ---
                 // Supports Wall Alignment AND Rotation/Grid

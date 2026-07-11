@@ -592,6 +592,62 @@ export class PlayerConfigPanel {
         disableInteractionContainer.appendChild(disableInteractionLabel);
         statsCol.appendChild(disableInteractionContainer);
 
+        // Flash Red on Damage Toggle (Visualizar Daño)
+        const flashDamageContainer = document.createElement('div');
+        flashDamageContainer.style.marginTop = "10px";
+        flashDamageContainer.style.display = "flex";
+        flashDamageContainer.style.alignItems = "center";
+        flashDamageContainer.style.gap = "10px";
+
+        const flashDamageCheck = document.createElement('input');
+        flashDamageCheck.type = "checkbox";
+        flashDamageCheck.checked = profile.flashOnDamage || false;
+        flashDamageCheck.style.transform = "scale(1.2)";
+        flashDamageCheck.onchange = (e) => {
+            this.manager.updateProfile(profile.id, { flashOnDamage: e.target.checked });
+        };
+
+        const flashDamageLabel = document.createElement('label');
+        flashDamageLabel.textContent = "Visualizar Daño (Parpadear Rojo)";
+        flashDamageLabel.style.color = "#ddd";
+        flashDamageLabel.style.cursor = "pointer";
+        flashDamageLabel.onclick = () => flashDamageCheck.click();
+
+        flashDamageContainer.appendChild(flashDamageCheck);
+        flashDamageContainer.appendChild(flashDamageLabel);
+        statsCol.appendChild(flashDamageContainer);
+
+        // Respawn Delay Input
+        this.createStatControl(statsCol, "Delay para Reaparecer (s)", 'respawnDelay', profile, 0.1, 10);
+
+        // Explode on Death Toggle
+        const explodeDeathContainer = document.createElement('div');
+        explodeDeathContainer.style.marginTop = "10px";
+        explodeDeathContainer.style.display = "flex";
+        explodeDeathContainer.style.alignItems = "center";
+        explodeDeathContainer.style.gap = "10px";
+
+        const explodeDeathCheck = document.createElement('input');
+        explodeDeathCheck.type = "checkbox";
+        explodeDeathCheck.checked = profile.explodeOnDeath || false;
+        explodeDeathCheck.style.transform = "scale(1.2)";
+        explodeDeathCheck.onchange = (e) => {
+            this.manager.updateProfile(profile.id, { explodeOnDeath: e.target.checked });
+        };
+
+        const explodeDeathLabel = document.createElement('label');
+        explodeDeathLabel.textContent = "Explotar Cuerpo al Morir";
+        explodeDeathLabel.style.color = "#ddd";
+        explodeDeathLabel.style.cursor = "pointer";
+        explodeDeathLabel.onclick = () => explodeDeathCheck.click();
+
+        explodeDeathContainer.appendChild(explodeDeathCheck);
+        explodeDeathContainer.appendChild(explodeDeathLabel);
+        statsCol.appendChild(explodeDeathContainer);
+
+        // Body Parts Duration Input
+        this.createStatControl(statsCol, "Tiempo Duración Partes Suelo (s)", 'bodyPartsDuration', profile, 1, 60);
+
         const gravityContainer = document.createElement('div');
         gravityContainer.style.cssText = "margin-top:15px; display:flex; flex-direction:column; gap:6px;";
 
@@ -1212,6 +1268,8 @@ export class PlayerConfigPanel {
                 if (key === 'runSpeed') profile[key] = (profile.speed || 10) * 1.5;
                 else if (key === 'crouchSpeed') profile[key] = (profile.speed || 10) * 0.5;
                 else if (key === 'staminaMax') profile[key] = 5.0;
+                else if (key === 'respawnDelay') profile[key] = 2.0;
+                else if (key === 'bodyPartsDuration') profile[key] = 5.0;
             }
             const value = profile[key];
 
@@ -1300,6 +1358,7 @@ export class PlayerConfigPanel {
                 range.type = "range";
                 range.min = min;
                 range.max = max;
+                range.step = (key === 'respawnDelay' || key === 'staminaMax' || key === 'crouchSpeed' || key === 'runSpeed' || key === 'bodyPartsDuration') ? '0.1' : '1';
                 range.value = value;
                 range.style.width = "100%";
                 range.oninput = (e) => {

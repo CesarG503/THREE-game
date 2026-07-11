@@ -33,6 +33,10 @@ export interface CharacterStats {
     respawns: number;
     canFly: boolean;
     maxMultiJumps: number;
+    flashOnDamage?: boolean;
+    respawnDelay?: number;
+    explodeOnDeath?: boolean;
+    bodyPartsDuration?: number;
 }
 
 export interface JumpConfig {

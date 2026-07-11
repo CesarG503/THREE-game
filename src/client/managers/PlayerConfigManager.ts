@@ -90,6 +90,10 @@ export class PlayerConfigManager {
                 playerCollision: "push",
                 gravityOrientation: "down",
                 gravityTransitionDuration: 0.65,
+                flashOnDamage: false,
+                respawnDelay: 2.0,
+                explodeOnDeath: false,
+                bodyPartsDuration: 5.0,
                 skinMode: "player",
                 skinUrl: DEFAULT_POLYGON_SKIN_URL,
                 skinAssetId: null,
@@ -549,7 +553,11 @@ export class PlayerConfigManager {
                 fallAnimationType: profile.fallAnimationType,
                 playerCollision: profile.playerCollision,
                 gravityOrientation: normalizeGravityOrientation(profile.gravityOrientation),
-                gravityTransitionDuration: profile.gravityTransitionDuration
+                gravityTransitionDuration: profile.gravityTransitionDuration,
+                flashOnDamage: profile.flashOnDamage,
+                respawnDelay: profile.respawnDelay,
+                explodeOnDeath: profile.explodeOnDeath,
+                bodyPartsDuration: profile.bodyPartsDuration
             });
         } else {
             character.speed = profile.speed;

@@ -80,6 +80,10 @@ export class CharacterController {
   capsuleCenterOffset: number;
   runRequireFullStamina: boolean;
   staminaNeedsFullCharge: boolean;
+  flashOnDamage: boolean;
+  respawnDelay: number;
+  explodeOnDeath: boolean;
+  bodyPartsDuration: number;
 
 
   constructor(scene: THREE.Scene, world: RAPIER.World, camera: THREE.Camera, cameraController: any) {
@@ -160,6 +164,10 @@ export class CharacterController {
     this.capsuleHalfHeight = 0.5;
     this.capsuleRadius = 0.4;
     this.capsuleCenterOffset = 0.82;
+    this.flashOnDamage = false;
+    this.respawnDelay = 2.0;
+    this.explodeOnDeath = false;
+    this.bodyPartsDuration = 5.0;
 
     this.initPhysics();
     this.particleSystem = new ParticleSystem(scene);
@@ -1178,6 +1186,10 @@ export class CharacterController {
       this.currentHealth = this.maxHealth;
     }
     if (stats.respawns !== undefined) this.respawns = stats.respawns;
+    if (stats.flashOnDamage !== undefined) this.flashOnDamage = stats.flashOnDamage;
+    if (stats.respawnDelay !== undefined) this.respawnDelay = stats.respawnDelay;
+    if (stats.explodeOnDeath !== undefined) this.explodeOnDeath = stats.explodeOnDeath;
+    if (stats.bodyPartsDuration !== undefined) this.bodyPartsDuration = stats.bodyPartsDuration;
     if (stats.canFly !== undefined) this.canFly = stats.canFly;
     if (stats.maxMultiJumps !== undefined) this.maxMultiJumps = stats.maxMultiJumps;
 
@@ -1228,9 +1240,71 @@ export class CharacterController {
 
     this.emit("healthChanged", { current: this.currentHealth, max: this.maxHealth });
 
+    if (this.flashOnDamage) {
+      this.flashDamageVisuals();
+    }
+
     if (this.currentHealth <= 0) {
       this.die();
     }
+  }
+
+  getActiveModelGroup() {
+    if (this.currentType === "glb") return this.glbModel?.model;
+    if (this.currentType === "polygon") return this.polygonModel?.model;
+    if (this.currentType === "skin") return this.polygonModelSkin?.model;
+    return null;
+  }
+
+  flashDamageVisuals() {
+    const activeModel = this.getActiveModelGroup();
+    if (!activeModel) return;
+
+    const flashDuration = 100; // ms
+    const flashes = 3;
+    let count = 0;
+
+    const interval = setInterval(() => {
+      count++;
+      const isRed = count % 2 === 1;
+
+      activeModel.traverse((child: any) => {
+        if (!child.isMesh || !child.material || child.userData?.isRoleOutline || child.userData?.isRoleVisual) return;
+        const materials = Array.isArray(child.material) ? child.material : [child.material];
+        materials.forEach((mat: any) => {
+          if (isRed) {
+            if (mat.emissive) {
+              if (mat.userData.originalEmissive === undefined) {
+                mat.userData.originalEmissive = mat.emissive.clone();
+                mat.userData.originalEmissiveIntensity = mat.emissiveIntensity;
+              }
+              mat.emissive.setHex(0xff0000);
+              mat.emissiveIntensity = 0.8;
+            }
+          } else {
+            if (mat.emissive && mat.userData.originalEmissive !== undefined) {
+              mat.emissive.copy(mat.userData.originalEmissive);
+              mat.emissiveIntensity = mat.userData.originalEmissiveIntensity;
+            }
+          }
+        });
+      });
+
+      if (count >= flashes * 2) {
+        clearInterval(interval);
+        // Reset to original
+        activeModel.traverse((child: any) => {
+          if (!child.isMesh || !child.material || child.userData?.isRoleOutline || child.userData?.isRoleVisual) return;
+          const materials = Array.isArray(child.material) ? child.material : [child.material];
+          materials.forEach((mat: any) => {
+            if (mat.emissive && mat.userData.originalEmissive !== undefined) {
+              mat.emissive.copy(mat.userData.originalEmissive);
+              mat.emissiveIntensity = mat.userData.originalEmissiveIntensity;
+            }
+          });
+        });
+      }
+    }, flashDuration);
   }
 
   die() {
@@ -1238,9 +1312,17 @@ export class CharacterController {
     this.isDead = true;
     console.log("Player Died!");
 
+    if (this.explodeOnDeath) {
+      const duration = this.bodyPartsDuration !== undefined ? this.bodyPartsDuration : 5;
+      if (this.currentType === "skin" && this.polygonModelSkin) {
+        this.polygonModelSkin.explodeBodyParts(duration);
+      }
+    }
+
     if (this.respawns === -1 || this.respawns > 0) {
       if (this.respawns > 0) this.respawns--;
-      setTimeout(() => this.respawn(), 2000);
+      const delay = (this.respawnDelay !== undefined ? this.respawnDelay : 2) * 1000;
+      setTimeout(() => this.respawn(), delay);
     } else {
       console.log("Game Over - No Respawns Left");
       alert("¡Has muerto definitivamente!");
@@ -1260,6 +1342,15 @@ export class CharacterController {
 
     this.rigidBody.setTranslation({ x: respawnPos.x, y: respawnPos.y, z: respawnPos.z }, true);
     this.rigidBody.setLinvel({ x: 0, y: 0, z: 0 }, true);
+
+    // Restore visual model visibility
+    if (this.currentType === "glb" && this.glbModel) {
+      this.glbModel.setVisible(true);
+    } else if (this.currentType === "polygon" && this.polygonModel) {
+      this.polygonModel.setVisible(true);
+    } else if (this.currentType === "skin" && this.polygonModelSkin) {
+      this.polygonModelSkin.setVisible(true);
+    }
 
     console.log("Respawned at", respawnPos);
   }

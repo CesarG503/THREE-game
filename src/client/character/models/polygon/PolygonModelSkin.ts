@@ -44,6 +44,7 @@ export class PolygonModelSkin implements ICharacterModel {
   roleVisualGroup: THREE.Group | null;
   roleOutlineMeshes: THREE.Mesh[];
   roleVisual: any;
+  activeDebris: any[];
 
   // New configuration options
   animationStyle: string;
@@ -100,6 +101,7 @@ export class PolygonModelSkin implements ICharacterModel {
     this.animationStyle = "classic";
     this.limbBending = "none";
     this.airJumpTriggered = false;
+    this.activeDebris = [];
 
     this.initLoader();
     this.createModel();
@@ -184,9 +186,9 @@ export class PolygonModelSkin implements ICharacterModel {
 
     const bodyOuterGeo = this.createBoxGeometryWithUVs(8, 12, 4, 16, 32);
     const bodyOuter = new THREE.Mesh(bodyOuterGeo, material);
-    bodyOuter.position.copy(this.body.position);
-    bodyOuter.scale.set(pixelScale * 1.05, pixelScale * 1.05, pixelScale * 1.05);
-    this.upperBodyGroup.add(bodyOuter);
+    bodyOuter.position.set(0, 0, 0);
+    bodyOuter.scale.set(1.05, 1.05, 1.05);
+    this.body.add(bodyOuter);
 
     // Right Arm (Subdivided)
     this.rightArmGroup = new THREE.Group();
@@ -591,6 +593,54 @@ export class PolygonModelSkin implements ICharacterModel {
     noPitchTilt = false,
     isRunning = false
   ) {
+    // Update debris even if model is hidden (since player is dead)
+    if (this.activeDebris && this.activeDebris.length > 0) {
+      this.activeDebris.forEach((deb) => {
+        deb.lifeTime += dt;
+
+        // Apply physics
+        if (deb.group.position.y > deb.groundY) {
+          deb.velocity.y -= 9.8 * dt; // gravity
+          deb.group.position.addScaledVector(deb.velocity, dt);
+
+          // Rotation
+          deb.group.rotation.x += deb.angularVelocity.x * dt;
+          deb.group.rotation.y += deb.angularVelocity.y * dt;
+          deb.group.rotation.z += deb.angularVelocity.z * dt;
+        } else {
+          deb.group.position.y = deb.groundY;
+          deb.velocity.set(0, 0, 0);
+          deb.angularVelocity.set(0, 0, 0);
+        }
+
+        // Fade out in the last 1 second
+        const timeRemaining = deb.maxLifeTime - deb.lifeTime;
+        if (timeRemaining <= 1.0) {
+          const opacity = Math.max(0, timeRemaining);
+          deb.group.traverse((child: any) => {
+            if (child.isMesh && child.material) {
+              child.material.opacity = opacity;
+              child.material.transparent = true;
+            }
+          });
+        }
+      });
+
+      // Filter out dead debris
+      const deadDebris = this.activeDebris.filter((deb) => deb.lifeTime >= deb.maxLifeTime);
+      deadDebris.forEach((deb) => {
+        this.scene.remove(deb.group);
+        deb.group.traverse((child: any) => {
+          if (child.geometry) child.geometry.dispose();
+          if (child.material) {
+            const materials = Array.isArray(child.material) ? child.material : [child.material];
+            materials.forEach((m: any) => m?.dispose?.());
+          }
+        });
+      });
+      this.activeDebris = this.activeDebris.filter((deb) => deb.lifeTime < deb.maxLifeTime);
+    }
+
     this.isSuperman = isSuperman;
     if (!this.model || !this.isVisible) return;
 
@@ -771,6 +821,97 @@ export class PolygonModelSkin implements ICharacterModel {
         this.heldItemMesh.rotation.set(Math.PI / 2, 1.5, 0);
       }
     }
+  }
+
+  explodeBodyParts(duration: number) {
+    if (!this.model) return;
+
+    // Force matrix update to get correct world coordinates
+    this.model.updateMatrixWorld(true);
+
+    const parts = [
+      { name: "head", obj: this.headGroup },
+      { name: "torso", obj: this.body },
+      { name: "rightArm", obj: this.rightArmGroup },
+      { name: "leftArm", obj: this.leftArmGroup },
+      { name: "rightLeg", obj: this.rightLegGroup },
+      { name: "leftLeg", obj: this.leftLegGroup }
+    ];
+
+    const groundY = this.model.position.y;
+    this.clearDebris();
+
+    parts.forEach((part) => {
+      const group = part.obj;
+      if (!group) return;
+
+      const worldPos = new THREE.Vector3();
+      const worldQuat = new THREE.Quaternion();
+      const worldScale = new THREE.Vector3();
+
+      group.getWorldPosition(worldPos);
+      group.getWorldQuaternion(worldQuat);
+      group.getWorldScale(worldScale);
+
+      const debrisGroup = new THREE.Group();
+      debrisGroup.position.copy(worldPos);
+      debrisGroup.quaternion.copy(worldQuat);
+      debrisGroup.scale.copy(worldScale);
+
+      // Clone child meshes and ensure they have individual materials for fading
+      const cloneObj = group.clone();
+      cloneObj.position.set(0, 0, 0);
+      cloneObj.rotation.set(0, 0, 0);
+      cloneObj.scale.set(1, 1, 1);
+      
+      cloneObj.traverse((child: any) => {
+        if (child.isMesh && child.material) {
+          child.material = child.material.clone();
+        }
+      });
+      debrisGroup.add(cloneObj);
+
+      this.scene.add(debrisGroup);
+
+      // Random velocities
+      const vel = new THREE.Vector3(
+        (Math.random() - 0.5) * 5.0,
+        2.5 + Math.random() * 3.5,
+        (Math.random() - 0.5) * 5.0
+      );
+
+      const angVel = new THREE.Vector3(
+        (Math.random() - 0.5) * 8.0,
+        (Math.random() - 0.5) * 8.0,
+        (Math.random() - 0.5) * 8.0
+      );
+
+      this.activeDebris.push({
+        group: debrisGroup,
+        velocity: vel,
+        angularVelocity: angVel,
+        groundY,
+        lifeTime: 0,
+        maxLifeTime: duration
+      });
+    });
+
+    // Hide character model
+    this.setVisible(false);
+  }
+
+  clearDebris() {
+    this.activeDebris.forEach((deb) => {
+      this.scene.remove(deb.group);
+      deb.group.traverse((child: any) => {
+        if (child.geometry) child.geometry.dispose();
+        if (child.material) {
+          const materials = Array.isArray(child.material) ? child.material : [child.material];
+          materials.forEach((m: any) => m?.dispose?.());
+        }
+      });
+    });
+    this.activeDebris = [];
   }
 }
 

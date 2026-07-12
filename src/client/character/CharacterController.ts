@@ -84,6 +84,7 @@ export class CharacterController {
   respawnDelay: number;
   explodeOnDeath: boolean;
   bodyPartsDuration: number;
+  damageFlashIntensity: number;
 
 
   constructor(scene: THREE.Scene, world: RAPIER.World, camera: THREE.Camera, cameraController: any) {
@@ -168,6 +169,7 @@ export class CharacterController {
     this.respawnDelay = 2.0;
     this.explodeOnDeath = false;
     this.bodyPartsDuration = 5.0;
+    this.damageFlashIntensity = 0.8;
 
     this.initPhysics();
     this.particleSystem = new ParticleSystem(scene);
@@ -1190,6 +1192,7 @@ export class CharacterController {
     if (stats.respawnDelay !== undefined) this.respawnDelay = stats.respawnDelay;
     if (stats.explodeOnDeath !== undefined) this.explodeOnDeath = stats.explodeOnDeath;
     if (stats.bodyPartsDuration !== undefined) this.bodyPartsDuration = stats.bodyPartsDuration;
+    if (stats.damageFlashIntensity !== undefined) this.damageFlashIntensity = stats.damageFlashIntensity;
     if (stats.canFly !== undefined) this.canFly = stats.canFly;
     if (stats.maxMultiJumps !== undefined) this.maxMultiJumps = stats.maxMultiJumps;
 
@@ -1279,7 +1282,7 @@ export class CharacterController {
                 mat.userData.originalEmissiveIntensity = mat.emissiveIntensity;
               }
               mat.emissive.setHex(0xff0000);
-              mat.emissiveIntensity = 0.8;
+              mat.emissiveIntensity = this.damageFlashIntensity !== undefined ? this.damageFlashIntensity : 0.8;
             }
           } else {
             if (mat.emissive && mat.userData.originalEmissive !== undefined) {

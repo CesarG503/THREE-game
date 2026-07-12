@@ -603,9 +603,6 @@ export class PlayerConfigPanel {
         flashDamageCheck.type = "checkbox";
         flashDamageCheck.checked = profile.flashOnDamage || false;
         flashDamageCheck.style.transform = "scale(1.2)";
-        flashDamageCheck.onchange = (e) => {
-            this.manager.updateProfile(profile.id, { flashOnDamage: e.target.checked });
-        };
 
         const flashDamageLabel = document.createElement('label');
         flashDamageLabel.textContent = "Visualizar Daño (Parpadear Rojo)";
@@ -616,6 +613,20 @@ export class PlayerConfigPanel {
         flashDamageContainer.appendChild(flashDamageCheck);
         flashDamageContainer.appendChild(flashDamageLabel);
         statsCol.appendChild(flashDamageContainer);
+
+        // Opacity container
+        const opacitySliderWrap = document.createElement('div');
+        opacitySliderWrap.style.display = flashDamageCheck.checked ? "block" : "none";
+        opacitySliderWrap.style.marginLeft = "20px";
+        opacitySliderWrap.style.marginTop = "5px";
+        this.createStatControl(opacitySliderWrap, "Opacidad de Daño (Rojo)", 'damageFlashIntensity', profile, 0.1, 1.0);
+        statsCol.appendChild(opacitySliderWrap);
+
+        flashDamageCheck.onchange = (e) => {
+            const checked = e.target.checked;
+            this.manager.updateProfile(profile.id, { flashOnDamage: checked });
+            opacitySliderWrap.style.display = checked ? "block" : "none";
+        };
 
         // Respawn Delay Input
         this.createStatControl(statsCol, "Delay para Reaparecer (s)", 'respawnDelay', profile, 0.1, 10);
@@ -1270,6 +1281,7 @@ export class PlayerConfigPanel {
                 else if (key === 'staminaMax') profile[key] = 5.0;
                 else if (key === 'respawnDelay') profile[key] = 2.0;
                 else if (key === 'bodyPartsDuration') profile[key] = 5.0;
+                else if (key === 'damageFlashIntensity') profile[key] = 0.8;
             }
             const value = profile[key];
 
@@ -1358,7 +1370,7 @@ export class PlayerConfigPanel {
                 range.type = "range";
                 range.min = min;
                 range.max = max;
-                range.step = (key === 'respawnDelay' || key === 'staminaMax' || key === 'crouchSpeed' || key === 'runSpeed' || key === 'bodyPartsDuration') ? '0.1' : '1';
+                range.step = (key === 'respawnDelay' || key === 'staminaMax' || key === 'crouchSpeed' || key === 'runSpeed' || key === 'bodyPartsDuration' || key === 'damageFlashIntensity') ? '0.1' : '1';
                 range.value = value;
                 range.style.width = "100%";
                 range.oninput = (e) => {

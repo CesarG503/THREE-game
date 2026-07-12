@@ -37,6 +37,7 @@ export interface CharacterStats {
     respawnDelay?: number;
     explodeOnDeath?: boolean;
     bodyPartsDuration?: number;
+    damageFlashIntensity?: number;
 }
 
 export interface JumpConfig {

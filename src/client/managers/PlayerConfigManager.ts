@@ -90,10 +90,11 @@ export class PlayerConfigManager {
                 playerCollision: "push",
                 gravityOrientation: "down",
                 gravityTransitionDuration: 0.65,
-                flashOnDamage: false,
-                respawnDelay: 2.0,
-                explodeOnDeath: false,
-                bodyPartsDuration: 5.0,
+                flashOnDamage: true,
+                damageFlashIntensity: 0.8,
+                respawnDelay: 3.0,
+                explodeOnDeath: true,
+                bodyPartsDuration: 30.0,
                 skinMode: "player",
                 skinUrl: DEFAULT_POLYGON_SKIN_URL,
                 skinAssetId: null,
@@ -557,7 +558,8 @@ export class PlayerConfigManager {
                 flashOnDamage: profile.flashOnDamage,
                 respawnDelay: profile.respawnDelay,
                 explodeOnDeath: profile.explodeOnDeath,
-                bodyPartsDuration: profile.bodyPartsDuration
+                bodyPartsDuration: profile.bodyPartsDuration,
+                damageFlashIntensity: profile.damageFlashIntensity
             });
         } else {
             character.speed = profile.speed;
@@ -652,6 +654,21 @@ export class PlayerConfigManager {
                 }
                 if (merged.runRequireFullStamina === undefined) {
                     merged.runRequireFullStamina = true;
+                }
+                if (merged.flashOnDamage === undefined) {
+                    merged.flashOnDamage = true;
+                }
+                if (merged.damageFlashIntensity === undefined) {
+                    merged.damageFlashIntensity = 0.8;
+                }
+                if (merged.respawnDelay === undefined) {
+                    merged.respawnDelay = 3.0;
+                }
+                if (merged.explodeOnDeath === undefined) {
+                    merged.explodeOnDeath = true;
+                }
+                if (merged.bodyPartsDuration === undefined) {
+                    merged.bodyPartsDuration = 30.0;
                 }
                 return merged;
             });

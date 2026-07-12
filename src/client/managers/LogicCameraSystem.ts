@@ -2,6 +2,22 @@ import * as THREE from "three";
 
 type LogicCameraMode = "fixed" | "free_rotation";
 
+function safeRequestPointerLock(element: any) {
+	if (!element || typeof element.requestPointerLock !== "function") return;
+	try {
+		const promise = element.requestPointerLock();
+		if (promise && typeof promise.catch === "function") {
+			promise.catch((err: any) => {
+				if (err.name !== "NotAllowedError" && err.name !== "SecurityError") {
+					console.warn("[LogicCameraSystem] requestPointerLock promise rejected:", err);
+				}
+			});
+		}
+	} catch (err) {
+		console.warn("[LogicCameraSystem] requestPointerLock threw error:", err);
+	}
+}
+
 type LogicCameraObject = THREE.Object3D & {
 	userData: {
 		uuid?: string;
@@ -284,7 +300,7 @@ export class LogicCameraSystem {
 			if (!this.isViewingLogicCamera || !this.activeCameraObject) return;
 			const props = this.activeCameraObject.userData.logicProperties || {};
 			if (props.mode === "free_rotation") {
-				this.game?.sceneManager?.renderer?.domElement?.requestPointerLock?.();
+				safeRequestPointerLock(this.game?.sceneManager?.renderer?.domElement);
 			}
 		};
 		this.game?.sceneManager?.renderer?.domElement?.addEventListener("click", this.canvasClickHandler);
@@ -438,7 +454,7 @@ export class LogicCameraSystem {
 
 		const props = cameraObject.userData.logicProperties || {};
 		if ((props.mode as LogicCameraMode) === "free_rotation") {
-			this.game?.sceneManager?.renderer?.domElement?.requestPointerLock?.();
+			safeRequestPointerLock(this.game?.sceneManager?.renderer?.domElement);
 		} else {
 			document.exitPointerLock?.();
 		}

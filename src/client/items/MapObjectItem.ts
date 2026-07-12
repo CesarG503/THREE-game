@@ -530,7 +530,8 @@ export class MapObjectItem extends Item {
           logicProps.instantKill = !!dmgDefaults.instantKill;
           logicProps.percentDamage = dmgDefaults.percentDamage !== undefined ? dmgDefaults.percentDamage : 0;
           logicProps.maxDamage = dmgDefaults.maxDamage !== undefined ? dmgDefaults.maxDamage : 100;
-          logicProps.damageStopLimit = dmgDefaults.damageStopLimit !== undefined ? dmgDefaults.damageStopLimit : 0;
+          logicProps.enableDamageStopLimit = !!dmgDefaults.enableDamageStopLimit;
+          logicProps.damageStopLimit = dmgDefaults.damageStopLimit !== undefined ? dmgDefaults.damageStopLimit : 100;
           logicProps.damageCooldown = dmgDefaults.damageCooldown !== undefined ? dmgDefaults.damageCooldown : 1.0;
           logicProps.accumulatedDamage = dmgDefaults.accumulatedDamage !== undefined ? dmgDefaults.accumulatedDamage : 0;
           logicProps.enableKnockback = !!dmgDefaults.enableKnockback;

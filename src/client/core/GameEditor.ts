@@ -125,7 +125,13 @@ export function loadMap(this: any, jsonData: any) {
 		);
 
 		if (data.logicProperties) {
-			tempItem.logicProperties = data.logicProperties;
+			const cleanProps = { ...data.logicProperties };
+			delete cleanProps._lastDamageTime;
+			delete cleanProps._isInside;
+			if (cleanProps.accumulatedDamage !== undefined) {
+				cleanProps.accumulatedDamage = 0;
+			}
+			tempItem.logicProperties = cleanProps;
 		}
 
 		if (data.opacity !== undefined) {
@@ -266,7 +272,8 @@ export function useCurrentItem(this: any, isRightClickOrItem: any = false) {
 				logicProps.instantKill = !!dmgDefaults.instantKill;
 				logicProps.percentDamage = dmgDefaults.percentDamage !== undefined ? dmgDefaults.percentDamage : 0;
 				logicProps.maxDamage = dmgDefaults.maxDamage !== undefined ? dmgDefaults.maxDamage : 100;
-				logicProps.damageStopLimit = dmgDefaults.damageStopLimit !== undefined ? dmgDefaults.damageStopLimit : 0;
+				logicProps.enableDamageStopLimit = !!dmgDefaults.enableDamageStopLimit;
+				logicProps.damageStopLimit = dmgDefaults.damageStopLimit !== undefined ? dmgDefaults.damageStopLimit : 100;
 				logicProps.damageCooldown = dmgDefaults.damageCooldown !== undefined ? dmgDefaults.damageCooldown : 1.0;
 				logicProps.accumulatedDamage = dmgDefaults.accumulatedDamage !== undefined ? dmgDefaults.accumulatedDamage : 0;
 				logicProps.enableKnockback = !!dmgDefaults.enableKnockback;
@@ -391,7 +398,15 @@ export function _loadSingleMapObject(this: any, data: any) {
 		data.textureAssetId || null,
 		data.textureSettings || null
 	);
-	if (data.logicProperties) tempItem.logicProperties = data.logicProperties;
+	if (data.logicProperties) {
+		const cleanProps = { ...data.logicProperties };
+		delete cleanProps._lastDamageTime;
+		delete cleanProps._isInside;
+		if (cleanProps.accumulatedDamage !== undefined) {
+			cleanProps.accumulatedDamage = 0;
+		}
+		tempItem.logicProperties = cleanProps;
+	}
 	if (data.opacity !== undefined) tempItem.opacity = data.opacity;
 
 	tempItem.spawnObjectFromData(this.sceneManager.scene, this.world, data.pos, data.rot);
@@ -737,12 +752,13 @@ export function updateCollisionLogic(this: any, dt: number) {
 				const now = this.clock ? this.clock.getElapsedTime() : performance.now() / 1000;
 				if (props._lastDamageTime === undefined) props._lastDamageTime = 0;
 
-				if (now - props._lastDamageTime >= (props.damageCooldown ?? 1.0)) {
+				if (props._lastDamageTime === 0 || now - props._lastDamageTime >= (props.damageCooldown ?? 1.0)) {
 					// Check if we hit the stop limit
-					const damageStopLimit = Number(props.damageStopLimit ?? 0);
+					const enableStop = !!props.enableDamageStopLimit;
+					const damageStopLimit = Number(props.damageStopLimit ?? 100);
 					const accumulatedDamage = Number(props.accumulatedDamage ?? 0);
 
-					if (damageStopLimit <= 0 || accumulatedDamage < damageStopLimit) {
+					if (!enableStop || accumulatedDamage < damageStopLimit) {
 						// Determine damage
 						let finalDamage = 0;
 						if (props.instantKill) {

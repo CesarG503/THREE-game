@@ -150,21 +150,44 @@ export class DamageLogic extends LogicItem {
             cdRow.appendChild(cdInput);
             contentDiv.appendChild(cdRow);
 
-            // 6. Stop Limit
-            const slRow = document.createElement('div');
-            slRow.style.cssText = "display: flex; flex-direction: column; gap: 3px;";
-            const slLabel = document.createElement('label');
-            slLabel.textContent = "Límite Daño Acumulado (Stop)";
-            slLabel.style.cssText = "color: #aaa; font-size: 10px;";
-            const slInput = document.createElement('input');
-            slInput.type = 'number';
-            slInput.min = '0';
-            slInput.value = props.damageStopLimit !== undefined ? props.damageStopLimit : 0;
-            slInput.style.cssText = "background: #222; border: 1px solid #555; color: white; padding: 4px; font-size: 11px; border-radius: 4px;";
-            slInput.onchange = (e) => updateCallback('damageStopLimit', parseFloat(e.target.value) || 0);
-            slRow.appendChild(slLabel);
-            slRow.appendChild(slInput);
-            contentDiv.appendChild(slRow);
+            // 6. Checkbox: Enable Damage Stop Limit
+            const eslRow = document.createElement('div');
+            eslRow.style.cssText = "display: flex; align-items: center; gap: 8px; margin-top: 2px;";
+            const eslChk = document.createElement('input');
+            eslChk.type = 'checkbox';
+            eslChk.checked = !!props.enableDamageStopLimit;
+            eslChk.onchange = (e) => {
+                updateCallback('enableDamageStopLimit', e.target.checked);
+            };
+            const eslLabel = document.createElement('label');
+            eslLabel.textContent = "Habilitar Límite de Daño (Stop)";
+            eslLabel.style.cssText = "color: #ccc; font-size: 11px; cursor: pointer;";
+            eslLabel.onclick = () => eslChk.click();
+            eslRow.appendChild(eslChk);
+            eslRow.appendChild(eslLabel);
+            contentDiv.appendChild(eslRow);
+
+            // 6b. Stop Limit Value Input
+            if (props.enableDamageStopLimit) {
+                const slRow = document.createElement('div');
+                slRow.style.cssText = "display: flex; flex-direction: column; gap: 3px; margin-left: 20px; margin-top: 2px;";
+                const slLabel = document.createElement('label');
+                slLabel.textContent = "Límite Daño Acumulado";
+                slLabel.style.cssText = "color: #aaa; font-size: 10px;";
+                const slInput = document.createElement('input');
+                slInput.type = 'number';
+                slInput.min = '1';
+                slInput.placeholder = "Ej: 100";
+                slInput.value = props.damageStopLimit !== undefined ? props.damageStopLimit : 100;
+                slInput.style.cssText = "background: #222; border: 1px solid #555; color: white; padding: 4px; font-size: 11px; border-radius: 4px;";
+                slInput.onchange = (e) => {
+                    const val = e.target.value;
+                    updateCallback('damageStopLimit', parseFloat(val) || 100);
+                };
+                slRow.appendChild(slLabel);
+                slRow.appendChild(slInput);
+                contentDiv.appendChild(slRow);
+            }
 
             // 7. Accumulated Damage Display & Reset
             const acRow = document.createElement('div');

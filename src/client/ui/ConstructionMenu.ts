@@ -255,7 +255,8 @@ export class ConstructionMenu {
             instantKill: false,
             percentDamage: 0,
             maxDamage: 100,
-            damageStopLimit: 0,
+            enableDamageStopLimit: false,
+            damageStopLimit: 100,
             damageCooldown: 1.0,
             accumulatedDamage: 0,
             enableKnockback: false,
@@ -4288,7 +4289,8 @@ renderLogicLibraryGrid(container) {
             this.createLogicDraftInput(this.editorLogicControlsContainer, "Daño Porcentual (%):", "percentDamage", "number", 0);
             this.createLogicDraftInput(this.editorLogicControlsContainer, "Muerte Instantánea:", "instantKill", "boolean", false);
             this.createLogicDraftInput(this.editorLogicControlsContainer, "Límite Máximo Daño:", "maxDamage", "number", 100);
-            this.createLogicDraftInput(this.editorLogicControlsContainer, "Límite Daño Acumulado (Stop):", "damageStopLimit", "number", 0);
+            this.createLogicDraftInput(this.editorLogicControlsContainer, "Habilitar Stop:", "enableDamageStopLimit", "boolean", false);
+            this.createLogicDraftInput(this.editorLogicControlsContainer, "Límite Daño Acumulado (Stop):", "damageStopLimit", "number", 100);
             this.createLogicDraftInput(this.editorLogicControlsContainer, "Intervalo Cooldown (s):", "damageCooldown", "number", 1.0);
             this.createLogicDraftInput(this.editorLogicControlsContainer, "Retroceso (Knockback):", "enableKnockback", "boolean", false);
             this.createLogicDraftInput(this.editorLogicControlsContainer, "Fuerza Retroceso:", "knockbackForce", "number", 15);
@@ -4824,7 +4826,18 @@ renderLogicLibraryGrid(container) {
                 if (this.game.cameraController) {
                     this.game.cameraController.lock();
                 } else {
-                    document.body.requestPointerLock();
+                    try {
+                        const promise = document.body.requestPointerLock();
+                        if (promise && typeof promise.catch === "function") {
+                            promise.catch((err) => {
+                                if (err.name !== "NotAllowedError" && err.name !== "SecurityError") {
+                                    console.warn("[ConstructionMenu] requestPointerLock failed:", err);
+                                }
+                            });
+                        }
+                    } catch (err) {
+                        console.warn("[ConstructionMenu] requestPointerLock threw error:", err);
+                    }
                 }
             }, 100);
         }

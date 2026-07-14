@@ -16,6 +16,7 @@ export class ObjectInspector {
         this.customTextureAssets = []
         this.allowDynamicSwitch = false
         this.isCollapsed = false
+        this.spikeTextureSelectionMode = false
 
         this.setupUI()
         this.transformGizmo = new TransformGizmo(this.game, this)
@@ -384,6 +385,71 @@ export class ObjectInspector {
             section.appendChild(rSpikeSp.row);
             this.rowSpikeSpacing = rSpikeSp.row;
             this.inputSpikeSpacing = rSpikeSp.input;
+
+            // Spike Color Row
+            const rSpikeColor = createCustomRow("Color Pinchos:");
+            const spikeColorPicker = document.createElement("input");
+            spikeColorPicker.type = "color";
+            spikeColorPicker.style.cssText = "width: 70px; background: #222; border: 1px solid #444; border-radius: 4px; padding: 2px; cursor: pointer;";
+            rSpikeColor.row.replaceChild(spikeColorPicker, rSpikeColor.input);
+            spikeColorPicker.addEventListener("input", (e: any) => {
+                if (this.selectedObject) {
+                    this.selectedObject.userData.originalScale.spikeColor = e.target.value;
+                    this.updateDimensions('y', this.selectedObject.userData.originalScale.y, true);
+                }
+            });
+            section.appendChild(rSpikeColor.row);
+            this.rowSpikeColor = rSpikeColor.row;
+            this.inputSpikeColor = spikeColorPicker;
+
+            // Spike Texture Row
+            const rSpikeTex = createCustomRow("Textura Pinchos:");
+            
+            const spikeTexContainer = document.createElement("div");
+            spikeTexContainer.style.cssText = "display: flex; align-items: center; gap: 5px;";
+            
+            const spikeTexLabel = document.createElement("span");
+            spikeTexLabel.style.cssText = "font-size: 11px; color: #aaa; max-width: 80px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;";
+            spikeTexLabel.textContent = "Ninguna";
+            
+            const spikeTexBtn = document.createElement("button");
+            spikeTexBtn.type = "button";
+            spikeTexBtn.textContent = "Seleccionar";
+            spikeTexBtn.style.cssText = "background: #444; color: white; border: 1px solid #555; border-radius: 4px; padding: 3px 8px; font-size: 11px; cursor: pointer;";
+            
+            const spikeTexClearBtn = document.createElement("button");
+            spikeTexClearBtn.type = "button";
+            spikeTexClearBtn.textContent = "✖";
+            spikeTexClearBtn.title = "Quitar textura";
+            spikeTexClearBtn.style.cssText = "background: #cc3333; color: white; border: none; border-radius: 4px; padding: 3px 6px; font-size: 11px; cursor: pointer; display: none;";
+            
+            spikeTexBtn.onclick = () => {
+                this.spikeTextureSelectionMode = !this.spikeTextureSelectionMode;
+                this.syncTransformInputs();
+            };
+            
+            spikeTexClearBtn.onclick = () => {
+                if (this.selectedObject) {
+                    this.selectedObject.userData.originalScale.spikeTexturePath = null;
+                    this.updateDimensions('y', this.selectedObject.userData.originalScale.y, true);
+                    this.spikeTextureSelectionMode = false;
+                    this.syncTransformInputs();
+                    if (this.game && this.game.broadcastObjectUpdate) {
+                        this.game.broadcastObjectUpdate(this.selectedObject);
+                    }
+                }
+            };
+            
+            spikeTexContainer.appendChild(spikeTexLabel);
+            spikeTexContainer.appendChild(spikeTexBtn);
+            spikeTexContainer.appendChild(spikeTexClearBtn);
+            
+            rSpikeTex.row.replaceChild(spikeTexContainer, rSpikeTex.input);
+            section.appendChild(rSpikeTex.row);
+            this.rowSpikeTexture = rSpikeTex.row;
+            this.inputSpikeTexture = spikeTexLabel; 
+            this.btnSpikeTexture = spikeTexBtn; 
+            this.btnSpikeTextureClear = spikeTexClearBtn;
 
             // Tube Multi-segment Controls
             const tubeRow = document.createElement("div");
@@ -1217,6 +1283,8 @@ export class ObjectInspector {
         if (this.rowSpikeRadius) this.rowSpikeRadius.style.display = "none";
         if (this.rowSpikeHeight) this.rowSpikeHeight.style.display = "none";
         if (this.rowSpikeSpacing) this.rowSpikeSpacing.style.display = "none";
+        if (this.rowSpikeColor) this.rowSpikeColor.style.display = "none";
+        if (this.rowSpikeTexture) this.rowSpikeTexture.style.display = "none";
 
         // Handle visual tube editing rotation writeback
         if (type === "tube" && this.chkEditBends?.checked) {
@@ -1279,9 +1347,37 @@ export class ObjectInspector {
             if (this.rowSpikeRadius) this.rowSpikeRadius.style.display = "flex";
             if (this.rowSpikeHeight) this.rowSpikeHeight.style.display = "flex";
             if (this.rowSpikeSpacing) this.rowSpikeSpacing.style.display = "flex";
+            if (this.rowSpikeColor) this.rowSpikeColor.style.display = "flex";
+            if (this.rowSpikeTexture) this.rowSpikeTexture.style.display = "flex";
             if (this.inputSpikeRadius) this.inputSpikeRadius.value = dims.spikeRadius || 0.15;
             if (this.inputSpikeHeight) this.inputSpikeHeight.value = dims.spikeHeight || 0.4;
             if (this.inputSpikeSpacing) this.inputSpikeSpacing.value = dims.spikeSpacing || 0.5;
+            if (this.inputSpikeColor) this.inputSpikeColor.value = dims.spikeColor || "#dc2626";
+
+            if (this.inputSpikeTexture) {
+                const currentPath = dims.spikeTexturePath;
+                if (currentPath) {
+                    const parts = currentPath.split("/");
+                    const filename = parts[parts.length - 1];
+                    this.inputSpikeTexture.textContent = filename || "Asignada";
+                    if (this.btnSpikeTextureClear) this.btnSpikeTextureClear.style.display = "inline-block";
+                } else {
+                    this.inputSpikeTexture.textContent = "Ninguna";
+                    if (this.btnSpikeTextureClear) this.btnSpikeTextureClear.style.display = "none";
+                }
+            }
+
+            if (this.btnSpikeTexture) {
+                if (this.spikeTextureSelectionMode) {
+                    this.btnSpikeTexture.textContent = "Click en textura...";
+                    this.btnSpikeTexture.style.background = "#ff9800";
+                    this.btnSpikeTexture.style.borderColor = "#ff9800";
+                } else {
+                    this.btnSpikeTexture.textContent = "Seleccionar";
+                    this.btnSpikeTexture.style.background = "#444";
+                    this.btnSpikeTexture.style.borderColor = "#555";
+                }
+            }
         } else if (type === "circle") {
             if (dimRow) dimRow.style.display = "none";
             if (this.rowRadius) this.rowRadius.style.display = "flex";
@@ -1614,6 +1710,8 @@ export class ObjectInspector {
             const spikeRadius = dims.spikeRadius !== undefined ? dims.spikeRadius : 0.15;
             const spikeHeight = dims.spikeHeight !== undefined ? dims.spikeHeight : 0.4;
             const spikeSpacing = dims.spikeSpacing !== undefined ? dims.spikeSpacing : 0.5;
+            const spikeColor = dims.spikeColor !== undefined ? dims.spikeColor : "#dc2626";
+            const spikeTexturePath = dims.spikeTexturePath || null;
 
             const buffer = spikeRadius * 1.5;
             const availableW = dims.x - 2 * buffer;
@@ -1624,7 +1722,7 @@ export class ObjectInspector {
 
             const spikeGeo = new THREE.ConeGeometry(spikeRadius, spikeHeight, 8);
             const spikeMat = new THREE.MeshStandardMaterial({
-                color: 0xdc2626, // Hazard Red
+                color: new THREE.Color(spikeColor),
                 roughness: 0.8
             });
 
@@ -1651,6 +1749,22 @@ export class ObjectInspector {
                     spike.receiveShadow = true;
                     this.selectedObject.add(spike);
                 }
+            }
+
+            // Apply texture to spikes if present
+            if (spikeTexturePath) {
+                const loader = new THREE.TextureLoader();
+                loader.load(spikeTexturePath, (texture) => {
+                    this.selectedObject.children.forEach(c => {
+                        if (c.userData && c.userData.isSpike) {
+                            c.material.map = texture.clone();
+                            c.material.map.wrapS = THREE.RepeatWrapping;
+                            c.material.map.wrapT = THREE.RepeatWrapping;
+                            c.material.map.repeat.set(1, 1);
+                            c.material.needsUpdate = true;
+                        }
+                    });
+                });
             }
         } else if (this.selectedObject.userData.mapObjectType === 'circle') {
             const radius = dims.radius !== undefined ? dims.radius : (dims.x / 2 || 1.0);
@@ -1796,10 +1910,12 @@ export class ObjectInspector {
         if (this.selectedObject.material) {
             this.selectedObject.material.color.set(hex)
         }
-        // If Group (Stairs)
+        // If Group (Stairs, Spiked Floor)
         if (this.selectedObject.isGroup) {
             this.selectedObject.children.forEach(c => {
-                if (c.material) c.material.color.set(hex)
+                if (c.material && (!c.userData || !c.userData.isSpike)) {
+                    c.material.color.set(hex)
+                }
             })
         }
         
@@ -1810,6 +1926,17 @@ export class ObjectInspector {
 
     updateTexture(pathOrDataUrl, assetId = null) {
         if (!this.selectedObject) return
+
+        if (this.spikeTextureSelectionMode) {
+            this.selectedObject.userData.originalScale.spikeTexturePath = pathOrDataUrl;
+            this.updateDimensions('y', this.selectedObject.userData.originalScale.y, true);
+            this.spikeTextureSelectionMode = false;
+            this.syncTransformInputs();
+            if (this.game && this.game.broadcastObjectUpdate) {
+                this.game.broadcastObjectUpdate(this.selectedObject);
+            }
+            return;
+        }
 
         const isEnv = this.selectedObject.userData.mapObjectType?.startsWith("environment_");
         if (isEnv) {

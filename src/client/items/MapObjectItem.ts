@@ -423,16 +423,27 @@ export class MapObjectItem extends Item {
   }
 
   use(context: ItemContext) {
+    const findEditableTarget = (intersects: any[]) => {
+      for (const hit of intersects) {
+        let curr = hit.object;
+        while (curr) {
+          if (curr.userData && curr.userData.isEditableMapObject) {
+            return curr;
+          }
+          curr = curr.parent;
+        }
+      }
+      return null;
+    };
+
     if (this.type === "interactive_collision") {
       if (context.isRightClick) {
         const raycaster = new THREE.Raycaster();
         raycaster.set(context.origin, context.direction);
         const intersects = raycaster.intersectObjects(context.scene.children, true);
-        const hit = intersects.find((h: any) => h.object.userData && h.object.userData.isEditableMapObject);
+        const target = findEditableTarget(intersects);
 
-        if (hit) {
-          const target = hit.object;
-
+        if (target) {
           if (!target.userData.logicProperties) target.userData.logicProperties = {};
 
           target.userData.originalMapObjectType = target.userData.mapObjectType;
@@ -498,11 +509,9 @@ export class MapObjectItem extends Item {
       raycaster.set(context.origin, context.direction);
 
       const intersects = raycaster.intersectObjects(context.scene.children, true);
-      const hit = intersects.find((h: any) => h.object.userData && h.object.userData.isEditableMapObject);
+      const target = findEditableTarget(intersects);
 
-      if (hit) {
-        const target = hit.object;
-
+      if (target) {
         if (!target.userData.logicProperties) {
           target.userData.logicProperties = {};
         }
@@ -537,11 +546,9 @@ export class MapObjectItem extends Item {
       raycaster.set(context.origin, context.direction);
 
       const intersects = raycaster.intersectObjects(context.scene.children, true);
-      const hit = intersects.find((h: any) => h.object.userData && h.object.userData.isEditableMapObject);
+      const target = findEditableTarget(intersects);
 
-      if (hit) {
-        const target = hit.object;
-
+      if (target) {
         if (!target.userData.logicProperties) {
           target.userData.logicProperties = {};
         }
@@ -1253,6 +1260,8 @@ export class MapObjectItem extends Item {
       const spikeRadius = this.scale.spikeRadius !== undefined ? this.scale.spikeRadius : 0.15;
       const spikeHeight = this.scale.spikeHeight !== undefined ? this.scale.spikeHeight : 0.4;
       const spikeSpacing = this.scale.spikeSpacing !== undefined ? this.scale.spikeSpacing : 0.5;
+      const spikeColor = this.scale.spikeColor !== undefined ? this.scale.spikeColor : "#dc2626";
+      const spikeTexturePath = this.scale.spikeTexturePath || null;
 
       const buffer = spikeRadius * 1.5;
       const availableW = this.scale.x - 2 * buffer;
@@ -1263,7 +1272,7 @@ export class MapObjectItem extends Item {
 
       const spikeGeo = new THREE.ConeGeometry(spikeRadius, spikeHeight, 8);
       const spikeMat = new THREE.MeshStandardMaterial({
-        color: 0xdc2626,
+        color: new THREE.Color(spikeColor),
         roughness: 0.8
       });
 
@@ -1284,11 +1293,31 @@ export class MapObjectItem extends Item {
           }
 
           const spike = new THREE.Mesh(spikeGeo, spikeMat);
+          spike.userData.isSpike = true;
           spike.position.set(xPos, this.scale.y / 2 + spikeHeight / 2, zPos);
           spike.castShadow = true;
           spike.receiveShadow = true;
           group.add(spike);
         }
+      }
+
+      // Load texture for spikes
+      if (spikeTexturePath) {
+        MapAssetManager.loadTexture(spikeTexturePath)
+          .then((texture) => {
+            group.children.forEach(c => {
+              if (c.userData && c.userData.isSpike) {
+                c.material.map = texture.clone();
+                c.material.map.wrapS = THREE.RepeatWrapping;
+                c.material.map.wrapT = THREE.RepeatWrapping;
+                c.material.map.repeat.set(1, 1);
+                c.material.needsUpdate = true;
+              }
+            });
+          })
+          .catch((err) => {
+            console.error("Failed to load spike texture:", spikeTexturePath, err);
+          });
       }
 
       object3D = group;

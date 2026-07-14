@@ -849,8 +849,9 @@ export class PlacementManager {
         const spikeRadius = item.scale.spikeRadius !== undefined ? item.scale.spikeRadius : 0.15;
         const spikeHeight = item.scale.spikeHeight !== undefined ? item.scale.spikeHeight : 0.4;
         const spikeSpacing = item.scale.spikeSpacing !== undefined ? item.scale.spikeSpacing : 0.5;
+        const spikeColor = item.scale.spikeColor !== undefined ? item.scale.spikeColor : "#dc2626";
 
-        const key = `${item.scale.x}_${item.scale.y}_${item.scale.z}_${spikeRadius}_${spikeHeight}_${spikeSpacing}`;
+        const key = `${item.scale.x}_${item.scale.y}_${item.scale.z}_${spikeRadius}_${spikeHeight}_${spikeSpacing}_${spikeColor}`;
         if (this.ghostSpikedFloorLastKey === key && this.ghostSpikedFloorGroup.children.length > 0) return;
 
         this.ghostSpikedFloorLastKey = key;
@@ -876,7 +877,7 @@ export class PlacementManager {
 
         const spikeGeo = new THREE.ConeGeometry(spikeRadius, spikeHeight, 8);
         const spikeMat = new THREE.MeshBasicMaterial({
-            color: 0xef4444,
+            color: new THREE.Color(spikeColor),
             transparent: true,
             opacity: 0.4,
             wireframe: true

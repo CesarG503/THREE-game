@@ -90,6 +90,14 @@ export function regenerateObjectPhysics(this: Game, objectMesh: THREE.Object3D) 
 		const h = dims.y || 0.05;
 		colDesc = RAPIER.ColliderDesc.cylinder(h / 2, r);
 		this.world.createCollider(colDesc, rigidBody);
+	} else if (objectMesh.userData.mapObjectType === "cone") {
+		const r = dims.radius !== undefined ? dims.radius : (dims.x / 2 || 1.0);
+		const h = dims.y || 1.0;
+		colDesc = RAPIER.ColliderDesc.cone(h / 2, r);
+		this.world.createCollider(colDesc, rigidBody);
+	} else if (objectMesh.userData.mapObjectType === "spiked_floor") {
+		colDesc = RAPIER.ColliderDesc.cuboid(dims.x / 2, dims.y / 2, dims.z / 2);
+		this.world.createCollider(colDesc, rigidBody);
 	} else if (objectMesh.userData.mapObjectType === "tube") {
 		const radius = dims.radius !== undefined ? dims.radius : 0.5;
 		const segments = getTubeSegments(dims);

@@ -167,6 +167,8 @@ export class ConstructionMenu {
             { id_prefix: "tall", name: "Torre", type: "pillar", scale: { x: 2, y: 10, z: 2 } },
             { id_prefix: "sphere_shape", name: "Esfera", type: "sphere", scale: { x: 2, y: 2, z: 2, radius: 1 } },
             { id_prefix: "cylinder_shape", name: "Cilindro", type: "cylinder", scale: { x: 2, y: 3, z: 2, radius: 1 } },
+            { id_prefix: "cone_shape", name: "Cono", type: "cone", scale: { x: 2, y: 3, z: 2, radius: 1 } },
+            { id_prefix: "spiked_floor_shape", name: "Suelo de Pinchos", type: "spiked_floor", scale: { x: 5, y: 0.5, z: 5, spikeRadius: 0.15, spikeHeight: 0.4, spikeSpacing: 0.5 } },
             { id_prefix: "circle_shape", name: "Círculo con Superficie", type: "circle", scale: { x: 3, y: 0.05, z: 3, radius: 1.5 } },
             { id_prefix: "tube_shape", name: "Tubo Dobladizo", type: "tube", scale: { x: 1, y: 2, z: 1, radius: 0.5, length2: 2, bendAngleX: 0, bendAngleY: 90 } },
             { id_prefix: "camera_prop", name: "Cámara (Decorativa)", type: "camera_prop", scale: { x: 0.7, y: 0.7, z: 0.7 } }
@@ -2886,7 +2888,7 @@ renderLogicLibraryGrid(container) {
                     } else if (this.currentDraftItem.type === "circle") {
                         this.currentDraftItem.scale.x = val * 2;
                         this.currentDraftItem.scale.z = val * 2;
-                    } else if (this.currentDraftItem.type === "cylinder" || this.currentDraftItem.type === "tube") {
+                    } else if (this.currentDraftItem.type === "cylinder" || this.currentDraftItem.type === "tube" || this.currentDraftItem.type === "cone") {
                         this.currentDraftItem.scale.x = val * 2;
                         this.currentDraftItem.scale.z = val * 2;
                     }
@@ -3000,6 +3002,84 @@ renderLogicLibraryGrid(container) {
         this.inputBendAngleY = bendYInput;
         this.rowBendAngleY = bendYRow;
         dimContainer.appendChild(bendYRow);
+
+        // Spike Radius row
+        const spikeRadiusRow = document.createElement("div");
+        spikeRadiusRow.style.cssText = "display: none; align-items: center; justify-content: space-between; gap: 10px; margin-top: 5px;";
+        const spikeRadiusLbl = document.createElement("span");
+        spikeRadiusLbl.textContent = "Radio Pinchos:";
+        spikeRadiusLbl.style.fontSize = "12px";
+        spikeRadiusLbl.style.color = "#aaa";
+        const spikeRadiusInput = document.createElement("input");
+        spikeRadiusInput.type = "number";
+        spikeRadiusInput.step = "0.05";
+        spikeRadiusInput.min = "0.01";
+        spikeRadiusInput.style.cssText = "width: 80px; background: #333; color: white; border: 1px solid #555; border-radius: 4px; padding: 4px;";
+        spikeRadiusInput.addEventListener("input", (e: any) => {
+            const val = parseFloat(e.target.value);
+            if (!isNaN(val) && val > 0) {
+                if (this.currentDraftItem) {
+                    this.currentDraftItem.scale.spikeRadius = val;
+                }
+            }
+        });
+        spikeRadiusRow.appendChild(spikeRadiusLbl);
+        spikeRadiusRow.appendChild(spikeRadiusInput);
+        this.inputSpikeRadius = spikeRadiusInput;
+        this.rowSpikeRadius = spikeRadiusRow;
+        dimContainer.appendChild(spikeRadiusRow);
+
+        // Spike Height row
+        const spikeHeightRow = document.createElement("div");
+        spikeHeightRow.style.cssText = "display: none; align-items: center; justify-content: space-between; gap: 10px; margin-top: 5px;";
+        const spikeHeightLbl = document.createElement("span");
+        spikeHeightLbl.textContent = "Alto Pinchos:";
+        spikeHeightLbl.style.fontSize = "12px";
+        spikeHeightLbl.style.color = "#aaa";
+        const spikeHeightInput = document.createElement("input");
+        spikeHeightInput.type = "number";
+        spikeHeightInput.step = "0.05";
+        spikeHeightInput.min = "0.01";
+        spikeHeightInput.style.cssText = "width: 80px; background: #333; color: white; border: 1px solid #555; border-radius: 4px; padding: 4px;";
+        spikeHeightInput.addEventListener("input", (e: any) => {
+            const val = parseFloat(e.target.value);
+            if (!isNaN(val) && val > 0) {
+                if (this.currentDraftItem) {
+                    this.currentDraftItem.scale.spikeHeight = val;
+                }
+            }
+        });
+        spikeHeightRow.appendChild(spikeHeightLbl);
+        spikeHeightRow.appendChild(spikeHeightInput);
+        this.inputSpikeHeight = spikeHeightInput;
+        this.rowSpikeHeight = spikeHeightRow;
+        dimContainer.appendChild(spikeHeightRow);
+
+        // Spike Spacing row
+        const spikeSpacingRow = document.createElement("div");
+        spikeSpacingRow.style.cssText = "display: none; align-items: center; justify-content: space-between; gap: 10px; margin-top: 5px;";
+        const spikeSpacingLbl = document.createElement("span");
+        spikeSpacingLbl.textContent = "Separación Pinchos:";
+        spikeSpacingLbl.style.fontSize = "12px";
+        spikeSpacingLbl.style.color = "#aaa";
+        const spikeSpacingInput = document.createElement("input");
+        spikeSpacingInput.type = "number";
+        spikeSpacingInput.step = "0.05";
+        spikeSpacingInput.min = "0.05";
+        spikeSpacingInput.style.cssText = "width: 80px; background: #333; color: white; border: 1px solid #555; border-radius: 4px; padding: 4px;";
+        spikeSpacingInput.addEventListener("input", (e: any) => {
+            const val = parseFloat(e.target.value);
+            if (!isNaN(val) && val > 0) {
+                if (this.currentDraftItem) {
+                    this.currentDraftItem.scale.spikeSpacing = val;
+                }
+            }
+        });
+        spikeSpacingRow.appendChild(spikeSpacingLbl);
+        spikeSpacingRow.appendChild(spikeSpacingInput);
+        this.inputSpikeSpacing = spikeSpacingInput;
+        this.rowSpikeSpacing = spikeSpacingRow;
+        dimContainer.appendChild(spikeSpacingRow);
 
         this.panelEditor.appendChild(dimContainer);
 
@@ -4177,6 +4257,11 @@ renderLogicLibraryGrid(container) {
         const dimLabel = this.editorDimContainer.querySelector("span");
         const dimRow = this.editorDimContainer.querySelector("div");
 
+        // Hide spike rows by default
+        if (this.rowSpikeRadius) this.rowSpikeRadius.style.display = "none";
+        if (this.rowSpikeHeight) this.rowSpikeHeight.style.display = "none";
+        if (this.rowSpikeSpacing) this.rowSpikeSpacing.style.display = "none";
+
         if (type === "sphere") {
             if (dimLabel) dimLabel.textContent = "Parámetros de Esfera:";
             if (dimRow) dimRow.style.display = "none";
@@ -4196,6 +4281,30 @@ renderLogicLibraryGrid(container) {
             this.rowBendAngleY.style.display = "none";
             this.inputRadius.value = scaleCopy.radius || 1.0;
             this.inputLength1.value = scaleCopy.y || 2.0;
+        } else if (type === "cone") {
+            if (dimLabel) dimLabel.textContent = "Parámetros de Cono:";
+            if (dimRow) dimRow.style.display = "none";
+            this.rowRadius.style.display = "flex";
+            this.rowLength1.style.display = "flex";
+            this.rowLength2.style.display = "none";
+            this.rowBendAngleX.style.display = "none";
+            this.rowBendAngleY.style.display = "none";
+            this.inputRadius.value = scaleCopy.radius || 1.0;
+            this.inputLength1.value = scaleCopy.y || 3.0;
+        } else if (type === "spiked_floor") {
+            if (dimLabel) dimLabel.textContent = "Dimensiones de la Base:";
+            if (dimRow) dimRow.style.display = "flex";
+            if (this.rowRadius) this.rowRadius.style.display = "none";
+            if (this.rowLength1) this.rowLength1.style.display = "none";
+            if (this.rowLength2) this.rowLength2.style.display = "none";
+            if (this.rowBendAngleX) this.rowBendAngleX.style.display = "none";
+            if (this.rowBendAngleY) this.rowBendAngleY.style.display = "none";
+            if (this.rowSpikeRadius) this.rowSpikeRadius.style.display = "flex";
+            if (this.rowSpikeHeight) this.rowSpikeHeight.style.display = "flex";
+            if (this.rowSpikeSpacing) this.rowSpikeSpacing.style.display = "flex";
+            if (this.inputSpikeRadius) this.inputSpikeRadius.value = scaleCopy.spikeRadius || 0.15;
+            if (this.inputSpikeHeight) this.inputSpikeHeight.value = scaleCopy.spikeHeight || 0.4;
+            if (this.inputSpikeSpacing) this.inputSpikeSpacing.value = scaleCopy.spikeSpacing || 0.5;
         } else if (type === "circle") {
             if (dimLabel) dimLabel.textContent = "Parámetros de Círculo:";
             if (dimRow) dimRow.style.display = "none";

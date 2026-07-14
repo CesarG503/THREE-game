@@ -245,7 +245,7 @@ export class ObjectInspector {
                     } else if (type === "circle") {
                         this.selectedObject.userData.originalScale.x = val * 2;
                         this.selectedObject.userData.originalScale.z = val * 2;
-                    } else if (type === "cylinder" || type === "tube") {
+                    } else if (type === "cylinder" || type === "tube" || type === "cone") {
                         this.selectedObject.userData.originalScale.x = val * 2;
                         this.selectedObject.userData.originalScale.z = val * 2;
                     }
@@ -342,6 +342,48 @@ export class ObjectInspector {
             section.appendChild(rBendY.row);
             this.rowBendAngleY = rBendY.row;
             this.inputBendAngleY = rBendY.input;
+
+            const rSpikeRad = createCustomRow("Radio Pinchos:");
+            rSpikeRad.input.step = "0.05";
+            rSpikeRad.input.min = "0.01";
+            rSpikeRad.input.onchange = (e: any) => {
+                const val = parseFloat(e.target.value);
+                if (!isNaN(val) && val > 0 && this.selectedObject) {
+                    this.selectedObject.userData.originalScale.spikeRadius = val;
+                    this.updateDimensions('y', this.selectedObject.userData.originalScale.y, true);
+                }
+            };
+            section.appendChild(rSpikeRad.row);
+            this.rowSpikeRadius = rSpikeRad.row;
+            this.inputSpikeRadius = rSpikeRad.input;
+
+            const rSpikeHt = createCustomRow("Alto Pinchos:");
+            rSpikeHt.input.step = "0.05";
+            rSpikeHt.input.min = "0.01";
+            rSpikeHt.input.onchange = (e: any) => {
+                const val = parseFloat(e.target.value);
+                if (!isNaN(val) && val > 0 && this.selectedObject) {
+                    this.selectedObject.userData.originalScale.spikeHeight = val;
+                    this.updateDimensions('y', this.selectedObject.userData.originalScale.y, true);
+                }
+            };
+            section.appendChild(rSpikeHt.row);
+            this.rowSpikeHeight = rSpikeHt.row;
+            this.inputSpikeHeight = rSpikeHt.input;
+
+            const rSpikeSp = createCustomRow("Separación Pinchos:");
+            rSpikeSp.input.step = "0.05";
+            rSpikeSp.input.min = "0.05";
+            rSpikeSp.input.onchange = (e: any) => {
+                const val = parseFloat(e.target.value);
+                if (!isNaN(val) && val > 0 && this.selectedObject) {
+                    this.selectedObject.userData.originalScale.spikeSpacing = val;
+                    this.updateDimensions('y', this.selectedObject.userData.originalScale.y, true);
+                }
+            };
+            section.appendChild(rSpikeSp.row);
+            this.rowSpikeSpacing = rSpikeSp.row;
+            this.inputSpikeSpacing = rSpikeSp.input;
 
             // Tube Multi-segment Controls
             const tubeRow = document.createElement("div");
@@ -1168,9 +1210,13 @@ export class ObjectInspector {
         this.inputScaleY.input.value = Number(dims.y).toFixed(2)
         this.inputScaleZ.input.value = Number(dims.z).toFixed(2)
 
-        // Toggle custom inputs based on mapObjectType
         const type = this.selectedObject.userData.mapObjectType;
-        const dimRow = this.dimensionsSection.querySelector('div'); // Standard grid row
+        const dimRow = this.dimensionsSection.querySelector("div");
+
+        // Hide spike rows by default
+        if (this.rowSpikeRadius) this.rowSpikeRadius.style.display = "none";
+        if (this.rowSpikeHeight) this.rowSpikeHeight.style.display = "none";
+        if (this.rowSpikeSpacing) this.rowSpikeSpacing.style.display = "none";
 
         // Handle visual tube editing rotation writeback
         if (type === "tube" && this.chkEditBends?.checked) {
@@ -1214,6 +1260,28 @@ export class ObjectInspector {
             if (this.rowBendAngleY) this.rowBendAngleY.style.display = "none";
             if (this.inputRadius) this.inputRadius.value = dims.radius || dims.x / 2 || 1.0;
             if (this.inputLength1) this.inputLength1.value = dims.y || 1.0;
+        } else if (type === "cone") {
+            if (dimRow) dimRow.style.display = "none";
+            if (this.rowRadius) this.rowRadius.style.display = "flex";
+            if (this.rowLength1) this.rowLength1.style.display = "flex";
+            if (this.rowLength2) this.rowLength2.style.display = "none";
+            if (this.rowBendAngleX) this.rowBendAngleX.style.display = "none";
+            if (this.rowBendAngleY) this.rowBendAngleY.style.display = "none";
+            if (this.inputRadius) this.inputRadius.value = dims.radius || dims.x / 2 || 1.0;
+            if (this.inputLength1) this.inputLength1.value = dims.y || 3.0;
+        } else if (type === "spiked_floor") {
+            if (dimRow) dimRow.style.display = "grid";
+            if (this.rowRadius) this.rowRadius.style.display = "none";
+            if (this.rowLength1) this.rowLength1.style.display = "none";
+            if (this.rowLength2) this.rowLength2.style.display = "none";
+            if (this.rowBendAngleX) this.rowBendAngleX.style.display = "none";
+            if (this.rowBendAngleY) this.rowBendAngleY.style.display = "none";
+            if (this.rowSpikeRadius) this.rowSpikeRadius.style.display = "flex";
+            if (this.rowSpikeHeight) this.rowSpikeHeight.style.display = "flex";
+            if (this.rowSpikeSpacing) this.rowSpikeSpacing.style.display = "flex";
+            if (this.inputSpikeRadius) this.inputSpikeRadius.value = dims.spikeRadius || 0.15;
+            if (this.inputSpikeHeight) this.inputSpikeHeight.value = dims.spikeHeight || 0.4;
+            if (this.inputSpikeSpacing) this.inputSpikeSpacing.value = dims.spikeSpacing || 0.5;
         } else if (type === "circle") {
             if (dimRow) dimRow.style.display = "none";
             if (this.rowRadius) this.rowRadius.style.display = "flex";
@@ -1511,6 +1579,79 @@ export class ObjectInspector {
             const radius = dims.radius !== undefined ? dims.radius : (dims.x / 2 || 1.0);
             const height = dims.y || 1.0;
             newGeo = new THREE.CylinderGeometry(radius, radius, height, 32);
+        } else if (this.selectedObject.userData.mapObjectType === 'cone') {
+            const radius = dims.radius !== undefined ? dims.radius : (dims.x / 2 || 1.0);
+            const height = dims.y || 3.0;
+            newGeo = new THREE.ConeGeometry(radius, height, 32);
+        } else if (this.selectedObject.userData.mapObjectType === 'spiked_floor') {
+            const toRemove = [...this.selectedObject.children];
+            toRemove.forEach(c => {
+                if (c.geometry) c.geometry.dispose();
+                this.selectedObject.remove(c);
+            });
+
+            // Base floor box
+            const baseGeo = new THREE.BoxGeometry(dims.x, dims.y, dims.z);
+            const material = new THREE.MeshStandardMaterial({
+                color: this.selectedObject.userData.color !== undefined ? this.selectedObject.userData.color : 0xffffff,
+                transparent: this.selectedObject.userData.opacity !== undefined && this.selectedObject.userData.opacity < 1.0,
+                opacity: this.selectedObject.userData.opacity !== undefined ? this.selectedObject.userData.opacity : 1.0
+            });
+            const baseMesh = new THREE.Mesh(baseGeo, material);
+            baseMesh.castShadow = true;
+            baseMesh.receiveShadow = true;
+            this.selectedObject.add(baseMesh);
+
+            // Reapply texture if present
+            if (this.selectedObject.userData.texturePath) {
+                const loader = new THREE.TextureLoader();
+                loader.load(this.selectedObject.userData.texturePath, (texture) => {
+                    applyMapObjectTexture(baseMesh, texture, dims, this.selectedObject.userData.textureSettings);
+                });
+            }
+
+            // Spikes (cones)
+            const spikeRadius = dims.spikeRadius !== undefined ? dims.spikeRadius : 0.15;
+            const spikeHeight = dims.spikeHeight !== undefined ? dims.spikeHeight : 0.4;
+            const spikeSpacing = dims.spikeSpacing !== undefined ? dims.spikeSpacing : 0.5;
+
+            const buffer = spikeRadius * 1.5;
+            const availableW = dims.x - 2 * buffer;
+            const availableD = dims.z - 2 * buffer;
+
+            const numX = availableW > 0 ? Math.max(1, Math.floor(availableW / spikeSpacing) + 1) : 1;
+            const numZ = availableD > 0 ? Math.max(1, Math.floor(availableD / spikeSpacing) + 1) : 1;
+
+            const spikeGeo = new THREE.ConeGeometry(spikeRadius, spikeHeight, 8);
+            const spikeMat = new THREE.MeshStandardMaterial({
+                color: 0xdc2626, // Hazard Red
+                roughness: 0.8
+            });
+
+            for (let i = 0; i < numX; i++) {
+                for (let j = 0; j < numZ; j++) {
+                    let xPos = 0;
+                    if (numX > 1) {
+                        xPos = -availableW / 2 + (i * (availableW / (numX - 1)));
+                    } else {
+                        xPos = 0;
+                    }
+
+                    let zPos = 0;
+                    if (numZ > 1) {
+                        zPos = -availableD / 2 + (j * (availableD / (numZ - 1)));
+                    } else {
+                        zPos = 0;
+                    }
+
+                    const spike = new THREE.Mesh(spikeGeo, spikeMat);
+                    spike.userData.isSpike = true;
+                    spike.position.set(xPos, dims.y / 2 + spikeHeight / 2, zPos);
+                    spike.castShadow = true;
+                    spike.receiveShadow = true;
+                    this.selectedObject.add(spike);
+                }
+            }
         } else if (this.selectedObject.userData.mapObjectType === 'circle') {
             const radius = dims.radius !== undefined ? dims.radius : (dims.x / 2 || 1.0);
             const height = dims.y || 0.05;
@@ -1960,8 +2101,8 @@ export class ObjectInspector {
     refreshPhysicsAndVisuals() {
         if (!this.game || !this.selectedObject) return
 
-        // If it's a tube, regenerate visual meshes on drag end to ensure perfect alignment!
-        if (this.selectedObject.userData.mapObjectType === "tube") {
+        // If it's a tube or spiked_floor, regenerate visual meshes on drag end to ensure perfect alignment!
+        if (this.selectedObject.userData.mapObjectType === "tube" || this.selectedObject.userData.mapObjectType === "spiked_floor") {
             this.updateDimensions('y', this.selectedObject.userData.originalScale.y, false);
         }
 

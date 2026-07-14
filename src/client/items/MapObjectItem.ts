@@ -389,6 +389,31 @@ export class MapObjectItem extends Item {
       ctx.lineTo(52, 24);
       ctx.stroke();
       ctx.lineWidth = 2;
+    } else if (this.type === "cone") {
+      ctx.beginPath();
+      ctx.moveTo(32, 8);
+      ctx.lineTo(56, 56);
+      ctx.lineTo(8, 56);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.ellipse(32, 56, 24, 8, 0, 0, Math.PI * 2);
+      ctx.stroke();
+    } else if (this.type === "spiked_floor") {
+      ctx.fillRect(8, 40, 48, 16);
+      ctx.strokeRect(8, 40, 48, 16);
+      ctx.beginPath();
+      ctx.moveTo(16, 40);
+      ctx.lineTo(20, 24);
+      ctx.lineTo(24, 40);
+      ctx.moveTo(28, 40);
+      ctx.lineTo(32, 24);
+      ctx.lineTo(36, 40);
+      ctx.moveTo(40, 40);
+      ctx.lineTo(44, 24);
+      ctx.lineTo(48, 40);
+      ctx.stroke();
     } else {
       ctx.fillRect(8, 20, 48, 24);
       ctx.strokeRect(8, 20, 48, 24);
@@ -1194,6 +1219,89 @@ export class MapObjectItem extends Item {
 
       object3D.userData.shapeType = "circle";
       object3D.userData.radius = radius;
+    } else if (this.type === "cone") {
+      const radius = this.scale.radius !== undefined ? this.scale.radius : (this.scale.x / 2 || 1.0);
+      const height = this.scale.y || 1.0;
+      const geometry = new THREE.ConeGeometry(radius, height, 32);
+      const material = new THREE.MeshStandardMaterial({
+        color: this.color,
+        transparent: this.opacity !== undefined && this.opacity < 1.0,
+        opacity: this.opacity !== undefined ? this.opacity : 1.0
+      });
+      object3D = new THREE.Mesh(geometry, material);
+      object3D.castShadow = true;
+      object3D.receiveShadow = true;
+
+      const col = RAPIER.ColliderDesc.cone(height / 2, radius);
+      collidersDesc.push(col);
+
+      object3D.userData.shapeType = "cone";
+      object3D.userData.radius = radius;
+    } else if (this.type === "spiked_floor") {
+      const group = new THREE.Group();
+      const baseGeo = new THREE.BoxGeometry(this.scale.x, this.scale.y, this.scale.z);
+      const material = new THREE.MeshStandardMaterial({
+        color: this.color,
+        transparent: this.opacity !== undefined && this.opacity < 1.0,
+        opacity: this.opacity !== undefined ? this.opacity : 1.0
+      });
+      const baseMesh = new THREE.Mesh(baseGeo, material);
+      baseMesh.castShadow = true;
+      baseMesh.receiveShadow = true;
+      group.add(baseMesh);
+
+      const spikeRadius = this.scale.spikeRadius !== undefined ? this.scale.spikeRadius : 0.15;
+      const spikeHeight = this.scale.spikeHeight !== undefined ? this.scale.spikeHeight : 0.4;
+      const spikeSpacing = this.scale.spikeSpacing !== undefined ? this.scale.spikeSpacing : 0.5;
+
+      const buffer = spikeRadius * 1.5;
+      const availableW = this.scale.x - 2 * buffer;
+      const availableD = this.scale.z - 2 * buffer;
+
+      const numX = availableW > 0 ? Math.max(1, Math.floor(availableW / spikeSpacing) + 1) : 1;
+      const numZ = availableD > 0 ? Math.max(1, Math.floor(availableD / spikeSpacing) + 1) : 1;
+
+      const spikeGeo = new THREE.ConeGeometry(spikeRadius, spikeHeight, 8);
+      const spikeMat = new THREE.MeshStandardMaterial({
+        color: 0xdc2626,
+        roughness: 0.8
+      });
+
+      for (let i = 0; i < numX; i++) {
+        for (let j = 0; j < numZ; j++) {
+          let xPos = 0;
+          if (numX > 1) {
+            xPos = -availableW / 2 + (i * (availableW / (numX - 1)));
+          } else {
+            xPos = 0;
+          }
+
+          let zPos = 0;
+          if (numZ > 1) {
+            zPos = -availableD / 2 + (j * (availableD / (numZ - 1)));
+          } else {
+            zPos = 0;
+          }
+
+          const spike = new THREE.Mesh(spikeGeo, spikeMat);
+          spike.position.set(xPos, this.scale.y / 2 + spikeHeight / 2, zPos);
+          spike.castShadow = true;
+          spike.receiveShadow = true;
+          group.add(spike);
+        }
+      }
+
+      object3D = group;
+
+      const col = RAPIER.ColliderDesc.cuboid(this.scale.x / 2, this.scale.y / 2, this.scale.z / 2);
+      collidersDesc.push(col);
+
+      if (!this.logicProperties) this.logicProperties = {};
+      if (this.logicProperties.enableDamage === undefined) this.logicProperties.enableDamage = true;
+      if (this.logicProperties.damage === undefined) this.logicProperties.damage = 10;
+      if (this.logicProperties.damageCooldown === undefined) this.logicProperties.damageCooldown = 0.5;
+
+      object3D.userData.shapeType = "spiked_floor";
     } else if (this.type === "tube") {
       const radius = this.scale.radius !== undefined ? this.scale.radius : 0.5;
       const segments = getTubeSegments(this.scale);
@@ -1314,10 +1422,12 @@ export class MapObjectItem extends Item {
       collidersDesc.push(col);
     }
 
-    object3D.position.copy(position);
-    if (this.type !== "interaction_button" && this.type !== "spawn_point" && this.type !== "tube" && !isCenterPosition) {
-      object3D.position.y += this.scale.y / 2;
-    }
+     object3D.position.copy(position);
+     const surfaceAlignedTypes = ["interaction_button", "target", "gravity_pad", "impulse_jump", "impulse_lateral", "farming_zone", "logic_camera", "camera_panel", "camera_prop", "cone", "spiked_floor"];
+     const isSurfaceAligned = surfaceAlignedTypes.includes(this.type);
+     if (!isSurfaceAligned && this.type !== "spawn_point" && this.type !== "tube" && !isCenterPosition) {
+       object3D.position.y += this.scale.y / 2;
+     }
 
     object3D.rotation.copy(rotation);
     object3D.scale.set(1, 1, 1);

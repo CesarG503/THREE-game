@@ -43,10 +43,13 @@ export class PlacementManager {
     ghostStairsGroup: THREE.Group | null;
     ghostLadderGroup: THREE.Group | null;
     ghostTubeGroup: THREE.Group | null;
+    ghostConeMesh: THREE.Mesh | null;
+    ghostSpikedFloorGroup: THREE.Group | null;
     ghostRampLastKey: string | null;
     ghostStairsLastKey: string | null;
     ghostLadderLastKey: string | null;
     ghostTubeLastKey: string | null;
+    ghostSpikedFloorLastKey: string | null;
     ghostLabelSprite: THREE.Sprite | null;
     logicToolbar: HTMLDivElement | null;
     toolbarInputs: Record<string, HTMLInputElement>;
@@ -83,11 +86,14 @@ export class PlacementManager {
         this.ghostRampMesh = null;
         this.ghostStairsGroup = null;
         this.ghostLadderGroup = null;
+        this.ghostTubeGroup = null;
+        this.ghostConeMesh = null;
+        this.ghostSpikedFloorGroup = null;
         this.ghostRampLastKey = null;
         this.ghostStairsLastKey = null;
         this.ghostLadderLastKey = null;
-        this.ghostTubeGroup = null;
         this.ghostTubeLastKey = null;
+        this.ghostSpikedFloorLastKey = null;
         this.ghostLabelSprite = null;
 
         // Texturas precargadas
@@ -187,6 +193,16 @@ export class PlacementManager {
         // 5. Ghost TUBE
         this.ghostTubeGroup = new THREE.Group();
         this.placementGhost.add(this.ghostTubeGroup);
+
+        // 6. Ghost CONE
+        const coneGeo = new THREE.ConeGeometry(1, 1, 32);
+        this.ghostConeMesh = new THREE.Mesh(coneGeo, material);
+        this.ghostConeMesh.visible = false;
+        this.placementGhost.add(this.ghostConeMesh);
+
+        // 7. Ghost SPIKED FLOOR
+        this.ghostSpikedFloorGroup = new THREE.Group();
+        this.placementGhost.add(this.ghostSpikedFloorGroup);
 
 
         // Flecha / Icono indicador (Solo para Pads viejos)
@@ -827,6 +843,69 @@ export class PlacementManager {
         this.ghostRampMesh.scale.set(1, 1, 1);
     }
 
+    rebuildSpikedFloorGhost(item) {
+        if (!this.ghostSpikedFloorGroup) return;
+
+        const spikeRadius = item.scale.spikeRadius !== undefined ? item.scale.spikeRadius : 0.15;
+        const spikeHeight = item.scale.spikeHeight !== undefined ? item.scale.spikeHeight : 0.4;
+        const spikeSpacing = item.scale.spikeSpacing !== undefined ? item.scale.spikeSpacing : 0.5;
+
+        const key = `${item.scale.x}_${item.scale.y}_${item.scale.z}_${spikeRadius}_${spikeHeight}_${spikeSpacing}`;
+        if (this.ghostSpikedFloorLastKey === key && this.ghostSpikedFloorGroup.children.length > 0) return;
+
+        this.ghostSpikedFloorLastKey = key;
+
+        // Clear existing
+        while (this.ghostSpikedFloorGroup.children.length > 0) {
+            this.ghostSpikedFloorGroup.remove(this.ghostSpikedFloorGroup.children[0]);
+        }
+
+        // 1. Base floor box
+        const baseGeo = new THREE.BoxGeometry(item.scale.x, item.scale.y, item.scale.z);
+        const baseMesh = new THREE.Mesh(baseGeo, this.ghostBaseMat);
+        baseMesh.raycast = () => { };
+        this.ghostSpikedFloorGroup.add(baseMesh);
+
+        // 2. Add spikes
+        const buffer = spikeRadius * 1.5;
+        const availableW = item.scale.x - 2 * buffer;
+        const availableD = item.scale.z - 2 * buffer;
+
+        const numX = availableW > 0 ? Math.max(1, Math.floor(availableW / spikeSpacing) + 1) : 1;
+        const numZ = availableD > 0 ? Math.max(1, Math.floor(availableD / spikeSpacing) + 1) : 1;
+
+        const spikeGeo = new THREE.ConeGeometry(spikeRadius, spikeHeight, 8);
+        const spikeMat = new THREE.MeshBasicMaterial({
+            color: 0xef4444,
+            transparent: true,
+            opacity: 0.4,
+            wireframe: true
+        });
+
+        for (let i = 0; i < numX; i++) {
+            for (let j = 0; j < numZ; j++) {
+                let xPos = 0;
+                if (numX > 1) {
+                    xPos = -availableW / 2 + (i * (availableW / (numX - 1)));
+                } else {
+                    xPos = 0;
+                }
+
+                let zPos = 0;
+                if (numZ > 1) {
+                    zPos = -availableD / 2 + (j * (availableD / (numZ - 1)));
+                } else {
+                    zPos = 0;
+                }
+
+                const spike = new THREE.Mesh(spikeGeo, spikeMat);
+                spike.position.set(xPos, item.scale.y / 2 + spikeHeight / 2, zPos);
+                spike.raycast = () => { };
+                this.ghostSpikedFloorGroup.add(spike);
+            }
+        }
+    }
+
     rebuildLadderGhost(item) {
         const key = `${item.scale.x}_${item.scale.y}_${item.scale.z}`;
         if (this.ghostLadderLastKey === key && this.ghostLadderGroup.children.length > 0) return;
@@ -1228,7 +1307,7 @@ export class PlacementManager {
 
             const gridSize = this.gridSize || 1;
             let targetPos = hit.point.clone();
-	            const surfaceAlignedTypes = ["interaction_button", "target", "gravity_pad", "impulse_jump", "impulse_lateral", "farming_zone", "logic_camera", "camera_panel", "camera_prop"];
+	            const surfaceAlignedTypes = ["interaction_button", "target", "gravity_pad", "impulse_jump", "impulse_lateral", "farming_zone", "logic_camera", "camera_panel", "camera_prop", "cone", "spiked_floor"];
 
             // --- Snapping Logic ---
             if (this.snapToGrid || this.aerialGridActive) {
@@ -1446,6 +1525,8 @@ export class PlacementManager {
                 if (this.ghostStairsGroup) this.ghostStairsGroup.visible = false;
                 if (this.ghostLadderGroup) this.ghostLadderGroup.visible = false;
                 if (this.ghostTubeGroup) this.ghostTubeGroup.visible = false;
+                if (this.ghostConeMesh) this.ghostConeMesh.visible = false;
+                if (this.ghostSpikedFloorGroup) this.ghostSpikedFloorGroup.visible = false;
 
                 if (item.type === "impulse_jump" || item.type === "impulse_lateral") {
                     const isJump = (item.type === "impulse_jump");
@@ -1535,7 +1616,7 @@ export class PlacementManager {
                         }
 
                         // Standard Box
-                        if (["sphere", "cylinder", "circle", "tube"].includes(item.type)) {
+                        if (["sphere", "cylinder", "circle", "tube", "cone", "spiked_floor"].includes(item.type)) {
                             this.ghostBoxMesh.visible = false;
                         } else {
                             this.ghostBoxMesh.visible = true;
@@ -1636,6 +1717,25 @@ export class PlacementManager {
                         const h = item.scale.y || 0.05;
                         this.ghostCylinderMesh.scale.set(r, h, r);
                         this.ghostCylinderMesh.position.y = 0;
+                    } else if (item.type === "cone") {
+                        this.ghostBoxMesh.visible = false;
+                        this.ghostSphereMesh.visible = false;
+                        this.ghostCylinderMesh.visible = false;
+                        if (this.ghostTubeGroup) this.ghostTubeGroup.visible = false;
+                        if (this.ghostSpikedFloorGroup) this.ghostSpikedFloorGroup.visible = false;
+                        this.ghostConeMesh.visible = true;
+                        const r = item.scale.radius || item.scale.x / 2 || 1.0;
+                        const h = item.scale.y || 1.0;
+                        this.ghostConeMesh.scale.set(r, h, r);
+                        this.ghostConeMesh.position.y = 0;
+                    } else if (item.type === "spiked_floor") {
+                        this.ghostBoxMesh.visible = false;
+                        this.ghostSphereMesh.visible = false;
+                        this.ghostCylinderMesh.visible = false;
+                        if (this.ghostTubeGroup) this.ghostTubeGroup.visible = false;
+                        if (this.ghostConeMesh) this.ghostConeMesh.visible = false;
+                        this.rebuildSpikedFloorGhost(item);
+                        if (this.ghostSpikedFloorGroup) this.ghostSpikedFloorGroup.visible = true;
                     } else if (item.type === "tube") {
                         this.ghostBoxMesh.visible = false;
                         this.ghostSphereMesh.visible = false;
@@ -1651,6 +1751,8 @@ export class PlacementManager {
                 // Ensure other meshes are hidden for pads if reused
                 if (this.ghostRampMesh) this.ghostRampMesh.visible = false;
                 if (this.ghostStairsGroup) this.ghostStairsGroup.visible = false;
+                if (this.ghostConeMesh) this.ghostConeMesh.visible = false;
+                if (this.ghostSpikedFloorGroup) this.ghostSpikedFloorGroup.visible = false;
                 this.ghostBoxMesh.visible = true;
             }
 
@@ -1687,7 +1789,10 @@ export class PlacementManager {
 
             // Return Base Position (Bottom Center) for Spawner
             const basePos = targetPos.clone();
-            basePos.y -= realSize.y / 2;
+            const isSurfaceAligned = surfaceAlignedTypes.includes(item.type);
+            if (!isSurfaceAligned) {
+                basePos.y -= realSize.y / 2;
+            }
 
             // ALWAYS update lastValidPosition with the SNAPPED position
             // regardless of collision validity.

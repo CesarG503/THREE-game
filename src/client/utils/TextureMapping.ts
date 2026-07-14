@@ -269,6 +269,7 @@ export function applyMapObjectTexture(object3D: any, texture: THREE.Texture, fal
 
   const applyToMesh = (mesh: any) => {
     if (!mesh?.isMesh || !mesh.material) return;
+    if (mesh.userData && mesh.userData.isSpike) return;
     const dimensions = getMeshDimensions(mesh, fallbackDimensions);
 
     if (normalized.fitMode === "auto" && mesh.geometry?.type === "BoxGeometry") {

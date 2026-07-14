@@ -1075,7 +1075,11 @@ export class PlacementManager {
 
             // --- MOVEMENT CONTROLLER LOGIC ---
             if (item.type === "movement_controller") {
-                const isTargetObject = hit.object.userData && hit.object.userData.isEditableMapObject;
+                let targetObj = hit.object;
+                while (targetObj && (!targetObj.userData || !targetObj.userData.isEditableMapObject)) {
+                    targetObj = targetObj.parent;
+                }
+                const isTargetObject = !!targetObj;
 
                 if (!isTargetObject) {
                     this.placementGhost.visible = false;
@@ -1086,7 +1090,7 @@ export class PlacementManager {
                 this.placementGhost.visible = true;
 
                 // 1. Match Target Size
-                const targetBox = new THREE.Box3().setFromObject(hit.object);
+                const targetBox = new THREE.Box3().setFromObject(targetObj);
                 const targetSize = new THREE.Vector3();
                 targetBox.getSize(targetSize);
                 const targetCenter = new THREE.Vector3();
@@ -1097,6 +1101,11 @@ export class PlacementManager {
                 if (this.ghostRampMesh) this.ghostRampMesh.visible = false;
                 if (this.ghostStairsGroup) this.ghostStairsGroup.visible = false;
                 if (this.ghostLadderGroup) this.ghostLadderGroup.visible = false;
+                if (this.ghostSphereMesh) this.ghostSphereMesh.visible = false;
+                if (this.ghostCylinderMesh) this.ghostCylinderMesh.visible = false;
+                if (this.ghostTubeGroup) this.ghostTubeGroup.visible = false;
+                if (this.ghostConeMesh) this.ghostConeMesh.visible = false;
+                if (this.ghostSpikedFloorGroup) this.ghostSpikedFloorGroup.visible = false;
 
                 // Use Box Mesh for highlight
                 this.ghostBoxMesh.visible = true;
@@ -1109,7 +1118,7 @@ export class PlacementManager {
                 // Position at Center of Target
                 this.placementGhost.position.copy(targetCenter);
                 this.placementGhost.rotation.set(0, 0, 0);
-                this.placementGhost.quaternion.copy(hit.object.quaternion);
+                this.placementGhost.quaternion.copy(targetObj.quaternion);
 
                 // 2. Text Label
                 if (!this.ghostLabelSprite) {
@@ -1120,7 +1129,7 @@ export class PlacementManager {
                 this.ghostLabelSprite.position.set(0, targetSize.y / 2 + 0.5, 0); // Above object
 
                 // Update text
-                const logicProps = hit.object.userData.logicProperties;
+                const logicProps = targetObj.userData.logicProperties;
                 const hasLogic = logicProps && (logicProps.waypoints || (Array.isArray(logicProps.sequences) && logicProps.sequences.length > 0));
                 const txt = hasLogic ? "Aplicado!" : "Aplicar";
                 const col = hasLogic ? "#00FF00" : "#FFFF00";
@@ -1129,7 +1138,11 @@ export class PlacementManager {
                 this.lastValidPosition = hit.point;
                 return hit.point;
             } else if (item.type === "damage_controller") {
-                const isTargetObject = hit.object.userData && hit.object.userData.isEditableMapObject;
+                let targetObj = hit.object;
+                while (targetObj && (!targetObj.userData || !targetObj.userData.isEditableMapObject)) {
+                    targetObj = targetObj.parent;
+                }
+                const isTargetObject = !!targetObj;
 
                 if (!isTargetObject) {
                     this.placementGhost.visible = false;
@@ -1140,7 +1153,7 @@ export class PlacementManager {
                 this.placementGhost.visible = true;
 
                 // 1. Match Target Size
-                const targetBox = new THREE.Box3().setFromObject(hit.object);
+                const targetBox = new THREE.Box3().setFromObject(targetObj);
                 const targetSize = new THREE.Vector3();
                 targetBox.getSize(targetSize);
                 const targetCenter = new THREE.Vector3();
@@ -1151,6 +1164,11 @@ export class PlacementManager {
                 if (this.ghostRampMesh) this.ghostRampMesh.visible = false;
                 if (this.ghostStairsGroup) this.ghostStairsGroup.visible = false;
                 if (this.ghostLadderGroup) this.ghostLadderGroup.visible = false;
+                if (this.ghostSphereMesh) this.ghostSphereMesh.visible = false;
+                if (this.ghostCylinderMesh) this.ghostCylinderMesh.visible = false;
+                if (this.ghostTubeGroup) this.ghostTubeGroup.visible = false;
+                if (this.ghostConeMesh) this.ghostConeMesh.visible = false;
+                if (this.ghostSpikedFloorGroup) this.ghostSpikedFloorGroup.visible = false;
 
                 // Use Box Mesh for highlight
                 this.ghostBoxMesh.visible = true;
@@ -1163,7 +1181,7 @@ export class PlacementManager {
                 // Position at Center of Target
                 this.placementGhost.position.copy(targetCenter);
                 this.placementGhost.rotation.set(0, 0, 0);
-                this.placementGhost.quaternion.copy(hit.object.quaternion);
+                this.placementGhost.quaternion.copy(targetObj.quaternion);
 
                 // 2. Text Label
                 if (!this.ghostLabelSprite) {
@@ -1174,7 +1192,7 @@ export class PlacementManager {
                 this.ghostLabelSprite.position.set(0, targetSize.y / 2 + 0.5, 0); // Above object
 
                 // Update text
-                const logicProps = hit.object.userData.logicProperties;
+                const logicProps = targetObj.userData.logicProperties;
                 const hasLogic = logicProps && logicProps.enableDamage === true;
                 const txt = hasLogic ? "Aplicado!" : "Aplicar Daño";
                 const col = hasLogic ? "#00FF00" : "#ffaa00";

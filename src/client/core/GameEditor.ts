@@ -214,11 +214,22 @@ export function useCurrentItem(this: any, isRightClickOrItem: any = false) {
 		raycaster.setFromCamera(new THREE.Vector2(0, 0), this.sceneManager.camera);
 		const intersects = raycaster.intersectObjects(this.sceneManager.scene.children, true);
 
-		const hit = intersects.find((h: any) => h.object.userData && h.object.userData.isEditableMapObject);
+		const findEditableTarget = (intersects: any[]) => {
+			for (const h of intersects) {
+				let curr = h.object;
+				while (curr) {
+					if (curr.userData && curr.userData.isEditableMapObject) {
+						return curr;
+					}
+					curr = curr.parent;
+				}
+			}
+			return null;
+		};
 
-		if (hit) {
-			const targetObj = hit.object;
+		const targetObj = findEditableTarget(intersects);
 
+		if (targetObj) {
 			if (!targetObj.userData.logicProperties) targetObj.userData.logicProperties = {};
 
 			const hasMovement = targetObj.userData.logicProperties.waypoints ||
@@ -236,7 +247,7 @@ export function useCurrentItem(this: any, isRightClickOrItem: any = false) {
 					triggerType: "none"
 				}];
 
-				alert("Controlador de movimiento aplicado a: " + (targetObj.userData.name || "Objeto"));
+				alert("Controlador de movimiento aplicado a: " + (targetObj.userData.name || targetObj.userData.mapObjectType || "Objeto"));
 				if (this.placementManager && this.placementManager.ghostLabelSprite) {
 					this.placementManager.updateLabelSprite(this.placementManager.ghostLabelSprite, "Aplicado!", "#00FF00");
 				}
@@ -256,11 +267,22 @@ export function useCurrentItem(this: any, isRightClickOrItem: any = false) {
 		raycaster.setFromCamera(new THREE.Vector2(0, 0), this.sceneManager.camera);
 		const intersects = raycaster.intersectObjects(this.sceneManager.scene.children, true);
 
-		const hit = intersects.find((h: any) => h.object.userData && h.object.userData.isEditableMapObject);
+		const findEditableTarget = (intersects: any[]) => {
+			for (const h of intersects) {
+				let curr = h.object;
+				while (curr) {
+					if (curr.userData && curr.userData.isEditableMapObject) {
+						return curr;
+					}
+					curr = curr.parent;
+				}
+			}
+			return null;
+		};
 
-		if (hit) {
-			const targetObj = hit.object;
+		const targetObj = findEditableTarget(intersects);
 
+		if (targetObj) {
 			if (!targetObj.userData.logicProperties) targetObj.userData.logicProperties = {};
 			const logicProps = targetObj.userData.logicProperties;
 
@@ -280,7 +302,7 @@ export function useCurrentItem(this: any, isRightClickOrItem: any = false) {
 				logicProps.knockbackForce = dmgDefaults.knockbackForce !== undefined ? dmgDefaults.knockbackForce : 15;
 				logicProps.knockbackDirection = dmgDefaults.knockbackDirection || "automatic";
 
-				alert("Controlador de Daño aplicado a: " + (targetObj.userData.name || "Objeto"));
+				alert("Controlador de Daño aplicado a: " + (targetObj.userData.name || targetObj.userData.mapObjectType || "Objeto"));
 				if (this.placementManager && this.placementManager.ghostLabelSprite) {
 					this.placementManager.updateLabelSprite(this.placementManager.ghostLabelSprite, "Aplicado!", "#00FF00");
 				}

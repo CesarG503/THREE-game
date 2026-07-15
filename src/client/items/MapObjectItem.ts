@@ -878,6 +878,127 @@ export class MapObjectItem extends Item {
       if (this.logicProperties.eyeHeightOffset === undefined) this.logicProperties.eyeHeightOffset = 0;
 
       // Note: No collider for logic_camera to avoid physical interactions.
+    } else if (this.type === "logic_light") {
+      const group: any = new THREE.Group();
+      const isEditor = window.location.pathname.includes("/editor");
+
+      // Visual Helper Mesh: A small glowing sphere representing the light bulb
+      const helperMat = new THREE.MeshBasicMaterial({
+        color: this.color !== undefined ? this.color : 0xffeb3b,
+        transparent: true,
+        opacity: 0.8
+      });
+      const helperMesh = new THREE.Mesh(new THREE.SphereGeometry(0.25, 16, 16), helperMat);
+      helperMesh.visible = isEditor;
+      group.add(helperMesh);
+
+      // Range Helper Wireframe: Sphere showing the distance of the light (for point/spot)
+      const rangeWireframeMat = new THREE.MeshBasicMaterial({
+        color: this.color !== undefined ? this.color : 0xffeb3b,
+        wireframe: true,
+        transparent: true,
+        opacity: 0.15
+      });
+      let rangeWireframe: THREE.Mesh | null = null;
+
+      // Spotlight Cone Wireframe helper
+      let coneWireframe: THREE.LineSegments | null = null;
+
+      group.updateLightVisuals = () => {
+        // Remove old lights and helpers
+        if (group.userData.physicalLight) {
+          group.remove(group.userData.physicalLight);
+          if (typeof group.userData.physicalLight.dispose === "function") {
+            group.userData.physicalLight.dispose();
+          }
+        }
+        if (rangeWireframe) {
+          group.remove(rangeWireframe);
+          rangeWireframe.geometry?.dispose?.();
+          rangeWireframe = null;
+        }
+        if (coneWireframe) {
+          group.remove(coneWireframe);
+          coneWireframe.geometry?.dispose?.();
+          coneWireframe = null;
+        }
+
+        const props = group.userData.logicProperties || this.logicProperties || {};
+        const lightColor = props.color || "#ffffff";
+        const intensity = Number(props.intensity ?? 2.0);
+        const distance = Number(props.distance ?? 15.0);
+        const decay = Number(props.decay ?? 2.0);
+        const angle = THREE.MathUtils.degToRad(Number(props.angle ?? 45.0));
+        const penumbra = Number(props.penumbra ?? 0.5);
+        const castShadow = props.castShadow !== false;
+        const currentType = props.lightType || "point";
+
+        // Update helper color
+        helperMesh.material.color.set(lightColor);
+        helperMesh.visible = window.location.pathname.includes("/editor");
+
+        let lightObj: THREE.Light | null = null;
+
+        if (currentType === "point") {
+          lightObj = new THREE.PointLight(lightColor, intensity, distance, decay);
+          
+          // Wireframe sphere representing point light range
+          if (distance > 0 && window.location.pathname.includes("/editor")) {
+            const rangeGeo = new THREE.SphereGeometry(distance, 16, 16);
+            rangeWireframe = new THREE.Mesh(rangeGeo, rangeWireframeMat);
+            rangeWireframe.userData.ignoreRaycast = true;
+            group.add(rangeWireframe);
+          }
+        } else if (currentType === "spot") {
+          lightObj = new THREE.SpotLight(lightColor, intensity, distance, angle, penumbra, decay);
+          
+          // Wireframe cone representing spotlight beam
+          if (distance > 0 && window.location.pathname.includes("/editor")) {
+            const height = distance;
+            const radius = height * Math.tan(angle);
+            const coneGeo = new THREE.ConeGeometry(radius, height, 16, 1, true);
+            coneGeo.rotateX(-Math.PI / 2);
+            coneGeo.translate(0, 0, -height / 2);
+            const edges = new THREE.EdgesGeometry(coneGeo);
+            coneWireframe = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: lightColor, transparent: true, opacity: 0.25 }));
+            coneWireframe.userData.ignoreRaycast = true;
+            group.add(coneWireframe);
+          }
+        } else if (currentType === "directional") {
+          lightObj = new THREE.DirectionalLight(lightColor, intensity);
+          // Position directional light slightly offset
+          lightObj.position.set(0, 10, 0);
+        } else if (currentType === "ambient") {
+          lightObj = new THREE.AmbientLight(lightColor, intensity);
+        }
+
+        if (lightObj) {
+          if (currentType !== "ambient") {
+            lightObj.castShadow = castShadow;
+            // Optimize shadow map defaults for performance
+            if (lightObj.shadow) {
+              lightObj.shadow.bias = -0.001;
+              lightObj.shadow.mapSize.width = 512;  // High performance light source shadows
+              lightObj.shadow.mapSize.height = 512;
+            }
+          }
+          group.add(lightObj);
+          group.userData.physicalLight = lightObj;
+        }
+      };
+
+      if (!this.logicProperties) this.logicProperties = {};
+      if (this.logicProperties.logicKind === undefined) this.logicProperties.logicKind = "logic_light";
+      if (this.logicProperties.lightType === undefined) this.logicProperties.lightType = "point";
+      if (this.logicProperties.color === undefined) this.logicProperties.color = "#ffffff";
+      if (this.logicProperties.intensity === undefined) this.logicProperties.intensity = 2.0;
+      if (this.logicProperties.distance === undefined) this.logicProperties.distance = 15.0;
+      if (this.logicProperties.decay === undefined) this.logicProperties.decay = 2.0;
+      if (this.logicProperties.angle === undefined) this.logicProperties.angle = 45.0;
+      if (this.logicProperties.penumbra === undefined) this.logicProperties.penumbra = 0.5;
+      if (this.logicProperties.castShadow === undefined) this.logicProperties.castShadow = true;
+
+      // Note: No collider for logic_light to avoid physical interactions.
     } else if (this.type === "camera_panel") {
       const group = new THREE.Group();
       const panelColor = this.color !== undefined ? this.color : 0x0f172a;
@@ -1491,6 +1612,10 @@ export class MapObjectItem extends Item {
 
     if (typeof object3D.updateLogicCameraVisuals === "function") {
       object3D.updateLogicCameraVisuals();
+    }
+
+    if (typeof object3D.updateLightVisuals === "function") {
+      object3D.updateLightVisuals();
     }
 
     scene.add(object3D);

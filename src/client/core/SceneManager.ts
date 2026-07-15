@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { Sky } from "three/addons/objects/Sky.js";
 
 const SKYBOX_PREFIX = "skybox:";
 const SKYBOX_FACE_LAYOUT = {
@@ -19,6 +20,10 @@ export class SceneManager {
   dirLight: THREE.DirectionalLight;
   stars: THREE.Points | null;
   currentRenderDistance: number | undefined;
+  skyMesh: Sky | null = null;
+  sunVec: THREE.Vector3;
+  lastShadowQuality: string | null = null;
+  lastFrustumRenderDistance: number | null = null;
   private boundResize: () => void;
   private skyboxCache: Map<string, Promise<THREE.CubeTexture>>;
   private loadedSkyboxTextures: Set<THREE.CubeTexture>;
@@ -35,6 +40,7 @@ export class SceneManager {
     this.loadedSkyboxTextures = new Set();
     this.activeSkyboxTexture = null;
     this.skyboxRequestId = 0;
+    this.sunVec = new THREE.Vector3();
 
     this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
     this.camera.position.set(0, 5, 10);
@@ -247,6 +253,228 @@ export class SceneManager {
     } else if (fog instanceof THREE.FogExp2) {
       fog.density = 1.5 / distance;
     }
+  }
+
+  updateLightingAndSky(config: any) {
+    if (!config) return;
+
+    // 1. Shadow Quality configuration (High Performance default)
+    const shadowQuality = config.shadowQuality || "medium";
+    const renderDistance = this.currentRenderDistance || 100;
+    
+    if (shadowQuality !== this.lastShadowQuality || renderDistance !== this.lastFrustumRenderDistance) {
+      this.lastShadowQuality = shadowQuality;
+      this.lastFrustumRenderDistance = renderDistance;
+      
+      if (shadowQuality === "off") {
+        this.dirLight.castShadow = false;
+        this.renderer.shadowMap.enabled = false;
+      } else {
+        this.renderer.shadowMap.enabled = true;
+        this.dirLight.castShadow = true;
+        
+        let mapSize = 1024;
+        let frustumSizeMultiplier = 0.8;
+        
+        if (shadowQuality === "low") {
+          mapSize = 512;
+          frustumSizeMultiplier = 0.5;
+        } else if (shadowQuality === "medium") {
+          mapSize = 1024;
+          frustumSizeMultiplier = 0.8;
+        } else if (shadowQuality === "high") {
+          mapSize = 2048;
+          frustumSizeMultiplier = 1.2;
+        }
+        
+        const frustumSize = renderDistance * frustumSizeMultiplier;
+        
+        this.dirLight.shadow.mapSize.width = mapSize;
+        this.dirLight.shadow.mapSize.height = mapSize;
+        
+        const cam = this.dirLight.shadow.camera;
+        cam.left = -frustumSize;
+        cam.right = frustumSize;
+        cam.top = frustumSize;
+        cam.bottom = -frustumSize;
+        
+        // Large offset and far plane to ensure tall walls, ceilings, and far objects always cast shadows
+        const offsetDistance = Math.max(120, renderDistance * 1.5);
+        cam.near = 0.1;
+        cam.far = offsetDistance * 2.5;
+        
+        if (this.dirLight.shadow.map) {
+          this.dirLight.shadow.map.dispose();
+          this.dirLight.shadow.map = null;
+        }
+        cam.updateProjectionMatrix();
+      }
+    }
+
+    // 2. Light Mode & Preset Setup
+    const lightMode = config.lightMode || "day";
+    const skyType = config.skyType || "day";
+    
+    // Check if we need to enable Sky Shader
+    const isShaderSky = skyType === "shader" || lightMode === "cycle";
+    
+    if (isShaderSky) {
+      if (!this.skyMesh) {
+        this.skyMesh = new Sky();
+        this.skyMesh.scale.setScalar(450000);
+        this.scene.add(this.skyMesh);
+      }
+      this.skyMesh.visible = true;
+      this.scene.background = null;
+      this.scene.environment = null;
+      this.scene.fog = null;
+      
+      // Update Sky Shader uniforms
+      const uniforms = this.skyMesh.material.uniforms;
+      uniforms["turbidity"].value = config.skyTurbidity !== undefined ? Number(config.skyTurbidity) : 10;
+      uniforms["rayleigh"].value = config.skyRayleigh !== undefined ? Number(config.skyRayleigh) : 2;
+      uniforms["mieCoefficient"].value = config.skyMieCoefficient !== undefined ? Number(config.skyMieCoefficient) : 0.005;
+      uniforms["mieDirectionalG"].value = config.skyMieDirectionalG !== undefined ? Number(config.skyMieDirectionalG) : 0.8;
+    } else {
+      if (this.skyMesh) {
+        this.skyMesh.visible = false;
+      }
+      // Apply background color/texture
+      if (skyType === "night" || lightMode === "night") {
+        this.scene.background = new THREE.Color(0x020210);
+        this.scene.fog = new THREE.FogExp2(0x020210, 0.015);
+      } else if (skyType === "sunset" || lightMode === "sunset") {
+        const sunsetColor = 0xffae88;
+        this.scene.background = new THREE.Color(sunsetColor);
+        this.scene.fog = new THREE.Fog(sunsetColor, 10, 60);
+      } else if (typeof skyType === "string" && skyType.startsWith(SKYBOX_PREFIX)) {
+        // Skybox texture loading is handled asynchronously by setSky
+      } else {
+        this.scene.background = new THREE.Color(0x87ceeb);
+        this.scene.fog = new THREE.Fog(0x87ceeb, 10, 50);
+      }
+    }
+
+    // 3. Dynamic Ciclo Día/Noche o presets
+    let sunIntensity = 0.8;
+    let sunColor = "#ffffff";
+    let ambientIntensity = 0.6;
+    let ambientColor = "#ffffff";
+    let sunElevation = 45; // Degrees
+    let sunAzimuth = 180;
+
+    if (lightMode === "cycle") {
+      const time = config.timeOfDay !== undefined ? config.timeOfDay : 12; // 0 to 24
+      
+      // Sun position calculation
+      // 6am is rise (0 elevation), 12pm is noon (90 elevation), 6pm is sunset (0 elevation), night is below 0
+      const angle = (time / 24) * Math.PI * 2 - Math.PI / 2;
+      sunElevation = Math.sin(angle) * 90;
+      sunAzimuth = 180; // keep it simple, along X-axis
+      
+      const isNight = sunElevation < -5;
+      const isGoldenHour = sunElevation >= -5 && sunElevation <= 15;
+      
+      if (isNight) {
+        // Night settings (sistema de oscuridad)
+        sunIntensity = 0.05;
+        sunColor = "#8899bb"; // dim blue moonlight
+        ambientIntensity = 0.05;
+        ambientColor = "#111122";
+        if (this.stars) this.stars.visible = true;
+      } else if (isGoldenHour) {
+        // Sunset / Sunrise
+        const factor = (sunElevation + 5) / 20; // 0 to 1
+        sunIntensity = 0.1 + factor * 0.5;
+        
+        // Interpolate sun color (orange to white)
+        const cSun = new THREE.Color("#ff5722").lerp(new THREE.Color("#ffffff"), factor);
+        sunColor = "#" + cSun.getHexString();
+        
+        // Interpolate ambient color
+        const cAmbient = new THREE.Color("#33235f").lerp(new THREE.Color("#8899bb"), factor);
+        ambientIntensity = 0.1 + factor * 0.4;
+        ambientColor = "#" + cAmbient.getHexString();
+        
+        if (this.stars) this.stars.visible = sunElevation < 0;
+      } else {
+        // Full day
+        const factor = (sunElevation - 15) / 75; // 0 to 1
+        sunIntensity = 0.6 + factor * 0.4;
+        sunColor = "#ffffff";
+        ambientIntensity = 0.5 + factor * 0.2;
+        ambientColor = "#ffffff";
+        if (this.stars) this.stars.visible = false;
+      }
+    } else if (lightMode === "night") {
+      sunIntensity = 0.05;
+      sunColor = "#8899bb";
+      ambientIntensity = 0.05;
+      ambientColor = "#111122";
+      sunElevation = -30;
+      if (this.stars) this.stars.visible = true;
+    } else if (lightMode === "sunset") {
+      sunIntensity = 0.5;
+      sunColor = "#ff8f70";
+      ambientIntensity = 0.3;
+      ambientColor = "#33235f";
+      sunElevation = 8;
+      if (this.stars) this.stars.visible = false;
+    } else if (lightMode === "custom") {
+      sunIntensity = config.sunIntensity !== undefined ? Number(config.sunIntensity) : 0.8;
+      sunColor = config.sunColor || "#ffffff";
+      ambientIntensity = config.ambientIntensity !== undefined ? Number(config.ambientIntensity) : 0.6;
+      ambientColor = config.ambientColor || "#ffffff";
+      sunElevation = config.sunElevation !== undefined ? Number(config.sunElevation) : 45;
+      sunAzimuth = config.sunAzimuth !== undefined ? Number(config.sunAzimuth) : 180;
+      if (this.stars) this.stars.visible = sunElevation < 0;
+    } else {
+      // Day
+      sunIntensity = 0.8;
+      sunColor = "#ffffff";
+      ambientIntensity = 0.6;
+      ambientColor = "#ffffff";
+      sunElevation = 45;
+      if (this.stars) this.stars.visible = false;
+    }
+
+    // Apply values to Lights
+    if (this.ambientLight) {
+      this.ambientLight.intensity = ambientIntensity;
+      this.ambientLight.color.set(ambientColor);
+    }
+    if (this.dirLight) {
+      this.dirLight.intensity = sunIntensity;
+      this.dirLight.color.set(sunColor);
+    }
+
+    // Update Sun Position Vector for Sky shader & light direction
+    const phi = THREE.MathUtils.degToRad(90 - sunElevation);
+    const theta = THREE.MathUtils.degToRad(sunAzimuth);
+    this.sunVec.setFromSphericalCoords(1, phi, theta);
+    
+    if (isShaderSky && this.skyMesh) {
+      this.skyMesh.material.uniforms["sunPosition"].value.copy(this.sunVec);
+    }
+  }
+
+  updateShadowFollow(playerPos: any) {
+    if (!playerPos || !this.dirLight || !this.dirLight.castShadow) return;
+
+    const renderDistance = this.currentRenderDistance || 100;
+    const offsetDistance = Math.max(120, renderDistance * 1.5);
+    
+    let lightDirection = this.sunVec;
+    if (this.sunVec.y < 0) {
+      // Invert light direction at night to act as moonlight coming from above ground
+      lightDirection = new THREE.Vector3().copy(this.sunVec).negate();
+    }
+    
+    this.dirLight.position.copy(lightDirection).multiplyScalar(offsetDistance).add(playerPos);
+    
+    // Ensure dirLight target matches player position
+    this.dirLight.target.position.copy(playerPos);
+    this.dirLight.target.updateMatrixWorld();
   }
 
   update() {

@@ -17,6 +17,13 @@ export function buildEnvironment(this: any) {
 	}
 }
 
+export function updateEnvironmentLighting(this: any) {
+	if (!this.environmentConfig) return;
+	if (this.sceneManager && this.sceneManager.updateLightingAndSky) {
+		this.sceneManager.updateLightingAndSky(this.environmentConfig);
+	}
+}
+
 export async function loadLevelFromFile(this: any, url: string, position: any, scale: any) {
 	this.levelLoader = new LevelLoader(this.sceneManager.scene, this.world);
 	try {
@@ -88,6 +95,7 @@ export function updateEnvironmentConfig(this: any, config: any) {
 	if (this.sceneManager && this.sceneManager.setSky) {
 		this.sceneManager.setSky(this.environmentConfig.skyType || "day");
 	}
+	this.updateEnvironmentLighting();
 	const shapeType = this.environmentConfig.shapeType || "rect";
 	const sx = this.environmentConfig.mapSizeX || 100;
 	const sz = this.environmentConfig.mapSizeZ || 100;

@@ -2278,6 +2278,10 @@ export class ObjectInspector {
                     this.selectedObject.updateLogicCameraVisuals();
                 }
 
+                if (typeof this.selectedObject.updateLightVisuals === 'function') {
+                    this.selectedObject.updateLightVisuals();
+                }
+
                 if (this.game && this.game.broadcastObjectUpdate) {
                     this.game.broadcastObjectUpdate(this.selectedObject);
                 }

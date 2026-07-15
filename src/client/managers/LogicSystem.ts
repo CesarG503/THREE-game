@@ -5,6 +5,7 @@ import { InteractiveCollisionLogic } from "../ui/logic_items/InteractiveCollisio
 import { TargetLogic } from "../ui/logic_items/TargetLogic";
 import { DianaLogic } from "../ui/logic_items/DianaLogic";
 import { DamageLogic } from "../ui/logic_items/DamageLogic";
+import { LightLogic } from "../ui/logic_items/LightLogic";
 import { PlayerConfigManager } from "./PlayerConfigManager";
 import { getActiveFarmingGroups } from "../ui/GameHUD";
 import { WaypointTransformGizmo } from "../editor/WaypointTransformGizmo";
@@ -41,6 +42,7 @@ export class LogicSystem {
 	targetLogic: any;
 	dianaLogic: any;
 	damageLogic: any;
+	lightLogic: any;
 	waypointGizmo: any;
 	selectedWaypoint: any;
 	waypointPanel: HTMLElement | null;
@@ -57,6 +59,7 @@ export class LogicSystem {
 		this.targetLogic = new TargetLogic(game, this);
 		this.dianaLogic = new DianaLogic();
 		this.damageLogic = new DamageLogic();
+		this.lightLogic = new LightLogic();
 		this.selectedWaypoint = null;
 		this.waypointPanel = null;
 		this.waypointNavIndex = -1;
@@ -738,8 +741,9 @@ export class LogicSystem {
 					const hasWaypoints = this.hasMovementLogic(child);
 					const isDamageController = child.userData.mapObjectType === "damage_controller";
 					const hasDamage = child.userData.logicProperties?.enableDamage === true;
+					const isLogicLight = child.userData.mapObjectType === "logic_light";
 
-					if (isSpawn || isButton || isCollision || isTarget || isLogicCamera || isCameraPanel || isInteractiveZone || hasWaypoints || isDamageController || hasDamage) {
+					if (isSpawn || isButton || isCollision || isTarget || isLogicCamera || isCameraPanel || isInteractiveZone || hasWaypoints || isDamageController || hasDamage || isLogicLight) {
 						logicObjects.push(child);
 					}
 				}
@@ -801,6 +805,28 @@ export class LogicSystem {
 		if (object.userData.mapObjectType === "interactive_collision") {
 			this.interactiveCollisionLogic.render(container, props, (key: string, value: any) => {
 				props[key] = value;
+				if (refreshCallback) refreshCallback();
+			});
+		}
+
+		// Light Logic
+		if (object.userData.mapObjectType === "logic_light") {
+			if (props.logicKind === undefined) props.logicKind = "logic_light";
+			if (props.lightType === undefined) props.lightType = "point";
+			if (props.color === undefined) props.color = "#ffffff";
+			if (props.intensity === undefined) props.intensity = 2.0;
+			if (props.distance === undefined) props.distance = 15.0;
+			if (props.decay === undefined) props.decay = 2.0;
+			if (props.angle === undefined) props.angle = 45.0;
+			if (props.penumbra === undefined) props.penumbra = 0.5;
+			if (props.castShadow === undefined) props.castShadow = true;
+
+			this.lightLogic.render(container, props, (key: string, value: any) => {
+				props[key] = value;
+				if (typeof object.updateLightVisuals === "function") {
+					object.updateLightVisuals();
+				}
+				this.broadcastObjectLogicUpdate(object);
 				if (refreshCallback) refreshCallback();
 			});
 		}
@@ -1827,6 +1853,7 @@ export class LogicSystem {
 			case "interactive_collision": return "Colisión Interactiva";
 			case "logic_camera": return "Camara";
 			case "camera_panel": return "Panel de Camaras";
+			case "logic_light": return "Fuente de Luz";
 			case "interactive_zones": return "Pads y Zonas";
 			case "impulse_jump": return "Pad de Salto";
 			case "impulse_lateral": return "Pad de Empuje";

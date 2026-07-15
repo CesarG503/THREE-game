@@ -32,7 +32,7 @@ import { JetpackItem } from "./items/JetpackItem";
 import { setupGameInput } from "./core/GameInput";
 import { animate, setupDebugRender, setupOrientationGizmo, updateDebugRender, renderOrientationGizmo } from "./core/GameLoop";
 import { setupMultiplayerUI, updateConnectionStatus, handleRemoteShoot } from "./core/GameNetwork";
-import { buildEnvironment, loadLevelFromFile, updateEnvironmentConfig } from "./core/GameEnvironment";
+import { buildEnvironment, loadLevelFromFile, updateEnvironmentConfig, updateEnvironmentLighting } from "./core/GameEnvironment";
 import { setupEditorUI, saveMap, loadMap, useCurrentItem, _loadSingleMapObject, deleteObjectByUuid, broadcastObjectUpdate, setObjectBodyType, updateButtonInteraction, emitSignal, triggerButton, updateCollisionLogic, updateMovementLogic, triggerGravitySphere } from "./core/GameEditor";
 import { regenerateObjectPhysics, updateObjectPhysics } from "./core/GamePhysics";
 import { GameHUD } from "./ui/GameHUD";
@@ -111,6 +111,7 @@ export class Game {
 	buildEnvironment: any;
 	loadLevelFromFile: any;
 	updateEnvironmentConfig: any;
+	updateEnvironmentLighting: any;
 	setupEditorUI: any;
 	saveMap: any;
 	loadMap: any;
@@ -154,6 +155,7 @@ export class Game {
 		this.buildEnvironment = buildEnvironment.bind(this);
 		this.loadLevelFromFile = loadLevelFromFile.bind(this);
 		this.updateEnvironmentConfig = updateEnvironmentConfig.bind(this);
+		this.updateEnvironmentLighting = updateEnvironmentLighting.bind(this);
 		this.setupEditorUI = setupEditorUI.bind(this);
 		this.saveMap = saveMap.bind(this);
 		this.loadMap = loadMap.bind(this);

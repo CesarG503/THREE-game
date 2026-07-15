@@ -220,6 +220,38 @@ export function animate(this: any) {
 
 	const dt = this.clock.getDelta();
 
+	// 1. Progress day/night cycle and update lights
+	if (this.environmentConfig && this.environmentConfig.enableDayNightCycle) {
+		const speed = this.environmentConfig.cycleSpeed !== undefined ? Number(this.environmentConfig.cycleSpeed) : 0.05;
+		this.environmentConfig.timeOfDay = (this.environmentConfig.timeOfDay || 12) + dt * speed;
+		if (this.environmentConfig.timeOfDay >= 24) {
+			this.environmentConfig.timeOfDay -= 24;
+		}
+		
+		if (typeof this.updateEnvironmentLighting === "function") {
+			this.updateEnvironmentLighting();
+		}
+
+		if (this.constructionMenu && this.constructionMenu.isVisible && typeof this.constructionMenu.refreshSettings === "function") {
+			this.constructionMenu.refreshSettings();
+		}
+	} else {
+		if (typeof this.updateEnvironmentLighting === "function") {
+			this.updateEnvironmentLighting();
+		}
+	}
+
+	// 2. Follow player with shadow frustum
+	let playerPos = null;
+	if (this.character && typeof this.character.getPosition === "function") {
+		playerPos = this.character.getPosition();
+	} else if (this.sceneManager?.camera) {
+		playerPos = this.sceneManager.camera.position;
+	}
+	if (playerPos && this.sceneManager && typeof this.sceneManager.updateShadowFollow === "function") {
+		this.sceneManager.updateShadowFollow(playerPos);
+	}
+
 	if (this.scopeController && this.character) {
 		this.scopeController.update(
 			dt,

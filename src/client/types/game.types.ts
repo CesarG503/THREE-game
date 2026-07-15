@@ -27,6 +27,33 @@ export interface EnvironmentConfig {
 	ceilingGroups?: any[];
 	customGridCeilingGroups?: { [key: string]: string };
 	customGridCeilingShapes?: { [key: string]: string };
+	enableStarsNight?: boolean;
+	enableStarsSkybox?: boolean;
+	enableStarsCycle?: boolean;
+	sunElevation?: number;
+	sunAzimuth?: number;
+	lightMode?: string;
+	shadowQuality?: string;
+	enableDayNightCycle?: boolean;
+	timeOfDay?: number;
+	cycleSpeed?: number;
+	sunIntensity?: number;
+	sunColor?: string;
+	ambientIntensity?: number;
+	ambientColor?: string;
+	environmentIntensity?: number;
+	backgroundIntensity?: number;
+	backgroundBlurriness?: number;
+	skyboxRotation?: number;
+	enableSkyboxFog?: boolean;
+	fogColor?: string;
+	fogNear?: number;
+	fogFar?: number;
+	fogDensity?: number;
+	skyTurbidity?: number;
+	skyRayleigh?: number;
+	skyMieCoefficient?: number;
+	skyMieDirectionalG?: number;
 }
 
 export interface MainBootstrapOptions {

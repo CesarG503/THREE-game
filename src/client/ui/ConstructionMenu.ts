@@ -15,6 +15,7 @@ import { savePlatformMapForRoom } from "../platform/mapRuntime";
 import { listAssets, uploadAsset } from "../platform/api";
 import { getDefaultTextureSettings, normalizeTextureSettings } from "../utils/TextureMapping";
 import { GRAVITY_ORIENTATION_OPTIONS } from "../utils/GravityOrientation";
+import { getSkyboxPresetDefaults } from "../platform/skyboxPresets";
 
 const SKYBOX_CUBEMAP_DIR = "/assets/skybox/Cubemap";
 const SKYBOX_VALUE_PREFIX = "skybox:";
@@ -870,7 +871,7 @@ export class ConstructionMenu {
         let skyboxPreviewScene = null;
         let skyboxPreviewCamera = null;
         let skyboxPreviewRenderer = null;
-        let renderSkyboxPreview = () => {};
+        let renderSkyboxPreview = () => { };
 
         if (this.skyboxPreviewCleanup) {
             this.skyboxPreviewCleanup();
@@ -1131,6 +1132,10 @@ export class ConstructionMenu {
             previewLabel.textContent = label;
             previewStatus.textContent = pendingSkyType === (this.game.environmentConfig?.skyType || "day") ? "Aplicado" : "Vista previa";
 
+            const preset = getSkyboxPresetDefaults(pendingSkyType);
+            if (this.presetNameSpan) this.presetNameSpan.textContent = `${preset.name}`;
+            if (this.presetDescSpan) this.presetDescSpan.textContent = preset.themeDescription;
+
             if (skyboxUrl) {
                 previewImage.style.display = "none";
                 skyboxPreviewViewport.style.display = "block";
@@ -1154,8 +1159,32 @@ export class ConstructionMenu {
 
         const applyPendingSky = () => {
             const skyType = pendingSkyType || "day";
+            const defaults = getSkyboxPresetDefaults(skyType);
+
+            const currentCfg = this.game.environmentConfig || {};
+            const isSkyboxChanged = currentCfg.skyType !== skyType;
+
+            const newConfig: any = { skyType };
+            if (isSkyboxChanged) {
+                newConfig.environmentIntensity = defaults.environmentIntensity;
+                newConfig.backgroundIntensity = defaults.backgroundIntensity;
+                newConfig.backgroundBlurriness = defaults.backgroundBlurriness;
+                newConfig.skyboxRotation = defaults.skyboxRotation;
+                newConfig.sunColor = defaults.sunColor;
+                newConfig.sunIntensity = defaults.sunIntensity;
+                newConfig.ambientColor = defaults.ambientColor;
+                newConfig.ambientIntensity = defaults.ambientIntensity;
+                newConfig.sunElevation = defaults.sunElevation;
+                newConfig.sunAzimuth = defaults.sunAzimuth;
+                newConfig.enableSkyboxFog = defaults.enableSkyboxFog;
+                newConfig.fogColor = defaults.fogColor;
+                newConfig.fogNear = defaults.fogNear;
+                newConfig.fogFar = defaults.fogFar;
+            }
+
             if (this.game && this.game.updateEnvironmentConfig) {
-                this.game.updateEnvironmentConfig({ skyType });
+                this.game.updateEnvironmentConfig(newConfig);
+                this.refreshSettings();
                 if (this.game.networkManager && this.game.networkManager.collaborativeMode) {
                     const mapJson = this.game.saveMap();
                     this.game.networkManager.broadcastMapSync(mapJson);
@@ -1288,6 +1317,281 @@ export class ConstructionMenu {
         rowSky.appendChild(actionsRow);
         rowSky.appendChild(previewWrap);
 
+        // ------------------ Panel de Propiedades Predeterminadas & Edición de Skybox ------------------
+        const skyboxParamsGroup = document.createElement("div");
+        skyboxParamsGroup.style.cssText = `
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-top: 14px;
+            padding: 14px;
+            background: rgba(24, 28, 38, 0.85);
+            border: 1px solid #3b82f6;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        `;
+
+        const presetHeader = document.createElement("div");
+        presetHeader.style.cssText = "display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; border-bottom: 1px solid #334155; padding-bottom: 10px;";
+
+        const presetTitle = document.createElement("div");
+        presetTitle.style.cssText = "display: flex; flex-direction: column; gap: 2px;";
+        this.presetNameSpan = document.createElement("span");
+        this.presetNameSpan.style.cssText = "font-size: 15px; font-weight: bold; color: #60a5fa;";
+        this.presetNameSpan.textContent = "Propiedades Predeterminadas del Skybox";
+
+        this.presetDescSpan = document.createElement("span");
+        this.presetDescSpan.style.cssText = "font-size: 12px; color: #94a3b8;";
+        this.presetDescSpan.textContent = "Cargando temática...";
+
+        presetTitle.appendChild(this.presetNameSpan);
+        presetTitle.appendChild(this.presetDescSpan);
+
+        const resetDefaultsBtn = document.createElement("button");
+        resetDefaultsBtn.type = "button";
+        resetDefaultsBtn.textContent = "Restablecer Predeterminados del Skybox";
+        resetDefaultsBtn.style.cssText = `
+            padding: 6px 12px;
+            background: #374151;
+            color: #f3f4f6;
+            border: 1px solid #4b5563;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+        `;
+        resetDefaultsBtn.onmouseover = () => resetDefaultsBtn.style.background = "#4b5563";
+        resetDefaultsBtn.onmouseout = () => resetDefaultsBtn.style.background = "#374151";
+
+        resetDefaultsBtn.onclick = () => {
+            const skyType = pendingSkyType || "day";
+            const defaults = getSkyboxPresetDefaults(skyType);
+            this.game.updateEnvironmentConfig({
+                skyType,
+                environmentIntensity: defaults.environmentIntensity,
+                backgroundIntensity: defaults.backgroundIntensity,
+                backgroundBlurriness: defaults.backgroundBlurriness,
+                skyboxRotation: defaults.skyboxRotation,
+                sunColor: defaults.sunColor,
+                sunIntensity: defaults.sunIntensity,
+                ambientColor: defaults.ambientColor,
+                ambientIntensity: defaults.ambientIntensity,
+                sunElevation: defaults.sunElevation,
+                sunAzimuth: defaults.sunAzimuth,
+                enableSkyboxFog: defaults.enableSkyboxFog,
+                fogColor: defaults.fogColor,
+                fogNear: defaults.fogNear,
+                fogFar: defaults.fogFar,
+                ...(defaults.skyTurbidity !== undefined ? { skyTurbidity: defaults.skyTurbidity } : {}),
+                ...(defaults.skyRayleigh !== undefined ? { skyRayleigh: defaults.skyRayleigh } : {}),
+                ...(defaults.skyMieCoefficient !== undefined ? { skyMieCoefficient: defaults.skyMieCoefficient } : {}),
+                ...(defaults.skyMieDirectionalG !== undefined ? { skyMieDirectionalG: defaults.skyMieDirectionalG } : {})
+            });
+            this.refreshSettings();
+            if (this.game.networkManager && this.game.networkManager.collaborativeMode) {
+                const mapJson = this.game.saveMap();
+                this.game.networkManager.broadcastMapSync(mapJson);
+            }
+        };
+
+        presetHeader.appendChild(presetTitle);
+        presetHeader.appendChild(resetDefaultsBtn);
+        skyboxParamsGroup.appendChild(presetHeader);
+
+        const buildSliderRow = (labelText, min, max, step, initialVal, unit, onChange) => {
+            const row = document.createElement("div");
+            row.style.cssText = "display: flex; flex-direction: column; gap: 2px;";
+            const labelRow = document.createElement("div");
+            labelRow.style.cssText = "display: flex; justify-content: space-between; font-size: 12px; color: #cbd5e1;";
+            const lbl = document.createElement("span");
+            lbl.textContent = labelText;
+            const valSpan = document.createElement("span");
+            valSpan.style.color = "#60a5fa";
+            valSpan.style.fontWeight = "bold";
+            valSpan.textContent = initialVal + unit;
+            labelRow.appendChild(lbl);
+            labelRow.appendChild(valSpan);
+
+            const slider = document.createElement("input");
+            slider.type = "range";
+            slider.min = String(min);
+            slider.max = String(max);
+            slider.step = String(step);
+            slider.value = String(initialVal);
+            slider.style.cssText = "cursor: pointer; width: 100%;";
+            slider.addEventListener("input", (e: any) => {
+                const num = parseFloat(e.target.value);
+                valSpan.textContent = (step < 1 ? num.toFixed(2) : num) + unit;
+                onChange(num);
+            });
+            row.appendChild(labelRow);
+            row.appendChild(slider);
+            return { row, slider, valSpan };
+        };
+
+        const buildColorRow = (labelText, initialVal, onChange) => {
+            const row = document.createElement("div");
+            row.style.cssText = "display: flex; justify-content: space-between; align-items: center; gap: 8px;";
+            const lbl = document.createElement("span");
+            lbl.textContent = labelText;
+            lbl.style.cssText = "font-size: 12px; color: #cbd5e1;";
+
+            const colorWrap = document.createElement("div");
+            colorWrap.style.cssText = "display: flex; align-items: center; gap: 6px;";
+
+            const colorInput = document.createElement("input");
+            colorInput.type = "color";
+            colorInput.value = initialVal || "#ffffff";
+            colorInput.style.cssText = "border: none; width: 28px; height: 28px; border-radius: 4px; cursor: pointer; background: transparent;";
+
+            const hexSpan = document.createElement("span");
+            hexSpan.style.cssText = "font-size: 12px; color: #94a3b8; font-family: monospace;";
+            hexSpan.textContent = initialVal || "#ffffff";
+
+            colorInput.addEventListener("input", (e: any) => {
+                const hex = e.target.value;
+                hexSpan.textContent = hex;
+                onChange(hex);
+            });
+
+            colorWrap.appendChild(colorInput);
+            colorWrap.appendChild(hexSpan);
+            row.appendChild(lbl);
+            row.appendChild(colorWrap);
+            return { row, colorInput, hexSpan };
+        };
+
+        const controlsGrid = document.createElement("div");
+        controlsGrid.style.cssText = "display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px;";
+
+        // 1. Reflejos IBL & Fondo
+        const section1 = document.createElement("div");
+        section1.style.cssText = "display: flex; flex-direction: column; gap: 8px; border-left: 2px solid #3b82f6; padding-left: 10px;";
+        const sec1Title = document.createElement("span");
+        sec1Title.textContent = "Reflejos IBL & Apariencia de Skybox:";
+        sec1Title.style.cssText = "font-size: 13px; font-weight: bold; color: #93c5fd;";
+        section1.appendChild(sec1Title);
+
+        const ctrlEnv = buildSliderRow("Intensidad Reflejos IBL (Tinte 3D):", 0, 3, 0.05, 1.0, "", (v) => {
+            this.game.updateEnvironmentConfig({ environmentIntensity: v });
+        });
+        this.sliderEnvIntensity = ctrlEnv.slider;
+        this.valEnvIntensity = ctrlEnv.valSpan;
+        section1.appendChild(ctrlEnv.row);
+
+        const ctrlBg = buildSliderRow("Brillo del Fondo Skybox:", 0, 3, 0.05, 1.0, "", (v) => {
+            this.game.updateEnvironmentConfig({ backgroundIntensity: v });
+        });
+        this.sliderBgIntensity = ctrlBg.slider;
+        this.valBgIntensity = ctrlBg.valSpan;
+        section1.appendChild(ctrlBg.row);
+
+        const ctrlRot = buildSliderRow("Rotación del Skybox (Eje Y):", 0, 360, 1, 0, "°", (v) => {
+            this.game.updateEnvironmentConfig({ skyboxRotation: v });
+        });
+        this.sliderSkyRotation = ctrlRot.slider;
+        this.valSkyRotation = ctrlRot.valSpan;
+        section1.appendChild(ctrlRot.row);
+
+        const ctrlBlur = buildSliderRow("Desenfoque del Fondo:", 0, 1, 0.05, 0.0, "", (v) => {
+            this.game.updateEnvironmentConfig({ backgroundBlurriness: v });
+        });
+        this.sliderBgBlur = ctrlBlur.slider;
+        this.valBgBlur = ctrlBlur.valSpan;
+        section1.appendChild(ctrlBlur.row);
+
+        controlsGrid.appendChild(section1);
+
+        // 2. Luces Sol y Ambiente
+        const section2 = document.createElement("div");
+        section2.style.cssText = "display: flex; flex-direction: column; gap: 8px; border-left: 2px solid #eab308; padding-left: 10px;";
+        const sec2Title = document.createElement("span");
+        sec2Title.textContent = "Luces Directas del Skybox:";
+        sec2Title.style.cssText = "font-size: 13px; font-weight: bold; color: #fde047;";
+        section2.appendChild(sec2Title);
+
+        const ctrlSunCol = buildColorRow("Color Luz del Sol:", "#ffffff", (hex) => {
+            this.game.updateEnvironmentConfig({ sunColor: hex });
+        });
+        this.inputSkySunColor = ctrlSunCol.colorInput;
+        this.hexSkySunColor = ctrlSunCol.hexSpan;
+        section2.appendChild(ctrlSunCol.row);
+
+        const ctrlSunInt = buildSliderRow("Intensidad Solar:", 0, 3, 0.05, 0.8, "", (v) => {
+            this.game.updateEnvironmentConfig({ sunIntensity: v });
+        });
+        this.sliderSkySunIntensity = ctrlSunInt.slider;
+        this.valSkySunIntensity = ctrlSunInt.valSpan;
+        section2.appendChild(ctrlSunInt.row);
+
+        const ctrlAmbCol = buildColorRow("Color Luz Ambiental:", "#ffffff", (hex) => {
+            this.game.updateEnvironmentConfig({ ambientColor: hex });
+        });
+        this.inputSkyAmbientColor = ctrlAmbCol.colorInput;
+        this.hexSkyAmbientColor = ctrlAmbCol.hexSpan;
+        section2.appendChild(ctrlAmbCol.row);
+
+        const ctrlAmbInt = buildSliderRow("Intensidad Ambiental:", 0, 3, 0.05, 0.6, "", (v) => {
+            this.game.updateEnvironmentConfig({ ambientIntensity: v });
+        });
+        this.sliderSkyAmbientIntensity = ctrlAmbInt.slider;
+        this.valSkyAmbientIntensity = ctrlAmbInt.valSpan;
+        section2.appendChild(ctrlAmbInt.row);
+
+        controlsGrid.appendChild(section2);
+
+        // 3. Niebla de Skybox
+        const section3 = document.createElement("div");
+        section3.style.cssText = "display: flex; flex-direction: column; gap: 8px; border-left: 2px solid #10b981; padding-left: 10px;";
+        const sec3Title = document.createElement("span");
+        sec3Title.textContent = "Niebla Armónica del Skybox:";
+        sec3Title.style.cssText = "font-size: 13px; font-weight: bold; color: #6ee7b7;";
+        section3.appendChild(sec3Title);
+
+        const rowChkFog = document.createElement("div");
+        rowChkFog.style.cssText = "display: flex; align-items: center; gap: 8px;";
+        this.checkSkyboxFog = document.createElement("input");
+        this.checkSkyboxFog.type = "checkbox";
+        this.checkSkyboxFog.id = "chk-skybox-fog";
+        this.checkSkyboxFog.style.transform = "scale(1.2)";
+        this.checkSkyboxFog.addEventListener("change", (e: any) => {
+            this.game.updateEnvironmentConfig({ enableSkyboxFog: e.target.checked });
+        });
+        const lblChkFog = document.createElement("label");
+        lblChkFog.textContent = "Habilitar Niebla Atmosférica";
+        lblChkFog.htmlFor = "chk-skybox-fog";
+        lblChkFog.style.cssText = "font-size: 12px; color: #cbd5e1; cursor: pointer;";
+        rowChkFog.appendChild(this.checkSkyboxFog);
+        rowChkFog.appendChild(lblChkFog);
+        section3.appendChild(rowChkFog);
+
+        const ctrlFogCol = buildColorRow("Color de Niebla:", "#87ceeb", (hex) => {
+            this.game.updateEnvironmentConfig({ fogColor: hex });
+        });
+        this.inputSkyFogColor = ctrlFogCol.colorInput;
+        this.hexSkyFogColor = ctrlFogCol.hexSpan;
+        section3.appendChild(ctrlFogCol.row);
+
+        const ctrlFogNear = buildSliderRow("Distancia Cercana:", 0, 100, 1, 15, "m", (v) => {
+            this.game.updateEnvironmentConfig({ fogNear: v });
+        });
+        this.sliderSkyFogNear = ctrlFogNear.slider;
+        this.valSkyFogNear = ctrlFogNear.valSpan;
+        section3.appendChild(ctrlFogNear.row);
+
+        const ctrlFogFar = buildSliderRow("Distancia Lejana:", 10, 300, 1, 75, "m", (v) => {
+            this.game.updateEnvironmentConfig({ fogFar: v });
+        });
+        this.sliderSkyFogFar = ctrlFogFar.slider;
+        this.valSkyFogFar = ctrlFogFar.valSpan;
+        section3.appendChild(ctrlFogFar.row);
+
+        controlsGrid.appendChild(section3);
+
+        skyboxParamsGroup.appendChild(controlsGrid);
+        rowSky.appendChild(skyboxParamsGroup);
+
         skyboxPreviewScene = new THREE.Scene();
         skyboxPreviewCamera = new THREE.PerspectiveCamera(70, 1, 0.1, 10);
         skyboxPreviewRenderer = new THREE.WebGLRenderer({ antialias: true });
@@ -1303,7 +1607,7 @@ export class ConstructionMenu {
         let previewDragging = false;
         let previewDragX = 0;
         let previewDragY = 0;
-        
+
         renderSkyboxPreview = () => {
             const width = Math.max(1, previewFrame.clientWidth || 320);
             const height = Math.max(1, previewFrame.clientHeight || 220);
@@ -1363,7 +1667,7 @@ export class ConstructionMenu {
         // Lighting Config Container
         const rowLighting = document.createElement("div");
         rowLighting.style.cssText = "display: flex; flex-direction: column; gap: 12px; margin-top: 15px; border-top: 1px solid #444; padding-top: 15px;";
-        
+
         const labelLighting = document.createElement("label");
         labelLighting.textContent = "Iluminación del Mundo";
         labelLighting.style.fontSize = "18px";
@@ -1426,6 +1730,143 @@ export class ConstructionMenu {
         rowShadowQuality.appendChild(labelSQ);
         rowShadowQuality.appendChild(this.selectShadowQuality);
         rowLighting.appendChild(rowShadowQuality);
+
+        // Sun Position Sliders (Elevación & Azimut para sombras)
+        const rowSunPositionGroup = document.createElement("div");
+        rowSunPositionGroup.style.cssText = "display: flex; flex-direction: column; gap: 8px; border-left: 2px solid #eab308; padding-left: 10px; margin-top: 5px;";
+
+        const titleSunPos = document.createElement("span");
+        titleSunPos.textContent = "Posición del Sol (Ángulo y Sombras):";
+        titleSunPos.style.fontSize = "13px";
+        titleSunPos.style.fontWeight = "bold";
+        titleSunPos.style.color = "#fbbf24";
+        rowSunPositionGroup.appendChild(titleSunPos);
+
+        // Sun Elevation Slider
+        const rowSunElev = document.createElement("div");
+        rowSunElev.style.cssText = "display: flex; flex-direction: column; gap: 2px;";
+        const labelElevRow = document.createElement("div");
+        labelElevRow.style.cssText = "display: flex; justify-content: space-between; font-size:12px; color:#ccc;";
+        const labelElev = document.createElement("span");
+        labelElev.textContent = "Elevación del Sol (Altura):";
+        this.valSunElevation = document.createElement("span");
+        this.valSunElevation.style.color = "#ffaa00";
+        labelElevRow.appendChild(labelElev);
+        labelElevRow.appendChild(this.valSunElevation);
+
+        this.sliderSunElevation = document.createElement("input");
+        this.sliderSunElevation.type = "range";
+        this.sliderSunElevation.min = "0";
+        this.sliderSunElevation.max = "90";
+        this.sliderSunElevation.step = "1";
+        this.sliderSunElevation.style.cssText = "cursor:pointer; width:100%;";
+        this.sliderSunElevation.addEventListener("input", (e: any) => {
+            const val = parseFloat(e.target.value);
+            this.game.updateEnvironmentConfig({ sunElevation: val });
+            this.valSunElevation.textContent = val + "°";
+        });
+        rowSunElev.appendChild(labelElevRow);
+        rowSunElev.appendChild(this.sliderSunElevation);
+        rowSunPositionGroup.appendChild(rowSunElev);
+
+        // Sun Azimuth Slider
+        const rowSunAzim = document.createElement("div");
+        rowSunAzim.style.cssText = "display: flex; flex-direction: column; gap: 2px;";
+        const labelAzimRow = document.createElement("div");
+        labelAzimRow.style.cssText = "display: flex; justify-content: space-between; font-size:12px; color:#ccc;";
+        const labelAzim = document.createElement("span");
+        labelAzim.textContent = "Azimut / Dirección del Sol:";
+        this.valSunAzimuth = document.createElement("span");
+        this.valSunAzimuth.style.color = "#ffaa00";
+        labelAzimRow.appendChild(labelAzim);
+        labelAzimRow.appendChild(this.valSunAzimuth);
+
+        this.sliderSunAzimuth = document.createElement("input");
+        this.sliderSunAzimuth.type = "range";
+        this.sliderSunAzimuth.min = "0";
+        this.sliderSunAzimuth.max = "360";
+        this.sliderSunAzimuth.step = "1";
+        this.sliderSunAzimuth.style.cssText = "cursor:pointer; width:100%;";
+        this.sliderSunAzimuth.addEventListener("input", (e: any) => {
+            const val = parseFloat(e.target.value);
+            this.game.updateEnvironmentConfig({ sunAzimuth: val });
+            this.valSunAzimuth.textContent = val + "°";
+        });
+        rowSunAzim.appendChild(labelAzimRow);
+        rowSunAzim.appendChild(this.sliderSunAzimuth);
+        rowSunPositionGroup.appendChild(rowSunAzim);
+
+        rowLighting.appendChild(rowSunPositionGroup);
+
+        // Star Options Container
+        const rowStarsGroup = document.createElement("div");
+        rowStarsGroup.style.cssText = "display: flex; flex-direction: column; gap: 8px; border-left: 2px solid #8b5cf6; padding-left: 10px; margin-top: 5px;";
+
+        const titleStars = document.createElement("span");
+        titleStars.textContent = "Configuración de Estrellas Nocturnas:";
+        titleStars.style.fontSize = "13px";
+        titleStars.style.fontWeight = "bold";
+        titleStars.style.color = "#c084fc";
+        rowStarsGroup.appendChild(titleStars);
+
+        // Checkbox: Stars in Night mode
+        const rowStarsNight = document.createElement("div");
+        rowStarsNight.style.cssText = "display: flex; align-items: center; gap: 8px;";
+        this.checkStarsNight = document.createElement("input");
+        this.checkStarsNight.type = "checkbox";
+        this.checkStarsNight.id = "chk-stars-night";
+        this.checkStarsNight.style.transform = "scale(1.2)";
+        this.checkStarsNight.addEventListener("change", (e: any) => {
+            this.game.updateEnvironmentConfig({ enableStarsNight: e.target.checked });
+        });
+        const labelStarsNight = document.createElement("label");
+        labelStarsNight.textContent = "Estrellas en Modo Noche";
+        labelStarsNight.htmlFor = "chk-stars-night";
+        labelStarsNight.style.fontSize = "13px";
+        labelStarsNight.style.cursor = "pointer";
+        rowStarsNight.appendChild(this.checkStarsNight);
+        rowStarsNight.appendChild(labelStarsNight);
+        rowStarsGroup.appendChild(rowStarsNight);
+
+        // Checkbox: Stars in Night Skybox
+        const rowStarsSkybox = document.createElement("div");
+        rowStarsSkybox.style.cssText = "display: flex; align-items: center; gap: 8px;";
+        this.checkStarsSkybox = document.createElement("input");
+        this.checkStarsSkybox.type = "checkbox";
+        this.checkStarsSkybox.id = "chk-stars-skybox";
+        this.checkStarsSkybox.style.transform = "scale(1.2)";
+        this.checkStarsSkybox.addEventListener("change", (e: any) => {
+            this.game.updateEnvironmentConfig({ enableStarsSkybox: e.target.checked });
+        });
+        const labelStarsSkybox = document.createElement("label");
+        labelStarsSkybox.textContent = "Estrellas sobre Skybox";
+        labelStarsSkybox.htmlFor = "chk-stars-skybox";
+        labelStarsSkybox.style.fontSize = "13px";
+        labelStarsSkybox.style.cursor = "pointer";
+        rowStarsSkybox.appendChild(this.checkStarsSkybox);
+        rowStarsSkybox.appendChild(labelStarsSkybox);
+        rowStarsGroup.appendChild(rowStarsSkybox);
+
+        // Checkbox: Stars in Dynamic Cycle
+        const rowStarsCycle = document.createElement("div");
+        rowStarsCycle.style.cssText = "display: flex; align-items: center; gap: 8px;";
+        this.checkStarsCycle = document.createElement("input");
+        this.checkStarsCycle.type = "checkbox";
+        this.checkStarsCycle.id = "chk-stars-cycle";
+        this.checkStarsCycle.style.transform = "scale(1.2)";
+        this.checkStarsCycle.addEventListener("change", (e: any) => {
+            this.game.updateEnvironmentConfig({ enableStarsCycle: e.target.checked });
+        });
+        const labelStarsCycle = document.createElement("label");
+        labelStarsCycle.textContent = "Estrellas en Noche de Ciclo Dinámico";
+        labelStarsCycle.htmlFor = "chk-stars-cycle";
+        labelStarsCycle.style.fontSize = "13px";
+        labelStarsCycle.style.cursor = "pointer";
+        rowStarsCycle.appendChild(this.checkStarsCycle);
+        rowStarsCycle.appendChild(labelStarsCycle);
+        rowStarsGroup.appendChild(rowStarsCycle);
+
+        rowLighting.appendChild(rowStarsGroup);
 
         // Enable Day/Night Cycle Checkbox
         const rowEnableCycle = document.createElement("div");
@@ -1502,7 +1943,7 @@ export class ConstructionMenu {
         // Custom Light intensities and colors rows
         this.rowCustomLights = document.createElement("div");
         this.rowCustomLights.style.cssText = "display: flex; flex-direction: column; gap: 8px; border-left: 2px solid #555; padding-left: 10px; margin-top: 5px;";
-        
+
         // Sun Light row
         const rowSunL = document.createElement("div");
         rowSunL.style.cssText = "display:flex; justify-content:space-between; align-items:center; font-size:13px; color:#ccc;";
@@ -1555,7 +1996,7 @@ export class ConstructionMenu {
         // Sky Shader controls container
         this.rowSkyShader = document.createElement("div");
         this.rowSkyShader.style.cssText = "display: flex; flex-direction: column; gap: 8px; border-left: 2px solid #2563eb; padding-left: 10px; margin-top: 5px;";
-        
+
         const createShaderSlider = (labelStr, key, minVal, maxVal, stepVal, unit = "") => {
             const wrap = document.createElement("div");
             wrap.style.cssText = "display: flex; flex-direction: column; gap: 2px;";
@@ -1567,14 +2008,14 @@ export class ConstructionMenu {
             valSpan.style.color = "#ffaa00";
             labelRow.appendChild(labelText);
             labelRow.appendChild(valSpan);
-            
+
             const slider = document.createElement("input");
             slider.type = "range";
             slider.min = String(minVal);
             slider.max = String(maxVal);
             slider.step = String(stepVal);
             slider.style.cssText = "cursor:pointer; width:100%;";
-            
+
             slider.addEventListener("input", (e) => {
                 const val = parseFloat(e.target.value);
                 const update = {};
@@ -1582,11 +2023,11 @@ export class ConstructionMenu {
                 this.game.updateEnvironmentConfig(update);
                 valSpan.textContent = val.toFixed(2) + unit;
             });
-            
+
             wrap.appendChild(labelRow);
             wrap.appendChild(slider);
             this.rowSkyShader.appendChild(wrap);
-            
+
             return { slider, valSpan };
         };
 
@@ -1861,6 +2302,24 @@ export class ConstructionMenu {
         // ------------------ New Lighting Controls Refresh ------------------
         if (this.selectLightMode) this.selectLightMode.value = config.lightMode || "day";
         if (this.selectShadowQuality) this.selectShadowQuality.value = config.shadowQuality || "medium";
+
+        // Refresh Sun position sliders
+        if (this.sliderSunElevation) {
+            const elevVal = config.sunElevation !== undefined ? Number(config.sunElevation) : 45;
+            this.sliderSunElevation.value = String(elevVal);
+            if (this.valSunElevation) this.valSunElevation.textContent = elevVal + "°";
+        }
+        if (this.sliderSunAzimuth) {
+            const azimVal = config.sunAzimuth !== undefined ? Number(config.sunAzimuth) : 180;
+            this.sliderSunAzimuth.value = String(azimVal);
+            if (this.valSunAzimuth) this.valSunAzimuth.textContent = azimVal + "°";
+        }
+
+        // Refresh Star checkboxes
+        if (this.checkStarsNight) this.checkStarsNight.checked = config.enableStarsNight !== false;
+        if (this.checkStarsSkybox) this.checkStarsSkybox.checked = !!config.enableStarsSkybox;
+        if (this.checkStarsCycle) this.checkStarsCycle.checked = config.enableStarsCycle !== false;
+
         if (this.checkEnableCycle) this.checkEnableCycle.checked = !!config.enableDayNightCycle;
 
         const hasCycle = config.lightMode === "cycle" || !!config.enableDayNightCycle;
@@ -1869,7 +2328,7 @@ export class ConstructionMenu {
             this.sliderTimeOfDay.value = String(config.timeOfDay !== undefined ? config.timeOfDay : 12);
             if (this.valTimeOfDay) this.valTimeOfDay.textContent = (config.timeOfDay !== undefined ? Number(config.timeOfDay) : 12).toFixed(1) + " hrs";
         }
-        
+
         if (this.rowCycleSpeed) this.rowCycleSpeed.style.display = config.enableDayNightCycle ? "flex" : "none";
         if (this.sliderCycleSpeed) {
             this.sliderCycleSpeed.value = String(config.cycleSpeed !== undefined ? config.cycleSpeed : 0.05);
@@ -1901,6 +2360,66 @@ export class ConstructionMenu {
             const mieGVal = config.skyMieDirectionalG ?? 0.8;
             this.shaderSliders.mieDirectionalG.slider.value = String(mieGVal);
             this.shaderSliders.mieDirectionalG.valSpan.textContent = mieGVal.toFixed(2);
+        }
+
+        // --- Refresco de Controles del Panel de Propiedades de Skybox ---
+        if (this.sliderEnvIntensity) {
+            const envVal = config.environmentIntensity !== undefined ? Number(config.environmentIntensity) : 1.0;
+            this.sliderEnvIntensity.value = String(envVal);
+            if (this.valEnvIntensity) this.valEnvIntensity.textContent = envVal.toFixed(2);
+        }
+        if (this.sliderBgIntensity) {
+            const bgVal = config.backgroundIntensity !== undefined ? Number(config.backgroundIntensity) : 1.0;
+            this.sliderBgIntensity.value = String(bgVal);
+            if (this.valBgIntensity) this.valBgIntensity.textContent = bgVal.toFixed(2);
+        }
+        if (this.sliderSkyRotation) {
+            const rotVal = config.skyboxRotation !== undefined ? Number(config.skyboxRotation) : 0;
+            this.sliderSkyRotation.value = String(rotVal);
+            if (this.valSkyRotation) this.valSkyRotation.textContent = rotVal + "°";
+        }
+        if (this.sliderBgBlur) {
+            const blurVal = config.backgroundBlurriness !== undefined ? Number(config.backgroundBlurriness) : 0;
+            this.sliderBgBlur.value = String(blurVal);
+            if (this.valBgBlur) this.valBgBlur.textContent = blurVal.toFixed(2);
+        }
+
+        if (this.inputSkySunColor) {
+            const sc = config.sunColor || "#ffffff";
+            this.inputSkySunColor.value = sc;
+            if (this.hexSkySunColor) this.hexSkySunColor.textContent = sc;
+        }
+        if (this.sliderSkySunIntensity) {
+            const si = config.sunIntensity !== undefined ? Number(config.sunIntensity) : 0.8;
+            this.sliderSkySunIntensity.value = String(si);
+            if (this.valSkySunIntensity) this.valSkySunIntensity.textContent = si.toFixed(2);
+        }
+        if (this.inputSkyAmbientColor) {
+            const ac = config.ambientColor || "#ffffff";
+            this.inputSkyAmbientColor.value = ac;
+            if (this.hexSkyAmbientColor) this.hexSkyAmbientColor.textContent = ac;
+        }
+        if (this.sliderSkyAmbientIntensity) {
+            const ai = config.ambientIntensity !== undefined ? Number(config.ambientIntensity) : 0.6;
+            this.sliderSkyAmbientIntensity.value = String(ai);
+            if (this.valSkyAmbientIntensity) this.valSkyAmbientIntensity.textContent = ai.toFixed(2);
+        }
+
+        if (this.checkSkyboxFog) this.checkSkyboxFog.checked = !!config.enableSkyboxFog;
+        if (this.inputSkyFogColor) {
+            const fc = config.fogColor || "#87ceeb";
+            this.inputSkyFogColor.value = fc;
+            if (this.hexSkyFogColor) this.hexSkyFogColor.textContent = fc;
+        }
+        if (this.sliderSkyFogNear) {
+            const fn = config.fogNear !== undefined ? Number(config.fogNear) : 15;
+            this.sliderSkyFogNear.value = String(fn);
+            if (this.valSkyFogNear) this.valSkyFogNear.textContent = fn + "m";
+        }
+        if (this.sliderSkyFogFar) {
+            const ff = config.fogFar !== undefined ? Number(config.fogFar) : 75;
+            this.sliderSkyFogFar.value = String(ff);
+            if (this.valSkyFogFar) this.valSkyFogFar.textContent = ff + "m";
         }
     }
 
@@ -2643,7 +3162,7 @@ export class ConstructionMenu {
             container.appendChild(card);
         });
     }
-renderLogicLibraryGrid(container) {
+    renderLogicLibraryGrid(container) {
         container.innerHTML = "";
 
         const groups = [

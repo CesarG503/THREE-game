@@ -46,6 +46,11 @@ export function updateEnvironmentConfig(this: any, config: any) {
 	this.environmentConfig.invisibleWallsAdvanced = !!this.environmentConfig.invisibleWalls;
 	this.environmentConfig.ceilingsAdvanced = !!this.environmentConfig.ceilingsEnabled;
 
+	if (this.environmentConfig.environmentIntensity === undefined) this.environmentConfig.environmentIntensity = 1.0;
+	if (this.environmentConfig.backgroundIntensity === undefined) this.environmentConfig.backgroundIntensity = 1.0;
+	if (this.environmentConfig.backgroundBlurriness === undefined) this.environmentConfig.backgroundBlurriness = 0.0;
+	if (this.environmentConfig.skyboxRotation === undefined) this.environmentConfig.skyboxRotation = 0;
+
 	// Ensure default groups are always populated if missing or empty
 	if (!this.environmentConfig.groundGroups || this.environmentConfig.groundGroups.length === 0) {
 		this.environmentConfig.groundGroups = [

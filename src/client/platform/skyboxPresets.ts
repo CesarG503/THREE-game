@@ -12,6 +12,8 @@ export interface SkyboxPresetDefaults {
   sunElevation: number;
   sunAzimuth: number;
   enableSkyboxFog: boolean;
+  enableSunLight?: boolean;
+  enableAmbientLight?: boolean;
   fogColor: string;
   fogNear: number;
   fogFar: number;

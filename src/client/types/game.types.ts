@@ -41,6 +41,8 @@ export interface EnvironmentConfig {
 	sunColor?: string;
 	ambientIntensity?: number;
 	ambientColor?: string;
+	enableSunLight?: boolean;
+	enableAmbientLight?: boolean;
 	environmentIntensity?: number;
 	backgroundIntensity?: number;
 	backgroundBlurriness?: number;

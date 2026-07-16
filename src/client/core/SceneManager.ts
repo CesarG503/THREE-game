@@ -117,8 +117,6 @@ export class SceneManager {
     const skyType = type || "day";
     const requestId = ++this.skyboxRequestId;
 
-    this.applyDefaultLighting();
-
     if (typeof skyType === "string" && skyType.startsWith(SKYBOX_PREFIX)) {
       const atlasUrl = skyType.slice(SKYBOX_PREFIX.length);
       this.loadSkyboxFromAtlas(atlasUrl)
@@ -418,31 +416,24 @@ export class SceneManager {
         ambientIntensity = 0.5 + factor * 0.2;
         ambientColor = "#ffffff";
       }
-    } else if (lightMode === "night") {
+    } else if (lightMode === "night" && !isSkyboxActive) {
       sunIntensity = 0.05;
       sunColor = "#8899bb";
       ambientIntensity = 0.05;
       ambientColor = "#111122";
       sunElevation = -30;
-    } else if (lightMode === "sunset") {
+    } else if (lightMode === "sunset" && !isSkyboxActive) {
       sunIntensity = 0.5;
       sunColor = "#ff8f70";
       ambientIntensity = 0.3;
       ambientColor = "#33235f";
       sunElevation = 8;
-    } else if (lightMode === "custom") {
+    } else {
+      // Skybox mode, custom mode or standard mode: ALWAYS respect user/preset config
       sunIntensity = config.sunIntensity !== undefined ? Number(config.sunIntensity) : 0.8;
       sunColor = config.sunColor || "#ffffff";
       ambientIntensity = config.ambientIntensity !== undefined ? Number(config.ambientIntensity) : 0.6;
       ambientColor = config.ambientColor || "#ffffff";
-      sunElevation = config.sunElevation !== undefined ? Number(config.sunElevation) : 45;
-      sunAzimuth = config.sunAzimuth !== undefined ? Number(config.sunAzimuth) : 180;
-    } else {
-      // Day
-      sunIntensity = 0.8;
-      sunColor = "#ffffff";
-      ambientIntensity = 0.6;
-      ambientColor = "#ffffff";
       sunElevation = config.sunElevation !== undefined ? Number(config.sunElevation) : 45;
       sunAzimuth = config.sunAzimuth !== undefined ? Number(config.sunAzimuth) : 180;
     }
@@ -472,11 +463,15 @@ export class SceneManager {
 
     // Apply values to Lights
     if (this.ambientLight) {
-      this.ambientLight.intensity = ambientIntensity;
+      const isAmbientEnabled = config.enableAmbientLight !== false;
+      this.ambientLight.visible = isAmbientEnabled;
+      this.ambientLight.intensity = isAmbientEnabled ? ambientIntensity : 0;
       this.ambientLight.color.set(ambientColor);
     }
     if (this.dirLight) {
-      this.dirLight.intensity = sunIntensity;
+      const isSunEnabled = config.enableSunLight !== false;
+      this.dirLight.visible = isSunEnabled;
+      this.dirLight.intensity = isSunEnabled ? sunIntensity : 0;
       this.dirLight.color.set(sunColor);
     }
 

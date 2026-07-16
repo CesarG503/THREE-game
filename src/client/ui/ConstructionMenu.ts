@@ -1380,6 +1380,8 @@ export class ConstructionMenu {
                 sunElevation: defaults.sunElevation,
                 sunAzimuth: defaults.sunAzimuth,
                 enableSkyboxFog: defaults.enableSkyboxFog,
+                enableSunLight: defaults.enableSunLight !== false,
+                enableAmbientLight: defaults.enableAmbientLight !== false,
                 fogColor: defaults.fogColor,
                 fogNear: defaults.fogNear,
                 fogFar: defaults.fogFar,
@@ -1511,6 +1513,23 @@ export class ConstructionMenu {
         sec2Title.style.cssText = "font-size: 13px; font-weight: bold; color: #fde047;";
         section2.appendChild(sec2Title);
 
+        const rowChkSun = document.createElement("div");
+        rowChkSun.style.cssText = "display: flex; align-items: center; gap: 8px;";
+        this.checkSunLight = document.createElement("input");
+        this.checkSunLight.type = "checkbox";
+        this.checkSunLight.id = "chk-sun-light";
+        this.checkSunLight.style.transform = "scale(1.2)";
+        this.checkSunLight.addEventListener("change", (e: any) => {
+            this.game.updateEnvironmentConfig({ enableSunLight: e.target.checked });
+        });
+        const lblChkSun = document.createElement("label");
+        lblChkSun.textContent = "Habilitar Luz Solar Directa";
+        lblChkSun.htmlFor = "chk-sun-light";
+        lblChkSun.style.cssText = "font-size: 12px; color: #cbd5e1; cursor: pointer;";
+        rowChkSun.appendChild(this.checkSunLight);
+        rowChkSun.appendChild(lblChkSun);
+        section2.appendChild(rowChkSun);
+
         const ctrlSunCol = buildColorRow("Color Luz del Sol:", "#ffffff", (hex) => {
             this.game.updateEnvironmentConfig({ sunColor: hex });
         });
@@ -1524,6 +1543,23 @@ export class ConstructionMenu {
         this.sliderSkySunIntensity = ctrlSunInt.slider;
         this.valSkySunIntensity = ctrlSunInt.valSpan;
         section2.appendChild(ctrlSunInt.row);
+
+        const rowChkAmb = document.createElement("div");
+        rowChkAmb.style.cssText = "display: flex; align-items: center; gap: 8px; margin-top: 4px;";
+        this.checkAmbientLight = document.createElement("input");
+        this.checkAmbientLight.type = "checkbox";
+        this.checkAmbientLight.id = "chk-ambient-light";
+        this.checkAmbientLight.style.transform = "scale(1.2)";
+        this.checkAmbientLight.addEventListener("change", (e: any) => {
+            this.game.updateEnvironmentConfig({ enableAmbientLight: e.target.checked });
+        });
+        const lblChkAmb = document.createElement("label");
+        lblChkAmb.textContent = "Habilitar Luz Ambiental";
+        lblChkAmb.htmlFor = "chk-ambient-light";
+        lblChkAmb.style.cssText = "font-size: 12px; color: #cbd5e1; cursor: pointer;";
+        rowChkAmb.appendChild(this.checkAmbientLight);
+        rowChkAmb.appendChild(lblChkAmb);
+        section2.appendChild(rowChkAmb);
 
         const ctrlAmbCol = buildColorRow("Color Luz Ambiental:", "#ffffff", (hex) => {
             this.game.updateEnvironmentConfig({ ambientColor: hex });
@@ -2384,6 +2420,7 @@ export class ConstructionMenu {
             if (this.valBgBlur) this.valBgBlur.textContent = blurVal.toFixed(2);
         }
 
+        if (this.checkSunLight) this.checkSunLight.checked = config.enableSunLight !== false;
         if (this.inputSkySunColor) {
             const sc = config.sunColor || "#ffffff";
             this.inputSkySunColor.value = sc;
@@ -2394,6 +2431,7 @@ export class ConstructionMenu {
             this.sliderSkySunIntensity.value = String(si);
             if (this.valSkySunIntensity) this.valSkySunIntensity.textContent = si.toFixed(2);
         }
+        if (this.checkAmbientLight) this.checkAmbientLight.checked = config.enableAmbientLight !== false;
         if (this.inputSkyAmbientColor) {
             const ac = config.ambientColor || "#ffffff";
             this.inputSkyAmbientColor.value = ac;

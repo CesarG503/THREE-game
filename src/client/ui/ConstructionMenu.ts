@@ -2443,19 +2443,23 @@ export class ConstructionMenu {
             if (this.valSkyAmbientIntensity) this.valSkyAmbientIntensity.textContent = ai.toFixed(2);
         }
 
-        if (this.checkSkyboxFog) this.checkSkyboxFog.checked = !!config.enableSkyboxFog;
+        const presetDefaults = getSkyboxPresetDefaults(currentSkyType);
+
+        const isFogEnabled = config.enableSkyboxFog !== undefined ? !!config.enableSkyboxFog : !!presetDefaults.enableSkyboxFog;
+        if (this.checkSkyboxFog) this.checkSkyboxFog.checked = isFogEnabled;
+        
         if (this.inputSkyFogColor) {
-            const fc = config.fogColor || "#87ceeb";
+            const fc = config.fogColor || presetDefaults.fogColor || "#87ceeb";
             this.inputSkyFogColor.value = fc;
             if (this.hexSkyFogColor) this.hexSkyFogColor.textContent = fc;
         }
         if (this.sliderSkyFogNear) {
-            const fn = config.fogNear !== undefined ? Number(config.fogNear) : 15;
+            const fn = config.fogNear !== undefined ? Number(config.fogNear) : (presetDefaults.fogNear ?? 10);
             this.sliderSkyFogNear.value = String(fn);
             if (this.valSkyFogNear) this.valSkyFogNear.textContent = fn + "m";
         }
         if (this.sliderSkyFogFar) {
-            const ff = config.fogFar !== undefined ? Number(config.fogFar) : 75;
+            const ff = config.fogFar !== undefined ? Number(config.fogFar) : (presetDefaults.fogFar ?? 50);
             this.sliderSkyFogFar.value = String(ff);
             if (this.valSkyFogFar) this.valSkyFogFar.textContent = ff + "m";
         }

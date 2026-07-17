@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { Sky } from "three/addons/objects/Sky.js";
+import { getSkyboxPresetDefaults } from "../platform/skyboxPresets";
 
 const SKYBOX_PREFIX = "skybox:";
 const SKYBOX_FACE_LAYOUT = {
@@ -342,7 +343,6 @@ export class SceneManager {
       this.skyMesh.visible = true;
       this.scene.background = null;
       this.scene.environment = null;
-      this.scene.fog = null;
       
       // Update Sky Shader uniforms
       const uniforms = this.skyMesh.material.uniforms;
@@ -354,28 +354,30 @@ export class SceneManager {
       if (this.skyMesh) {
         this.skyMesh.visible = false;
       }
-      // Apply background color/texture & fog
+      // Apply background color/texture
       if (skyType === "night" || lightMode === "night") {
         this.scene.background = new THREE.Color(0x020210);
-        this.scene.fog = new THREE.FogExp2(0x020210, 0.015);
       } else if (skyType === "sunset" || lightMode === "sunset") {
         const sunsetColor = 0xffae88;
         this.scene.background = new THREE.Color(sunsetColor);
-        this.scene.fog = new THREE.Fog(sunsetColor, 10, 60);
       } else if (isSkyboxActive) {
-        // Skybox mode
-        if (config.enableSkyboxFog) {
-          const fogColor = config.fogColor || "#87ceeb";
-          const fogNear = config.fogNear !== undefined ? Number(config.fogNear) : 15;
-          const fogFar = config.fogFar !== undefined ? Number(config.fogFar) : 75;
-          this.scene.fog = new THREE.Fog(fogColor, fogNear, fogFar);
-        } else {
-          this.scene.fog = null;
-        }
+        // Skybox texture loading is handled asynchronously by setSky
       } else {
         this.scene.background = new THREE.Color(0x87ceeb);
-        this.scene.fog = new THREE.Fog(0x87ceeb, 10, 50);
       }
+    }
+
+    // Unified Fog Application for ALL Sky Types (day, night, sunset, shader, and cubemaps)
+    const presetDefaults = getSkyboxPresetDefaults(skyType);
+    const isFogEnabled = config.enableSkyboxFog !== undefined ? !!config.enableSkyboxFog : !!presetDefaults.enableSkyboxFog;
+    
+    if (isFogEnabled) {
+      const fogColor = config.fogColor || presetDefaults.fogColor || "#87ceeb";
+      const fogNear = config.fogNear !== undefined ? Number(config.fogNear) : (presetDefaults.fogNear ?? 10);
+      const fogFar = config.fogFar !== undefined ? Number(config.fogFar) : (presetDefaults.fogFar ?? 50);
+      this.scene.fog = new THREE.Fog(fogColor, fogNear, fogFar);
+    } else {
+      this.scene.fog = null;
     }
 
     // 3. Dynamic Ciclo Día/Noche o presets de luces

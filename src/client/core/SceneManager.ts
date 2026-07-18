@@ -91,7 +91,8 @@ export class SceneManager {
       sizeAttenuation: true,
       transparent: true,
       opacity: 0.85,
-      depthWrite: false
+      depthWrite: false,
+      fog: false
     });
 
     const starVertices = [];
@@ -338,6 +339,7 @@ export class SceneManager {
       if (!this.skyMesh) {
         this.skyMesh = new Sky();
         this.skyMesh.scale.setScalar(450000);
+        (this.skyMesh.material as THREE.ShaderMaterial).fog = false;
         this.scene.add(this.skyMesh);
       }
       this.skyMesh.visible = true;

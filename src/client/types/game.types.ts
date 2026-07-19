@@ -56,6 +56,8 @@ export interface EnvironmentConfig {
 	skyRayleigh?: number;
 	skyMieCoefficient?: number;
 	skyMieDirectionalG?: number;
+	dayNightTimeline?: import("../platform/timelineDefaults").TimelineKeyframe[];
+	isCycleSimulating?: boolean;
 }
 
 export interface MainBootstrapOptions {

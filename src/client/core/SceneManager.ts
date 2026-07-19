@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { Sky } from "three/addons/objects/Sky.js";
 import { getSkyboxPresetDefaults } from "../platform/skyboxPresets";
+import { interpolateTimelineState } from "../platform/timelineDefaults";
 
 const SKYBOX_PREFIX = "skybox:";
 const SKYBOX_FACE_LAYOUT = {
@@ -369,17 +370,38 @@ export class SceneManager {
       }
     }
 
+    // Dynamic timeline cycle evaluation
+    const isDynamicCycle = config.timeOfDay !== undefined || !!config.enableDayNightCycle || !!config.isCycleSimulating;
+    let interpolated: any = null;
+
+    if (isDynamicCycle) {
+      const timeOfDay = config.timeOfDay !== undefined ? config.timeOfDay : 12;
+      interpolated = interpolateTimelineState(config.dayNightTimeline, timeOfDay);
+    }
+
     // Unified Fog Application for ALL Sky Types (day, night, sunset, shader, and cubemaps)
-    const presetDefaults = getSkyboxPresetDefaults(skyType);
-    const isFogEnabled = config.enableSkyboxFog !== undefined ? !!config.enableSkyboxFog : !!presetDefaults.enableSkyboxFog;
-    
-    if (isFogEnabled) {
-      const fogColor = config.fogColor || presetDefaults.fogColor || "#87ceeb";
-      const fogNear = config.fogNear !== undefined ? Number(config.fogNear) : (presetDefaults.fogNear ?? 10);
-      const fogFar = config.fogFar !== undefined ? Number(config.fogFar) : (presetDefaults.fogFar ?? 50);
-      this.scene.fog = new THREE.Fog(fogColor, fogNear, fogFar);
+    if (isDynamicCycle && interpolated) {
+      const isFogEnabled = config.enableSkyboxFog !== undefined ? !!config.enableSkyboxFog : !!interpolated.enableSkyboxFog;
+      if (isFogEnabled) {
+        const fogColor = config.fogColor || interpolated.fogColor || "#87ceeb";
+        const fogNear = config.fogNear !== undefined ? Number(config.fogNear) : (interpolated.fogNear ?? 10);
+        const fogFar = config.fogFar !== undefined ? Number(config.fogFar) : (interpolated.fogFar ?? 50);
+        this.scene.fog = new THREE.Fog(fogColor, fogNear, fogFar);
+      } else {
+        this.scene.fog = null;
+      }
     } else {
-      this.scene.fog = null;
+      const presetDefaults = getSkyboxPresetDefaults(skyType);
+      const isFogEnabled = config.enableSkyboxFog !== undefined ? !!config.enableSkyboxFog : !!presetDefaults.enableSkyboxFog;
+      
+      if (isFogEnabled) {
+        const fogColor = config.fogColor || presetDefaults.fogColor || "#87ceeb";
+        const fogNear = config.fogNear !== undefined ? Number(config.fogNear) : (presetDefaults.fogNear ?? 10);
+        const fogFar = config.fogFar !== undefined ? Number(config.fogFar) : (presetDefaults.fogFar ?? 50);
+        this.scene.fog = new THREE.Fog(fogColor, fogNear, fogFar);
+      } else {
+        this.scene.fog = null;
+      }
     }
 
     // 3. Dynamic Ciclo Día/Noche o presets de luces
@@ -390,7 +412,16 @@ export class SceneManager {
     let sunElevation = config.sunElevation !== undefined ? Number(config.sunElevation) : 45; // Degrees
     let sunAzimuth = config.sunAzimuth !== undefined ? Number(config.sunAzimuth) : 180;
 
-    if (lightMode === "cycle") {
+    if (isDynamicCycle && interpolated) {
+      sunIntensity = interpolated.sunIntensity;
+      sunColor = interpolated.sunColor;
+      ambientIntensity = interpolated.ambientIntensity;
+      ambientColor = interpolated.ambientColor;
+      sunElevation = interpolated.sunElevation;
+      sunAzimuth = interpolated.sunAzimuth;
+      this.scene.environmentIntensity = interpolated.environmentIntensity;
+      this.scene.backgroundIntensity = interpolated.backgroundIntensity;
+    } else if (lightMode === "cycle") {
       const time = config.timeOfDay !== undefined ? config.timeOfDay : 12; // 0 to 24
       
       const angle = (time / 24) * Math.PI * 2 - Math.PI / 2;
@@ -444,9 +475,9 @@ export class SceneManager {
 
     // Star Visibility Evaluation
     if (this.stars) {
-      const isSkyboxActive = typeof skyType === "string" && skyType.startsWith(SKYBOX_PREFIX);
-      
-      if (isSkyboxActive) {
+      if (isDynamicCycle && interpolated) {
+        this.stars.visible = !!interpolated.enableStars;
+      } else if (isSkyboxActive) {
         // Skybox mode: controlled by enableStarsSkybox flag
         this.stars.visible = !!config.enableStarsSkybox;
       } else if (lightMode === "cycle") {

@@ -16,6 +16,7 @@ import { listAssets, uploadAsset } from "../platform/api";
 import { getDefaultTextureSettings, normalizeTextureSettings } from "../utils/TextureMapping";
 import { GRAVITY_ORIENTATION_OPTIONS } from "../utils/GravityOrientation";
 import { getSkyboxPresetDefaults } from "../platform/skyboxPresets";
+import { formatTimeOfDayHHMM, interpolateTimelineState, updateKeyframeInTimeline } from "../platform/timelineDefaults";
 
 const SKYBOX_CUBEMAP_DIR = "/assets/skybox/Cubemap";
 const SKYBOX_VALUE_PREFIX = "skybox:";
@@ -1475,29 +1476,40 @@ export class ConstructionMenu {
         sec1Title.style.cssText = "font-size: 13px; font-weight: bold; color: #93c5fd;";
         section1.appendChild(sec1Title);
 
+        const updateEnvProp = (partial: any) => {
+            const currentCfg = this.game.environmentConfig || {};
+            const currentTime = currentCfg.timeOfDay !== undefined ? Number(currentCfg.timeOfDay) : 12;
+            const updatedTimeline = updateKeyframeInTimeline(currentCfg.dayNightTimeline, currentTime, partial);
+            this.game.updateEnvironmentConfig({
+                ...partial,
+                dayNightTimeline: updatedTimeline
+            });
+            this.refreshSettings();
+        };
+
         const ctrlEnv = buildSliderRow("Intensidad Reflejos IBL (Tinte 3D):", 0, 3, 0.05, 1.0, "", (v) => {
-            this.game.updateEnvironmentConfig({ environmentIntensity: v });
+            updateEnvProp({ environmentIntensity: v });
         });
         this.sliderEnvIntensity = ctrlEnv.slider;
         this.valEnvIntensity = ctrlEnv.valSpan;
         section1.appendChild(ctrlEnv.row);
 
         const ctrlBg = buildSliderRow("Brillo del Fondo Skybox:", 0, 3, 0.05, 1.0, "", (v) => {
-            this.game.updateEnvironmentConfig({ backgroundIntensity: v });
+            updateEnvProp({ backgroundIntensity: v });
         });
         this.sliderBgIntensity = ctrlBg.slider;
         this.valBgIntensity = ctrlBg.valSpan;
         section1.appendChild(ctrlBg.row);
 
         const ctrlRot = buildSliderRow("Rotación del Skybox (Eje Y):", 0, 360, 1, 0, "°", (v) => {
-            this.game.updateEnvironmentConfig({ skyboxRotation: v });
+            updateEnvProp({ skyboxRotation: v });
         });
         this.sliderSkyRotation = ctrlRot.slider;
         this.valSkyRotation = ctrlRot.valSpan;
         section1.appendChild(ctrlRot.row);
 
         const ctrlBlur = buildSliderRow("Desenfoque del Fondo:", 0, 1, 0.05, 0.0, "", (v) => {
-            this.game.updateEnvironmentConfig({ backgroundBlurriness: v });
+            updateEnvProp({ backgroundBlurriness: v });
         });
         this.sliderBgBlur = ctrlBlur.slider;
         this.valBgBlur = ctrlBlur.valSpan;
@@ -1520,7 +1532,7 @@ export class ConstructionMenu {
         this.checkSunLight.id = "chk-sun-light";
         this.checkSunLight.style.transform = "scale(1.2)";
         this.checkSunLight.addEventListener("change", (e: any) => {
-            this.game.updateEnvironmentConfig({ enableSunLight: e.target.checked });
+            updateEnvProp({ enableSunLight: e.target.checked });
         });
         const lblChkSun = document.createElement("label");
         lblChkSun.textContent = "Habilitar Luz Solar Directa";
@@ -1531,14 +1543,14 @@ export class ConstructionMenu {
         section2.appendChild(rowChkSun);
 
         const ctrlSunCol = buildColorRow("Color Luz del Sol:", "#ffffff", (hex) => {
-            this.game.updateEnvironmentConfig({ sunColor: hex });
+            updateEnvProp({ sunColor: hex });
         });
         this.inputSkySunColor = ctrlSunCol.colorInput;
         this.hexSkySunColor = ctrlSunCol.hexSpan;
         section2.appendChild(ctrlSunCol.row);
 
         const ctrlSunInt = buildSliderRow("Intensidad Solar:", 0, 3, 0.05, 0.8, "", (v) => {
-            this.game.updateEnvironmentConfig({ sunIntensity: v });
+            updateEnvProp({ sunIntensity: v });
         });
         this.sliderSkySunIntensity = ctrlSunInt.slider;
         this.valSkySunIntensity = ctrlSunInt.valSpan;
@@ -1551,7 +1563,7 @@ export class ConstructionMenu {
         this.checkAmbientLight.id = "chk-ambient-light";
         this.checkAmbientLight.style.transform = "scale(1.2)";
         this.checkAmbientLight.addEventListener("change", (e: any) => {
-            this.game.updateEnvironmentConfig({ enableAmbientLight: e.target.checked });
+            updateEnvProp({ enableAmbientLight: e.target.checked });
         });
         const lblChkAmb = document.createElement("label");
         lblChkAmb.textContent = "Habilitar Luz Ambiental";
@@ -1562,14 +1574,14 @@ export class ConstructionMenu {
         section2.appendChild(rowChkAmb);
 
         const ctrlAmbCol = buildColorRow("Color Luz Ambiental:", "#ffffff", (hex) => {
-            this.game.updateEnvironmentConfig({ ambientColor: hex });
+            updateEnvProp({ ambientColor: hex });
         });
         this.inputSkyAmbientColor = ctrlAmbCol.colorInput;
         this.hexSkyAmbientColor = ctrlAmbCol.hexSpan;
         section2.appendChild(ctrlAmbCol.row);
 
         const ctrlAmbInt = buildSliderRow("Intensidad Ambiental:", 0, 3, 0.05, 0.6, "", (v) => {
-            this.game.updateEnvironmentConfig({ ambientIntensity: v });
+            updateEnvProp({ ambientIntensity: v });
         });
         this.sliderSkyAmbientIntensity = ctrlAmbInt.slider;
         this.valSkyAmbientIntensity = ctrlAmbInt.valSpan;
@@ -1592,7 +1604,7 @@ export class ConstructionMenu {
         this.checkSkyboxFog.id = "chk-skybox-fog";
         this.checkSkyboxFog.style.transform = "scale(1.2)";
         this.checkSkyboxFog.addEventListener("change", (e: any) => {
-            this.game.updateEnvironmentConfig({ enableSkyboxFog: e.target.checked });
+            updateEnvProp({ enableSkyboxFog: e.target.checked });
         });
         const lblChkFog = document.createElement("label");
         lblChkFog.textContent = "Habilitar Niebla Atmosférica";
@@ -1603,21 +1615,21 @@ export class ConstructionMenu {
         section3.appendChild(rowChkFog);
 
         const ctrlFogCol = buildColorRow("Color de Niebla:", "#87ceeb", (hex) => {
-            this.game.updateEnvironmentConfig({ fogColor: hex });
+            updateEnvProp({ fogColor: hex });
         });
         this.inputSkyFogColor = ctrlFogCol.colorInput;
         this.hexSkyFogColor = ctrlFogCol.hexSpan;
         section3.appendChild(ctrlFogCol.row);
 
         const ctrlFogNear = buildSliderRow("Distancia Cercana:", 0, 100, 1, 15, "m", (v) => {
-            this.game.updateEnvironmentConfig({ fogNear: v });
+            updateEnvProp({ fogNear: v });
         });
         this.sliderSkyFogNear = ctrlFogNear.slider;
         this.valSkyFogNear = ctrlFogNear.valSpan;
         section3.appendChild(ctrlFogNear.row);
 
         const ctrlFogFar = buildSliderRow("Distancia Lejana:", 10, 300, 1, 75, "m", (v) => {
-            this.game.updateEnvironmentConfig({ fogFar: v });
+            updateEnvProp({ fogFar: v });
         });
         this.sliderSkyFogFar = ctrlFogFar.slider;
         this.valSkyFogFar = ctrlFogFar.valSpan;
@@ -1710,34 +1722,18 @@ export class ConstructionMenu {
         labelLighting.style.color = "#aaa";
         rowLighting.appendChild(labelLighting);
 
-        // Light Mode Select
+        // Modo de Iluminación Unificado
         const rowLightMode = document.createElement("div");
         rowLightMode.style.cssText = "display: flex; justify-content: space-between; align-items: center; gap: 10px;";
         const labelLMode = document.createElement("span");
         labelLMode.textContent = "Modo de Iluminación:";
         labelLMode.style.fontSize = "14px";
         labelLMode.style.color = "#ccc";
-        this.selectLightMode = document.createElement("select");
-        this.selectLightMode.style.cssText = "padding: 6px; background:#333; color:white; border:1px solid #555; border-radius:4px; cursor:pointer; width:150px;";
-        [
-            { value: "day", label: "Día" },
-            { value: "night", label: "Noche Oscura" },
-            { value: "sunset", label: "Atardecer" },
-            { value: "custom", label: "Personalizado" },
-            { value: "cycle", label: "Ciclo Dinámico" }
-        ].forEach(opt => {
-            const o = document.createElement("option");
-            o.value = opt.value;
-            o.textContent = opt.label;
-            this.selectLightMode.appendChild(o);
-        });
-        this.selectLightMode.addEventListener("change", (e) => {
-            const val = e.target.value;
-            this.game.updateEnvironmentConfig({ lightMode: val });
-            this.refreshSettings();
-        });
+        const badgeLMode = document.createElement("span");
+        badgeLMode.textContent = "☀️ Modo Día / Base Unificado";
+        badgeLMode.style.cssText = "padding: 5px 10px; background:#1e293b; color:#38bdf8; border:1px solid #38bdf8; border-radius:6px; font-size:12px; font-weight:bold;";
         rowLightMode.appendChild(labelLMode);
-        rowLightMode.appendChild(this.selectLightMode);
+        rowLightMode.appendChild(badgeLMode);
         rowLighting.appendChild(rowLightMode);
 
         // Shadow Quality Select
@@ -1904,37 +1900,210 @@ export class ConstructionMenu {
 
         rowLighting.appendChild(rowStarsGroup);
 
-        // Enable Day/Night Cycle Checkbox
-        const rowEnableCycle = document.createElement("div");
-        rowEnableCycle.style.cssText = "display: flex; align-items: center; gap: 10px;";
-        this.checkEnableCycle = document.createElement("input");
-        this.checkEnableCycle.type = "checkbox";
-        this.checkEnableCycle.id = "chk-enable-cycle";
-        this.checkEnableCycle.style.transform = "scale(1.3)";
-        this.checkEnableCycle.addEventListener("change", (e) => {
-            this.game.updateEnvironmentConfig({ enableDayNightCycle: e.target.checked });
-            this.refreshSettings();
-        });
-        const labelEnableCycle = document.createElement("label");
-        labelEnableCycle.textContent = "Activar Transición de Tiempo (Ciclo)";
-        labelEnableCycle.htmlFor = "chk-enable-cycle";
-        labelEnableCycle.style.fontSize = "14px";
-        labelEnableCycle.style.cursor = "pointer";
-        rowEnableCycle.appendChild(this.checkEnableCycle);
-        rowEnableCycle.appendChild(labelEnableCycle);
-        rowLighting.appendChild(rowEnableCycle);
+        // ------------------ Panel de Simulación de 24 Horas & Línea del Tiempo ------------------
+        const simContainer = document.createElement("div");
+        simContainer.style.cssText = `
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-top: 10px;
+            padding: 12px;
+            background: #0f172a;
+            border: 1px solid #38bdf8;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+        `;
 
-        // Time of Day Slider
+        // Top Control Bar: Simulación: [ ▶️ ] [ ⏸️ ] [ ⏹️ ] | [ ⏮️ ] [ ⏭️ ] | ⏱️ 00:00
+        const simTopBar = document.createElement("div");
+        simTopBar.style.cssText = "display: flex; justify-content: space-between; align-items: center; background: #1e293b; padding: 8px 12px; border-radius: 6px; flex-wrap: wrap; gap: 8px;";
+
+        const leftControls = document.createElement("div");
+        leftControls.style.cssText = "display: flex; align-items: center; gap: 6px;";
+
+        const simLabel = document.createElement("span");
+        simLabel.textContent = "Simulación:";
+        simLabel.style.cssText = "font-size: 13px; font-weight: bold; color: #94a3b8; margin-right: 4px;";
+        leftControls.appendChild(simLabel);
+
+        const btnPlay = document.createElement("button");
+        btnPlay.type = "button";
+        btnPlay.innerHTML = "▶️";
+        btnPlay.title = "Iniciar Simulación del Día";
+        btnPlay.style.cssText = "padding: 6px 10px; background: #16a34a; border: none; border-radius: 4px; cursor: pointer; color: white; font-size: 13px; transition: background 0.2s;";
+        btnPlay.onmouseover = () => btnPlay.style.background = "#15803d";
+        btnPlay.onmouseout = () => btnPlay.style.background = "#16a34a";
+        btnPlay.onclick = () => {
+            this.game.updateEnvironmentConfig({ enableDayNightCycle: true, isCycleSimulating: true });
+            this.refreshSettings();
+        };
+
+        const btnPause = document.createElement("button");
+        btnPause.type = "button";
+        btnPause.innerHTML = "⏸️";
+        btnPause.title = "Pausar Simulación";
+        btnPause.style.cssText = "padding: 6px 10px; background: #ca8a04; border: none; border-radius: 4px; cursor: pointer; color: white; font-size: 13px; transition: background 0.2s;";
+        btnPause.onmouseover = () => btnPause.style.background = "#a16207";
+        btnPause.onmouseout = () => btnPause.style.background = "#ca8a04";
+        btnPause.onclick = () => {
+            this.game.updateEnvironmentConfig({ enableDayNightCycle: false, isCycleSimulating: false });
+            this.refreshSettings();
+        };
+
+        const btnStop = document.createElement("button");
+        btnStop.type = "button";
+        btnStop.innerHTML = "⏹️";
+        btnStop.title = "Detener y Reiniciar (12:00 Mediodía)";
+        btnStop.style.cssText = "padding: 6px 10px; background: #dc2626; border: none; border-radius: 4px; cursor: pointer; color: white; font-size: 13px; transition: background 0.2s;";
+        btnStop.onmouseover = () => btnStop.style.background = "#b91c1c";
+        btnStop.onmouseout = () => btnStop.style.background = "#dc2626";
+        btnStop.onclick = () => {
+            this.game.updateEnvironmentConfig({ enableDayNightCycle: false, isCycleSimulating: false, timeOfDay: 12 });
+            this.refreshSettings();
+        };
+
+        const sep1 = document.createElement("span");
+        sep1.textContent = "|";
+        sep1.style.cssText = "color: #475569; margin: 0 4px; font-weight: bold;";
+
+        const btnPrev = document.createElement("button");
+        btnPrev.type = "button";
+        btnPrev.innerHTML = "⏮️";
+        btnPrev.title = "Estado Anterior";
+        btnPrev.style.cssText = "padding: 6px 10px; background: #334155; border: none; border-radius: 4px; cursor: pointer; color: white; font-size: 13px; transition: background 0.2s;";
+        btnPrev.onmouseover = () => btnPrev.style.background = "#475569";
+        btnPrev.onmouseout = () => btnPrev.style.background = "#334155";
+        btnPrev.onclick = () => {
+            const times = [0, 6, 12, 18];
+            const currentT = this.game.environmentConfig?.timeOfDay ?? 12;
+            let prevT = 18;
+            for (let i = times.length - 1; i >= 0; i--) {
+                if (times[i] < currentT - 0.1) {
+                    prevT = times[i];
+                    break;
+                }
+            }
+            this.game.updateEnvironmentConfig({ timeOfDay: prevT, isCycleSimulating: false, enableDayNightCycle: false });
+            this.refreshSettings();
+        };
+
+        const btnNext = document.createElement("button");
+        btnNext.type = "button";
+        btnNext.innerHTML = "⏭️";
+        btnNext.title = "Estado Siguiente";
+        btnNext.style.cssText = "padding: 6px 10px; background: #334155; border: none; border-radius: 4px; cursor: pointer; color: white; font-size: 13px; transition: background 0.2s;";
+        btnNext.onmouseover = () => btnNext.style.background = "#475569";
+        btnNext.onmouseout = () => btnNext.style.background = "#334155";
+        btnNext.onclick = () => {
+            const times = [0, 6, 12, 18];
+            const currentT = this.game.environmentConfig?.timeOfDay ?? 12;
+            let nextT = 0;
+            for (let i = 0; i < times.length; i++) {
+                if (times[i] > currentT + 0.1) {
+                    nextT = times[i];
+                    break;
+                }
+            }
+            this.game.updateEnvironmentConfig({ timeOfDay: nextT, isCycleSimulating: false, enableDayNightCycle: false });
+            this.refreshSettings();
+        };
+
+        leftControls.appendChild(btnPlay);
+        leftControls.appendChild(btnPause);
+        leftControls.appendChild(btnStop);
+        leftControls.appendChild(sep1);
+        leftControls.appendChild(btnPrev);
+        leftControls.appendChild(btnNext);
+
+        const clockDisplay = document.createElement("div");
+        clockDisplay.style.cssText = "display: flex; align-items: center; gap: 6px; font-family: monospace; font-size: 17px; font-weight: bold; color: #38bdf8;";
+        this.simClockSpan = document.createElement("span");
+        this.simClockSpan.textContent = "⏱️ 12:00";
+        clockDisplay.appendChild(this.simClockSpan);
+
+        simTopBar.appendChild(leftControls);
+        simTopBar.appendChild(clockDisplay);
+        simContainer.appendChild(simTopBar);
+
+        // 4 Keyframe Cards Grid
+        const cardsGrid = document.createElement("div");
+        cardsGrid.style.cssText = "display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-top: 4px;";
+
+        const keyframeCardsData = [
+            { time: 0, label: "Noche", timeStr: "00:00", icon: "🌙", sub: "Estrellas & Luna" },
+            { time: 6, label: "Amanecer", timeStr: "06:00", icon: "🌅", sub: "Luz Dorada" },
+            { time: 12, label: "Mediodía", timeStr: "12:00", icon: "☀️", sub: "Luz Cenital" },
+            { time: 18, label: "Atardecer", timeStr: "18:00", icon: "🌇", sub: "Ocaso Cálido" }
+        ];
+
+        this.keyframeCardElements = [];
+        keyframeCardsData.forEach((k) => {
+            const card = document.createElement("button");
+            card.type = "button";
+            card.style.cssText = `
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                gap: 4px;
+                padding: 12px 8px;
+                background: #1e293b;
+                border: 2px solid #334155;
+                border-radius: 8px;
+                cursor: pointer;
+                color: white;
+                transition: all 0.2s;
+            `;
+            card.onmouseover = () => {
+                if (card.dataset.active !== "true") card.style.borderColor = "#64748b";
+            };
+            card.onmouseout = () => {
+                if (card.dataset.active !== "true") card.style.borderColor = "#334155";
+            };
+            card.onclick = () => {
+                this.game.updateEnvironmentConfig({ timeOfDay: k.time, isCycleSimulating: false, enableDayNightCycle: false });
+                this.refreshSettings();
+            };
+
+            const iconSpan = document.createElement("span");
+            iconSpan.textContent = k.icon;
+            iconSpan.style.fontSize = "26px";
+
+            const titleSpan = document.createElement("span");
+            titleSpan.textContent = k.label;
+            titleSpan.style.cssText = "font-size: 13px; font-weight: bold; color: #f8fafc;";
+
+            const timeSpan = document.createElement("span");
+            timeSpan.textContent = k.timeStr;
+            timeSpan.style.cssText = "font-size: 12px; font-family: monospace; font-weight: bold; color: #38bdf8;";
+
+            const subSpan = document.createElement("span");
+            subSpan.textContent = k.sub;
+            subSpan.style.cssText = "font-size: 10px; color: #94a3b8;";
+
+            card.appendChild(iconSpan);
+            card.appendChild(titleSpan);
+            card.appendChild(timeSpan);
+            card.appendChild(subSpan);
+            cardsGrid.appendChild(card);
+            this.keyframeCardElements.push({ time: k.time, card });
+        });
+
+        simContainer.appendChild(cardsGrid);
+
+        // Sliders for Time of Day & Speed inside Sim Container
         this.rowTimeOfDay = document.createElement("div");
-        this.rowTimeOfDay.style.cssText = "display: flex; flex-direction: column; gap: 4px;";
+        this.rowTimeOfDay.style.cssText = "display: flex; flex-direction: column; gap: 4px; margin-top: 6px;";
         const labelTODRow = document.createElement("div");
-        labelTODRow.style.cssText = "display: flex; justify-content: space-between; font-size:13px; color:#ccc;";
+        labelTODRow.style.cssText = "display: flex; justify-content: space-between; font-size:12px; color:#cbd5e1;";
         const labelTOD = document.createElement("span");
-        labelTOD.textContent = "Hora del Día:";
+        labelTOD.textContent = "Control Manual de Hora (0 a 24h):";
         this.valTimeOfDay = document.createElement("span");
-        this.valTimeOfDay.style.color = "#ffaa00";
+        this.valTimeOfDay.style.color = "#38bdf8";
+        this.valTimeOfDay.style.fontWeight = "bold";
         labelTODRow.appendChild(labelTOD);
         labelTODRow.appendChild(this.valTimeOfDay);
+
         this.sliderTimeOfDay = document.createElement("input");
         this.sliderTimeOfDay.type = "range";
         this.sliderTimeOfDay.min = "0";
@@ -1942,25 +2111,26 @@ export class ConstructionMenu {
         this.sliderTimeOfDay.step = "0.1";
         this.sliderTimeOfDay.style.cssText = "cursor:pointer; width:100%;";
         this.sliderTimeOfDay.addEventListener("input", (e) => {
-            const val = parseFloat(e.target.value);
+            const val = parseFloat((e.target as any).value);
             this.game.updateEnvironmentConfig({ timeOfDay: val });
-            this.valTimeOfDay.textContent = val.toFixed(1) + " hrs";
+            this.refreshSettings();
         });
         this.rowTimeOfDay.appendChild(labelTODRow);
         this.rowTimeOfDay.appendChild(this.sliderTimeOfDay);
-        rowLighting.appendChild(this.rowTimeOfDay);
+        simContainer.appendChild(this.rowTimeOfDay);
 
-        // Cycle Speed Slider
         this.rowCycleSpeed = document.createElement("div");
         this.rowCycleSpeed.style.cssText = "display: flex; flex-direction: column; gap: 4px;";
         const labelCSRow = document.createElement("div");
-        labelCSRow.style.cssText = "display: flex; justify-content: space-between; font-size:13px; color:#ccc;";
+        labelCSRow.style.cssText = "display: flex; justify-content: space-between; font-size:12px; color:#cbd5e1;";
         const labelCS = document.createElement("span");
-        labelCS.textContent = "Velocidad de Tiempo:";
+        labelCS.textContent = "Velocidad de Simulación:";
         this.valCycleSpeed = document.createElement("span");
-        this.valCycleSpeed.style.color = "#00ffcc";
+        this.valCycleSpeed.style.color = "#4ade80";
+        this.valCycleSpeed.style.fontWeight = "bold";
         labelCSRow.appendChild(labelCS);
         labelCSRow.appendChild(this.valCycleSpeed);
+
         this.sliderCycleSpeed = document.createElement("input");
         this.sliderCycleSpeed.type = "range";
         this.sliderCycleSpeed.min = "0";
@@ -1968,13 +2138,15 @@ export class ConstructionMenu {
         this.sliderCycleSpeed.step = "0.01";
         this.sliderCycleSpeed.style.cssText = "cursor:pointer; width:100%;";
         this.sliderCycleSpeed.addEventListener("input", (e) => {
-            const val = parseFloat(e.target.value);
+            const val = parseFloat((e.target as any).value);
             this.game.updateEnvironmentConfig({ cycleSpeed: val });
             this.valCycleSpeed.textContent = (val * 10).toFixed(1) + "x";
         });
         this.rowCycleSpeed.appendChild(labelCSRow);
         this.rowCycleSpeed.appendChild(this.sliderCycleSpeed);
-        rowLighting.appendChild(this.rowCycleSpeed);
+        simContainer.appendChild(this.rowCycleSpeed);
+
+        rowLighting.appendChild(simContainer);
 
         // Custom Light intensities and colors rows
         this.rowCustomLights = document.createElement("div");
@@ -2356,19 +2528,43 @@ export class ConstructionMenu {
         if (this.checkStarsSkybox) this.checkStarsSkybox.checked = !!config.enableStarsSkybox;
         if (this.checkStarsCycle) this.checkStarsCycle.checked = config.enableStarsCycle !== false;
 
-        if (this.checkEnableCycle) this.checkEnableCycle.checked = !!config.enableDayNightCycle;
-
-        const hasCycle = config.lightMode === "cycle" || !!config.enableDayNightCycle;
-        if (this.rowTimeOfDay) this.rowTimeOfDay.style.display = hasCycle ? "flex" : "none";
-        if (this.sliderTimeOfDay) {
-            this.sliderTimeOfDay.value = String(config.timeOfDay !== undefined ? config.timeOfDay : 12);
-            if (this.valTimeOfDay) this.valTimeOfDay.textContent = (config.timeOfDay !== undefined ? Number(config.timeOfDay) : 12).toFixed(1) + " hrs";
+        const currentTime = config.timeOfDay !== undefined ? Number(config.timeOfDay) : 12;
+        if (this.simClockSpan) {
+            this.simClockSpan.textContent = "⏱️ " + formatTimeOfDayHHMM(currentTime);
         }
 
-        if (this.rowCycleSpeed) this.rowCycleSpeed.style.display = config.enableDayNightCycle ? "flex" : "none";
+        if (this.keyframeCardElements) {
+            let closestKeyTime = 12;
+            let minDiff = 999;
+            this.keyframeCardElements.forEach(k => {
+                const diff = Math.min(
+                    Math.abs(k.time - currentTime),
+                    Math.abs(k.time - (currentTime - 24)),
+                    Math.abs(k.time - (currentTime + 24))
+                );
+                if (diff < minDiff) {
+                    minDiff = diff;
+                    closestKeyTime = k.time;
+                }
+            });
+            this.keyframeCardElements.forEach(k => {
+                const isActive = k.time === closestKeyTime;
+                k.card.dataset.active = isActive ? "true" : "false";
+                k.card.style.borderColor = isActive ? "#38bdf8" : "#334155";
+                k.card.style.boxShadow = isActive ? "0 0 12px rgba(56,189,248,0.5)" : "none";
+                k.card.style.background = isActive ? "#0f172a" : "#1e293b";
+            });
+        }
+
+        if (this.sliderTimeOfDay) {
+            this.sliderTimeOfDay.value = String(currentTime);
+            if (this.valTimeOfDay) this.valTimeOfDay.textContent = currentTime.toFixed(1) + " hrs";
+        }
+
         if (this.sliderCycleSpeed) {
-            this.sliderCycleSpeed.value = String(config.cycleSpeed !== undefined ? config.cycleSpeed : 0.05);
-            if (this.valCycleSpeed) this.valCycleSpeed.textContent = ((config.cycleSpeed !== undefined ? Number(config.cycleSpeed) : 0.05) * 10).toFixed(1) + "x";
+            const spd = config.cycleSpeed !== undefined ? Number(config.cycleSpeed) : 0.05;
+            this.sliderCycleSpeed.value = String(spd);
+            if (this.valCycleSpeed) this.valCycleSpeed.textContent = (spd * 10).toFixed(1) + "x";
         }
 
         if (this.rowCustomLights) this.rowCustomLights.style.display = config.lightMode === "custom" ? "flex" : "none";
@@ -2398,16 +2594,18 @@ export class ConstructionMenu {
             this.shaderSliders.mieDirectionalG.valSpan.textContent = mieGVal.toFixed(2);
         }
 
-        // --- Refresco de Controles del Panel de Propiedades de Skybox ---
+        // --- Refresco de Controles del Panel de Propiedades de Skybox & Timeline ---
+        const interp = interpolateTimelineState(config.dayNightTimeline, currentTime);
+
         if (this.sliderEnvIntensity) {
-            const envVal = config.environmentIntensity !== undefined ? Number(config.environmentIntensity) : 1.0;
+            const envVal = config.environmentIntensity !== undefined ? Number(config.environmentIntensity) : interp.environmentIntensity;
             this.sliderEnvIntensity.value = String(envVal);
-            if (this.valEnvIntensity) this.valEnvIntensity.textContent = envVal.toFixed(2);
+            if (this.valEnvIntensity) this.valEnvIntensity.textContent = Number(envVal).toFixed(2);
         }
         if (this.sliderBgIntensity) {
-            const bgVal = config.backgroundIntensity !== undefined ? Number(config.backgroundIntensity) : 1.0;
+            const bgVal = config.backgroundIntensity !== undefined ? Number(config.backgroundIntensity) : interp.backgroundIntensity;
             this.sliderBgIntensity.value = String(bgVal);
-            if (this.valBgIntensity) this.valBgIntensity.textContent = bgVal.toFixed(2);
+            if (this.valBgIntensity) this.valBgIntensity.textContent = Number(bgVal).toFixed(2);
         }
         if (this.sliderSkyRotation) {
             const rotVal = config.skyboxRotation !== undefined ? Number(config.skyboxRotation) : 0;
@@ -2417,51 +2615,49 @@ export class ConstructionMenu {
         if (this.sliderBgBlur) {
             const blurVal = config.backgroundBlurriness !== undefined ? Number(config.backgroundBlurriness) : 0;
             this.sliderBgBlur.value = String(blurVal);
-            if (this.valBgBlur) this.valBgBlur.textContent = blurVal.toFixed(2);
+            if (this.valBgBlur) this.valBgBlur.textContent = Number(blurVal).toFixed(2);
         }
 
         if (this.checkSunLight) this.checkSunLight.checked = config.enableSunLight !== false;
         if (this.inputSkySunColor) {
-            const sc = config.sunColor || "#ffffff";
+            const sc = config.sunColor || interp.sunColor;
             this.inputSkySunColor.value = sc;
             if (this.hexSkySunColor) this.hexSkySunColor.textContent = sc;
         }
         if (this.sliderSkySunIntensity) {
-            const si = config.sunIntensity !== undefined ? Number(config.sunIntensity) : 0.8;
+            const si = config.sunIntensity !== undefined ? Number(config.sunIntensity) : interp.sunIntensity;
             this.sliderSkySunIntensity.value = String(si);
-            if (this.valSkySunIntensity) this.valSkySunIntensity.textContent = si.toFixed(2);
+            if (this.valSkySunIntensity) this.valSkySunIntensity.textContent = Number(si).toFixed(2);
         }
         if (this.checkAmbientLight) this.checkAmbientLight.checked = config.enableAmbientLight !== false;
         if (this.inputSkyAmbientColor) {
-            const ac = config.ambientColor || "#ffffff";
+            const ac = config.ambientColor || interp.ambientColor;
             this.inputSkyAmbientColor.value = ac;
             if (this.hexSkyAmbientColor) this.hexSkyAmbientColor.textContent = ac;
         }
         if (this.sliderSkyAmbientIntensity) {
-            const ai = config.ambientIntensity !== undefined ? Number(config.ambientIntensity) : 0.6;
+            const ai = config.ambientIntensity !== undefined ? Number(config.ambientIntensity) : interp.ambientIntensity;
             this.sliderSkyAmbientIntensity.value = String(ai);
-            if (this.valSkyAmbientIntensity) this.valSkyAmbientIntensity.textContent = ai.toFixed(2);
+            if (this.valSkyAmbientIntensity) this.valSkyAmbientIntensity.textContent = Number(ai).toFixed(2);
         }
 
-        const presetDefaults = getSkyboxPresetDefaults(currentSkyType);
-
-        const isFogEnabled = config.enableSkyboxFog !== undefined ? !!config.enableSkyboxFog : !!presetDefaults.enableSkyboxFog;
+        const isFogEnabled = config.enableSkyboxFog !== undefined ? !!config.enableSkyboxFog : !!interp.enableSkyboxFog;
         if (this.checkSkyboxFog) this.checkSkyboxFog.checked = isFogEnabled;
         
         if (this.inputSkyFogColor) {
-            const fc = config.fogColor || presetDefaults.fogColor || "#87ceeb";
+            const fc = config.fogColor || interp.fogColor || "#87ceeb";
             this.inputSkyFogColor.value = fc;
             if (this.hexSkyFogColor) this.hexSkyFogColor.textContent = fc;
         }
         if (this.sliderSkyFogNear) {
-            const fn = config.fogNear !== undefined ? Number(config.fogNear) : (presetDefaults.fogNear ?? 10);
+            const fn = config.fogNear !== undefined ? Number(config.fogNear) : (interp.fogNear ?? 10);
             this.sliderSkyFogNear.value = String(fn);
-            if (this.valSkyFogNear) this.valSkyFogNear.textContent = fn + "m";
+            if (this.valSkyFogNear) this.valSkyFogNear.textContent = Number(fn).toFixed(0) + "m";
         }
         if (this.sliderSkyFogFar) {
-            const ff = config.fogFar !== undefined ? Number(config.fogFar) : (presetDefaults.fogFar ?? 50);
+            const ff = config.fogFar !== undefined ? Number(config.fogFar) : (interp.fogFar ?? 50);
             this.sliderSkyFogFar.value = String(ff);
-            if (this.valSkyFogFar) this.valSkyFogFar.textContent = ff + "m";
+            if (this.valSkyFogFar) this.valSkyFogFar.textContent = Number(ff).toFixed(0) + "m";
         }
     }
 

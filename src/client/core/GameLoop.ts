@@ -221,12 +221,13 @@ export function animate(this: any) {
 	const dt = this.clock.getDelta();
 
 	// 1. Progress day/night cycle and update lights
-	if (this.environmentConfig && this.environmentConfig.enableDayNightCycle) {
+	const isSimulatingCycle = this.environmentConfig && (this.environmentConfig.enableDayNightCycle || this.environmentConfig.isCycleSimulating);
+	if (isSimulatingCycle) {
 		const speed = this.environmentConfig.cycleSpeed !== undefined ? Number(this.environmentConfig.cycleSpeed) : 0.05;
-		this.environmentConfig.timeOfDay = (this.environmentConfig.timeOfDay || 12) + dt * speed;
-		if (this.environmentConfig.timeOfDay >= 24) {
-			this.environmentConfig.timeOfDay -= 24;
-		}
+		let t = (this.environmentConfig.timeOfDay !== undefined ? Number(this.environmentConfig.timeOfDay) : 12) + dt * speed;
+		if (t >= 24) t -= 24;
+		if (t < 0) t += 24;
+		this.environmentConfig.timeOfDay = t;
 		
 		if (typeof this.updateEnvironmentLighting === "function") {
 			this.updateEnvironmentLighting();

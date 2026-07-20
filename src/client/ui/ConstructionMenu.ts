@@ -1914,66 +1914,52 @@ export class ConstructionMenu {
             box-shadow: 0 4px 12px rgba(0,0,0,0.4);
         `;
 
-        // Top Control Bar: Simulación: [ ▶️ ] [ ⏸️ ] [ ⏹️ ] | [ ⏮️ ] [ ⏭️ ] | ⏱️ 00:00
+        // Top Control Bar matching GameConfigPanel styles
         const simTopBar = document.createElement("div");
-        simTopBar.style.cssText = "display: flex; justify-content: space-between; align-items: center; background: #1e293b; padding: 8px 12px; border-radius: 6px; flex-wrap: wrap; gap: 8px;";
-
-        const leftControls = document.createElement("div");
-        leftControls.style.cssText = "display: flex; align-items: center; gap: 6px;";
+        simTopBar.style.cssText = "display: flex; gap: 5px; background: #222; padding: 8px; border-radius: 6px; align-items: center; border: 1px solid #444; flex-wrap: wrap;";
 
         const simLabel = document.createElement("span");
         simLabel.textContent = "Simulación:";
-        simLabel.style.cssText = "font-size: 13px; font-weight: bold; color: #94a3b8; margin-right: 4px;";
-        leftControls.appendChild(simLabel);
+        simLabel.style.cssText = "font-size: 11px; color: #aaa; margin-right: 5px;";
+        simTopBar.appendChild(simLabel);
 
-        const btnPlay = document.createElement("button");
-        btnPlay.type = "button";
-        btnPlay.innerHTML = "▶️";
-        btnPlay.title = "Iniciar Simulación del Día";
-        btnPlay.style.cssText = "padding: 6px 10px; background: #16a34a; border: none; border-radius: 4px; cursor: pointer; color: white; font-size: 13px; transition: background 0.2s;";
-        btnPlay.onmouseover = () => btnPlay.style.background = "#15803d";
-        btnPlay.onmouseout = () => btnPlay.style.background = "#16a34a";
-        btnPlay.onclick = () => {
+        const createCtrlBtn = (icon: string, title: string, color: string, onClick: () => void) => {
+            const btn = document.createElement("button");
+            btn.type = "button";
+            btn.innerHTML = icon;
+            btn.title = title;
+            btn.style.cssText = `
+                background: #333; color: ${color}; border: 1px solid #555; 
+                width: 30px; height: 30px; border-radius: 4px; cursor: pointer;
+                display: flex; align-items: center; justify-content: center; font-size: 14px;
+            `;
+            btn.onclick = onClick;
+            btn.onmouseenter = () => { if (btn.dataset.active !== "true") btn.style.background = "#444"; };
+            btn.onmouseleave = () => { if (btn.dataset.active !== "true") btn.style.background = "#333"; };
+            simTopBar.appendChild(btn);
+            return btn;
+        };
+
+        this.simPlayBtn = createCtrlBtn("▶", "Iniciar Simulación del Día", "#0f0", () => {
             this.game.updateEnvironmentConfig({ enableDayNightCycle: true, isCycleSimulating: true });
             this.refreshSettings();
-        };
+        });
 
-        const btnPause = document.createElement("button");
-        btnPause.type = "button";
-        btnPause.innerHTML = "⏸️";
-        btnPause.title = "Pausar Simulación";
-        btnPause.style.cssText = "padding: 6px 10px; background: #ca8a04; border: none; border-radius: 4px; cursor: pointer; color: white; font-size: 13px; transition: background 0.2s;";
-        btnPause.onmouseover = () => btnPause.style.background = "#a16207";
-        btnPause.onmouseout = () => btnPause.style.background = "#ca8a04";
-        btnPause.onclick = () => {
+        this.simPauseBtn = createCtrlBtn("⏸", "Pausar Simulación", "#fa0", () => {
             this.game.updateEnvironmentConfig({ enableDayNightCycle: false, isCycleSimulating: false });
             this.refreshSettings();
-        };
+        });
 
-        const btnStop = document.createElement("button");
-        btnStop.type = "button";
-        btnStop.innerHTML = "⏹️";
-        btnStop.title = "Detener y Reiniciar (12:00 Mediodía)";
-        btnStop.style.cssText = "padding: 6px 10px; background: #dc2626; border: none; border-radius: 4px; cursor: pointer; color: white; font-size: 13px; transition: background 0.2s;";
-        btnStop.onmouseover = () => btnStop.style.background = "#b91c1c";
-        btnStop.onmouseout = () => btnStop.style.background = "#dc2626";
-        btnStop.onclick = () => {
+        this.simStopBtn = createCtrlBtn("⏹", "Detener y Reiniciar (12:00 Mediodía)", "#f44", () => {
             this.game.updateEnvironmentConfig({ enableDayNightCycle: false, isCycleSimulating: false, timeOfDay: 12 });
             this.refreshSettings();
-        };
+        });
 
-        const sep1 = document.createElement("span");
-        sep1.textContent = "|";
-        sep1.style.cssText = "color: #475569; margin: 0 4px; font-weight: bold;";
+        const sep1 = document.createElement("div");
+        sep1.style.cssText = "width: 1px; height: 20px; background: #555; margin: 0 5px;";
+        simTopBar.appendChild(sep1);
 
-        const btnPrev = document.createElement("button");
-        btnPrev.type = "button";
-        btnPrev.innerHTML = "⏮️";
-        btnPrev.title = "Estado Anterior";
-        btnPrev.style.cssText = "padding: 6px 10px; background: #334155; border: none; border-radius: 4px; cursor: pointer; color: white; font-size: 13px; transition: background 0.2s;";
-        btnPrev.onmouseover = () => btnPrev.style.background = "#475569";
-        btnPrev.onmouseout = () => btnPrev.style.background = "#334155";
-        btnPrev.onclick = () => {
+        this.simPrevBtn = createCtrlBtn("⏮", "Estado Anterior", "#fff", () => {
             const times = [0, 6, 12, 18];
             const currentT = this.game.environmentConfig?.timeOfDay ?? 12;
             let prevT = 18;
@@ -1985,16 +1971,9 @@ export class ConstructionMenu {
             }
             this.game.updateEnvironmentConfig({ timeOfDay: prevT, isCycleSimulating: false, enableDayNightCycle: false });
             this.refreshSettings();
-        };
+        });
 
-        const btnNext = document.createElement("button");
-        btnNext.type = "button";
-        btnNext.innerHTML = "⏭️";
-        btnNext.title = "Estado Siguiente";
-        btnNext.style.cssText = "padding: 6px 10px; background: #334155; border: none; border-radius: 4px; cursor: pointer; color: white; font-size: 13px; transition: background 0.2s;";
-        btnNext.onmouseover = () => btnNext.style.background = "#475569";
-        btnNext.onmouseout = () => btnNext.style.background = "#334155";
-        btnNext.onclick = () => {
+        this.simNextBtn = createCtrlBtn("⏭", "Estado Siguiente", "#fff", () => {
             const times = [0, 6, 12, 18];
             const currentT = this.game.environmentConfig?.timeOfDay ?? 12;
             let nextT = 0;
@@ -2006,23 +1985,23 @@ export class ConstructionMenu {
             }
             this.game.updateEnvironmentConfig({ timeOfDay: nextT, isCycleSimulating: false, enableDayNightCycle: false });
             this.refreshSettings();
-        };
+        });
 
-        leftControls.appendChild(btnPlay);
-        leftControls.appendChild(btnPause);
-        leftControls.appendChild(btnStop);
-        leftControls.appendChild(sep1);
-        leftControls.appendChild(btnPrev);
-        leftControls.appendChild(btnNext);
+        // Time Display matching GameConfigPanel
+        const timeContainer = document.createElement("div");
+        timeContainer.style.cssText = "margin-left: auto; display: flex; align-items: center; gap: 5px;";
 
-        const clockDisplay = document.createElement("div");
-        clockDisplay.style.cssText = "display: flex; align-items: center; gap: 6px; font-family: monospace; font-size: 17px; font-weight: bold; color: #38bdf8;";
+        const timeIcon = document.createElement("span");
+        timeIcon.textContent = "⏱";
+        timeIcon.style.fontSize = "12px";
+        timeContainer.appendChild(timeIcon);
+
         this.simClockSpan = document.createElement("span");
-        this.simClockSpan.textContent = "⏱️ 12:00";
-        clockDisplay.appendChild(this.simClockSpan);
+        this.simClockSpan.textContent = "12:00";
+        this.simClockSpan.style.cssText = "font-family: monospace; font-size: 14px; color: #0ff;";
+        timeContainer.appendChild(this.simClockSpan);
 
-        simTopBar.appendChild(leftControls);
-        simTopBar.appendChild(clockDisplay);
+        simTopBar.appendChild(timeContainer);
         simContainer.appendChild(simTopBar);
 
         // 4 Keyframe Cards Grid
@@ -2528,9 +2507,24 @@ export class ConstructionMenu {
         if (this.checkStarsSkybox) this.checkStarsSkybox.checked = !!config.enableStarsSkybox;
         if (this.checkStarsCycle) this.checkStarsCycle.checked = config.enableStarsCycle !== false;
 
+        const isPlaying = !!config.enableDayNightCycle || !!config.isCycleSimulating;
+        if (this.simPlayBtn && this.simPauseBtn) {
+            if (isPlaying) {
+                this.simPlayBtn.style.background = "#050";
+                this.simPlayBtn.dataset.active = "true";
+                this.simPauseBtn.style.background = "#333";
+                this.simPauseBtn.dataset.active = "false";
+            } else {
+                this.simPlayBtn.style.background = "#333";
+                this.simPlayBtn.dataset.active = "false";
+                this.simPauseBtn.style.background = "#333";
+                this.simPauseBtn.dataset.active = "false";
+            }
+        }
+
         const currentTime = config.timeOfDay !== undefined ? Number(config.timeOfDay) : 12;
         if (this.simClockSpan) {
-            this.simClockSpan.textContent = "⏱️ " + formatTimeOfDayHHMM(currentTime);
+            this.simClockSpan.textContent = formatTimeOfDayHHMM(currentTime);
         }
 
         if (this.keyframeCardElements) {

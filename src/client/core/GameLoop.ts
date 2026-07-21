@@ -223,8 +223,9 @@ export function animate(this: any) {
 	// 1. Progress day/night cycle and update lights
 	const isSimulatingCycle = this.environmentConfig && (this.environmentConfig.enableDayNightCycle || this.environmentConfig.isCycleSimulating);
 	if (isSimulatingCycle) {
-		const speed = this.environmentConfig.cycleSpeed !== undefined ? Number(this.environmentConfig.cycleSpeed) : 0.05;
-		let t = (this.environmentConfig.timeOfDay !== undefined ? Number(this.environmentConfig.timeOfDay) : 12) + dt * speed;
+		const rawSpeed = this.environmentConfig.cycleSpeed !== undefined ? Number(this.environmentConfig.cycleSpeed) : 0.05;
+		const speedMultiplier = rawSpeed > 0 ? Math.max(0.1, rawSpeed * 4.0) : 0.2;
+		let t = (this.environmentConfig.timeOfDay !== undefined ? Number(this.environmentConfig.timeOfDay) : 12) + dt * speedMultiplier;
 		if (t >= 24) t -= 24;
 		if (t < 0) t += 24;
 		this.environmentConfig.timeOfDay = t;

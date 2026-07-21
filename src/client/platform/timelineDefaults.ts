@@ -213,3 +213,119 @@ export function updateKeyframeInTimeline(
   return list;
 }
 
+export const DEFAULT_DAY_NIGHT_PROFILES = [
+  {
+    id: "estandar",
+    name: "Estándar",
+    isDefault: true,
+    timeline: DEFAULT_DAY_NIGHT_TIMELINE.map(k => ({ ...k }))
+  },
+  {
+    id: "personalizado",
+    name: "Personalizado",
+    isDefault: false,
+    timeline: DEFAULT_DAY_NIGHT_TIMELINE.map(k => ({ ...k }))
+  }
+];
+
+export function getKeyframeDurationRange(timeline: TimelineKeyframe[] | undefined, keyframeId: string): string {
+  const list = timeline && timeline.length > 0 ? timeline : DEFAULT_DAY_NIGHT_TIMELINE;
+  const sorted = [...list].sort((a, b) => a.time - b.time);
+  const index = sorted.findIndex(k => k.id === keyframeId);
+  if (index === -1) return "00:00 - 24:00";
+
+  const currentKey = sorted[index];
+  const nextKey = sorted[(index + 1) % sorted.length];
+
+  const startTimeStr = formatTimeOfDayHHMM(currentKey.time);
+  const endTimeStr = formatTimeOfDayHHMM(nextKey.time);
+
+  return `${startTimeStr} - ${endTimeStr}`;
+}
+
+export function addKeyframeToTimeline(
+  timeline: TimelineKeyframe[] | undefined,
+  targetTime?: number
+): TimelineKeyframe[] {
+  const list = timeline && timeline.length > 0 ? timeline.map(k => ({ ...k })) : DEFAULT_DAY_NIGHT_TIMELINE.map(k => ({ ...k }));
+  
+  let newTime = 3.0; // default 03:00
+  if (targetTime !== undefined) {
+    newTime = ((targetTime % 24) + 24) % 24;
+  } else {
+    // Find biggest gap between existing keyframes
+    const sorted = [...list].sort((a, b) => a.time - b.time);
+    let maxGap = 0;
+    let gapTime = 3.0;
+    for (let i = 0; i < sorted.length; i++) {
+      const k1 = sorted[i];
+      const k2 = sorted[(i + 1) % sorted.length];
+      let t1 = k1.time;
+      let t2 = k2.time;
+      if (t2 <= t1) t2 += 24;
+      const gap = t2 - t1;
+      if (gap > maxGap) {
+        maxGap = gap;
+        gapTime = ((t1 + gap / 2) % 24);
+      }
+    }
+    newTime = gapTime;
+  }
+
+  const interpolated = interpolateTimelineState(list, newTime);
+  const newId = "kf_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
+  
+  // Icon and label determination
+  let icon = "🌤️";
+  let label = "Nuevo Estado";
+  if (newTime >= 22 || newTime < 5) {
+    icon = "🌌";
+    label = "Madrugada";
+  } else if (newTime >= 5 && newTime < 9) {
+    icon = "🌅";
+    label = "Amanecer";
+  } else if (newTime >= 9 && newTime < 15) {
+    icon = "☀️";
+    label = "Día";
+  } else if (newTime >= 15 && newTime < 19) {
+    icon = "🌇";
+    label = "Tarde";
+  } else {
+    icon = "🌙";
+    label = "Anochecer";
+  }
+
+  const newKf: TimelineKeyframe = {
+    id: newId,
+    time: Math.round(newTime * 10) / 10,
+    label,
+    icon,
+    sunColor: interpolated.sunColor,
+    sunIntensity: interpolated.sunIntensity,
+    ambientColor: interpolated.ambientColor,
+    ambientIntensity: interpolated.ambientIntensity,
+    sunElevation: interpolated.sunElevation,
+    sunAzimuth: interpolated.sunAzimuth,
+    environmentIntensity: interpolated.environmentIntensity,
+    backgroundIntensity: interpolated.backgroundIntensity,
+    enableSkyboxFog: interpolated.enableSkyboxFog,
+    fogColor: interpolated.fogColor,
+    fogNear: interpolated.fogNear,
+    fogFar: interpolated.fogFar,
+    enableStars: interpolated.enableStars
+  };
+
+  list.push(newKf);
+  list.sort((a, b) => a.time - b.time);
+  return list;
+}
+
+export function removeKeyframeFromTimeline(
+  timeline: TimelineKeyframe[] | undefined,
+  keyframeId: string
+): TimelineKeyframe[] {
+  const list = timeline && timeline.length > 0 ? timeline.map(k => ({ ...k })) : DEFAULT_DAY_NIGHT_TIMELINE.map(k => ({ ...k }));
+  if (list.length <= 2) return list; // Cannot remove if 2 or fewer keyframes
+  return list.filter(k => k.id !== keyframeId);
+}
+

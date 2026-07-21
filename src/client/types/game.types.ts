@@ -5,6 +5,13 @@ export interface Route {
 	roomId: string | null;
 }
 
+export interface DayNightProfile {
+	id: string;
+	name: string;
+	isDefault?: boolean;
+	timeline: import("../platform/timelineDefaults").TimelineKeyframe[];
+}
+
 export interface EnvironmentConfig {
 	shapeType?: "rect" | "circle" | "custom";
 	mapSizeX?: number;
@@ -57,6 +64,8 @@ export interface EnvironmentConfig {
 	skyMieCoefficient?: number;
 	skyMieDirectionalG?: number;
 	dayNightTimeline?: import("../platform/timelineDefaults").TimelineKeyframe[];
+	dayNightProfiles?: DayNightProfile[];
+	activeTimelineProfileId?: string;
 	isCycleSimulating?: boolean;
 }
 

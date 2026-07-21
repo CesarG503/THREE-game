@@ -16,7 +16,15 @@ import { listAssets, uploadAsset } from "../platform/api";
 import { getDefaultTextureSettings, normalizeTextureSettings } from "../utils/TextureMapping";
 import { GRAVITY_ORIENTATION_OPTIONS } from "../utils/GravityOrientation";
 import { getSkyboxPresetDefaults } from "../platform/skyboxPresets";
-import { formatTimeOfDayHHMM, interpolateTimelineState, updateKeyframeInTimeline } from "../platform/timelineDefaults";
+import {
+  formatTimeOfDayHHMM,
+  interpolateTimelineState,
+  updateKeyframeInTimeline,
+  DEFAULT_DAY_NIGHT_PROFILES,
+  getKeyframeDurationRange,
+  addKeyframeToTimeline,
+  removeKeyframeFromTimeline
+} from "../platform/timelineDefaults";
 
 const SKYBOX_CUBEMAP_DIR = "/assets/skybox/Cubemap";
 const SKYBOX_VALUE_PREFIX = "skybox:";
@@ -1480,9 +1488,20 @@ export class ConstructionMenu {
             const currentCfg = this.game.environmentConfig || {};
             const currentTime = currentCfg.timeOfDay !== undefined ? Number(currentCfg.timeOfDay) : 12;
             const updatedTimeline = updateKeyframeInTimeline(currentCfg.dayNightTimeline, currentTime, partial);
+            
+            const profiles = currentCfg.dayNightProfiles;
+            if (profiles && profiles.length > 0) {
+                const activeId = currentCfg.activeTimelineProfileId || profiles[0].id;
+                const activeProf = profiles.find(p => p.id === activeId);
+                if (activeProf) {
+                    activeProf.timeline = updatedTimeline.map(k => ({ ...k }));
+                }
+            }
+
             this.game.updateEnvironmentConfig({
                 ...partial,
-                dayNightTimeline: updatedTimeline
+                dayNightTimeline: updatedTimeline,
+                dayNightProfiles: profiles
             });
             this.refreshSettings();
         };
@@ -1908,8 +1927,8 @@ export class ConstructionMenu {
             gap: 10px;
             margin-top: 10px;
             padding: 12px;
-            background: #0f172a;
-            border: 1px solid #38bdf8;
+            background: #141414;
+            border: 1px solid #333;
             border-radius: 8px;
             box-shadow: 0 4px 12px rgba(0,0,0,0.4);
         `;
@@ -1960,12 +1979,14 @@ export class ConstructionMenu {
         simTopBar.appendChild(sep1);
 
         this.simPrevBtn = createCtrlBtn("⏮", "Estado Anterior", "#fff", () => {
-            const times = [0, 6, 12, 18];
-            const currentT = this.game.environmentConfig?.timeOfDay ?? 12;
-            let prevT = 18;
-            for (let i = times.length - 1; i >= 0; i--) {
-                if (times[i] < currentT - 0.1) {
-                    prevT = times[i];
+            const config = this.game.environmentConfig || {};
+            const timeline = config.dayNightTimeline && config.dayNightTimeline.length > 0 ? config.dayNightTimeline : DEFAULT_DAY_NIGHT_PROFILES[0].timeline;
+            const sorted = [...timeline].sort((a, b) => a.time - b.time);
+            const currentT = config.timeOfDay ?? 12;
+            let prevT = sorted[sorted.length - 1].time;
+            for (let i = sorted.length - 1; i >= 0; i--) {
+                if (sorted[i].time < currentT - 0.1) {
+                    prevT = sorted[i].time;
                     break;
                 }
             }
@@ -1974,12 +1995,14 @@ export class ConstructionMenu {
         });
 
         this.simNextBtn = createCtrlBtn("⏭", "Estado Siguiente", "#fff", () => {
-            const times = [0, 6, 12, 18];
-            const currentT = this.game.environmentConfig?.timeOfDay ?? 12;
-            let nextT = 0;
-            for (let i = 0; i < times.length; i++) {
-                if (times[i] > currentT + 0.1) {
-                    nextT = times[i];
+            const config = this.game.environmentConfig || {};
+            const timeline = config.dayNightTimeline && config.dayNightTimeline.length > 0 ? config.dayNightTimeline : DEFAULT_DAY_NIGHT_PROFILES[0].timeline;
+            const sorted = [...timeline].sort((a, b) => a.time - b.time);
+            const currentT = config.timeOfDay ?? 12;
+            let nextT = sorted[0].time;
+            for (let i = 0; i < sorted.length; i++) {
+                if (sorted[i].time > currentT + 0.1) {
+                    nextT = sorted[i].time;
                     break;
                 }
             }
@@ -2004,71 +2027,15 @@ export class ConstructionMenu {
         simTopBar.appendChild(timeContainer);
         simContainer.appendChild(simTopBar);
 
-        // 4 Keyframe Cards Grid
-        const cardsGrid = document.createElement("div");
-        cardsGrid.style.cssText = "display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-top: 4px;";
+        // Pestañas de Perfiles de Ciclo Día/Noche
+        this.simTabsContainer = document.createElement("div");
+        this.simTabsContainer.style.cssText = "display: flex; justify-content: space-between; align-items: center; gap: 6px; border-bottom: 1px solid #333; padding-bottom: 6px; flex-wrap: wrap;";
+        simContainer.appendChild(this.simTabsContainer);
 
-        const keyframeCardsData = [
-            { time: 0, label: "Noche", timeStr: "00:00", icon: "🌙", sub: "Estrellas & Luna" },
-            { time: 6, label: "Amanecer", timeStr: "06:00", icon: "🌅", sub: "Luz Dorada" },
-            { time: 12, label: "Mediodía", timeStr: "12:00", icon: "☀️", sub: "Luz Cenital" },
-            { time: 18, label: "Atardecer", timeStr: "18:00", icon: "🌇", sub: "Ocaso Cálido" }
-        ];
-
-        this.keyframeCardElements = [];
-        keyframeCardsData.forEach((k) => {
-            const card = document.createElement("button");
-            card.type = "button";
-            card.style.cssText = `
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                justify-content: center;
-                gap: 4px;
-                padding: 12px 8px;
-                background: #1e293b;
-                border: 2px solid #334155;
-                border-radius: 8px;
-                cursor: pointer;
-                color: white;
-                transition: all 0.2s;
-            `;
-            card.onmouseover = () => {
-                if (card.dataset.active !== "true") card.style.borderColor = "#64748b";
-            };
-            card.onmouseout = () => {
-                if (card.dataset.active !== "true") card.style.borderColor = "#334155";
-            };
-            card.onclick = () => {
-                this.game.updateEnvironmentConfig({ timeOfDay: k.time, isCycleSimulating: false, enableDayNightCycle: false });
-                this.refreshSettings();
-            };
-
-            const iconSpan = document.createElement("span");
-            iconSpan.textContent = k.icon;
-            iconSpan.style.fontSize = "26px";
-
-            const titleSpan = document.createElement("span");
-            titleSpan.textContent = k.label;
-            titleSpan.style.cssText = "font-size: 13px; font-weight: bold; color: #f8fafc;";
-
-            const timeSpan = document.createElement("span");
-            timeSpan.textContent = k.timeStr;
-            timeSpan.style.cssText = "font-size: 12px; font-family: monospace; font-weight: bold; color: #38bdf8;";
-
-            const subSpan = document.createElement("span");
-            subSpan.textContent = k.sub;
-            subSpan.style.cssText = "font-size: 10px; color: #94a3b8;";
-
-            card.appendChild(iconSpan);
-            card.appendChild(titleSpan);
-            card.appendChild(timeSpan);
-            card.appendChild(subSpan);
-            cardsGrid.appendChild(card);
-            this.keyframeCardElements.push({ time: k.time, card });
-        });
-
-        simContainer.appendChild(cardsGrid);
+        // Keyframe Cards Grid
+        this.simCardsGrid = document.createElement("div");
+        this.simCardsGrid.style.cssText = "display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-top: 4px;";
+        simContainer.appendChild(this.simCardsGrid);
 
         // Sliders for Time of Day & Speed inside Sim Container
         this.rowTimeOfDay = document.createElement("div");
@@ -2449,6 +2416,291 @@ export class ConstructionMenu {
         container.appendChild(rowMap);
     }
 
+    renderTimelineProfilesAndCards(forceRebuild = false) {
+        if (!this.game || !this.game.environmentConfig) return;
+        const config = this.game.environmentConfig;
+
+        // Initialize profiles if not set
+        let profiles = config.dayNightProfiles;
+        if (!profiles || profiles.length === 0) {
+            profiles = DEFAULT_DAY_NIGHT_PROFILES.map(p => ({
+                id: p.id,
+                name: p.name,
+                isDefault: p.isDefault,
+                timeline: p.timeline.map(k => ({ ...k }))
+            }));
+            config.dayNightProfiles = profiles;
+        }
+
+        let activeId = config.activeTimelineProfileId || profiles[0].id;
+        let activeProfile = profiles.find(p => p.id === activeId) || profiles[0];
+        activeId = activeProfile.id;
+
+        const timeline = (config.dayNightTimeline && config.dayNightTimeline.length > 0)
+            ? config.dayNightTimeline
+            : activeProfile.timeline;
+
+        activeProfile.timeline = timeline;
+
+        const sortedTimeline = [...timeline].sort((a, b) => a.time - b.time);
+        const currentTime = config.timeOfDay !== undefined ? Number(config.timeOfDay) : 12;
+
+        let closestKeyTime = 12;
+        let minDiff = 999;
+        sortedTimeline.forEach(k => {
+            const diff = Math.min(
+                Math.abs(k.time - currentTime),
+                Math.abs(k.time - (currentTime - 24)),
+                Math.abs(k.time - (currentTime + 24))
+            );
+            if (diff < minDiff) {
+                minDiff = diff;
+                closestKeyTime = k.time;
+            }
+        });
+
+        const shouldRebuildDOM = forceRebuild || !this.simCardsGrid || this.simCardsGrid.children.length === 0;
+
+        if (shouldRebuildDOM) {
+            // 1. Render Tab Buttons
+            if (this.simTabsContainer) {
+                this.simTabsContainer.innerHTML = "";
+
+                const leftTabsWrap = document.createElement("div");
+                leftTabsWrap.style.cssText = "display: flex; gap: 6px; align-items: center; flex-wrap: wrap;";
+
+                profiles.forEach(prof => {
+                    const isActive = prof.id === activeId;
+                    const tabBtn = document.createElement("button");
+                    tabBtn.type = "button";
+                    tabBtn.textContent = prof.name;
+                    tabBtn.style.cssText = `
+                        padding: 5px 14px;
+                        background: ${isActive ? "#0284c7" : "#222222"};
+                        border: 1px solid ${isActive ? "#00ffff" : "#444444"};
+                        border-radius: 4px;
+                        color: ${isActive ? "#ffffff" : "#aaaaaa"};
+                        font-size: 12px;
+                        font-weight: bold;
+                        cursor: pointer;
+                        transition: all 0.2s;
+                        box-shadow: ${isActive ? "0 0 8px rgba(0, 255, 255, 0.4)" : "none"};
+                    `;
+                    tabBtn.onclick = () => {
+                        this.game.updateEnvironmentConfig({
+                            activeTimelineProfileId: prof.id,
+                            dayNightTimeline: prof.timeline.map(k => ({ ...k })),
+                            dayNightProfiles: profiles
+                        });
+                        this.renderTimelineProfilesAndCards(true);
+                        this.refreshSettings();
+                    };
+
+                    if (!prof.isDefault && profiles.length > 1) {
+                        const delSpan = document.createElement("span");
+                        delSpan.textContent = " ×";
+                        delSpan.style.cssText = "margin-left: 6px; color: #ff4444; font-weight: bold; cursor: pointer;";
+                        delSpan.onclick = (e) => {
+                            e.stopPropagation();
+                            const updatedProfiles = profiles.filter(p => p.id !== prof.id);
+                            const fallbackProf = updatedProfiles[0];
+                            this.game.updateEnvironmentConfig({
+                                dayNightProfiles: updatedProfiles,
+                                activeTimelineProfileId: fallbackProf.id,
+                                dayNightTimeline: fallbackProf.timeline.map(k => ({ ...k }))
+                            });
+                            this.renderTimelineProfilesAndCards(true);
+                            this.refreshSettings();
+                        };
+                        tabBtn.appendChild(delSpan);
+                    }
+
+                    leftTabsWrap.appendChild(tabBtn);
+                });
+
+                // Plus Tab Button [+]
+                const plusBtn = document.createElement("button");
+                plusBtn.type = "button";
+                plusBtn.textContent = "+";
+                plusBtn.title = "Agregar Nueva Configuración de Ciclo";
+                plusBtn.style.cssText = `
+                    width: 28px; height: 28px;
+                    background: #222222; border: 1px solid #444444; border-radius: 4px;
+                    color: #ffffff; font-size: 14px; font-weight: bold; cursor: pointer;
+                    display: flex; align-items: center; justify-content: center;
+                    transition: background 0.2s;
+                `;
+                plusBtn.onmouseover = () => plusBtn.style.background = "#333333";
+                plusBtn.onmouseout = () => plusBtn.style.background = "#222222";
+                plusBtn.onclick = () => {
+                    const newId = "custom_" + Date.now();
+                    const newName = "Perfil " + (profiles.length + 1);
+                    const newProf = {
+                        id: newId,
+                        name: newName,
+                        isDefault: false,
+                        timeline: timeline.map(k => ({ ...k }))
+                    };
+                    profiles.push(newProf);
+                    this.game.updateEnvironmentConfig({
+                        dayNightProfiles: profiles,
+                        activeTimelineProfileId: newProf.id,
+                        dayNightTimeline: newProf.timeline.map(k => ({ ...k }))
+                    });
+                    this.renderTimelineProfilesAndCards(true);
+                    this.refreshSettings();
+                };
+                leftTabsWrap.appendChild(plusBtn);
+                this.simTabsContainer.appendChild(leftTabsWrap);
+
+                // Right Action: [+ Agregar Estado] Button
+                const rightActionsWrap = document.createElement("div");
+                rightActionsWrap.style.cssText = "display: flex; align-items: center; gap: 6px;";
+
+                const addStateBtn = document.createElement("button");
+                addStateBtn.type = "button";
+                addStateBtn.innerHTML = "<span>+</span> Agregar Estado";
+                addStateBtn.title = "Agregar Nuevo Estado / Hora al Día";
+                addStateBtn.style.cssText = `
+                    padding: 5px 12px;
+                    background: #10b981;
+                    border: none;
+                    border-radius: 4px;
+                    color: white;
+                    font-size: 11px;
+                    font-weight: bold;
+                    cursor: pointer;
+                    display: flex;
+                    align-items: center;
+                    gap: 4px;
+                    transition: background 0.2s;
+                `;
+                addStateBtn.onmouseover = () => addStateBtn.style.background = "#059669";
+                addStateBtn.onmouseout = () => addStateBtn.style.background = "#10b981";
+                addStateBtn.onclick = () => {
+                    const updatedTimeline = addKeyframeToTimeline(timeline);
+                    activeProfile.timeline = updatedTimeline;
+                    this.game.updateEnvironmentConfig({
+                        dayNightTimeline: updatedTimeline,
+                        dayNightProfiles: profiles
+                    });
+                    this.renderTimelineProfilesAndCards(true);
+                    this.refreshSettings();
+                };
+                rightActionsWrap.appendChild(addStateBtn);
+                this.simTabsContainer.appendChild(rightActionsWrap);
+            }
+
+            // 2. Render Cards Grid
+            if (this.simCardsGrid) {
+                this.simCardsGrid.innerHTML = "";
+                this.keyframeCardElements = [];
+
+                sortedTimeline.forEach(kf => {
+                    const isActive = kf.time === closestKeyTime;
+                    const durationRange = getKeyframeDurationRange(sortedTimeline, kf.id);
+
+                    const card = document.createElement("button");
+                    card.type = "button";
+                    card.dataset.active = isActive ? "true" : "false";
+                    card.style.cssText = `
+                        display: flex;
+                        flex-direction: column;
+                        align-items: center;
+                        justify-content: center;
+                        gap: 3px;
+                        padding: 10px 8px;
+                        background: ${isActive ? "#181818" : "#222222"};
+                        border: 2px solid ${isActive ? "#00ffff" : "#333333"};
+                        border-radius: 6px;
+                        cursor: pointer;
+                        color: white;
+                        position: relative;
+                        transition: all 0.2s;
+                        box-shadow: ${isActive ? "0 0 10px rgba(0, 255, 255, 0.4)" : "none"};
+                    `;
+                    card.onmouseover = () => {
+                        if (card.dataset.active !== "true") card.style.borderColor = "#555555";
+                    };
+                    card.onmouseout = () => {
+                        if (card.dataset.active !== "true") card.style.borderColor = "#333333";
+                    };
+                    card.onclick = () => {
+                        this.game.updateEnvironmentConfig({
+                            timeOfDay: kf.time,
+                            isCycleSimulating: false,
+                            enableDayNightCycle: false
+                        });
+                        this.refreshSettings();
+                    };
+
+                    if (sortedTimeline.length > 2) {
+                        const btnDelKf = document.createElement("button");
+                        btnDelKf.type = "button";
+                        btnDelKf.innerHTML = "🗑️";
+                        btnDelKf.title = "Eliminar este estado del día";
+                        btnDelKf.style.cssText = "position: absolute; top: 3px; right: 4px; background: transparent; border: none; font-size: 11px; cursor: pointer; opacity: 0.6; padding: 2px;";
+                        btnDelKf.onmouseover = () => btnDelKf.style.opacity = "1.0";
+                        btnDelKf.onmouseout = () => btnDelKf.style.opacity = "0.6";
+                        btnDelKf.onclick = (e) => {
+                            e.stopPropagation();
+                            const updatedTimeline = removeKeyframeFromTimeline(timeline, kf.id);
+                            activeProfile.timeline = updatedTimeline;
+                            this.game.updateEnvironmentConfig({
+                                dayNightTimeline: updatedTimeline,
+                                dayNightProfiles: profiles
+                            });
+                            this.renderTimelineProfilesAndCards(true);
+                            this.refreshSettings();
+                        };
+                        card.appendChild(btnDelKf);
+                    }
+
+                    const iconSpan = document.createElement("span");
+                    iconSpan.textContent = kf.icon || "🌤️";
+                    iconSpan.style.fontSize = "24px";
+
+                    const titleSpan = document.createElement("span");
+                    titleSpan.textContent = kf.label;
+                    titleSpan.style.cssText = "font-size: 13px; font-weight: bold; color: #ffffff;";
+
+                    const timeSpan = document.createElement("span");
+                    timeSpan.textContent = formatTimeOfDayHHMM(kf.time);
+                    timeSpan.style.cssText = "font-size: 12px; font-family: monospace; font-weight: bold; color: #00ffff;";
+
+                    const durationSpan = document.createElement("span");
+                    durationSpan.textContent = durationRange;
+                    durationSpan.style.cssText = "font-size: 10px; font-family: monospace; color: #888888;";
+
+                    const subSpan = document.createElement("span");
+                    subSpan.textContent = kf.skyType || (kf.enableStars ? "Estrellas & Luna" : "Luz del Día");
+                    subSpan.style.cssText = "font-size: 10px; color: #aaaaaa;";
+
+                    card.appendChild(iconSpan);
+                    card.appendChild(titleSpan);
+                    card.appendChild(timeSpan);
+                    card.appendChild(durationSpan);
+                    card.appendChild(subSpan);
+
+                    this.simCardsGrid.appendChild(card);
+                    this.keyframeCardElements.push({ time: kf.time, card });
+                });
+            }
+        } else {
+            if (this.keyframeCardElements) {
+                this.keyframeCardElements.forEach(k => {
+                    const isActive = k.time === closestKeyTime;
+                    if (k.card) {
+                        k.card.dataset.active = isActive ? "true" : "false";
+                        k.card.style.borderColor = isActive ? "#00ffff" : "#333333";
+                        k.card.style.boxShadow = isActive ? "0 0 10px rgba(0, 255, 255, 0.4)" : "none";
+                        k.card.style.background = isActive ? "#181818" : "#222222";
+                    }
+                });
+            }
+        }
+    }
+
     refreshSettings() {
         if (!this.game || !this.game.environmentConfig) return;
         const config = this.game.environmentConfig;
@@ -2527,35 +2779,14 @@ export class ConstructionMenu {
             this.simClockSpan.textContent = formatTimeOfDayHHMM(currentTime);
         }
 
-        if (this.keyframeCardElements) {
-            let closestKeyTime = 12;
-            let minDiff = 999;
-            this.keyframeCardElements.forEach(k => {
-                const diff = Math.min(
-                    Math.abs(k.time - currentTime),
-                    Math.abs(k.time - (currentTime - 24)),
-                    Math.abs(k.time - (currentTime + 24))
-                );
-                if (diff < minDiff) {
-                    minDiff = diff;
-                    closestKeyTime = k.time;
-                }
-            });
-            this.keyframeCardElements.forEach(k => {
-                const isActive = k.time === closestKeyTime;
-                k.card.dataset.active = isActive ? "true" : "false";
-                k.card.style.borderColor = isActive ? "#38bdf8" : "#334155";
-                k.card.style.boxShadow = isActive ? "0 0 12px rgba(56,189,248,0.5)" : "none";
-                k.card.style.background = isActive ? "#0f172a" : "#1e293b";
-            });
-        }
+        this.renderTimelineProfilesAndCards(false);
 
-        if (this.sliderTimeOfDay) {
+        if (this.sliderTimeOfDay && document.activeElement !== this.sliderTimeOfDay) {
             this.sliderTimeOfDay.value = String(currentTime);
             if (this.valTimeOfDay) this.valTimeOfDay.textContent = currentTime.toFixed(1) + " hrs";
         }
 
-        if (this.sliderCycleSpeed) {
+        if (this.sliderCycleSpeed && document.activeElement !== this.sliderCycleSpeed) {
             const spd = config.cycleSpeed !== undefined ? Number(config.cycleSpeed) : 0.05;
             this.sliderCycleSpeed.value = String(spd);
             if (this.valCycleSpeed) this.valCycleSpeed.textContent = (spd * 10).toFixed(1) + "x";

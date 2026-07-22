@@ -229,18 +229,82 @@ export const DEFAULT_DAY_NIGHT_PROFILES = [
 ];
 
 export function getKeyframeDurationRange(timeline: TimelineKeyframe[] | undefined, keyframeId: string): string {
+  const info = getKeyframeTimeAndDuration(timeline, keyframeId);
+  return info.rangeStr;
+}
+
+export function getKeyframeTimeAndDuration(timeline: TimelineKeyframe[] | undefined, keyframeId: string) {
   const list = timeline && timeline.length > 0 ? timeline : DEFAULT_DAY_NIGHT_TIMELINE;
   const sorted = [...list].sort((a, b) => a.time - b.time);
   const index = sorted.findIndex(k => k.id === keyframeId);
-  if (index === -1) return "00:00 - 24:00";
+  if (index === -1) return { startTime: 0, endTime: 24, duration: 24, rangeStr: "00:00 - 24:00" };
 
   const currentKey = sorted[index];
   const nextKey = sorted[(index + 1) % sorted.length];
 
+  let duration = nextKey.time - currentKey.time;
+  if (duration <= 0) duration += 24;
+
   const startTimeStr = formatTimeOfDayHHMM(currentKey.time);
   const endTimeStr = formatTimeOfDayHHMM(nextKey.time);
 
-  return `${startTimeStr} - ${endTimeStr}`;
+  return {
+    startTime: Math.round(currentKey.time * 10) / 10,
+    endTime: Math.round(nextKey.time * 10) / 10,
+    duration: Math.round(duration * 10) / 10,
+    rangeStr: `${startTimeStr} - ${endTimeStr}`
+  };
+}
+
+export function setKeyframeStartTime(timeline: TimelineKeyframe[] | undefined, keyframeId: string, newStartTime: number): TimelineKeyframe[] {
+  const list = (timeline && timeline.length > 0 ? timeline : DEFAULT_DAY_NIGHT_TIMELINE).map(k => ({ ...k }));
+  const kf = list.find(k => k.id === keyframeId);
+  if (kf) {
+    kf.time = Math.round((((newStartTime % 24) + 24) % 24) * 10) / 10;
+  }
+  list.sort((a, b) => a.time - b.time);
+  return list;
+}
+
+export function setKeyframeEndTime(timeline: TimelineKeyframe[] | undefined, keyframeId: string, newEndTime: number): TimelineKeyframe[] {
+  const list = (timeline && timeline.length > 0 ? timeline : DEFAULT_DAY_NIGHT_TIMELINE).map(k => ({ ...k }));
+  const sorted = [...list].sort((a, b) => a.time - b.time);
+  const index = sorted.findIndex(k => k.id === keyframeId);
+  if (index !== -1) {
+    const nextKey = sorted[(index + 1) % sorted.length];
+    const targetKf = list.find(k => k.id === nextKey.id);
+    if (targetKf) {
+      targetKf.time = Math.round((((newEndTime % 24) + 24) % 24) * 10) / 10;
+    }
+  }
+  list.sort((a, b) => a.time - b.time);
+  return list;
+}
+
+export function setKeyframeDuration(timeline: TimelineKeyframe[] | undefined, keyframeId: string, newDuration: number): TimelineKeyframe[] {
+  const list = (timeline && timeline.length > 0 ? timeline : DEFAULT_DAY_NIGHT_TIMELINE).map(k => ({ ...k }));
+  const sorted = [...list].sort((a, b) => a.time - b.time);
+  const index = sorted.findIndex(k => k.id === keyframeId);
+  if (index !== -1) {
+    const currentKf = sorted[index];
+    const nextKey = sorted[(index + 1) % sorted.length];
+    const targetKf = list.find(k => k.id === nextKey.id);
+    if (targetKf) {
+      const calcEnd = (currentKf.time + Math.max(0.1, newDuration)) % 24;
+      targetKf.time = Math.round(calcEnd * 10) / 10;
+    }
+  }
+  list.sort((a, b) => a.time - b.time);
+  return list;
+}
+
+export function updateKeyframeLabel(timeline: TimelineKeyframe[] | undefined, keyframeId: string, newLabel: string): TimelineKeyframe[] {
+  const list = (timeline && timeline.length > 0 ? timeline : DEFAULT_DAY_NIGHT_TIMELINE).map(k => ({ ...k }));
+  const kf = list.find(k => k.id === keyframeId);
+  if (kf && newLabel.trim()) {
+    kf.label = newLabel.trim();
+  }
+  return list;
 }
 
 export function addKeyframeToTimeline(
@@ -275,23 +339,17 @@ export function addKeyframeToTimeline(
   const interpolated = interpolateTimelineState(list, newTime);
   const newId = "kf_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
   
-  // Icon and label determination
-  let icon = "🌤️";
+  let icon = "";
   let label = "Nuevo Estado";
   if (newTime >= 22 || newTime < 5) {
-    icon = "🌌";
     label = "Madrugada";
   } else if (newTime >= 5 && newTime < 9) {
-    icon = "🌅";
     label = "Amanecer";
   } else if (newTime >= 9 && newTime < 15) {
-    icon = "☀️";
     label = "Día";
   } else if (newTime >= 15 && newTime < 19) {
-    icon = "🌇";
     label = "Tarde";
   } else {
-    icon = "🌙";
     label = "Anochecer";
   }
 

@@ -22,6 +22,11 @@ import {
   updateKeyframeInTimeline,
   DEFAULT_DAY_NIGHT_PROFILES,
   getKeyframeDurationRange,
+  getKeyframeTimeAndDuration,
+  setKeyframeStartTime,
+  setKeyframeEndTime,
+  setKeyframeDuration,
+  updateKeyframeLabel,
   addKeyframeToTimeline,
   removeKeyframeFromTimeline
 } from "../platform/timelineDefaults";
@@ -2534,7 +2539,8 @@ export class ConstructionMenu {
                 plusBtn.onmouseout = () => plusBtn.style.background = "#222222";
                 plusBtn.onclick = () => {
                     const newId = "custom_" + Date.now();
-                    const newName = "Perfil " + (profiles.length + 1);
+                    const cicloCount = profiles.filter(p => p.name.includes("Ciclo de Día")).length + 1;
+                    const newName = "Ciclo de Día " + cicloCount;
                     const newProf = {
                         id: newId,
                         name: newName,
@@ -2598,17 +2604,16 @@ export class ConstructionMenu {
 
                 sortedTimeline.forEach(kf => {
                     const isActive = kf.time === closestKeyTime;
-                    const durationRange = getKeyframeDurationRange(sortedTimeline, kf.id);
+                    const info = getKeyframeTimeAndDuration(sortedTimeline, kf.id);
 
-                    const card = document.createElement("button");
-                    card.type = "button";
+                    const card = document.createElement("div");
                     card.dataset.active = isActive ? "true" : "false";
                     card.style.cssText = `
                         display: flex;
                         flex-direction: column;
                         align-items: center;
-                        justify-content: center;
-                        gap: 3px;
+                        justify-content: space-between;
+                        gap: 6px;
                         padding: 10px 8px;
                         background: ${isActive ? "#181818" : "#222222"};
                         border: 2px solid ${isActive ? "#00ffff" : "#333333"};
@@ -2656,31 +2661,153 @@ export class ConstructionMenu {
                         card.appendChild(btnDelKf);
                     }
 
-                    const iconSpan = document.createElement("span");
-                    iconSpan.textContent = kf.icon || "🌤️";
-                    iconSpan.style.fontSize = "24px";
+                    // Title Header (Click to edit custom name)
+                    const titleWrap = document.createElement("div");
+                    titleWrap.style.cssText = "display: flex; align-items: center; gap: 4px; max-width: 90%; justify-content: center;";
 
                     const titleSpan = document.createElement("span");
                     titleSpan.textContent = kf.label;
-                    titleSpan.style.cssText = "font-size: 13px; font-weight: bold; color: #ffffff;";
+                    titleSpan.title = "Haz clic para editar el nombre de este estado";
+                    titleSpan.style.cssText = "font-size: 13px; font-weight: bold; color: #ffffff; cursor: pointer; border-bottom: 1px dashed #666;";
+                    
+                    const editIcon = document.createElement("span");
+                    editIcon.textContent = "✏️";
+                    editIcon.style.cssText = "font-size: 10px; opacity: 0.7; cursor: pointer;";
 
-                    const timeSpan = document.createElement("span");
-                    timeSpan.textContent = formatTimeOfDayHHMM(kf.time);
-                    timeSpan.style.cssText = "font-size: 12px; font-family: monospace; font-weight: bold; color: #00ffff;";
+                    const triggerLabelEdit = (e: Event) => {
+                        e.stopPropagation();
+                        const newName = prompt("Nombre personalizado para este estado:", kf.label);
+                        if (newName !== null && newName.trim() !== "") {
+                            const updatedTimeline = updateKeyframeLabel(timeline, kf.id, newName);
+                            activeProfile.timeline = updatedTimeline;
+                            this.game.updateEnvironmentConfig({
+                                dayNightTimeline: updatedTimeline,
+                                dayNightProfiles: profiles
+                            });
+                            this.renderTimelineProfilesAndCards(true);
+                            this.refreshSettings();
+                        }
+                    };
 
-                    const durationSpan = document.createElement("span");
-                    durationSpan.textContent = durationRange;
-                    durationSpan.style.cssText = "font-size: 10px; font-family: monospace; color: #888888;";
+                    titleSpan.onclick = triggerLabelEdit;
+                    editIcon.onclick = triggerLabelEdit;
 
-                    const subSpan = document.createElement("span");
-                    subSpan.textContent = kf.skyType || (kf.enableStars ? "Estrellas & Luna" : "Luz del Día");
-                    subSpan.style.cssText = "font-size: 10px; color: #aaaaaa;";
+                    titleWrap.appendChild(titleSpan);
+                    titleWrap.appendChild(editIcon);
 
-                    card.appendChild(iconSpan);
-                    card.appendChild(titleSpan);
-                    card.appendChild(timeSpan);
-                    card.appendChild(durationSpan);
-                    card.appendChild(subSpan);
+                    // Time Range Badge (e.g. 06:00 - 12:00)
+                    const rangeSpan = document.createElement("span");
+                    rangeSpan.textContent = info.rangeStr;
+                    rangeSpan.style.cssText = "font-size: 12px; font-family: monospace; font-weight: bold; color: #00ffff;";
+
+                    // Duration Timer Badge (e.g. ⏱ 6.0h)
+                    const durBadge = document.createElement("span");
+                    durBadge.textContent = `⏱ Duración: ${info.duration}h`;
+                    durBadge.style.cssText = "font-size: 10px; font-family: monospace; font-weight: bold; color: #4ade80;";
+
+                    // Time & Duration Controls (Inicio, Duración, Fin)
+                    const timeControlsRow = document.createElement("div");
+                    timeControlsRow.style.cssText = "display: flex; gap: 4px; align-items: center; justify-content: center; margin-top: 4px; width: 100%;";
+                    timeControlsRow.onclick = (e) => e.stopPropagation();
+
+                    // 1. Hora Inicio
+                    const startWrap = document.createElement("div");
+                    startWrap.style.cssText = "display: flex; flex-direction: column; align-items: center; gap: 1px;";
+                    const startLabel = document.createElement("span");
+                    startLabel.textContent = "Inicio";
+                    startLabel.style.cssText = "font-size: 9px; color: #888888;";
+                    const inputStart = document.createElement("input");
+                    inputStart.type = "number";
+                    inputStart.min = "0";
+                    inputStart.max = "23.9";
+                    inputStart.step = "0.5";
+                    inputStart.value = String(info.startTime);
+                    inputStart.title = "Modificar hora de inicio de este estado (0 a 24)";
+                    inputStart.style.cssText = "width: 42px; background: #111111; color: #00ffff; border: 1px solid #444444; border-radius: 3px; font-size: 10px; text-align: center; padding: 2px 0;";
+                    inputStart.onchange = () => {
+                        const val = parseFloat(inputStart.value);
+                        if (!isNaN(val)) {
+                            const updatedTimeline = setKeyframeStartTime(timeline, kf.id, val);
+                            activeProfile.timeline = updatedTimeline;
+                            this.game.updateEnvironmentConfig({
+                                dayNightTimeline: updatedTimeline,
+                                dayNightProfiles: profiles
+                            });
+                            this.renderTimelineProfilesAndCards(true);
+                            this.refreshSettings();
+                        }
+                    };
+                    startWrap.appendChild(startLabel);
+                    startWrap.appendChild(inputStart);
+
+                    // 2. Duración (hrs)
+                    const durWrap = document.createElement("div");
+                    durWrap.style.cssText = "display: flex; flex-direction: column; align-items: center; gap: 1px;";
+                    const durLabel = document.createElement("span");
+                    durLabel.textContent = "Duración";
+                    durLabel.style.cssText = "font-size: 9px; color: #888888;";
+                    const inputDur = document.createElement("input");
+                    inputDur.type = "number";
+                    inputDur.min = "0.5";
+                    inputDur.max = "24";
+                    inputDur.step = "0.5";
+                    inputDur.value = String(info.duration);
+                    inputDur.title = "Modificar duración en horas";
+                    inputDur.style.cssText = "width: 42px; background: #111111; color: #4ade80; border: 1px solid #444444; border-radius: 3px; font-size: 10px; text-align: center; padding: 2px 0;";
+                    inputDur.onchange = () => {
+                        const val = parseFloat(inputDur.value);
+                        if (!isNaN(val) && val > 0) {
+                            const updatedTimeline = setKeyframeDuration(timeline, kf.id, val);
+                            activeProfile.timeline = updatedTimeline;
+                            this.game.updateEnvironmentConfig({
+                                dayNightTimeline: updatedTimeline,
+                                dayNightProfiles: profiles
+                            });
+                            this.renderTimelineProfilesAndCards(true);
+                            this.refreshSettings();
+                        }
+                    };
+                    durWrap.appendChild(durLabel);
+                    durWrap.appendChild(inputDur);
+
+                    // 3. Hora Fin
+                    const endWrap = document.createElement("div");
+                    endWrap.style.cssText = "display: flex; flex-direction: column; align-items: center; gap: 1px;";
+                    const endLabel = document.createElement("span");
+                    endLabel.textContent = "Fin";
+                    endLabel.style.cssText = "font-size: 9px; color: #888888;";
+                    const inputEnd = document.createElement("input");
+                    inputEnd.type = "number";
+                    inputEnd.min = "0";
+                    inputEnd.max = "24";
+                    inputEnd.step = "0.5";
+                    inputEnd.value = String(info.endTime);
+                    inputEnd.title = "Modificar hora de fin de este estado (0 a 24)";
+                    inputEnd.style.cssText = "width: 42px; background: #111111; color: #00ffff; border: 1px solid #444444; border-radius: 3px; font-size: 10px; text-align: center; padding: 2px 0;";
+                    inputEnd.onchange = () => {
+                        const val = parseFloat(inputEnd.value);
+                        if (!isNaN(val)) {
+                            const updatedTimeline = setKeyframeEndTime(timeline, kf.id, val);
+                            activeProfile.timeline = updatedTimeline;
+                            this.game.updateEnvironmentConfig({
+                                dayNightTimeline: updatedTimeline,
+                                dayNightProfiles: profiles
+                            });
+                            this.renderTimelineProfilesAndCards(true);
+                            this.refreshSettings();
+                        }
+                    };
+                    endWrap.appendChild(endLabel);
+                    endWrap.appendChild(inputEnd);
+
+                    timeControlsRow.appendChild(startWrap);
+                    timeControlsRow.appendChild(durWrap);
+                    timeControlsRow.appendChild(endWrap);
+
+                    card.appendChild(titleWrap);
+                    card.appendChild(rangeSpan);
+                    card.appendChild(durBadge);
+                    card.appendChild(timeControlsRow);
 
                     this.simCardsGrid.appendChild(card);
                     this.keyframeCardElements.push({ time: kf.time, card });

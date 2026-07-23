@@ -307,75 +307,154 @@ export function updateKeyframeLabel(timeline: TimelineKeyframe[] | undefined, ke
   return list;
 }
 
-export function addKeyframeToTimeline(
+export function addPresetKeyframeToTimeline(
   timeline: TimelineKeyframe[] | undefined,
-  targetTime?: number
+  presetType: "night" | "sunrise" | "noon" | "sunset" | "custom",
+  customTime?: number,
+  customLabel?: string,
+  copyFromKeyframeId?: string
 ): TimelineKeyframe[] {
-  const list = timeline && timeline.length > 0 ? timeline.map(k => ({ ...k })) : DEFAULT_DAY_NIGHT_TIMELINE.map(k => ({ ...k }));
-  
-  let newTime = 3.0; // default 03:00
-  if (targetTime !== undefined) {
-    newTime = ((targetTime % 24) + 24) % 24;
-  } else {
-    // Find biggest gap between existing keyframes
-    const sorted = [...list].sort((a, b) => a.time - b.time);
-    let maxGap = 0;
-    let gapTime = 3.0;
-    for (let i = 0; i < sorted.length; i++) {
-      const k1 = sorted[i];
-      const k2 = sorted[(i + 1) % sorted.length];
-      let t1 = k1.time;
-      let t2 = k2.time;
-      if (t2 <= t1) t2 += 24;
-      const gap = t2 - t1;
-      if (gap > maxGap) {
-        maxGap = gap;
-        gapTime = ((t1 + gap / 2) % 24);
-      }
+  const list = (timeline && timeline.length > 0 ? timeline : DEFAULT_DAY_NIGHT_TIMELINE).map(k => ({ ...k }));
+
+  let baseTemplate: Partial<TimelineKeyframe> = {};
+  let defaultTime = 12;
+  let defaultLabel = "Nuevo Estado";
+
+  const defaultPresets: Record<string, Partial<TimelineKeyframe>> = {
+    night: {
+      time: 0,
+      label: "Noche",
+      sunColor: "#8899bb",
+      sunIntensity: 0.15,
+      ambientColor: "#111122",
+      ambientIntensity: 0.2,
+      sunElevation: -35,
+      sunAzimuth: 360,
+      environmentIntensity: 0.6,
+      backgroundIntensity: 0.8,
+      enableSkyboxFog: true,
+      fogColor: "#020210",
+      fogNear: 10,
+      fogFar: 40,
+      enableStars: true
+    },
+    sunrise: {
+      time: 6,
+      label: "Amanecer",
+      sunColor: "#ff5722",
+      sunIntensity: 0.65,
+      ambientColor: "#33235f",
+      ambientIntensity: 0.45,
+      sunElevation: 5,
+      sunAzimuth: 90,
+      environmentIntensity: 0.85,
+      backgroundIntensity: 1.0,
+      enableSkyboxFog: true,
+      fogColor: "#ffaa77",
+      fogNear: 15,
+      fogFar: 65,
+      enableStars: false
+    },
+    noon: {
+      time: 12,
+      label: "Mediodía",
+      sunColor: "#ffffff",
+      sunIntensity: 0.95,
+      ambientColor: "#ffffff",
+      ambientIntensity: 0.65,
+      sunElevation: 75,
+      sunAzimuth: 180,
+      environmentIntensity: 1.0,
+      backgroundIntensity: 1.0,
+      enableSkyboxFog: false,
+      fogColor: "#87ceeb",
+      fogNear: 20,
+      fogFar: 80,
+      enableStars: false
+    },
+    sunset: {
+      time: 18,
+      label: "Atardecer",
+      sunColor: "#ff8f70",
+      sunIntensity: 0.65,
+      ambientColor: "#33235f",
+      ambientIntensity: 0.45,
+      sunElevation: 5,
+      sunAzimuth: 270,
+      environmentIntensity: 0.9,
+      backgroundIntensity: 1.0,
+      enableSkyboxFog: true,
+      fogColor: "#ffae88",
+      fogNear: 15,
+      fogFar: 65,
+      enableStars: false
     }
-    newTime = gapTime;
+  };
+
+  if (presetType in defaultPresets) {
+    baseTemplate = { ...defaultPresets[presetType] };
+    defaultTime = baseTemplate.time!;
+    defaultLabel = baseTemplate.label!;
+  } else if (copyFromKeyframeId) {
+    const found = list.find(k => k.id === copyFromKeyframeId);
+    if (found) {
+      baseTemplate = { ...found };
+    }
   }
 
-  const interpolated = interpolateTimelineState(list, newTime);
+  const finalTime = customTime !== undefined ? ((customTime % 24) + 24) % 24 : defaultTime;
+  const finalLabel = customLabel || defaultLabel;
+
+  if (!baseTemplate.sunColor) {
+    const interpolated = interpolateTimelineState(list, finalTime);
+    baseTemplate = {
+      sunColor: interpolated.sunColor,
+      sunIntensity: interpolated.sunIntensity,
+      ambientColor: interpolated.ambientColor,
+      ambientIntensity: interpolated.ambientIntensity,
+      sunElevation: interpolated.sunElevation,
+      sunAzimuth: interpolated.sunAzimuth,
+      environmentIntensity: interpolated.environmentIntensity,
+      backgroundIntensity: interpolated.backgroundIntensity,
+      enableSkyboxFog: interpolated.enableSkyboxFog,
+      fogColor: interpolated.fogColor,
+      fogNear: interpolated.fogNear,
+      fogFar: interpolated.fogFar,
+      enableStars: interpolated.enableStars
+    };
+  }
+
   const newId = "kf_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
-  
-  let icon = "";
-  let label = "Nuevo Estado";
-  if (newTime >= 22 || newTime < 5) {
-    label = "Madrugada";
-  } else if (newTime >= 5 && newTime < 9) {
-    label = "Amanecer";
-  } else if (newTime >= 9 && newTime < 15) {
-    label = "Día";
-  } else if (newTime >= 15 && newTime < 19) {
-    label = "Tarde";
-  } else {
-    label = "Anochecer";
-  }
-
   const newKf: TimelineKeyframe = {
     id: newId,
-    time: Math.round(newTime * 10) / 10,
-    label,
-    icon,
-    sunColor: interpolated.sunColor,
-    sunIntensity: interpolated.sunIntensity,
-    ambientColor: interpolated.ambientColor,
-    ambientIntensity: interpolated.ambientIntensity,
-    sunElevation: interpolated.sunElevation,
-    sunAzimuth: interpolated.sunAzimuth,
-    environmentIntensity: interpolated.environmentIntensity,
-    backgroundIntensity: interpolated.backgroundIntensity,
-    enableSkyboxFog: interpolated.enableSkyboxFog,
-    fogColor: interpolated.fogColor,
-    fogNear: interpolated.fogNear,
-    fogFar: interpolated.fogFar,
-    enableStars: interpolated.enableStars
+    time: Math.round(finalTime * 10) / 10,
+    label: finalLabel,
+    icon: "",
+    sunColor: baseTemplate.sunColor || "#ffffff",
+    sunIntensity: baseTemplate.sunIntensity ?? 0.8,
+    ambientColor: baseTemplate.ambientColor || "#333333",
+    ambientIntensity: baseTemplate.ambientIntensity ?? 0.5,
+    sunElevation: baseTemplate.sunElevation ?? 45,
+    sunAzimuth: baseTemplate.sunAzimuth ?? 180,
+    environmentIntensity: baseTemplate.environmentIntensity ?? 1.0,
+    backgroundIntensity: baseTemplate.backgroundIntensity ?? 1.0,
+    enableSkyboxFog: !!baseTemplate.enableSkyboxFog,
+    fogColor: baseTemplate.fogColor || "#87ceeb",
+    fogNear: baseTemplate.fogNear ?? 10,
+    fogFar: baseTemplate.fogFar ?? 50,
+    enableStars: !!baseTemplate.enableStars
   };
 
   list.push(newKf);
   list.sort((a, b) => a.time - b.time);
   return list;
+}
+
+export function addKeyframeToTimeline(
+  timeline: TimelineKeyframe[] | undefined,
+  targetTime?: number
+): TimelineKeyframe[] {
+  return addPresetKeyframeToTimeline(timeline, "custom", targetTime);
 }
 
 export function removeKeyframeFromTimeline(

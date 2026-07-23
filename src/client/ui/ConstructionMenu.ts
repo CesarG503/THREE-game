@@ -28,6 +28,7 @@ import {
   setKeyframeDuration,
   updateKeyframeLabel,
   addKeyframeToTimeline,
+  addPresetKeyframeToTimeline,
   removeKeyframeFromTimeline
 } from "../platform/timelineDefaults";
 
@@ -2584,14 +2585,199 @@ export class ConstructionMenu {
                 addStateBtn.onmouseover = () => addStateBtn.style.background = "#059669";
                 addStateBtn.onmouseout = () => addStateBtn.style.background = "#10b981";
                 addStateBtn.onclick = () => {
-                    const updatedTimeline = addKeyframeToTimeline(timeline);
-                    activeProfile.timeline = updatedTimeline;
-                    this.game.updateEnvironmentConfig({
-                        dayNightTimeline: updatedTimeline,
-                        dayNightProfiles: profiles
+                    // Backdrop
+                    const backdrop = document.createElement("div");
+                    backdrop.style.cssText = `
+                        position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+                        background: rgba(0, 0, 0, 0.75); backdrop-filter: blur(4px);
+                        display: flex; align-items: center; justify-content: center;
+                        z-index: 100000;
+                    `;
+                    backdrop.onclick = (e) => {
+                        if (e.target === backdrop) backdrop.remove();
+                    };
+
+                    // Modal Box
+                    const modal = document.createElement("div");
+                    modal.style.cssText = `
+                        background: #181818; border: 1px solid #444; border-radius: 8px;
+                        padding: 18px; width: 380px; max-width: 92vw; color: white;
+                        display: flex; flex-direction: column; gap: 12px;
+                        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.6);
+                    `;
+
+                    // Header
+                    const header = document.createElement("div");
+                    header.style.cssText = "display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #333; padding-bottom: 8px;";
+                    const title = document.createElement("h3");
+                    title.textContent = "➕ Agregar Estado al Día";
+                    title.style.cssText = "margin: 0; font-size: 15px; color: #00ffff;";
+                    const closeBtn = document.createElement("button");
+                    closeBtn.textContent = "×";
+                    closeBtn.style.cssText = "background: none; border: none; color: #aaa; font-size: 20px; cursor: pointer;";
+                    closeBtn.onclick = () => backdrop.remove();
+                    header.appendChild(title);
+                    header.appendChild(closeBtn);
+                    modal.appendChild(header);
+
+                    // Options Container
+                    const optionsWrap = document.createElement("div");
+                    optionsWrap.style.cssText = "display: flex; flex-direction: column; gap: 8px;";
+
+                    const applyState = (presetType: "night" | "sunrise" | "noon" | "sunset" | "custom", customTime?: number, customLabel?: string, copyFromId?: string) => {
+                        const updatedTimeline = addPresetKeyframeToTimeline(timeline, presetType, customTime, customLabel, copyFromId);
+                        activeProfile.timeline = updatedTimeline;
+                        this.game.updateEnvironmentConfig({
+                            dayNightTimeline: updatedTimeline,
+                            dayNightProfiles: profiles
+                        });
+                        this.renderTimelineProfilesAndCards(true);
+                        this.refreshSettings();
+                        backdrop.remove();
+                    };
+
+                    const presets = [
+                        { type: "night", label: "Noche", time: "00:00", desc: "Cielo nocturno con estrellas y luz de luna.", color: "#8899bb" },
+                        { type: "sunrise", label: "Amanecer", time: "06:00", desc: "Luz cálida y sol dorada naciente.", color: "#ff5722" },
+                        { type: "noon", label: "Mediodía", time: "12:00", desc: "Sol cenital brillante y máxima iluminación.", color: "#ffaa00" },
+                        { type: "sunset", label: "Atardecer", time: "18:00", desc: "Luz anaranjada y crepúsculo de la tarde.", color: "#ff8f70" }
+                    ];
+
+                    presets.forEach(p => {
+                        const btnOption = document.createElement("button");
+                        btnOption.type = "button";
+                        btnOption.style.cssText = `
+                            display: flex; flex-direction: column; gap: 2px; text-align: left;
+                            padding: 8px 10px; background: #222; border: 1px solid #333; border-radius: 6px;
+                            color: white; cursor: pointer; transition: all 0.2s;
+                        `;
+                        btnOption.onmouseover = () => {
+                            btnOption.style.background = "#2a2a2a";
+                            btnOption.style.borderColor = p.color;
+                        };
+                        btnOption.onmouseout = () => {
+                            btnOption.style.background = "#222";
+                            btnOption.style.borderColor = "#333";
+                        };
+                        btnOption.onclick = () => applyState(p.type as any);
+
+                        const row1 = document.createElement("div");
+                        row1.style.cssText = "display: flex; justify-content: space-between; font-weight: bold; font-size: 13px;";
+                        const labelSpan = document.createElement("span");
+                        labelSpan.textContent = p.label;
+                        labelSpan.style.color = p.color;
+                        const timeSpan = document.createElement("span");
+                        timeSpan.textContent = p.time;
+                        timeSpan.style.cssText = "font-family: monospace; color: #00ffff;";
+                        row1.appendChild(labelSpan);
+                        row1.appendChild(timeSpan);
+
+                        const descSpan = document.createElement("span");
+                        descSpan.textContent = p.desc;
+                        descSpan.style.cssText = "font-size: 11px; color: #888888;";
+
+                        btnOption.appendChild(row1);
+                        btnOption.appendChild(descSpan);
+                        optionsWrap.appendChild(btnOption);
                     });
-                    this.renderTimelineProfilesAndCards(true);
-                    this.refreshSettings();
+
+                    // Custom Cycle Option
+                    const customSection = document.createElement("div");
+                    customSection.style.cssText = "border-top: 1px solid #333; padding-top: 10px; margin-top: 4px; display: flex; flex-direction: column; gap: 8px;";
+                    
+                    const customTitle = document.createElement("span");
+                    customTitle.textContent = "⚙️ Ciclo Personalizado / Copiar Configuración";
+                    customTitle.style.cssText = "font-size: 12px; font-weight: bold; color: #10b981;";
+
+                    const customRow1 = document.createElement("div");
+                    customRow1.style.cssText = "display: flex; gap: 8px; align-items: center;";
+                    
+                    const labelTime = document.createElement("span");
+                    labelTime.textContent = "Hora de Inicio (0-24):";
+                    labelTime.style.cssText = "font-size: 11px; color: #aaa;";
+                    
+                    const inputCustomTime = document.createElement("input");
+                    inputCustomTime.type = "number";
+                    inputCustomTime.min = "0";
+                    inputCustomTime.max = "23.9";
+                    inputCustomTime.step = "0.5";
+                    inputCustomTime.value = "15.0";
+                    inputCustomTime.style.cssText = "width: 60px; background: #111; color: #00ffff; border: 1px solid #444; border-radius: 4px; padding: 4px; font-size: 12px; text-align: center;";
+
+                    customRow1.appendChild(labelTime);
+                    customRow1.appendChild(inputCustomTime);
+
+                    const customRow2 = document.createElement("div");
+                    customRow2.style.cssText = "display: flex; gap: 8px; align-items: center;";
+                    const labelCopy = document.createElement("span");
+                    labelCopy.textContent = "Iniciar con:";
+                    labelCopy.style.cssText = "font-size: 11px; color: #aaa; min-width: 65px;";
+                    
+                    const selectCopy = document.createElement("select");
+                    selectCopy.style.cssText = "flex: 1; background: #111; color: white; border: 1px solid #444; border-radius: 4px; padding: 4px; font-size: 11px;";
+                    
+                    const optInterp = document.createElement("option");
+                    optInterp.value = "interpolated";
+                    optInterp.textContent = "Interpolado del ciclo actual";
+                    selectCopy.appendChild(optInterp);
+
+                    const optN = document.createElement("option");
+                    optN.value = "night"; optN.textContent = "Configuración Noche (Medianoche)";
+                    selectCopy.appendChild(optN);
+
+                    const optSr = document.createElement("option");
+                    optSr.value = "sunrise"; optSr.textContent = "Configuración Amanecer (06:00)";
+                    selectCopy.appendChild(optSr);
+
+                    const optNo = document.createElement("option");
+                    optNo.value = "noon"; optNo.textContent = "Configuración Mediodía (12:00)";
+                    selectCopy.appendChild(optNo);
+
+                    const optSs = document.createElement("option");
+                    optSs.value = "sunset"; optSs.textContent = "Configuración Atardecer (18:00)";
+                    selectCopy.appendChild(optSs);
+
+                    sortedTimeline.forEach(k => {
+                        const optK = document.createElement("option");
+                        optK.value = "copy_" + k.id;
+                        optK.textContent = `Copiar del estado: ${k.label} (${formatTimeOfDayHHMM(k.time)})`;
+                        selectCopy.appendChild(optK);
+                    });
+
+                    customRow2.appendChild(labelCopy);
+                    customRow2.appendChild(selectCopy);
+
+                    const btnAddCustom = document.createElement("button");
+                    btnAddCustom.type = "button";
+                    btnAddCustom.textContent = "Crear Estado Personalizado";
+                    btnAddCustom.style.cssText = `
+                        padding: 8px; background: #10b981; border: none; border-radius: 4px;
+                        color: white; font-weight: bold; font-size: 12px; cursor: pointer; transition: background 0.2s; margin-top: 4px;
+                    `;
+                    btnAddCustom.onmouseover = () => btnAddCustom.style.background = "#059669";
+                    btnAddCustom.onmouseout = () => btnAddCustom.style.background = "#10b981";
+                    btnAddCustom.onclick = () => {
+                        const cTime = parseFloat(inputCustomTime.value) || 12;
+                        const selectedVal = selectCopy.value;
+                        if (selectedVal === "interpolated") {
+                            applyState("custom", cTime, "Estado Personalizado");
+                        } else if (selectedVal.startsWith("copy_")) {
+                            const kfId = selectedVal.replace("copy_", "");
+                            applyState("custom", cTime, "Estado Copiado", kfId);
+                        } else {
+                            applyState(selectedVal as any, cTime, "Estado Personalizado");
+                        }
+                    };
+
+                    customSection.appendChild(customTitle);
+                    customSection.appendChild(customRow1);
+                    customSection.appendChild(customRow2);
+                    customSection.appendChild(btnAddCustom);
+
+                    modal.appendChild(optionsWrap);
+                    modal.appendChild(customSection);
+                    backdrop.appendChild(modal);
+                    document.body.appendChild(backdrop);
                 };
                 rightActionsWrap.appendChild(addStateBtn);
                 this.simTabsContainer.appendChild(rightActionsWrap);

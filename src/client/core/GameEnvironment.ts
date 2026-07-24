@@ -7,6 +7,7 @@ import { MapAssetManager } from "../map/MapAssetManager";
 import { MapMaterialCache } from "../map/MapMaterialCache";
 import { MapGeometryBuilder, createPrismGeometryForShape } from "../map/MapGeometryBuilder";
 import { MapPhysicsBuilder } from "../map/MapPhysicsBuilder";
+import { DEFAULT_DAY_NIGHT_PROFILES, normalizeTimeline } from "../platform/timelineDefaults";
 
 export function buildEnvironment(this: any) {
 	this.levelBuilder = new LevelBuilder(this.sceneManager.scene, this.world);
@@ -50,6 +51,30 @@ export function updateEnvironmentConfig(this: any, config: any) {
 	if (this.environmentConfig.backgroundIntensity === undefined) this.environmentConfig.backgroundIntensity = 1.0;
 	if (this.environmentConfig.backgroundBlurriness === undefined) this.environmentConfig.backgroundBlurriness = 0.0;
 	if (this.environmentConfig.skyboxRotation === undefined) this.environmentConfig.skyboxRotation = 0;
+
+	const normalizedProfiles = (this.environmentConfig.dayNightProfiles && this.environmentConfig.dayNightProfiles.length > 0
+		? this.environmentConfig.dayNightProfiles
+		: DEFAULT_DAY_NIGHT_PROFILES
+	).map((profile: any) => ({
+		id: profile.id,
+		name: profile.name,
+		isDefault: !!profile.isDefault,
+		timeline: normalizeTimeline(profile.timeline).map(k => ({ ...k }))
+	}));
+	const activeProfileId = this.environmentConfig.activeTimelineProfileId || normalizedProfiles[0].id;
+	const activeProfile = normalizedProfiles.find((profile: any) => profile.id === activeProfileId) || normalizedProfiles[0];
+	const normalizedTimeline = normalizeTimeline(
+		this.environmentConfig.dayNightTimeline && this.environmentConfig.dayNightTimeline.length > 0
+			? this.environmentConfig.dayNightTimeline
+			: activeProfile.timeline
+	).map(k => ({ ...k }));
+	activeProfile.timeline = normalizedTimeline.map(k => ({ ...k }));
+	this.environmentConfig.dayNightProfiles = normalizedProfiles;
+	this.environmentConfig.activeTimelineProfileId = activeProfile.id;
+	this.environmentConfig.dayNightTimeline = normalizedTimeline;
+	if (!this.environmentConfig.selectedEnvironmentStateId || !normalizedTimeline.some(k => k.id === this.environmentConfig.selectedEnvironmentStateId)) {
+		this.environmentConfig.selectedEnvironmentStateId = normalizedTimeline[0]?.id || null;
+	}
 
 	// Ensure default groups are always populated if missing or empty
 	if (!this.environmentConfig.groundGroups || this.environmentConfig.groundGroups.length === 0) {

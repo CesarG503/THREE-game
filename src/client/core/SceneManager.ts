@@ -30,6 +30,7 @@ export class SceneManager {
   private skyboxCache: Map<string, Promise<THREE.CubeTexture>>;
   private loadedSkyboxTextures: Set<THREE.CubeTexture>;
   private activeSkyboxTexture: THREE.CubeTexture | null;
+  private activeVisualSkyType: string | null;
   private skyboxRequestId: number;
 
   constructor(containerId: any) {
@@ -41,6 +42,7 @@ export class SceneManager {
     this.skyboxCache = new Map();
     this.loadedSkyboxTextures = new Set();
     this.activeSkyboxTexture = null;
+    this.activeVisualSkyType = null;
     this.skyboxRequestId = 0;
     this.sunVec = new THREE.Vector3();
 
@@ -118,6 +120,7 @@ export class SceneManager {
 
   setSky(type: any) {
     const skyType = type || "day";
+    this.activeVisualSkyType = skyType;
     const requestId = ++this.skyboxRequestId;
 
     if (typeof skyType === "string" && skyType.startsWith(SKYBOX_PREFIX)) {
@@ -316,16 +319,25 @@ export class SceneManager {
     }
 
     // 2. Light Mode & Preset Setup
-    const lightMode = config.lightMode || "day";
-    const skyType = config.skyType || "day";
+    const isDynamicCycle = config.timeOfDay !== undefined || !!config.enableDayNightCycle || !!config.isCycleSimulating;
+    let interpolated: any = null;
+
+    if (isDynamicCycle) {
+      const timeOfDay = config.timeOfDay !== undefined ? config.timeOfDay : 12;
+      interpolated = interpolateTimelineState(config.dayNightTimeline, timeOfDay);
+    }
+
+    const visualConfig = isDynamicCycle && interpolated ? { ...config, ...interpolated } : config;
+    const lightMode = visualConfig.lightMode || config.lightMode || "day";
+    const skyType = visualConfig.skyType || config.skyType || "day";
     const isSkyboxActive = typeof skyType === "string" && skyType.startsWith(SKYBOX_PREFIX);
     
     // Apply Scene Environment & Background Parameters (IBL, Brightness, Blur & Rotation)
-    (this.scene as any).environmentIntensity = config.environmentIntensity !== undefined ? Number(config.environmentIntensity) : 1.0;
-    (this.scene as any).backgroundIntensity = config.backgroundIntensity !== undefined ? Number(config.backgroundIntensity) : 1.0;
-    (this.scene as any).backgroundBlurriness = config.backgroundBlurriness !== undefined ? Number(config.backgroundBlurriness) : 0.0;
+    (this.scene as any).environmentIntensity = visualConfig.environmentIntensity !== undefined ? Number(visualConfig.environmentIntensity) : 1.0;
+    (this.scene as any).backgroundIntensity = visualConfig.backgroundIntensity !== undefined ? Number(visualConfig.backgroundIntensity) : 1.0;
+    (this.scene as any).backgroundBlurriness = visualConfig.backgroundBlurriness !== undefined ? Number(visualConfig.backgroundBlurriness) : 0.0;
     
-    const skyRotRad = THREE.MathUtils.degToRad(config.skyboxRotation !== undefined ? Number(config.skyboxRotation) : 0);
+    const skyRotRad = THREE.MathUtils.degToRad(visualConfig.skyboxRotation !== undefined ? Number(visualConfig.skyboxRotation) : 0);
     if ((this.scene as any).backgroundRotation) {
       (this.scene as any).backgroundRotation.y = skyRotRad;
     }
@@ -337,6 +349,8 @@ export class SceneManager {
     const isShaderSky = skyType === "shader" || lightMode === "cycle";
     
     if (isShaderSky) {
+      this.activeVisualSkyType = skyType;
+      this.clearActiveSkybox();
       if (!this.skyMesh) {
         this.skyMesh = new Sky();
         this.skyMesh.scale.setScalar(450000);
@@ -349,13 +363,16 @@ export class SceneManager {
       
       // Update Sky Shader uniforms
       const uniforms = this.skyMesh.material.uniforms;
-      uniforms["turbidity"].value = config.skyTurbidity !== undefined ? Number(config.skyTurbidity) : 10;
-      uniforms["rayleigh"].value = config.skyRayleigh !== undefined ? Number(config.skyRayleigh) : 2;
-      uniforms["mieCoefficient"].value = config.skyMieCoefficient !== undefined ? Number(config.skyMieCoefficient) : 0.005;
-      uniforms["mieDirectionalG"].value = config.skyMieDirectionalG !== undefined ? Number(config.skyMieDirectionalG) : 0.8;
+      uniforms["turbidity"].value = visualConfig.skyTurbidity !== undefined ? Number(visualConfig.skyTurbidity) : 10;
+      uniforms["rayleigh"].value = visualConfig.skyRayleigh !== undefined ? Number(visualConfig.skyRayleigh) : 2;
+      uniforms["mieCoefficient"].value = visualConfig.skyMieCoefficient !== undefined ? Number(visualConfig.skyMieCoefficient) : 0.005;
+      uniforms["mieDirectionalG"].value = visualConfig.skyMieDirectionalG !== undefined ? Number(visualConfig.skyMieDirectionalG) : 0.8;
     } else {
       if (this.skyMesh) {
         this.skyMesh.visible = false;
+      }
+      if (this.activeVisualSkyType !== skyType) {
+        this.setSky(skyType);
       }
       // Apply background color/texture
       if (skyType === "night" || lightMode === "night") {
@@ -370,22 +387,13 @@ export class SceneManager {
       }
     }
 
-    // Dynamic timeline cycle evaluation
-    const isDynamicCycle = config.timeOfDay !== undefined || !!config.enableDayNightCycle || !!config.isCycleSimulating;
-    let interpolated: any = null;
-
-    if (isDynamicCycle) {
-      const timeOfDay = config.timeOfDay !== undefined ? config.timeOfDay : 12;
-      interpolated = interpolateTimelineState(config.dayNightTimeline, timeOfDay);
-    }
-
     // Unified Fog Application for ALL Sky Types (day, night, sunset, shader, and cubemaps)
     if (isDynamicCycle && interpolated) {
-      const isFogEnabled = config.enableSkyboxFog !== undefined ? !!config.enableSkyboxFog : !!interpolated.enableSkyboxFog;
+      const isFogEnabled = visualConfig.enableSkyboxFog !== undefined ? !!visualConfig.enableSkyboxFog : !!interpolated.enableSkyboxFog;
       if (isFogEnabled) {
-        const fogColor = config.fogColor || interpolated.fogColor || "#87ceeb";
-        const fogNear = config.fogNear !== undefined ? Number(config.fogNear) : (interpolated.fogNear ?? 10);
-        const fogFar = config.fogFar !== undefined ? Number(config.fogFar) : (interpolated.fogFar ?? 50);
+        const fogColor = visualConfig.fogColor || interpolated.fogColor || "#87ceeb";
+        const fogNear = visualConfig.fogNear !== undefined ? Number(visualConfig.fogNear) : (interpolated.fogNear ?? 10);
+        const fogFar = visualConfig.fogFar !== undefined ? Number(visualConfig.fogFar) : (interpolated.fogFar ?? 50);
         this.scene.fog = new THREE.Fog(fogColor, fogNear, fogFar);
       } else {
         this.scene.fog = null;
@@ -405,22 +413,22 @@ export class SceneManager {
     }
 
     // 3. Dynamic Ciclo Día/Noche o presets de luces
-    let sunIntensity = config.sunIntensity !== undefined ? Number(config.sunIntensity) : 0.8;
-    let sunColor = config.sunColor || "#ffffff";
-    let ambientIntensity = config.ambientIntensity !== undefined ? Number(config.ambientIntensity) : 0.6;
-    let ambientColor = config.ambientColor || "#ffffff";
-    let sunElevation = config.sunElevation !== undefined ? Number(config.sunElevation) : 45; // Degrees
-    let sunAzimuth = config.sunAzimuth !== undefined ? Number(config.sunAzimuth) : 180;
+    let sunIntensity = visualConfig.sunIntensity !== undefined ? Number(visualConfig.sunIntensity) : 0.8;
+    let sunColor = visualConfig.sunColor || "#ffffff";
+    let ambientIntensity = visualConfig.ambientIntensity !== undefined ? Number(visualConfig.ambientIntensity) : 0.6;
+    let ambientColor = visualConfig.ambientColor || "#ffffff";
+    let sunElevation = visualConfig.sunElevation !== undefined ? Number(visualConfig.sunElevation) : 45; // Degrees
+    let sunAzimuth = visualConfig.sunAzimuth !== undefined ? Number(visualConfig.sunAzimuth) : 180;
 
     if (isDynamicCycle && interpolated) {
-      sunIntensity = interpolated.sunIntensity;
-      sunColor = interpolated.sunColor;
-      ambientIntensity = interpolated.ambientIntensity;
-      ambientColor = interpolated.ambientColor;
-      sunElevation = interpolated.sunElevation;
-      sunAzimuth = interpolated.sunAzimuth;
-      this.scene.environmentIntensity = interpolated.environmentIntensity;
-      this.scene.backgroundIntensity = interpolated.backgroundIntensity;
+      sunIntensity = visualConfig.sunIntensity;
+      sunColor = visualConfig.sunColor;
+      ambientIntensity = visualConfig.ambientIntensity;
+      ambientColor = visualConfig.ambientColor;
+      sunElevation = visualConfig.sunElevation;
+      sunAzimuth = visualConfig.sunAzimuth;
+      this.scene.environmentIntensity = visualConfig.environmentIntensity;
+      this.scene.backgroundIntensity = visualConfig.backgroundIntensity;
     } else if (lightMode === "cycle") {
       const time = config.timeOfDay !== undefined ? config.timeOfDay : 12; // 0 to 24
       
@@ -465,18 +473,18 @@ export class SceneManager {
       sunElevation = 8;
     } else {
       // Skybox mode, custom mode or standard mode: ALWAYS respect user/preset config
-      sunIntensity = config.sunIntensity !== undefined ? Number(config.sunIntensity) : 0.8;
-      sunColor = config.sunColor || "#ffffff";
-      ambientIntensity = config.ambientIntensity !== undefined ? Number(config.ambientIntensity) : 0.6;
-      ambientColor = config.ambientColor || "#ffffff";
-      sunElevation = config.sunElevation !== undefined ? Number(config.sunElevation) : 45;
-      sunAzimuth = config.sunAzimuth !== undefined ? Number(config.sunAzimuth) : 180;
+      sunIntensity = visualConfig.sunIntensity !== undefined ? Number(visualConfig.sunIntensity) : 0.8;
+      sunColor = visualConfig.sunColor || "#ffffff";
+      ambientIntensity = visualConfig.ambientIntensity !== undefined ? Number(visualConfig.ambientIntensity) : 0.6;
+      ambientColor = visualConfig.ambientColor || "#ffffff";
+      sunElevation = visualConfig.sunElevation !== undefined ? Number(visualConfig.sunElevation) : 45;
+      sunAzimuth = visualConfig.sunAzimuth !== undefined ? Number(visualConfig.sunAzimuth) : 180;
     }
 
     // Star Visibility Evaluation
     if (this.stars) {
       if (isDynamicCycle && interpolated) {
-        this.stars.visible = !!interpolated.enableStars;
+        this.stars.visible = !!visualConfig.enableStars;
       } else if (isSkyboxActive) {
         // Skybox mode: controlled by enableStarsSkybox flag
         this.stars.visible = !!config.enableStarsSkybox;
@@ -498,13 +506,13 @@ export class SceneManager {
 
     // Apply values to Lights
     if (this.ambientLight) {
-      const isAmbientEnabled = config.enableAmbientLight !== false;
+      const isAmbientEnabled = visualConfig.enableAmbientLight !== false;
       this.ambientLight.visible = isAmbientEnabled;
       this.ambientLight.intensity = isAmbientEnabled ? ambientIntensity : 0;
       this.ambientLight.color.set(ambientColor);
     }
     if (this.dirLight) {
-      const isSunEnabled = config.enableSunLight !== false;
+      const isSunEnabled = visualConfig.enableSunLight !== false;
       this.dirLight.visible = isSunEnabled;
       this.dirLight.intensity = isSunEnabled ? sunIntensity : 0;
       this.dirLight.color.set(sunColor);

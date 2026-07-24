@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { getSkyboxPresetDefaults } from "./skyboxPresets";
 
 export interface TimelineKeyframe {
   id: string;
@@ -6,20 +7,32 @@ export interface TimelineKeyframe {
   label: string;
   icon: string;
   skyType?: string;
+  lightMode?: string;
+  shadowQuality?: string;
   sunColor: string;
   sunIntensity: number;
   ambientColor: string;
   ambientIntensity: number;
+  enableSunLight?: boolean;
+  enableAmbientLight?: boolean;
   sunElevation: number;
   sunAzimuth: number;
   environmentIntensity: number;
   backgroundIntensity: number;
+  backgroundBlurriness?: number;
+  skyboxRotation?: number;
   enableSkyboxFog: boolean;
   fogColor: string;
   fogNear: number;
   fogFar: number;
   enableStars: boolean;
+  skyTurbidity?: number;
+  skyRayleigh?: number;
+  skyMieCoefficient?: number;
+  skyMieDirectionalG?: number;
 }
+
+const DEFAULT_STATE_SKY_TYPE = "shader";
 
 export const DEFAULT_DAY_NIGHT_TIMELINE: TimelineKeyframe[] = [
   {
@@ -100,6 +113,51 @@ export const DEFAULT_DAY_NIGHT_TIMELINE: TimelineKeyframe[] = [
   }
 ];
 
+export function normalizeTimelineKeyframe(
+  keyframe: Partial<TimelineKeyframe>,
+  index = 0
+): TimelineKeyframe {
+  const skyType = keyframe.skyType || DEFAULT_STATE_SKY_TYPE;
+  const defaults = getSkyboxPresetDefaults(skyType);
+  return {
+    id: keyframe.id || `kf_${index}`,
+    time: Math.round((((keyframe.time ?? 12) % 24) + 24) % 24 * 10) / 10,
+    label: keyframe.label || "Estado",
+    icon: keyframe.icon || "",
+    skyType,
+    lightMode: keyframe.lightMode || "day",
+    shadowQuality: keyframe.shadowQuality || "medium",
+    sunColor: keyframe.sunColor || defaults.sunColor,
+    sunIntensity: keyframe.sunIntensity ?? defaults.sunIntensity,
+    ambientColor: keyframe.ambientColor || defaults.ambientColor,
+    ambientIntensity: keyframe.ambientIntensity ?? defaults.ambientIntensity,
+    enableSunLight: keyframe.enableSunLight ?? defaults.enableSunLight ?? true,
+    enableAmbientLight: keyframe.enableAmbientLight ?? defaults.enableAmbientLight ?? true,
+    sunElevation: keyframe.sunElevation ?? defaults.sunElevation,
+    sunAzimuth: keyframe.sunAzimuth ?? defaults.sunAzimuth,
+    environmentIntensity: keyframe.environmentIntensity ?? defaults.environmentIntensity,
+    backgroundIntensity: keyframe.backgroundIntensity ?? defaults.backgroundIntensity,
+    backgroundBlurriness: keyframe.backgroundBlurriness ?? defaults.backgroundBlurriness,
+    skyboxRotation: keyframe.skyboxRotation ?? defaults.skyboxRotation,
+    enableSkyboxFog: keyframe.enableSkyboxFog ?? defaults.enableSkyboxFog,
+    fogColor: keyframe.fogColor || defaults.fogColor,
+    fogNear: keyframe.fogNear ?? defaults.fogNear,
+    fogFar: keyframe.fogFar ?? defaults.fogFar,
+    enableStars: keyframe.enableStars ?? false,
+    skyTurbidity: keyframe.skyTurbidity ?? defaults.skyTurbidity ?? 10,
+    skyRayleigh: keyframe.skyRayleigh ?? defaults.skyRayleigh ?? 2,
+    skyMieCoefficient: keyframe.skyMieCoefficient ?? defaults.skyMieCoefficient ?? 0.005,
+    skyMieDirectionalG: keyframe.skyMieDirectionalG ?? defaults.skyMieDirectionalG ?? 0.8
+  };
+}
+
+export function normalizeTimeline(timeline: TimelineKeyframe[] | undefined): TimelineKeyframe[] {
+  const list = timeline && timeline.length > 0 ? timeline : DEFAULT_DAY_NIGHT_TIMELINE;
+  return list
+    .map((keyframe, index) => normalizeTimelineKeyframe(keyframe, index))
+    .sort((a, b) => a.time - b.time);
+}
+
 export function formatTimeOfDayHHMM(timeOfDay: number): string {
   const norm = ((timeOfDay % 24) + 24) % 24;
   const hours = Math.floor(norm);
@@ -111,8 +169,7 @@ export function interpolateTimelineState(
   timeline: TimelineKeyframe[] | undefined,
   timeOfDay: number
 ) {
-  const list = timeline && timeline.length > 0 ? timeline : DEFAULT_DAY_NIGHT_TIMELINE;
-  const sorted = [...list].sort((a, b) => a.time - b.time);
+  const sorted = normalizeTimeline(timeline);
 
   const normTime = ((timeOfDay % 24) + 24) % 24;
 
@@ -158,24 +215,44 @@ export function interpolateTimelineState(
   const lerpBgInt = THREE.MathUtils.lerp(k1.backgroundIntensity, k2.backgroundIntensity, factor);
   const lerpFogNear = THREE.MathUtils.lerp(k1.fogNear, k2.fogNear, factor);
   const lerpFogFar = THREE.MathUtils.lerp(k1.fogFar, k2.fogFar, factor);
+  const lerpBackgroundBlur = THREE.MathUtils.lerp(k1.backgroundBlurriness ?? 0, k2.backgroundBlurriness ?? 0, factor);
+  const lerpSkyboxRotation = THREE.MathUtils.lerp(k1.skyboxRotation ?? 0, k2.skyboxRotation ?? 0, factor);
+  const lerpSkyTurbidity = THREE.MathUtils.lerp(k1.skyTurbidity ?? 10, k2.skyTurbidity ?? 10, factor);
+  const lerpSkyRayleigh = THREE.MathUtils.lerp(k1.skyRayleigh ?? 2, k2.skyRayleigh ?? 2, factor);
+  const lerpSkyMieCoefficient = THREE.MathUtils.lerp(k1.skyMieCoefficient ?? 0.005, k2.skyMieCoefficient ?? 0.005, factor);
+  const lerpSkyMieDirectionalG = THREE.MathUtils.lerp(k1.skyMieDirectionalG ?? 0.8, k2.skyMieDirectionalG ?? 0.8, factor);
 
   const enableStars = lerpSunElev < 0 || (factor < 0.5 ? k1.enableStars : k2.enableStars);
   const enableSkyboxFog = factor < 0.5 ? k1.enableSkyboxFog : k2.enableSkyboxFog;
+  const pickFromNearest = <K extends keyof TimelineKeyframe>(key: K): TimelineKeyframe[K] => {
+    return factor < 0.5 ? k1[key] : k2[key];
+  };
 
   return {
+    skyType: pickFromNearest("skyType"),
+    lightMode: pickFromNearest("lightMode"),
+    shadowQuality: pickFromNearest("shadowQuality"),
     sunColor: "#" + lerpSunCol.getHexString(),
     sunIntensity: lerpSunInt,
     ambientColor: "#" + lerpAmbCol.getHexString(),
     ambientIntensity: lerpAmbInt,
+    enableSunLight: pickFromNearest("enableSunLight"),
+    enableAmbientLight: pickFromNearest("enableAmbientLight"),
     sunElevation: lerpSunElev,
     sunAzimuth: lerpSunAzim,
     environmentIntensity: lerpEnvInt,
     backgroundIntensity: lerpBgInt,
+    backgroundBlurriness: lerpBackgroundBlur,
+    skyboxRotation: lerpSkyboxRotation,
     enableSkyboxFog,
     fogColor: "#" + lerpFogCol.getHexString(),
     fogNear: lerpFogNear,
     fogFar: lerpFogFar,
     enableStars,
+    skyTurbidity: lerpSkyTurbidity,
+    skyRayleigh: lerpSkyRayleigh,
+    skyMieCoefficient: lerpSkyMieCoefficient,
+    skyMieDirectionalG: lerpSkyMieDirectionalG,
     k1,
     k2,
     factor
@@ -187,7 +264,7 @@ export function updateKeyframeInTimeline(
   timeOfDay: number,
   partialProps: Partial<TimelineKeyframe>
 ): TimelineKeyframe[] {
-  const list = timeline && timeline.length > 0 ? timeline.map(k => ({ ...k })) : DEFAULT_DAY_NIGHT_TIMELINE.map(k => ({ ...k }));
+  const list = normalizeTimeline(timeline).map(k => ({ ...k }));
   const normTime = ((timeOfDay % 24) + 24) % 24;
 
   let closestIndex = 0;
@@ -205,10 +282,10 @@ export function updateKeyframeInTimeline(
     }
   });
 
-  list[closestIndex] = {
+  list[closestIndex] = normalizeTimelineKeyframe({
     ...list[closestIndex],
     ...partialProps
-  };
+  }, closestIndex);
 
   return list;
 }
@@ -218,13 +295,13 @@ export const DEFAULT_DAY_NIGHT_PROFILES = [
     id: "estandar",
     name: "Estándar",
     isDefault: true,
-    timeline: DEFAULT_DAY_NIGHT_TIMELINE.map(k => ({ ...k }))
+    timeline: normalizeTimeline(DEFAULT_DAY_NIGHT_TIMELINE)
   },
   {
     id: "personalizado",
     name: "Personalizado",
     isDefault: false,
-    timeline: DEFAULT_DAY_NIGHT_TIMELINE.map(k => ({ ...k }))
+    timeline: normalizeTimeline(DEFAULT_DAY_NIGHT_TIMELINE)
   }
 ];
 
@@ -234,8 +311,7 @@ export function getKeyframeDurationRange(timeline: TimelineKeyframe[] | undefine
 }
 
 export function getKeyframeTimeAndDuration(timeline: TimelineKeyframe[] | undefined, keyframeId: string) {
-  const list = timeline && timeline.length > 0 ? timeline : DEFAULT_DAY_NIGHT_TIMELINE;
-  const sorted = [...list].sort((a, b) => a.time - b.time);
+  const sorted = normalizeTimeline(timeline);
   const index = sorted.findIndex(k => k.id === keyframeId);
   if (index === -1) return { startTime: 0, endTime: 24, duration: 24, rangeStr: "00:00 - 24:00" };
 
@@ -257,7 +333,7 @@ export function getKeyframeTimeAndDuration(timeline: TimelineKeyframe[] | undefi
 }
 
 export function setKeyframeStartTime(timeline: TimelineKeyframe[] | undefined, keyframeId: string, newStartTime: number): TimelineKeyframe[] {
-  const list = (timeline && timeline.length > 0 ? timeline : DEFAULT_DAY_NIGHT_TIMELINE).map(k => ({ ...k }));
+  const list = normalizeTimeline(timeline).map(k => ({ ...k }));
   const kf = list.find(k => k.id === keyframeId);
   if (kf) {
     kf.time = Math.round((((newStartTime % 24) + 24) % 24) * 10) / 10;
@@ -267,7 +343,7 @@ export function setKeyframeStartTime(timeline: TimelineKeyframe[] | undefined, k
 }
 
 export function setKeyframeEndTime(timeline: TimelineKeyframe[] | undefined, keyframeId: string, newEndTime: number): TimelineKeyframe[] {
-  const list = (timeline && timeline.length > 0 ? timeline : DEFAULT_DAY_NIGHT_TIMELINE).map(k => ({ ...k }));
+  const list = normalizeTimeline(timeline).map(k => ({ ...k }));
   const sorted = [...list].sort((a, b) => a.time - b.time);
   const index = sorted.findIndex(k => k.id === keyframeId);
   if (index !== -1) {
@@ -282,7 +358,7 @@ export function setKeyframeEndTime(timeline: TimelineKeyframe[] | undefined, key
 }
 
 export function setKeyframeDuration(timeline: TimelineKeyframe[] | undefined, keyframeId: string, newDuration: number): TimelineKeyframe[] {
-  const list = (timeline && timeline.length > 0 ? timeline : DEFAULT_DAY_NIGHT_TIMELINE).map(k => ({ ...k }));
+  const list = normalizeTimeline(timeline).map(k => ({ ...k }));
   const sorted = [...list].sort((a, b) => a.time - b.time);
   const index = sorted.findIndex(k => k.id === keyframeId);
   if (index !== -1) {
@@ -299,7 +375,7 @@ export function setKeyframeDuration(timeline: TimelineKeyframe[] | undefined, ke
 }
 
 export function updateKeyframeLabel(timeline: TimelineKeyframe[] | undefined, keyframeId: string, newLabel: string): TimelineKeyframe[] {
-  const list = (timeline && timeline.length > 0 ? timeline : DEFAULT_DAY_NIGHT_TIMELINE).map(k => ({ ...k }));
+  const list = normalizeTimeline(timeline).map(k => ({ ...k }));
   const kf = list.find(k => k.id === keyframeId);
   if (kf && newLabel.trim()) {
     kf.label = newLabel.trim();
@@ -314,7 +390,7 @@ export function addPresetKeyframeToTimeline(
   customLabel?: string,
   copyFromKeyframeId?: string
 ): TimelineKeyframe[] {
-  const list = (timeline && timeline.length > 0 ? timeline : DEFAULT_DAY_NIGHT_TIMELINE).map(k => ({ ...k }));
+  const list = normalizeTimeline(timeline).map(k => ({ ...k }));
 
   let baseTemplate: Partial<TimelineKeyframe> = {};
   let defaultTime = 12;
@@ -408,42 +484,41 @@ export function addPresetKeyframeToTimeline(
   if (!baseTemplate.sunColor) {
     const interpolated = interpolateTimelineState(list, finalTime);
     baseTemplate = {
+      skyType: interpolated.skyType,
+      lightMode: interpolated.lightMode,
+      shadowQuality: interpolated.shadowQuality,
       sunColor: interpolated.sunColor,
       sunIntensity: interpolated.sunIntensity,
       ambientColor: interpolated.ambientColor,
       ambientIntensity: interpolated.ambientIntensity,
+      enableSunLight: interpolated.enableSunLight,
+      enableAmbientLight: interpolated.enableAmbientLight,
       sunElevation: interpolated.sunElevation,
       sunAzimuth: interpolated.sunAzimuth,
       environmentIntensity: interpolated.environmentIntensity,
       backgroundIntensity: interpolated.backgroundIntensity,
+      backgroundBlurriness: interpolated.backgroundBlurriness,
+      skyboxRotation: interpolated.skyboxRotation,
       enableSkyboxFog: interpolated.enableSkyboxFog,
       fogColor: interpolated.fogColor,
       fogNear: interpolated.fogNear,
       fogFar: interpolated.fogFar,
-      enableStars: interpolated.enableStars
+      enableStars: interpolated.enableStars,
+      skyTurbidity: interpolated.skyTurbidity,
+      skyRayleigh: interpolated.skyRayleigh,
+      skyMieCoefficient: interpolated.skyMieCoefficient,
+      skyMieDirectionalG: interpolated.skyMieDirectionalG
     };
   }
 
   const newId = "kf_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
-  const newKf: TimelineKeyframe = {
+  const newKf: TimelineKeyframe = normalizeTimelineKeyframe({
+    ...baseTemplate,
     id: newId,
     time: Math.round(finalTime * 10) / 10,
     label: finalLabel,
-    icon: "",
-    sunColor: baseTemplate.sunColor || "#ffffff",
-    sunIntensity: baseTemplate.sunIntensity ?? 0.8,
-    ambientColor: baseTemplate.ambientColor || "#333333",
-    ambientIntensity: baseTemplate.ambientIntensity ?? 0.5,
-    sunElevation: baseTemplate.sunElevation ?? 45,
-    sunAzimuth: baseTemplate.sunAzimuth ?? 180,
-    environmentIntensity: baseTemplate.environmentIntensity ?? 1.0,
-    backgroundIntensity: baseTemplate.backgroundIntensity ?? 1.0,
-    enableSkyboxFog: !!baseTemplate.enableSkyboxFog,
-    fogColor: baseTemplate.fogColor || "#87ceeb",
-    fogNear: baseTemplate.fogNear ?? 10,
-    fogFar: baseTemplate.fogFar ?? 50,
-    enableStars: !!baseTemplate.enableStars
-  };
+    icon: baseTemplate.icon || ""
+  }, list.length);
 
   list.push(newKf);
   list.sort((a, b) => a.time - b.time);
@@ -461,8 +536,7 @@ export function removeKeyframeFromTimeline(
   timeline: TimelineKeyframe[] | undefined,
   keyframeId: string
 ): TimelineKeyframe[] {
-  const list = timeline && timeline.length > 0 ? timeline.map(k => ({ ...k })) : DEFAULT_DAY_NIGHT_TIMELINE.map(k => ({ ...k }));
+  const list = normalizeTimeline(timeline).map(k => ({ ...k }));
   if (list.length <= 2) return list; // Cannot remove if 2 or fewer keyframes
   return list.filter(k => k.id !== keyframeId);
 }
-

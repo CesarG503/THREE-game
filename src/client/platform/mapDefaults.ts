@@ -38,6 +38,10 @@ export interface SavedMapData {
 		ceilingGroups?: any[];
 		customGridCeilingGroups?: Record<string, string>;
 		customGridCeilingShapes?: Record<string, string>;
+		dayNightTimeline?: any[];
+		dayNightProfiles?: any[];
+		activeTimelineProfileId?: string;
+		selectedEnvironmentStateId?: string | null;
 	};
 	playerConfig: {
 		roles: unknown[];

@@ -19,15 +19,14 @@ import { getSkyboxPresetDefaults } from "../platform/skyboxPresets";
 import {
   formatTimeOfDayHHMM,
   interpolateTimelineState,
-  updateKeyframeInTimeline,
+  normalizeTimeline,
+  normalizeTimelineKeyframe,
   DEFAULT_DAY_NIGHT_PROFILES,
-  getKeyframeDurationRange,
   getKeyframeTimeAndDuration,
   setKeyframeStartTime,
   setKeyframeEndTime,
   setKeyframeDuration,
   updateKeyframeLabel,
-  addKeyframeToTimeline,
   addPresetKeyframeToTimeline,
   removeKeyframeFromTimeline
 } from "../platform/timelineDefaults";
@@ -1022,7 +1021,7 @@ export class ConstructionMenu {
             font-size: 16px;
             cursor: pointer;
         `;
-        const selectedSkyType = this.game.environmentConfig?.skyType || "day";
+        const selectedSkyType = this.getSelectedEnvironmentState()?.skyType || this.game.environmentConfig?.skyType || "day";
         let pendingSkyType = selectedSkyType;
         const options = [
             { value: "day", text: "Día", preview: "linear-gradient(180deg, #79c8ff 0%, #e4f7ff 72%, #b8e3ff 100%)" },
@@ -1144,8 +1143,9 @@ export class ConstructionMenu {
             this.selectSky.value = pendingSkyType;
             const skyboxUrl = getSkyboxUrlFromValue(pendingSkyType);
             const label = skyOptionLabels.get(pendingSkyType) || "Skybox guardado";
+            const selectedState = this.getSelectedEnvironmentState();
             previewLabel.textContent = label;
-            previewStatus.textContent = pendingSkyType === (this.game.environmentConfig?.skyType || "day") ? "Aplicado" : "Vista previa";
+            previewStatus.textContent = pendingSkyType === (selectedState?.skyType || this.game.environmentConfig?.skyType || "day") ? "Aplicado" : "Vista previa";
 
             const preset = getSkyboxPresetDefaults(pendingSkyType);
             if (this.presetNameSpan) this.presetNameSpan.textContent = `${preset.name}`;
@@ -1177,7 +1177,8 @@ export class ConstructionMenu {
             const defaults = getSkyboxPresetDefaults(skyType);
 
             const currentCfg = this.game.environmentConfig || {};
-            const isSkyboxChanged = currentCfg.skyType !== skyType;
+            const currentState = this.getSelectedEnvironmentState();
+            const isSkyboxChanged = (currentState?.skyType || currentCfg.skyType) !== skyType;
 
             const newConfig: any = { skyType };
             if (isSkyboxChanged) {
@@ -1198,7 +1199,7 @@ export class ConstructionMenu {
             }
 
             if (this.game && this.game.updateEnvironmentConfig) {
-                this.game.updateEnvironmentConfig(newConfig);
+                this.updateSelectedEnvironmentState(newConfig);
                 this.refreshSettings();
                 if (this.game.networkManager && this.game.networkManager.collaborativeMode) {
                     const mapJson = this.game.saveMap();
@@ -1382,7 +1383,7 @@ export class ConstructionMenu {
         resetDefaultsBtn.onclick = () => {
             const skyType = pendingSkyType || "day";
             const defaults = getSkyboxPresetDefaults(skyType);
-            this.game.updateEnvironmentConfig({
+            this.updateSelectedEnvironmentState({
                 skyType,
                 environmentIntensity: defaults.environmentIntensity,
                 backgroundIntensity: defaults.backgroundIntensity,
@@ -1415,6 +1416,22 @@ export class ConstructionMenu {
         presetHeader.appendChild(presetTitle);
         presetHeader.appendChild(resetDefaultsBtn);
         skyboxParamsGroup.appendChild(presetHeader);
+
+        this.selectedStateInfo = document.createElement("div");
+        this.selectedStateInfo.style.cssText = `
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            padding: 8px 10px;
+            background: rgba(2, 132, 199, 0.14);
+            border: 1px solid rgba(56, 189, 248, 0.35);
+            border-radius: 6px;
+            color: #e0f2fe;
+            font-size: 12px;
+        `;
+        skyboxParamsGroup.appendChild(this.selectedStateInfo);
 
         const buildSliderRow = (labelText, min, max, step, initialVal, unit, onChange) => {
             const row = document.createElement("div");
@@ -1491,24 +1508,7 @@ export class ConstructionMenu {
         section1.appendChild(sec1Title);
 
         const updateEnvProp = (partial: any) => {
-            const currentCfg = this.game.environmentConfig || {};
-            const currentTime = currentCfg.timeOfDay !== undefined ? Number(currentCfg.timeOfDay) : 12;
-            const updatedTimeline = updateKeyframeInTimeline(currentCfg.dayNightTimeline, currentTime, partial);
-            
-            const profiles = currentCfg.dayNightProfiles;
-            if (profiles && profiles.length > 0) {
-                const activeId = currentCfg.activeTimelineProfileId || profiles[0].id;
-                const activeProf = profiles.find(p => p.id === activeId);
-                if (activeProf) {
-                    activeProf.timeline = updatedTimeline.map(k => ({ ...k }));
-                }
-            }
-
-            this.game.updateEnvironmentConfig({
-                ...partial,
-                dayNightTimeline: updatedTimeline,
-                dayNightProfiles: profiles
-            });
+            this.updateSelectedEnvironmentState(partial);
             this.refreshSettings();
         };
 
@@ -1735,7 +1735,6 @@ export class ConstructionMenu {
         };
 
         this.setPendingSky(selectedSkyType);
-        container.appendChild(rowSky);
 
         // Lighting Config Container
         const rowLighting = document.createElement("div");
@@ -1819,7 +1818,7 @@ export class ConstructionMenu {
         this.sliderSunElevation.style.cssText = "cursor:pointer; width:100%;";
         this.sliderSunElevation.addEventListener("input", (e: any) => {
             const val = parseFloat(e.target.value);
-            this.game.updateEnvironmentConfig({ sunElevation: val });
+            this.updateSelectedEnvironmentState({ sunElevation: val });
             this.valSunElevation.textContent = val + "°";
         });
         rowSunElev.appendChild(labelElevRow);
@@ -1846,7 +1845,7 @@ export class ConstructionMenu {
         this.sliderSunAzimuth.style.cssText = "cursor:pointer; width:100%;";
         this.sliderSunAzimuth.addEventListener("input", (e: any) => {
             const val = parseFloat(e.target.value);
-            this.game.updateEnvironmentConfig({ sunAzimuth: val });
+            this.updateSelectedEnvironmentState({ sunAzimuth: val });
             this.valSunAzimuth.textContent = val + "°";
         });
         rowSunAzim.appendChild(labelAzimRow);
@@ -1912,10 +1911,10 @@ export class ConstructionMenu {
         this.checkStarsCycle.id = "chk-stars-cycle";
         this.checkStarsCycle.style.transform = "scale(1.2)";
         this.checkStarsCycle.addEventListener("change", (e: any) => {
-            this.game.updateEnvironmentConfig({ enableStarsCycle: e.target.checked });
+            this.updateSelectedEnvironmentState({ enableStars: e.target.checked });
         });
         const labelStarsCycle = document.createElement("label");
-        labelStarsCycle.textContent = "Estrellas en Noche de Ciclo Dinámico";
+        labelStarsCycle.textContent = "Estrellas en este estado";
         labelStarsCycle.htmlFor = "chk-stars-cycle";
         labelStarsCycle.style.fontSize = "13px";
         labelStarsCycle.style.cursor = "pointer";
@@ -1989,14 +1988,14 @@ export class ConstructionMenu {
             const timeline = config.dayNightTimeline && config.dayNightTimeline.length > 0 ? config.dayNightTimeline : DEFAULT_DAY_NIGHT_PROFILES[0].timeline;
             const sorted = [...timeline].sort((a, b) => a.time - b.time);
             const currentT = config.timeOfDay ?? 12;
-            let prevT = sorted[sorted.length - 1].time;
+            let prevState = sorted[sorted.length - 1];
             for (let i = sorted.length - 1; i >= 0; i--) {
                 if (sorted[i].time < currentT - 0.1) {
-                    prevT = sorted[i].time;
+                    prevState = sorted[i];
                     break;
                 }
             }
-            this.game.updateEnvironmentConfig({ timeOfDay: prevT, isCycleSimulating: false, enableDayNightCycle: false });
+            this.game.updateEnvironmentConfig({ selectedEnvironmentStateId: prevState.id, timeOfDay: prevState.time, isCycleSimulating: false, enableDayNightCycle: false });
             this.refreshSettings();
         });
 
@@ -2005,14 +2004,14 @@ export class ConstructionMenu {
             const timeline = config.dayNightTimeline && config.dayNightTimeline.length > 0 ? config.dayNightTimeline : DEFAULT_DAY_NIGHT_PROFILES[0].timeline;
             const sorted = [...timeline].sort((a, b) => a.time - b.time);
             const currentT = config.timeOfDay ?? 12;
-            let nextT = sorted[0].time;
+            let nextState = sorted[0];
             for (let i = 0; i < sorted.length; i++) {
                 if (sorted[i].time > currentT + 0.1) {
-                    nextT = sorted[i].time;
+                    nextState = sorted[i];
                     break;
                 }
             }
-            this.game.updateEnvironmentConfig({ timeOfDay: nextT, isCycleSimulating: false, enableDayNightCycle: false });
+            this.game.updateEnvironmentConfig({ selectedEnvironmentStateId: nextState.id, timeOfDay: nextState.time, isCycleSimulating: false, enableDayNightCycle: false });
             this.refreshSettings();
         });
 
@@ -2098,7 +2097,8 @@ export class ConstructionMenu {
         this.rowCycleSpeed.appendChild(this.sliderCycleSpeed);
         simContainer.appendChild(this.rowCycleSpeed);
 
-        rowLighting.appendChild(simContainer);
+        rowLighting.insertBefore(simContainer, rowLightMode);
+        rowLighting.insertBefore(rowSky, rowLightMode);
 
         // Custom Light intensities and colors rows
         this.rowCustomLights = document.createElement("div");
@@ -2115,13 +2115,13 @@ export class ConstructionMenu {
         this.inputSunIntensity.step = "0.1";
         this.inputSunIntensity.style.cssText = "background:#333; border:1px solid #555; color:white; padding:3px; width:45px; text-align:right;";
         this.inputSunIntensity.addEventListener("change", (e) => {
-            this.game.updateEnvironmentConfig({ sunIntensity: parseFloat(e.target.value) || 0 });
+            this.updateSelectedEnvironmentState({ sunIntensity: parseFloat(e.target.value) || 0 });
         });
         this.inputSunColor = document.createElement("input");
         this.inputSunColor.type = "color";
         this.inputSunColor.style.cssText = "background:transparent; border:none; width:28px; height:24px; padding:0; cursor:pointer;";
         this.inputSunColor.addEventListener("change", (e) => {
-            this.game.updateEnvironmentConfig({ sunColor: e.target.value });
+            this.updateSelectedEnvironmentState({ sunColor: e.target.value });
         });
         wrapSunL.appendChild(this.inputSunIntensity);
         wrapSunL.appendChild(this.inputSunColor);
@@ -2139,13 +2139,13 @@ export class ConstructionMenu {
         this.inputAmbientIntensity.step = "0.1";
         this.inputAmbientIntensity.style.cssText = "background:#333; border:1px solid #555; color:white; padding:3px; width:45px; text-align:right;";
         this.inputAmbientIntensity.addEventListener("change", (e) => {
-            this.game.updateEnvironmentConfig({ ambientIntensity: parseFloat(e.target.value) || 0 });
+            this.updateSelectedEnvironmentState({ ambientIntensity: parseFloat(e.target.value) || 0 });
         });
         this.inputAmbientColor = document.createElement("input");
         this.inputAmbientColor.type = "color";
         this.inputAmbientColor.style.cssText = "background:transparent; border:none; width:28px; height:24px; padding:0; cursor:pointer;";
         this.inputAmbientColor.addEventListener("change", (e) => {
-            this.game.updateEnvironmentConfig({ ambientColor: e.target.value });
+            this.updateSelectedEnvironmentState({ ambientColor: e.target.value });
         });
         wrapAmbL.appendChild(this.inputAmbientIntensity);
         wrapAmbL.appendChild(this.inputAmbientColor);
@@ -2180,7 +2180,7 @@ export class ConstructionMenu {
                 const val = parseFloat(e.target.value);
                 const update = {};
                 update[key] = val;
-                this.game.updateEnvironmentConfig(update);
+                this.updateSelectedEnvironmentState(update);
                 valSpan.textContent = val.toFixed(2) + unit;
             });
 
@@ -2422,36 +2422,121 @@ export class ConstructionMenu {
         container.appendChild(rowMap);
     }
 
-    renderTimelineProfilesAndCards(forceRebuild = false) {
-        if (!this.game || !this.game.environmentConfig) return;
-        const config = this.game.environmentConfig;
-
-        // Initialize profiles if not set
-        let profiles = config.dayNightProfiles;
-        if (!profiles || profiles.length === 0) {
-            profiles = DEFAULT_DAY_NIGHT_PROFILES.map(p => ({
+    getTimelineStateContext() {
+        const config = this.game?.environmentConfig || {};
+        let profiles = config.dayNightProfiles && config.dayNightProfiles.length > 0
+            ? config.dayNightProfiles
+            : DEFAULT_DAY_NIGHT_PROFILES.map(p => ({
                 id: p.id,
                 name: p.name,
                 isDefault: p.isDefault,
-                timeline: p.timeline.map(k => ({ ...k }))
+                timeline: normalizeTimeline(p.timeline).map(k => ({ ...k }))
             }));
-            config.dayNightProfiles = profiles;
-        }
+
+        profiles = profiles.map(p => ({
+            ...p,
+            timeline: normalizeTimeline(p.timeline).map(k => ({ ...k }))
+        }));
 
         let activeId = config.activeTimelineProfileId || profiles[0].id;
         let activeProfile = profiles.find(p => p.id === activeId) || profiles[0];
         activeId = activeProfile.id;
 
-        const timeline = (config.dayNightTimeline && config.dayNightTimeline.length > 0)
-            ? config.dayNightTimeline
-            : activeProfile.timeline;
+        const timeline = normalizeTimeline(
+            config.dayNightTimeline && config.dayNightTimeline.length > 0
+                ? config.dayNightTimeline
+                : activeProfile.timeline
+        ).map(k => ({ ...k }));
 
-        activeProfile.timeline = timeline;
+        activeProfile.timeline = timeline.map(k => ({ ...k }));
 
+        const currentTime = config.timeOfDay !== undefined ? Number(config.timeOfDay) : 12;
+        let selected = config.selectedEnvironmentStateId
+            ? timeline.find(k => k.id === config.selectedEnvironmentStateId)
+            : null;
+
+        if (!selected) {
+            let minDiff = 999;
+            timeline.forEach(k => {
+                const diff = Math.min(
+                    Math.abs(k.time - currentTime),
+                    Math.abs(k.time - (currentTime - 24)),
+                    Math.abs(k.time - (currentTime + 24))
+                );
+                if (diff < minDiff) {
+                    minDiff = diff;
+                    selected = k;
+                }
+            });
+        }
+
+        return { config, profiles, activeId, activeProfile, timeline, selected };
+    }
+
+    getSelectedEnvironmentState() {
+        return this.getTimelineStateContext().selected;
+    }
+
+    updateSelectedEnvironmentState(partial: any, stateId?: string) {
+        if (!this.game || !this.game.environmentConfig) return null;
+
+        const ctx = this.getTimelineStateContext();
+        const targetId = stateId || ctx.selected?.id || ctx.timeline[0]?.id;
+        if (!targetId) return null;
+
+        let updatedState = null;
+        const updatedTimeline = ctx.timeline.map((state, index) => {
+            const nextState = state.id === targetId
+                ? normalizeTimelineKeyframe({ ...state, ...partial }, index)
+                : normalizeTimelineKeyframe(state, index);
+            if (nextState.id === targetId) updatedState = nextState;
+            return nextState;
+        }).sort((a, b) => a.time - b.time);
+
+        const updatedProfiles = ctx.profiles.map(profile => ({
+            ...profile,
+            timeline: profile.id === ctx.activeProfile.id
+                ? updatedTimeline.map(k => ({ ...k }))
+                : normalizeTimeline(profile.timeline).map(k => ({ ...k }))
+        }));
+
+        const selectedState = updatedState || updatedTimeline.find(k => k.id === targetId) || updatedTimeline[0];
+        this.game.updateEnvironmentConfig({
+            ...partial,
+            activeTimelineProfileId: ctx.activeProfile.id,
+            selectedEnvironmentStateId: selectedState.id,
+            timeOfDay: selectedState.time,
+            dayNightTimeline: updatedTimeline,
+            dayNightProfiles: updatedProfiles
+        });
+        return selectedState;
+    }
+
+    getSkyTypeLabel(skyType: string) {
+        if (skyType === "shader") return "Cielo Atmosférico Shader";
+        if (skyType === "day") return "Día";
+        if (skyType === "night") return "Noche";
+        if (skyType === "sunset") return "Atardecer";
+        if (typeof skyType === "string" && skyType.startsWith(SKYBOX_VALUE_PREFIX)) {
+            const match = skyType.match(/Cubemap_Sky_(\d+)/i);
+            return match ? `Skybox #${match[1]}` : "Skybox";
+        }
+        return skyType || "Día";
+    }
+
+    renderTimelineProfilesAndCards(forceRebuild = false) {
+        if (!this.game || !this.game.environmentConfig) return;
+        const ctx = this.getTimelineStateContext();
+        const config = ctx.config;
+        const profiles = ctx.profiles;
+        const activeId = ctx.activeId;
+        const activeProfile = ctx.activeProfile;
+        const timeline = ctx.timeline;
         const sortedTimeline = [...timeline].sort((a, b) => a.time - b.time);
         const currentTime = config.timeOfDay !== undefined ? Number(config.timeOfDay) : 12;
+        const selectedStateId = ctx.selected?.id || sortedTimeline[0]?.id;
 
-        let closestKeyTime = 12;
+        let closestStateId = sortedTimeline[0]?.id || "";
         let minDiff = 999;
         sortedTimeline.forEach(k => {
             const diff = Math.min(
@@ -2461,7 +2546,7 @@ export class ConstructionMenu {
             );
             if (diff < minDiff) {
                 minDiff = diff;
-                closestKeyTime = k.time;
+                closestStateId = k.id;
             }
         });
 
@@ -2496,7 +2581,9 @@ export class ConstructionMenu {
                         this.game.updateEnvironmentConfig({
                             activeTimelineProfileId: prof.id,
                             dayNightTimeline: prof.timeline.map(k => ({ ...k })),
-                            dayNightProfiles: profiles
+                            dayNightProfiles: profiles,
+                            selectedEnvironmentStateId: prof.timeline[0]?.id || null,
+                            timeOfDay: prof.timeline[0]?.time ?? 12
                         });
                         this.renderTimelineProfilesAndCards(true);
                         this.refreshSettings();
@@ -2513,7 +2600,9 @@ export class ConstructionMenu {
                             this.game.updateEnvironmentConfig({
                                 dayNightProfiles: updatedProfiles,
                                 activeTimelineProfileId: fallbackProf.id,
-                                dayNightTimeline: fallbackProf.timeline.map(k => ({ ...k }))
+                                dayNightTimeline: fallbackProf.timeline.map(k => ({ ...k })),
+                                selectedEnvironmentStateId: fallbackProf.timeline[0]?.id || null,
+                                timeOfDay: fallbackProf.timeline[0]?.time ?? 12
                             });
                             this.renderTimelineProfilesAndCards(true);
                             this.refreshSettings();
@@ -2552,7 +2641,9 @@ export class ConstructionMenu {
                     this.game.updateEnvironmentConfig({
                         dayNightProfiles: profiles,
                         activeTimelineProfileId: newProf.id,
-                        dayNightTimeline: newProf.timeline.map(k => ({ ...k }))
+                        dayNightTimeline: newProf.timeline.map(k => ({ ...k })),
+                        selectedEnvironmentStateId: newProf.timeline[0]?.id || null,
+                        timeOfDay: newProf.timeline[0]?.time ?? 12
                     });
                     this.renderTimelineProfilesAndCards(true);
                     this.refreshSettings();
@@ -2625,11 +2716,15 @@ export class ConstructionMenu {
                     optionsWrap.style.cssText = "display: flex; flex-direction: column; gap: 8px;";
 
                     const applyState = (presetType: "night" | "sunrise" | "noon" | "sunset" | "custom", customTime?: number, customLabel?: string, copyFromId?: string) => {
+                        const previousIds = new Set(timeline.map(k => k.id));
                         const updatedTimeline = addPresetKeyframeToTimeline(timeline, presetType, customTime, customLabel, copyFromId);
+                        const newState = updatedTimeline.find(k => !previousIds.has(k.id)) || updatedTimeline[updatedTimeline.length - 1];
                         activeProfile.timeline = updatedTimeline;
                         this.game.updateEnvironmentConfig({
                             dayNightTimeline: updatedTimeline,
-                            dayNightProfiles: profiles
+                            dayNightProfiles: profiles,
+                            selectedEnvironmentStateId: newState.id,
+                            timeOfDay: newState.time
                         });
                         this.renderTimelineProfilesAndCards(true);
                         this.refreshSettings();
@@ -2789,11 +2884,14 @@ export class ConstructionMenu {
                 this.keyframeCardElements = [];
 
                 sortedTimeline.forEach(kf => {
-                    const isActive = kf.time === closestKeyTime;
+                    const isSelected = kf.id === selectedStateId;
+                    const isPlaybackState = kf.id === closestStateId;
                     const info = getKeyframeTimeAndDuration(sortedTimeline, kf.id);
+                    const skyLabel = this.getSkyTypeLabel(kf.skyType || "shader");
 
                     const card = document.createElement("div");
-                    card.dataset.active = isActive ? "true" : "false";
+                    card.dataset.active = isSelected ? "true" : "false";
+                    card.dataset.playback = isPlaybackState ? "true" : "false";
                     card.style.cssText = `
                         display: flex;
                         flex-direction: column;
@@ -2801,23 +2899,24 @@ export class ConstructionMenu {
                         justify-content: space-between;
                         gap: 6px;
                         padding: 10px 8px;
-                        background: ${isActive ? "#181818" : "#222222"};
-                        border: 2px solid ${isActive ? "#00ffff" : "#333333"};
+                        background: ${isSelected ? "#181818" : "#222222"};
+                        border: 2px solid ${isSelected ? "#00ffff" : (isPlaybackState ? "#4ade80" : "#333333")};
                         border-radius: 6px;
                         cursor: pointer;
                         color: white;
                         position: relative;
                         transition: all 0.2s;
-                        box-shadow: ${isActive ? "0 0 10px rgba(0, 255, 255, 0.4)" : "none"};
+                        box-shadow: ${isSelected ? "0 0 10px rgba(0, 255, 255, 0.4)" : (isPlaybackState ? "0 0 8px rgba(74, 222, 128, 0.28)" : "none")};
                     `;
                     card.onmouseover = () => {
                         if (card.dataset.active !== "true") card.style.borderColor = "#555555";
                     };
                     card.onmouseout = () => {
-                        if (card.dataset.active !== "true") card.style.borderColor = "#333333";
+                        if (card.dataset.active !== "true") card.style.borderColor = card.dataset.playback === "true" ? "#4ade80" : "#333333";
                     };
                     card.onclick = () => {
                         this.game.updateEnvironmentConfig({
+                            selectedEnvironmentStateId: kf.id,
                             timeOfDay: kf.time,
                             isCycleSimulating: false,
                             enableDayNightCycle: false
@@ -2836,10 +2935,13 @@ export class ConstructionMenu {
                         btnDelKf.onclick = (e) => {
                             e.stopPropagation();
                             const updatedTimeline = removeKeyframeFromTimeline(timeline, kf.id);
+                            const fallbackState = updatedTimeline.find(k => k.id === selectedStateId) || updatedTimeline[0];
                             activeProfile.timeline = updatedTimeline;
                             this.game.updateEnvironmentConfig({
                                 dayNightTimeline: updatedTimeline,
-                                dayNightProfiles: profiles
+                                dayNightProfiles: profiles,
+                                selectedEnvironmentStateId: fallbackState?.id || null,
+                                timeOfDay: fallbackState?.time ?? 12
                             });
                             this.renderTimelineProfilesAndCards(true);
                             this.refreshSettings();
@@ -2868,7 +2970,8 @@ export class ConstructionMenu {
                             activeProfile.timeline = updatedTimeline;
                             this.game.updateEnvironmentConfig({
                                 dayNightTimeline: updatedTimeline,
-                                dayNightProfiles: profiles
+                                dayNightProfiles: profiles,
+                                selectedEnvironmentStateId: kf.id
                             });
                             this.renderTimelineProfilesAndCards(true);
                             this.refreshSettings();
@@ -2917,7 +3020,9 @@ export class ConstructionMenu {
                             activeProfile.timeline = updatedTimeline;
                             this.game.updateEnvironmentConfig({
                                 dayNightTimeline: updatedTimeline,
-                                dayNightProfiles: profiles
+                                dayNightProfiles: profiles,
+                                selectedEnvironmentStateId: kf.id,
+                                timeOfDay: val
                             });
                             this.renderTimelineProfilesAndCards(true);
                             this.refreshSettings();
@@ -2947,7 +3052,8 @@ export class ConstructionMenu {
                             activeProfile.timeline = updatedTimeline;
                             this.game.updateEnvironmentConfig({
                                 dayNightTimeline: updatedTimeline,
-                                dayNightProfiles: profiles
+                                dayNightProfiles: profiles,
+                                selectedEnvironmentStateId: kf.id
                             });
                             this.renderTimelineProfilesAndCards(true);
                             this.refreshSettings();
@@ -2977,7 +3083,8 @@ export class ConstructionMenu {
                             activeProfile.timeline = updatedTimeline;
                             this.game.updateEnvironmentConfig({
                                 dayNightTimeline: updatedTimeline,
-                                dayNightProfiles: profiles
+                                dayNightProfiles: profiles,
+                                selectedEnvironmentStateId: kf.id
                             });
                             this.renderTimelineProfilesAndCards(true);
                             this.refreshSettings();
@@ -2993,21 +3100,48 @@ export class ConstructionMenu {
                     card.appendChild(titleWrap);
                     card.appendChild(rangeSpan);
                     card.appendChild(durBadge);
+
+                    const configChips = document.createElement("div");
+                    configChips.style.cssText = "display:flex; gap:4px; flex-wrap:wrap; justify-content:center; width:100%;";
+                    const makeChip = (text, color = "#94a3b8") => {
+                        const chip = document.createElement("span");
+                        chip.textContent = text;
+                        chip.style.cssText = `
+                            font-size: 9px;
+                            line-height: 1;
+                            padding: 3px 5px;
+                            border-radius: 999px;
+                            background: rgba(15, 23, 42, 0.9);
+                            border: 1px solid ${color};
+                            color: ${color};
+                            max-width: 100%;
+                            overflow: hidden;
+                            text-overflow: ellipsis;
+                            white-space: nowrap;
+                        `;
+                        return chip;
+                    };
+                    configChips.appendChild(makeChip(skyLabel, kf.skyType === "shader" ? "#60a5fa" : "#94a3b8"));
+                    configChips.appendChild(makeChip(`Sol ${Number(kf.sunIntensity ?? 0).toFixed(2)}`, "#fbbf24"));
+                    configChips.appendChild(makeChip(`Mie ${Number(kf.skyMieCoefficient ?? 0.005).toFixed(3)}`, "#38bdf8"));
+                    card.appendChild(configChips);
                     card.appendChild(timeControlsRow);
 
                     this.simCardsGrid.appendChild(card);
-                    this.keyframeCardElements.push({ time: kf.time, card });
+                    this.keyframeCardElements.push({ id: kf.id, time: kf.time, card });
                 });
             }
         } else {
             if (this.keyframeCardElements) {
                 this.keyframeCardElements.forEach(k => {
-                    const isActive = k.time === closestKeyTime;
+                    const isSelected = k.id === selectedStateId;
+                    const isPlaybackState = k.id === closestStateId;
                     if (k.card) {
-                        k.card.dataset.active = isActive ? "true" : "false";
-                        k.card.style.borderColor = isActive ? "#00ffff" : "#333333";
-                        k.card.style.boxShadow = isActive ? "0 0 10px rgba(0, 255, 255, 0.4)" : "none";
-                        k.card.style.background = isActive ? "#181818" : "#222222";
+                        k.card.dataset.active = isSelected ? "true" : "false";
+                        k.card.dataset.playback = isPlaybackState ? "true" : "false";
+                        k.card.style.borderColor = isSelected ? "#00ffff" : (isPlaybackState ? "#4ade80" : "#333333");
+                        k.card.style.boxShadow = isSelected ? "0 0 10px rgba(0, 255, 255, 0.4)" : (isPlaybackState ? "0 0 8px rgba(74, 222, 128, 0.28)" : "none");
+                        k.card.style.background = isSelected ? "#181818" : "#222222";
                     }
                 });
             }
@@ -3017,6 +3151,9 @@ export class ConstructionMenu {
     refreshSettings() {
         if (!this.game || !this.game.environmentConfig) return;
         const config = this.game.environmentConfig;
+        const timelineContext = this.getTimelineStateContext();
+        const selectedState = timelineContext.selected;
+        const selectedConfig = selectedState || config;
 
         // Size Inputs and Row Visibilities
         const isCustom = config.shapeType === "custom";
@@ -3047,22 +3184,22 @@ export class ConstructionMenu {
         if (this.syncCeilingsVisibility) this.syncCeilingsVisibility();
 
         // Skybox preview
-        if (config.skyType) {
-            if (this.setPendingSky) this.setPendingSky(config.skyType);
+        if (selectedConfig.skyType || config.skyType) {
+            if (this.setPendingSky) this.setPendingSky(selectedConfig.skyType || config.skyType);
         }
 
         // ------------------ New Lighting Controls Refresh ------------------
-        if (this.selectLightMode) this.selectLightMode.value = config.lightMode || "day";
+        if (this.selectLightMode) this.selectLightMode.value = selectedConfig.lightMode || config.lightMode || "day";
         if (this.selectShadowQuality) this.selectShadowQuality.value = config.shadowQuality || "medium";
 
         // Refresh Sun position sliders
         if (this.sliderSunElevation) {
-            const elevVal = config.sunElevation !== undefined ? Number(config.sunElevation) : 45;
+            const elevVal = selectedConfig.sunElevation !== undefined ? Number(selectedConfig.sunElevation) : 45;
             this.sliderSunElevation.value = String(elevVal);
             if (this.valSunElevation) this.valSunElevation.textContent = elevVal + "°";
         }
         if (this.sliderSunAzimuth) {
-            const azimVal = config.sunAzimuth !== undefined ? Number(config.sunAzimuth) : 180;
+            const azimVal = selectedConfig.sunAzimuth !== undefined ? Number(selectedConfig.sunAzimuth) : 180;
             this.sliderSunAzimuth.value = String(azimVal);
             if (this.valSunAzimuth) this.valSunAzimuth.textContent = azimVal + "°";
         }
@@ -3070,7 +3207,7 @@ export class ConstructionMenu {
         // Refresh Star checkboxes
         if (this.checkStarsNight) this.checkStarsNight.checked = config.enableStarsNight !== false;
         if (this.checkStarsSkybox) this.checkStarsSkybox.checked = !!config.enableStarsSkybox;
-        if (this.checkStarsCycle) this.checkStarsCycle.checked = config.enableStarsCycle !== false;
+        if (this.checkStarsCycle) this.checkStarsCycle.checked = !!selectedConfig.enableStars;
 
         const isPlaying = !!config.enableDayNightCycle || !!config.isCycleSimulating;
         if (this.simPlayBtn && this.simPauseBtn) {
@@ -3094,6 +3231,19 @@ export class ConstructionMenu {
 
         this.renderTimelineProfilesAndCards(false);
 
+        if (this.selectedStateInfo && selectedState) {
+            const stateInfo = getKeyframeTimeAndDuration(timelineContext.timeline, selectedState.id);
+            this.selectedStateInfo.innerHTML = "";
+            const label = document.createElement("span");
+            label.textContent = `Estado seleccionado: ${selectedState.label}`;
+            label.style.cssText = "font-weight:bold; color:#ffffff;";
+            const meta = document.createElement("span");
+            meta.textContent = `${stateInfo.rangeStr} · ${this.getSkyTypeLabel(selectedState.skyType || "shader")}`;
+            meta.style.cssText = "font-family:monospace; color:#7dd3fc;";
+            this.selectedStateInfo.appendChild(label);
+            this.selectedStateInfo.appendChild(meta);
+        }
+
         if (this.sliderTimeOfDay && document.activeElement !== this.sliderTimeOfDay) {
             this.sliderTimeOfDay.value = String(currentTime);
             if (this.valTimeOfDay) this.valTimeOfDay.textContent = currentTime.toFixed(1) + " hrs";
@@ -3105,29 +3255,29 @@ export class ConstructionMenu {
             if (this.valCycleSpeed) this.valCycleSpeed.textContent = (spd * 10).toFixed(1) + "x";
         }
 
-        if (this.rowCustomLights) this.rowCustomLights.style.display = config.lightMode === "custom" ? "flex" : "none";
-        if (this.inputSunIntensity) this.inputSunIntensity.value = String(config.sunIntensity ?? 0.8);
-        if (this.inputSunColor) this.inputSunColor.value = config.sunColor || "#ffffff";
-        if (this.inputAmbientIntensity) this.inputAmbientIntensity.value = String(config.ambientIntensity ?? 0.6);
-        if (this.inputAmbientColor) this.inputAmbientColor.value = config.ambientColor || "#ffffff";
+        if (this.rowCustomLights) this.rowCustomLights.style.display = selectedConfig.lightMode === "custom" ? "flex" : "none";
+        if (this.inputSunIntensity) this.inputSunIntensity.value = String(selectedConfig.sunIntensity ?? 0.8);
+        if (this.inputSunColor) this.inputSunColor.value = selectedConfig.sunColor || "#ffffff";
+        if (this.inputAmbientIntensity) this.inputAmbientIntensity.value = String(selectedConfig.ambientIntensity ?? 0.6);
+        if (this.inputAmbientColor) this.inputAmbientColor.value = selectedConfig.ambientColor || "#ffffff";
 
-        const currentSkyType = config.skyType || "day";
-        const usesShader = currentSkyType === "shader" || config.lightMode === "cycle";
+        const currentSkyType = selectedConfig.skyType || config.skyType || "day";
+        const usesShader = currentSkyType === "shader" || selectedConfig.lightMode === "cycle" || config.lightMode === "cycle";
         if (this.rowSkyShader) this.rowSkyShader.style.display = usesShader ? "flex" : "none";
         if (this.shaderSliders && usesShader) {
-            const turbidityVal = config.skyTurbidity ?? 10;
+            const turbidityVal = selectedConfig.skyTurbidity ?? 10;
             this.shaderSliders.turbidity.slider.value = String(turbidityVal);
             this.shaderSliders.turbidity.valSpan.textContent = turbidityVal.toFixed(2);
 
-            const rayleighVal = config.skyRayleigh ?? 2;
+            const rayleighVal = selectedConfig.skyRayleigh ?? 2;
             this.shaderSliders.rayleigh.slider.value = String(rayleighVal);
             this.shaderSliders.rayleigh.valSpan.textContent = rayleighVal.toFixed(2);
 
-            const mieCoeffVal = config.skyMieCoefficient ?? 0.005;
+            const mieCoeffVal = selectedConfig.skyMieCoefficient ?? 0.005;
             this.shaderSliders.mieCoefficient.slider.value = String(mieCoeffVal);
             this.shaderSliders.mieCoefficient.valSpan.textContent = mieCoeffVal.toFixed(3);
 
-            const mieGVal = config.skyMieDirectionalG ?? 0.8;
+            const mieGVal = selectedConfig.skyMieDirectionalG ?? 0.8;
             this.shaderSliders.mieDirectionalG.slider.value = String(mieGVal);
             this.shaderSliders.mieDirectionalG.valSpan.textContent = mieGVal.toFixed(2);
         }
@@ -3136,64 +3286,64 @@ export class ConstructionMenu {
         const interp = interpolateTimelineState(config.dayNightTimeline, currentTime);
 
         if (this.sliderEnvIntensity) {
-            const envVal = config.environmentIntensity !== undefined ? Number(config.environmentIntensity) : interp.environmentIntensity;
+            const envVal = selectedConfig.environmentIntensity !== undefined ? Number(selectedConfig.environmentIntensity) : interp.environmentIntensity;
             this.sliderEnvIntensity.value = String(envVal);
             if (this.valEnvIntensity) this.valEnvIntensity.textContent = Number(envVal).toFixed(2);
         }
         if (this.sliderBgIntensity) {
-            const bgVal = config.backgroundIntensity !== undefined ? Number(config.backgroundIntensity) : interp.backgroundIntensity;
+            const bgVal = selectedConfig.backgroundIntensity !== undefined ? Number(selectedConfig.backgroundIntensity) : interp.backgroundIntensity;
             this.sliderBgIntensity.value = String(bgVal);
             if (this.valBgIntensity) this.valBgIntensity.textContent = Number(bgVal).toFixed(2);
         }
         if (this.sliderSkyRotation) {
-            const rotVal = config.skyboxRotation !== undefined ? Number(config.skyboxRotation) : 0;
+            const rotVal = selectedConfig.skyboxRotation !== undefined ? Number(selectedConfig.skyboxRotation) : 0;
             this.sliderSkyRotation.value = String(rotVal);
             if (this.valSkyRotation) this.valSkyRotation.textContent = rotVal + "°";
         }
         if (this.sliderBgBlur) {
-            const blurVal = config.backgroundBlurriness !== undefined ? Number(config.backgroundBlurriness) : 0;
+            const blurVal = selectedConfig.backgroundBlurriness !== undefined ? Number(selectedConfig.backgroundBlurriness) : 0;
             this.sliderBgBlur.value = String(blurVal);
             if (this.valBgBlur) this.valBgBlur.textContent = Number(blurVal).toFixed(2);
         }
 
-        if (this.checkSunLight) this.checkSunLight.checked = config.enableSunLight !== false;
+        if (this.checkSunLight) this.checkSunLight.checked = selectedConfig.enableSunLight !== false;
         if (this.inputSkySunColor) {
-            const sc = config.sunColor || interp.sunColor;
+            const sc = selectedConfig.sunColor || interp.sunColor;
             this.inputSkySunColor.value = sc;
             if (this.hexSkySunColor) this.hexSkySunColor.textContent = sc;
         }
         if (this.sliderSkySunIntensity) {
-            const si = config.sunIntensity !== undefined ? Number(config.sunIntensity) : interp.sunIntensity;
+            const si = selectedConfig.sunIntensity !== undefined ? Number(selectedConfig.sunIntensity) : interp.sunIntensity;
             this.sliderSkySunIntensity.value = String(si);
             if (this.valSkySunIntensity) this.valSkySunIntensity.textContent = Number(si).toFixed(2);
         }
-        if (this.checkAmbientLight) this.checkAmbientLight.checked = config.enableAmbientLight !== false;
+        if (this.checkAmbientLight) this.checkAmbientLight.checked = selectedConfig.enableAmbientLight !== false;
         if (this.inputSkyAmbientColor) {
-            const ac = config.ambientColor || interp.ambientColor;
+            const ac = selectedConfig.ambientColor || interp.ambientColor;
             this.inputSkyAmbientColor.value = ac;
             if (this.hexSkyAmbientColor) this.hexSkyAmbientColor.textContent = ac;
         }
         if (this.sliderSkyAmbientIntensity) {
-            const ai = config.ambientIntensity !== undefined ? Number(config.ambientIntensity) : interp.ambientIntensity;
+            const ai = selectedConfig.ambientIntensity !== undefined ? Number(selectedConfig.ambientIntensity) : interp.ambientIntensity;
             this.sliderSkyAmbientIntensity.value = String(ai);
             if (this.valSkyAmbientIntensity) this.valSkyAmbientIntensity.textContent = Number(ai).toFixed(2);
         }
 
-        const isFogEnabled = config.enableSkyboxFog !== undefined ? !!config.enableSkyboxFog : !!interp.enableSkyboxFog;
+        const isFogEnabled = selectedConfig.enableSkyboxFog !== undefined ? !!selectedConfig.enableSkyboxFog : !!interp.enableSkyboxFog;
         if (this.checkSkyboxFog) this.checkSkyboxFog.checked = isFogEnabled;
         
         if (this.inputSkyFogColor) {
-            const fc = config.fogColor || interp.fogColor || "#87ceeb";
+            const fc = selectedConfig.fogColor || interp.fogColor || "#87ceeb";
             this.inputSkyFogColor.value = fc;
             if (this.hexSkyFogColor) this.hexSkyFogColor.textContent = fc;
         }
         if (this.sliderSkyFogNear) {
-            const fn = config.fogNear !== undefined ? Number(config.fogNear) : (interp.fogNear ?? 10);
+            const fn = selectedConfig.fogNear !== undefined ? Number(selectedConfig.fogNear) : (interp.fogNear ?? 10);
             this.sliderSkyFogNear.value = String(fn);
             if (this.valSkyFogNear) this.valSkyFogNear.textContent = Number(fn).toFixed(0) + "m";
         }
         if (this.sliderSkyFogFar) {
-            const ff = config.fogFar !== undefined ? Number(config.fogFar) : (interp.fogFar ?? 50);
+            const ff = selectedConfig.fogFar !== undefined ? Number(selectedConfig.fogFar) : (interp.fogFar ?? 50);
             this.sliderSkyFogFar.value = String(ff);
             if (this.valSkyFogFar) this.valSkyFogFar.textContent = Number(ff).toFixed(0) + "m";
         }

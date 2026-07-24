@@ -66,6 +66,7 @@ export interface EnvironmentConfig {
 	dayNightTimeline?: import("../platform/timelineDefaults").TimelineKeyframe[];
 	dayNightProfiles?: DayNightProfile[];
 	activeTimelineProfileId?: string;
+	selectedEnvironmentStateId?: string | null;
 	isCycleSimulating?: boolean;
 }
 

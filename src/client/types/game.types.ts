@@ -55,6 +55,10 @@ export interface EnvironmentConfig {
 	backgroundBlurriness?: number;
 	skyboxRotation?: number;
 	enableSkyboxFog?: boolean;
+	enableVisibleSun?: boolean;
+	visibleSunSize?: number;
+	visibleSunIntensity?: number;
+	transitionMode?: "procedural" | "instant";
 	fogColor?: string;
 	fogNear?: number;
 	fogFar?: number;

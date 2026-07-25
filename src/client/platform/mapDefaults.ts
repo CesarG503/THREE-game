@@ -42,6 +42,10 @@ export interface SavedMapData {
 		dayNightProfiles?: any[];
 		activeTimelineProfileId?: string;
 		selectedEnvironmentStateId?: string | null;
+		enableVisibleSun?: boolean;
+		visibleSunSize?: number;
+		visibleSunIntensity?: number;
+		transitionMode?: "procedural" | "instant";
 	};
 	playerConfig: {
 		roles: unknown[];

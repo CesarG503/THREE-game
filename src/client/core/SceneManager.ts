@@ -21,6 +21,7 @@ export class SceneManager {
   ambientLight: THREE.AmbientLight;
   dirLight: THREE.DirectionalLight;
   stars: THREE.Points | null;
+  visibleSun: THREE.Sprite | null;
   currentRenderDistance: number | undefined;
   skyMesh: Sky | null = null;
   sunVec: THREE.Vector3;
@@ -30,6 +31,9 @@ export class SceneManager {
   private skyboxCache: Map<string, Promise<THREE.CubeTexture>>;
   private loadedSkyboxTextures: Set<THREE.CubeTexture>;
   private activeSkyboxTexture: THREE.CubeTexture | null;
+  private visibleSunTexture: THREE.CanvasTexture | null;
+  private visibleSunMaterial: THREE.SpriteMaterial | null;
+  private visibleSunDistance: number;
   private activeVisualSkyType: string | null;
   private skyboxRequestId: number;
 
@@ -39,9 +43,13 @@ export class SceneManager {
     this.scene.background = new THREE.Color(0x87ceeb);
     this.scene.fog = new THREE.Fog(0x87ceeb, 10, 50);
     this.scene.environment = null;
+    this.visibleSun = null;
     this.skyboxCache = new Map();
     this.loadedSkyboxTextures = new Set();
     this.activeSkyboxTexture = null;
+    this.visibleSunTexture = null;
+    this.visibleSunMaterial = null;
+    this.visibleSunDistance = 450;
     this.activeVisualSkyType = null;
     this.skyboxRequestId = 0;
     this.sunVec = new THREE.Vector3();
@@ -84,6 +92,7 @@ export class SceneManager {
 
     // Initialize stars (hidden by default)
     this.createStars();
+    this.createVisibleSun();
   }
 
   createStars() {
@@ -116,6 +125,39 @@ export class SceneManager {
     this.stars.visible = false;
     this.stars.renderOrder = -1;
     this.scene.add(this.stars);
+  }
+
+  private createVisibleSun() {
+    const canvas = document.createElement("canvas");
+    canvas.width = 256;
+    canvas.height = 256;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const gradient = ctx.createRadialGradient(128, 128, 0, 128, 128, 128);
+    gradient.addColorStop(0, "rgba(255,255,255,1)");
+    gradient.addColorStop(0.16, "rgba(255,246,190,0.96)");
+    gradient.addColorStop(0.34, "rgba(255,202,98,0.5)");
+    gradient.addColorStop(0.62, "rgba(255,146,64,0.18)");
+    gradient.addColorStop(1, "rgba(255,146,64,0)");
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    this.visibleSunTexture = new THREE.CanvasTexture(canvas);
+    this.visibleSunTexture.colorSpace = THREE.SRGBColorSpace;
+    this.visibleSunMaterial = new THREE.SpriteMaterial({
+      map: this.visibleSunTexture,
+      color: 0xffffff,
+      transparent: true,
+      opacity: 1,
+      depthWrite: false,
+      depthTest: true,
+      fog: false
+    });
+    this.visibleSun = new THREE.Sprite(this.visibleSunMaterial);
+    this.visibleSun.visible = false;
+    this.visibleSun.renderOrder = -5;
+    this.scene.add(this.visibleSun);
   }
 
   setSky(type: any) {
@@ -526,6 +568,49 @@ export class SceneManager {
     if (isShaderSky && this.skyMesh) {
       this.skyMesh.material.uniforms["sunPosition"].value.copy(this.sunVec);
     }
+
+    this.updateVisibleSun(visualConfig, sunColor);
+  }
+
+  private updateVisibleSun(config: any, sunColor: string) {
+    if (!this.visibleSun || !this.visibleSunMaterial) return;
+
+    if (!config.enableVisibleSun) {
+      this.visibleSun.visible = false;
+      return;
+    }
+
+    const horizonFade = THREE.MathUtils.smoothstep(this.sunVec.y, -0.04, 0.08);
+    if (horizonFade <= 0.001) {
+      this.visibleSun.visible = false;
+      return;
+    }
+
+    const cameraFar = this.camera?.far || this.currentRenderDistance || 1000;
+    this.visibleSunDistance = Math.max(60, Math.min(cameraFar * 0.82, 850));
+
+    const baseSize = config.visibleSunSize !== undefined ? Number(config.visibleSunSize) : 28;
+    const turbidity = config.skyTurbidity !== undefined ? Number(config.skyTurbidity) : 10;
+    const rayleigh = config.skyRayleigh !== undefined ? Number(config.skyRayleigh) : 2;
+    const mieCoefficient = config.skyMieCoefficient !== undefined ? Number(config.skyMieCoefficient) : 0.005;
+    const mieDirectionalG = config.skyMieDirectionalG !== undefined ? Number(config.skyMieDirectionalG) : 0.8;
+    const visibleSunIntensity = config.visibleSunIntensity !== undefined ? Number(config.visibleSunIntensity) : 1;
+
+    const atmosphericSize = 1 + rayleigh * 0.035 + mieDirectionalG * 0.2 + turbidity * 0.006;
+    const scale = this.visibleSunDistance * (baseSize / 350) * atmosphericSize;
+    const hazeDimming = THREE.MathUtils.clamp(1.18 - turbidity / 28 + mieCoefficient * 3, 0.22, 1.25);
+    const opacity = THREE.MathUtils.clamp(visibleSunIntensity * hazeDimming * horizonFade, 0, 1);
+
+    this.visibleSun.scale.setScalar(scale);
+    this.visibleSunMaterial.opacity = opacity;
+    this.visibleSunMaterial.color.set(sunColor || "#ffffff");
+    this.visibleSun.visible = opacity > 0.001;
+    this.placeVisibleSun();
+  }
+
+  private placeVisibleSun() {
+    if (!this.visibleSun || !this.visibleSun.visible) return;
+    this.visibleSun.position.copy(this.camera.position).addScaledVector(this.sunVec, this.visibleSunDistance);
   }
 
   updateShadowFollow(playerPos: any) {
@@ -555,6 +640,7 @@ export class SceneManager {
   }
 
   update() {
+    this.placeVisibleSun();
     this.renderer.render(this.scene, this.camera);
   }
 
@@ -575,6 +661,8 @@ export class SceneManager {
     this.loadedSkyboxTextures.forEach((texture) => texture.dispose());
     this.loadedSkyboxTextures.clear();
     this.skyboxCache.clear();
+    if (this.visibleSunTexture) this.visibleSunTexture.dispose();
+    if (this.visibleSunMaterial) this.visibleSunMaterial.dispose();
 
     this.renderer.dispose();
     this.renderer.domElement.remove();

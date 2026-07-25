@@ -26,6 +26,10 @@ export interface TimelineKeyframe {
   fogNear: number;
   fogFar: number;
   enableStars: boolean;
+  enableVisibleSun?: boolean;
+  visibleSunSize?: number;
+  visibleSunIntensity?: number;
+  transitionMode?: "procedural" | "instant";
   skyTurbidity?: number;
   skyRayleigh?: number;
   skyMieCoefficient?: number;
@@ -144,6 +148,10 @@ export function normalizeTimelineKeyframe(
     fogNear: keyframe.fogNear ?? defaults.fogNear,
     fogFar: keyframe.fogFar ?? defaults.fogFar,
     enableStars: keyframe.enableStars ?? false,
+    enableVisibleSun: keyframe.enableVisibleSun ?? skyType === "shader",
+    visibleSunSize: keyframe.visibleSunSize ?? 28,
+    visibleSunIntensity: keyframe.visibleSunIntensity ?? 1,
+    transitionMode: keyframe.transitionMode === "instant" ? "instant" : "procedural",
     skyTurbidity: keyframe.skyTurbidity ?? defaults.skyTurbidity ?? 10,
     skyRayleigh: keyframe.skyRayleigh ?? defaults.skyRayleigh ?? 2,
     skyMieCoefficient: keyframe.skyMieCoefficient ?? defaults.skyMieCoefficient ?? 0.005,
@@ -194,38 +202,42 @@ export function interpolateTimelineState(
 
   const dt = t2 - t1;
   const factor = dt > 0.0001 ? Math.max(0, Math.min(1, (currentT - t1) / dt)) : 0;
+  const transitionMode = k1.transitionMode || "procedural";
+  const blendFactor = transitionMode === "instant" ? 0 : THREE.MathUtils.smoothstep(factor, 0, 1);
 
   const cSun1 = new THREE.Color(k1.sunColor);
   const cSun2 = new THREE.Color(k2.sunColor);
-  const lerpSunCol = cSun1.lerp(cSun2, factor);
+  const lerpSunCol = cSun1.lerp(cSun2, blendFactor);
 
   const cAmb1 = new THREE.Color(k1.ambientColor);
   const cAmb2 = new THREE.Color(k2.ambientColor);
-  const lerpAmbCol = cAmb1.lerp(cAmb2, factor);
+  const lerpAmbCol = cAmb1.lerp(cAmb2, blendFactor);
 
   const cFog1 = new THREE.Color(k1.fogColor);
   const cFog2 = new THREE.Color(k2.fogColor);
-  const lerpFogCol = cFog1.lerp(cFog2, factor);
+  const lerpFogCol = cFog1.lerp(cFog2, blendFactor);
 
-  const lerpSunInt = THREE.MathUtils.lerp(k1.sunIntensity, k2.sunIntensity, factor);
-  const lerpAmbInt = THREE.MathUtils.lerp(k1.ambientIntensity, k2.ambientIntensity, factor);
-  const lerpSunElev = THREE.MathUtils.lerp(k1.sunElevation, k2.sunElevation, factor);
-  const lerpSunAzim = THREE.MathUtils.lerp(k1.sunAzimuth, k2.sunAzimuth, factor);
-  const lerpEnvInt = THREE.MathUtils.lerp(k1.environmentIntensity, k2.environmentIntensity, factor);
-  const lerpBgInt = THREE.MathUtils.lerp(k1.backgroundIntensity, k2.backgroundIntensity, factor);
-  const lerpFogNear = THREE.MathUtils.lerp(k1.fogNear, k2.fogNear, factor);
-  const lerpFogFar = THREE.MathUtils.lerp(k1.fogFar, k2.fogFar, factor);
-  const lerpBackgroundBlur = THREE.MathUtils.lerp(k1.backgroundBlurriness ?? 0, k2.backgroundBlurriness ?? 0, factor);
-  const lerpSkyboxRotation = THREE.MathUtils.lerp(k1.skyboxRotation ?? 0, k2.skyboxRotation ?? 0, factor);
-  const lerpSkyTurbidity = THREE.MathUtils.lerp(k1.skyTurbidity ?? 10, k2.skyTurbidity ?? 10, factor);
-  const lerpSkyRayleigh = THREE.MathUtils.lerp(k1.skyRayleigh ?? 2, k2.skyRayleigh ?? 2, factor);
-  const lerpSkyMieCoefficient = THREE.MathUtils.lerp(k1.skyMieCoefficient ?? 0.005, k2.skyMieCoefficient ?? 0.005, factor);
-  const lerpSkyMieDirectionalG = THREE.MathUtils.lerp(k1.skyMieDirectionalG ?? 0.8, k2.skyMieDirectionalG ?? 0.8, factor);
+  const lerpSunInt = THREE.MathUtils.lerp(k1.sunIntensity, k2.sunIntensity, blendFactor);
+  const lerpAmbInt = THREE.MathUtils.lerp(k1.ambientIntensity, k2.ambientIntensity, blendFactor);
+  const lerpSunElev = THREE.MathUtils.lerp(k1.sunElevation, k2.sunElevation, blendFactor);
+  const lerpSunAzim = THREE.MathUtils.lerp(k1.sunAzimuth, k2.sunAzimuth, blendFactor);
+  const lerpEnvInt = THREE.MathUtils.lerp(k1.environmentIntensity, k2.environmentIntensity, blendFactor);
+  const lerpBgInt = THREE.MathUtils.lerp(k1.backgroundIntensity, k2.backgroundIntensity, blendFactor);
+  const lerpFogNear = THREE.MathUtils.lerp(k1.fogNear, k2.fogNear, blendFactor);
+  const lerpFogFar = THREE.MathUtils.lerp(k1.fogFar, k2.fogFar, blendFactor);
+  const lerpBackgroundBlur = THREE.MathUtils.lerp(k1.backgroundBlurriness ?? 0, k2.backgroundBlurriness ?? 0, blendFactor);
+  const lerpSkyboxRotation = THREE.MathUtils.lerp(k1.skyboxRotation ?? 0, k2.skyboxRotation ?? 0, blendFactor);
+  const lerpSkyTurbidity = THREE.MathUtils.lerp(k1.skyTurbidity ?? 10, k2.skyTurbidity ?? 10, blendFactor);
+  const lerpSkyRayleigh = THREE.MathUtils.lerp(k1.skyRayleigh ?? 2, k2.skyRayleigh ?? 2, blendFactor);
+  const lerpSkyMieCoefficient = THREE.MathUtils.lerp(k1.skyMieCoefficient ?? 0.005, k2.skyMieCoefficient ?? 0.005, blendFactor);
+  const lerpSkyMieDirectionalG = THREE.MathUtils.lerp(k1.skyMieDirectionalG ?? 0.8, k2.skyMieDirectionalG ?? 0.8, blendFactor);
+  const lerpVisibleSunSize = THREE.MathUtils.lerp(k1.visibleSunSize ?? 28, k2.visibleSunSize ?? 28, blendFactor);
+  const lerpVisibleSunIntensity = THREE.MathUtils.lerp(k1.visibleSunIntensity ?? 1, k2.visibleSunIntensity ?? 1, blendFactor);
 
-  const enableStars = lerpSunElev < 0 || (factor < 0.5 ? k1.enableStars : k2.enableStars);
-  const enableSkyboxFog = factor < 0.5 ? k1.enableSkyboxFog : k2.enableSkyboxFog;
+  const enableStars = lerpSunElev < 0 || (blendFactor < 0.5 ? k1.enableStars : k2.enableStars);
+  const enableSkyboxFog = blendFactor < 0.5 ? k1.enableSkyboxFog : k2.enableSkyboxFog;
   const pickFromNearest = <K extends keyof TimelineKeyframe>(key: K): TimelineKeyframe[K] => {
-    return factor < 0.5 ? k1[key] : k2[key];
+    return blendFactor < 0.5 ? k1[key] : k2[key];
   };
 
   return {
@@ -249,13 +261,18 @@ export function interpolateTimelineState(
     fogNear: lerpFogNear,
     fogFar: lerpFogFar,
     enableStars,
+    enableVisibleSun: pickFromNearest("enableVisibleSun"),
+    visibleSunSize: lerpVisibleSunSize,
+    visibleSunIntensity: lerpVisibleSunIntensity,
+    transitionMode,
     skyTurbidity: lerpSkyTurbidity,
     skyRayleigh: lerpSkyRayleigh,
     skyMieCoefficient: lerpSkyMieCoefficient,
     skyMieDirectionalG: lerpSkyMieDirectionalG,
     k1,
     k2,
-    factor
+    factor,
+    transitionFactor: blendFactor
   };
 }
 
@@ -504,6 +521,10 @@ export function addPresetKeyframeToTimeline(
       fogNear: interpolated.fogNear,
       fogFar: interpolated.fogFar,
       enableStars: interpolated.enableStars,
+      enableVisibleSun: interpolated.enableVisibleSun,
+      visibleSunSize: interpolated.visibleSunSize,
+      visibleSunIntensity: interpolated.visibleSunIntensity,
+      transitionMode: interpolated.transitionMode,
       skyTurbidity: interpolated.skyTurbidity,
       skyRayleigh: interpolated.skyRayleigh,
       skyMieCoefficient: interpolated.skyMieCoefficient,

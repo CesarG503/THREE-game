@@ -1198,6 +1198,10 @@ export class ConstructionMenu {
                 newConfig.fogFar = defaults.fogFar;
             }
 
+            newConfig.enableVisibleSun = currentState?.enableVisibleSun ?? skyType === "shader";
+            newConfig.visibleSunSize = currentState?.visibleSunSize ?? 28;
+            newConfig.visibleSunIntensity = currentState?.visibleSunIntensity ?? 1;
+
             if (this.game && this.game.updateEnvironmentConfig) {
                 this.updateSelectedEnvironmentState(newConfig);
                 this.refreshSettings();
@@ -2153,9 +2157,58 @@ export class ConstructionMenu {
         this.rowCustomLights.appendChild(rowAmbL);
         rowLighting.appendChild(this.rowCustomLights);
 
-        // Sky Shader controls container
+        // Visible Sun & Atmosphere controls container
         this.rowSkyShader = document.createElement("div");
         this.rowSkyShader.style.cssText = "display: flex; flex-direction: column; gap: 8px; border-left: 2px solid #2563eb; padding-left: 10px; margin-top: 5px;";
+
+        const skyShaderTitle = document.createElement("div");
+        skyShaderTitle.textContent = "Sol visible y atmósfera";
+        skyShaderTitle.style.cssText = "font-size:12px; color:#ffffff; font-weight:bold; text-transform:uppercase; letter-spacing:0.04em;";
+        this.rowSkyShader.appendChild(skyShaderTitle);
+
+        const createShaderCheckbox = (labelStr, onChange) => {
+            const label = document.createElement("label");
+            label.style.cssText = "display:flex; align-items:center; gap:8px; font-size:12px; color:#ddd; cursor:pointer;";
+            const checkbox = document.createElement("input");
+            checkbox.type = "checkbox";
+            checkbox.style.cursor = "pointer";
+            checkbox.addEventListener("change", (e) => onChange(e.target.checked));
+            const text = document.createElement("span");
+            text.textContent = labelStr;
+            label.appendChild(checkbox);
+            label.appendChild(text);
+            this.rowSkyShader.appendChild(label);
+            return checkbox;
+        };
+
+        this.checkVisibleSun = createShaderCheckbox("Mostrar sol visible en este estado", (checked) => {
+            this.updateSelectedEnvironmentState({ enableVisibleSun: checked });
+            this.refreshSettings();
+        });
+
+        const transitionRow = document.createElement("div");
+        transitionRow.style.cssText = "display:flex; justify-content:space-between; align-items:center; gap:8px; font-size:12px; color:#ddd;";
+        const transitionLabel = document.createElement("span");
+        transitionLabel.textContent = "Cambio al siguiente estado:";
+        this.selectTransitionMode = document.createElement("select");
+        this.selectTransitionMode.style.cssText = "background:#222; color:#fff; border:1px solid #555; border-radius:4px; padding:4px; font-size:12px; width:130px;";
+        [
+            { value: "procedural", label: "Procedural" },
+            { value: "instant", label: "De golpe" }
+        ].forEach(opt => {
+            const option = document.createElement("option");
+            option.value = opt.value;
+            option.textContent = opt.label;
+            this.selectTransitionMode.appendChild(option);
+        });
+        this.selectTransitionMode.addEventListener("change", (e) => {
+            this.updateSelectedEnvironmentState({ transitionMode: e.target.value });
+            this.renderTimelineProfilesAndCards(true);
+            this.refreshSettings();
+        });
+        transitionRow.appendChild(transitionLabel);
+        transitionRow.appendChild(this.selectTransitionMode);
+        this.rowSkyShader.appendChild(transitionRow);
 
         const createShaderSlider = (labelStr, key, minVal, maxVal, stepVal, unit = "") => {
             const wrap = document.createElement("div");
@@ -2192,6 +2245,8 @@ export class ConstructionMenu {
         };
 
         this.shaderSliders = {
+            visibleSunSize: createShaderSlider("Tamaño del Sol Visible:", "visibleSunSize", 6, 80, 1),
+            visibleSunIntensity: createShaderSlider("Brillo del Sol Visible:", "visibleSunIntensity", 0, 2, 0.05),
             turbidity: createShaderSlider("Turbidez del Aire (Turbidity):", "skyTurbidity", 0, 20, 0.5),
             rayleigh: createShaderSlider("Dispersión Rayleigh:", "skyRayleigh", 0, 4, 0.1),
             mieCoefficient: createShaderSlider("Coeficiente Mie:", "skyMieCoefficient", 0, 0.1, 0.001),
@@ -2994,6 +3049,33 @@ export class ConstructionMenu {
                     durBadge.textContent = `⏱ Duración: ${info.duration}h`;
                     durBadge.style.cssText = "font-size: 10px; font-family: monospace; font-weight: bold; color: #4ade80;";
 
+                    const transitionWrap = document.createElement("div");
+                    transitionWrap.style.cssText = "display:flex; align-items:center; gap:4px; width:100%; justify-content:center;";
+                    transitionWrap.onclick = (e) => e.stopPropagation();
+                    const transitionMiniLabel = document.createElement("span");
+                    transitionMiniLabel.textContent = "Cambio";
+                    transitionMiniLabel.style.cssText = "font-size:9px; color:#94a3b8;";
+                    const transitionSelect = document.createElement("select");
+                    transitionSelect.title = "Cómo cambian las luces y propiedades hacia el siguiente estado";
+                    transitionSelect.style.cssText = "background:#111; color:#e5e7eb; border:1px solid #444; border-radius:3px; font-size:10px; padding:2px; max-width:86px;";
+                    [
+                        { value: "procedural", label: "Procedural" },
+                        { value: "instant", label: "Golpe" }
+                    ].forEach(opt => {
+                        const option = document.createElement("option");
+                        option.value = opt.value;
+                        option.textContent = opt.label;
+                        transitionSelect.appendChild(option);
+                    });
+                    transitionSelect.value = kf.transitionMode || "procedural";
+                    transitionSelect.onchange = () => {
+                        this.updateSelectedEnvironmentState({ transitionMode: transitionSelect.value }, kf.id);
+                        this.renderTimelineProfilesAndCards(true);
+                        this.refreshSettings();
+                    };
+                    transitionWrap.appendChild(transitionMiniLabel);
+                    transitionWrap.appendChild(transitionSelect);
+
                     // Time & Duration Controls (Inicio, Duración, Fin)
                     const timeControlsRow = document.createElement("div");
                     timeControlsRow.style.cssText = "display: flex; gap: 4px; align-items: center; justify-content: center; margin-top: 4px; width: 100%;";
@@ -3100,6 +3182,7 @@ export class ConstructionMenu {
                     card.appendChild(titleWrap);
                     card.appendChild(rangeSpan);
                     card.appendChild(durBadge);
+                    card.appendChild(transitionWrap);
 
                     const configChips = document.createElement("div");
                     configChips.style.cssText = "display:flex; gap:4px; flex-wrap:wrap; justify-content:center; width:100%;";
@@ -3123,6 +3206,8 @@ export class ConstructionMenu {
                     };
                     configChips.appendChild(makeChip(skyLabel, kf.skyType === "shader" ? "#60a5fa" : "#94a3b8"));
                     configChips.appendChild(makeChip(`Sol ${Number(kf.sunIntensity ?? 0).toFixed(2)}`, "#fbbf24"));
+                    configChips.appendChild(makeChip(kf.enableVisibleSun ? "Sol visible" : "Sin sol visible", kf.enableVisibleSun ? "#fbbf24" : "#64748b"));
+                    configChips.appendChild(makeChip((kf.transitionMode || "procedural") === "instant" ? "Golpe" : "Procedural", (kf.transitionMode || "procedural") === "instant" ? "#fb7185" : "#4ade80"));
                     configChips.appendChild(makeChip(`Mie ${Number(kf.skyMieCoefficient ?? 0.005).toFixed(3)}`, "#38bdf8"));
                     card.appendChild(configChips);
                     card.appendChild(timeControlsRow);
@@ -3261,10 +3346,18 @@ export class ConstructionMenu {
         if (this.inputAmbientIntensity) this.inputAmbientIntensity.value = String(selectedConfig.ambientIntensity ?? 0.6);
         if (this.inputAmbientColor) this.inputAmbientColor.value = selectedConfig.ambientColor || "#ffffff";
 
-        const currentSkyType = selectedConfig.skyType || config.skyType || "day";
-        const usesShader = currentSkyType === "shader" || selectedConfig.lightMode === "cycle" || config.lightMode === "cycle";
-        if (this.rowSkyShader) this.rowSkyShader.style.display = usesShader ? "flex" : "none";
-        if (this.shaderSliders && usesShader) {
+        if (this.rowSkyShader) this.rowSkyShader.style.display = "flex";
+        if (this.checkVisibleSun) this.checkVisibleSun.checked = !!selectedConfig.enableVisibleSun;
+        if (this.selectTransitionMode) this.selectTransitionMode.value = selectedConfig.transitionMode || "procedural";
+        if (this.shaderSliders) {
+            const visibleSunSizeVal = selectedConfig.visibleSunSize ?? 28;
+            this.shaderSliders.visibleSunSize.slider.value = String(visibleSunSizeVal);
+            this.shaderSliders.visibleSunSize.valSpan.textContent = Number(visibleSunSizeVal).toFixed(0);
+
+            const visibleSunIntensityVal = selectedConfig.visibleSunIntensity ?? 1;
+            this.shaderSliders.visibleSunIntensity.slider.value = String(visibleSunIntensityVal);
+            this.shaderSliders.visibleSunIntensity.valSpan.textContent = Number(visibleSunIntensityVal).toFixed(2);
+
             const turbidityVal = selectedConfig.skyTurbidity ?? 10;
             this.shaderSliders.turbidity.slider.value = String(turbidityVal);
             this.shaderSliders.turbidity.valSpan.textContent = turbidityVal.toFixed(2);

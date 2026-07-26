@@ -56,7 +56,15 @@ export const DEFAULT_DAY_NIGHT_TIMELINE: TimelineKeyframe[] = [
     fogColor: "#020210",
     fogNear: 10,
     fogFar: 40,
-    enableStars: true
+    enableStars: true,
+    enableVisibleSun: false,
+    visibleSunSize: 6,
+    visibleSunIntensity: 0,
+    transitionMode: "procedural",
+    skyTurbidity: 3,
+    skyRayleigh: 0.8,
+    skyMieCoefficient: 0.003,
+    skyMieDirectionalG: 0.82
   },
   {
     id: "sunrise",
@@ -75,26 +83,49 @@ export const DEFAULT_DAY_NIGHT_TIMELINE: TimelineKeyframe[] = [
     fogColor: "#ffaa77",
     fogNear: 15,
     fogFar: 65,
-    enableStars: false
+    enableStars: false,
+    enableVisibleSun: false,
+    visibleSunSize: 6,
+    visibleSunIntensity: 0,
+    transitionMode: "procedural",
+    skyTurbidity: 7.5,
+    skyRayleigh: 1.4,
+    skyMieCoefficient: 0.018,
+    skyMieDirectionalG: 0.92
   },
   {
     id: "noon",
     time: 12, // 12:00 Mediodía
     label: "Mediodía",
     icon: "☀️",
+    skyType: "shader",
+    lightMode: "day",
+    shadowQuality: "medium",
     sunColor: "#ffffff",
     sunIntensity: 0.95,
     ambientColor: "#ffffff",
     ambientIntensity: 0.65,
+    enableSunLight: true,
+    enableAmbientLight: true,
     sunElevation: 75,
     sunAzimuth: 180,
     environmentIntensity: 1.0,
     backgroundIntensity: 1.0,
+    backgroundBlurriness: 0,
+    skyboxRotation: 0,
     enableSkyboxFog: false,
     fogColor: "#87ceeb",
     fogNear: 20,
     fogFar: 80,
-    enableStars: false
+    enableStars: false,
+    enableVisibleSun: false,
+    visibleSunSize: 6,
+    visibleSunIntensity: 0,
+    transitionMode: "procedural",
+    skyTurbidity: 1,
+    skyRayleigh: 0.4,
+    skyMieCoefficient: 0.001,
+    skyMieDirectionalG: 0.95
   },
   {
     id: "sunset",
@@ -113,7 +144,15 @@ export const DEFAULT_DAY_NIGHT_TIMELINE: TimelineKeyframe[] = [
     fogColor: "#ffae88",
     fogNear: 15,
     fogFar: 65,
-    enableStars: false
+    enableStars: false,
+    enableVisibleSun: false,
+    visibleSunSize: 6,
+    visibleSunIntensity: 0,
+    transitionMode: "procedural",
+    skyTurbidity: 9,
+    skyRayleigh: 1.1,
+    skyMieCoefficient: 0.022,
+    skyMieDirectionalG: 0.94
   }
 ];
 
@@ -148,9 +187,9 @@ export function normalizeTimelineKeyframe(
     fogNear: keyframe.fogNear ?? defaults.fogNear,
     fogFar: keyframe.fogFar ?? defaults.fogFar,
     enableStars: keyframe.enableStars ?? false,
-    enableVisibleSun: keyframe.enableVisibleSun ?? skyType === "shader",
-    visibleSunSize: keyframe.visibleSunSize ?? 28,
-    visibleSunIntensity: keyframe.visibleSunIntensity ?? 1,
+    enableVisibleSun: keyframe.enableVisibleSun ?? false,
+    visibleSunSize: keyframe.visibleSunSize ?? 6,
+    visibleSunIntensity: keyframe.visibleSunIntensity ?? 0,
     transitionMode: keyframe.transitionMode === "instant" ? "instant" : "procedural",
     skyTurbidity: keyframe.skyTurbidity ?? defaults.skyTurbidity ?? 10,
     skyRayleigh: keyframe.skyRayleigh ?? defaults.skyRayleigh ?? 2,
@@ -231,8 +270,8 @@ export function interpolateTimelineState(
   const lerpSkyRayleigh = THREE.MathUtils.lerp(k1.skyRayleigh ?? 2, k2.skyRayleigh ?? 2, blendFactor);
   const lerpSkyMieCoefficient = THREE.MathUtils.lerp(k1.skyMieCoefficient ?? 0.005, k2.skyMieCoefficient ?? 0.005, blendFactor);
   const lerpSkyMieDirectionalG = THREE.MathUtils.lerp(k1.skyMieDirectionalG ?? 0.8, k2.skyMieDirectionalG ?? 0.8, blendFactor);
-  const lerpVisibleSunSize = THREE.MathUtils.lerp(k1.visibleSunSize ?? 28, k2.visibleSunSize ?? 28, blendFactor);
-  const lerpVisibleSunIntensity = THREE.MathUtils.lerp(k1.visibleSunIntensity ?? 1, k2.visibleSunIntensity ?? 1, blendFactor);
+  const lerpVisibleSunSize = THREE.MathUtils.lerp(k1.visibleSunSize ?? 6, k2.visibleSunSize ?? 6, blendFactor);
+  const lerpVisibleSunIntensity = THREE.MathUtils.lerp(k1.visibleSunIntensity ?? 0, k2.visibleSunIntensity ?? 0, blendFactor);
 
   const enableStars = lerpSunElev < 0 || (blendFactor < 0.5 ? k1.enableStars : k2.enableStars);
   const enableSkyboxFog = blendFactor < 0.5 ? k1.enableSkyboxFog : k2.enableSkyboxFog;
@@ -417,6 +456,7 @@ export function addPresetKeyframeToTimeline(
     night: {
       time: 0,
       label: "Noche",
+      icon: "🌙",
       sunColor: "#8899bb",
       sunIntensity: 0.15,
       ambientColor: "#111122",
@@ -429,11 +469,20 @@ export function addPresetKeyframeToTimeline(
       fogColor: "#020210",
       fogNear: 10,
       fogFar: 40,
-      enableStars: true
+      enableStars: true,
+      enableVisibleSun: false,
+      visibleSunSize: 6,
+      visibleSunIntensity: 0,
+      transitionMode: "procedural",
+      skyTurbidity: 3,
+      skyRayleigh: 0.8,
+      skyMieCoefficient: 0.003,
+      skyMieDirectionalG: 0.82
     },
     sunrise: {
       time: 6,
       label: "Amanecer",
+      icon: "🌅",
       sunColor: "#ff5722",
       sunIntensity: 0.65,
       ambientColor: "#33235f",
@@ -446,28 +495,53 @@ export function addPresetKeyframeToTimeline(
       fogColor: "#ffaa77",
       fogNear: 15,
       fogFar: 65,
-      enableStars: false
+      enableStars: false,
+      enableVisibleSun: false,
+      visibleSunSize: 6,
+      visibleSunIntensity: 0,
+      transitionMode: "procedural",
+      skyTurbidity: 7.5,
+      skyRayleigh: 1.4,
+      skyMieCoefficient: 0.018,
+      skyMieDirectionalG: 0.92
     },
     noon: {
       time: 12,
       label: "Mediodía",
+      icon: "☀️",
+      skyType: "shader",
+      lightMode: "day",
+      shadowQuality: "medium",
       sunColor: "#ffffff",
       sunIntensity: 0.95,
       ambientColor: "#ffffff",
       ambientIntensity: 0.65,
+      enableSunLight: true,
+      enableAmbientLight: true,
       sunElevation: 75,
       sunAzimuth: 180,
       environmentIntensity: 1.0,
       backgroundIntensity: 1.0,
+      backgroundBlurriness: 0,
+      skyboxRotation: 0,
       enableSkyboxFog: false,
       fogColor: "#87ceeb",
       fogNear: 20,
       fogFar: 80,
-      enableStars: false
+      enableStars: false,
+      enableVisibleSun: false,
+      visibleSunSize: 6,
+      visibleSunIntensity: 0,
+      transitionMode: "procedural",
+      skyTurbidity: 1,
+      skyRayleigh: 0.4,
+      skyMieCoefficient: 0.001,
+      skyMieDirectionalG: 0.95
     },
     sunset: {
       time: 18,
       label: "Atardecer",
+      icon: "🌇",
       sunColor: "#ff8f70",
       sunIntensity: 0.65,
       ambientColor: "#33235f",
@@ -480,7 +554,15 @@ export function addPresetKeyframeToTimeline(
       fogColor: "#ffae88",
       fogNear: 15,
       fogFar: 65,
-      enableStars: false
+      enableStars: false,
+      enableVisibleSun: false,
+      visibleSunSize: 6,
+      visibleSunIntensity: 0,
+      transitionMode: "procedural",
+      skyTurbidity: 9,
+      skyRayleigh: 1.1,
+      skyMieCoefficient: 0.022,
+      skyMieDirectionalG: 0.94
     }
   };
 

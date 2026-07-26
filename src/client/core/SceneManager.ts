@@ -575,7 +575,10 @@ export class SceneManager {
   private updateVisibleSun(config: any, sunColor: string) {
     if (!this.visibleSun || !this.visibleSunMaterial) return;
 
-    if (!config.enableVisibleSun) {
+    const skyType = config.skyType || "day";
+    const lightMode = config.lightMode || "day";
+    const isShaderSky = skyType === "shader" || lightMode === "cycle";
+    if (isShaderSky) {
       this.visibleSun.visible = false;
       return;
     }
@@ -589,17 +592,21 @@ export class SceneManager {
     const cameraFar = this.camera?.far || this.currentRenderDistance || 1000;
     this.visibleSunDistance = Math.max(60, Math.min(cameraFar * 0.82, 850));
 
-    const baseSize = config.visibleSunSize !== undefined ? Number(config.visibleSunSize) : 28;
     const turbidity = config.skyTurbidity !== undefined ? Number(config.skyTurbidity) : 10;
     const rayleigh = config.skyRayleigh !== undefined ? Number(config.skyRayleigh) : 2;
     const mieCoefficient = config.skyMieCoefficient !== undefined ? Number(config.skyMieCoefficient) : 0.005;
     const mieDirectionalG = config.skyMieDirectionalG !== undefined ? Number(config.skyMieDirectionalG) : 0.8;
-    const visibleSunIntensity = config.visibleSunIntensity !== undefined ? Number(config.visibleSunIntensity) : 1;
+    const sunIntensity = config.sunIntensity !== undefined ? Number(config.sunIntensity) : 0.8;
 
-    const atmosphericSize = 1 + rayleigh * 0.035 + mieDirectionalG * 0.2 + turbidity * 0.006;
+    const baseSize = THREE.MathUtils.clamp(
+      8 + rayleigh * 2.2 + turbidity * 0.45 + mieCoefficient * 380 + (1 - mieDirectionalG) * 10,
+      6,
+      38
+    );
+    const atmosphericSize = 1 + rayleigh * 0.035 + mieDirectionalG * 0.18 + turbidity * 0.006;
     const scale = this.visibleSunDistance * (baseSize / 350) * atmosphericSize;
-    const hazeDimming = THREE.MathUtils.clamp(1.18 - turbidity / 28 + mieCoefficient * 3, 0.22, 1.25);
-    const opacity = THREE.MathUtils.clamp(visibleSunIntensity * hazeDimming * horizonFade, 0, 1);
+    const hazeDimming = THREE.MathUtils.clamp(1.08 - turbidity / 30 + mieCoefficient * 3.5 + mieDirectionalG * 0.12, 0.22, 1.2);
+    const opacity = THREE.MathUtils.clamp((0.45 + sunIntensity * 0.55) * hazeDimming * horizonFade, 0, 1);
 
     this.visibleSun.scale.setScalar(scale);
     this.visibleSunMaterial.opacity = opacity;

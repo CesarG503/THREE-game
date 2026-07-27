@@ -21,7 +21,6 @@ export class SceneManager {
   ambientLight: THREE.AmbientLight;
   dirLight: THREE.DirectionalLight;
   stars: THREE.Points | null;
-  visibleSun: THREE.Sprite | null;
   currentRenderDistance: number | undefined;
   skyMesh: Sky | null = null;
   sunVec: THREE.Vector3;
@@ -31,9 +30,10 @@ export class SceneManager {
   private skyboxCache: Map<string, Promise<THREE.CubeTexture>>;
   private loadedSkyboxTextures: Set<THREE.CubeTexture>;
   private activeSkyboxTexture: THREE.CubeTexture | null;
-  private visibleSunTexture: THREE.CanvasTexture | null;
-  private visibleSunMaterial: THREE.SpriteMaterial | null;
-  private visibleSunDistance: number;
+  private skyboxTransitionMesh: THREE.Mesh<THREE.BoxGeometry, THREE.ShaderMaterial> | null;
+  private skyboxTransitionMaterial: THREE.ShaderMaterial | null;
+  private skyboxTransitionKey: string | null;
+  private skyboxTransitionRequestId: number;
   private activeVisualSkyType: string | null;
   private skyboxRequestId: number;
 
@@ -43,13 +43,13 @@ export class SceneManager {
     this.scene.background = new THREE.Color(0x87ceeb);
     this.scene.fog = new THREE.Fog(0x87ceeb, 10, 50);
     this.scene.environment = null;
-    this.visibleSun = null;
     this.skyboxCache = new Map();
     this.loadedSkyboxTextures = new Set();
     this.activeSkyboxTexture = null;
-    this.visibleSunTexture = null;
-    this.visibleSunMaterial = null;
-    this.visibleSunDistance = 450;
+    this.skyboxTransitionMesh = null;
+    this.skyboxTransitionMaterial = null;
+    this.skyboxTransitionKey = null;
+    this.skyboxTransitionRequestId = 0;
     this.activeVisualSkyType = null;
     this.skyboxRequestId = 0;
     this.sunVec = new THREE.Vector3();
@@ -92,7 +92,6 @@ export class SceneManager {
 
     // Initialize stars (hidden by default)
     this.createStars();
-    this.createVisibleSun();
   }
 
   createStars() {
@@ -127,37 +126,109 @@ export class SceneManager {
     this.scene.add(this.stars);
   }
 
-  private createVisibleSun() {
-    const canvas = document.createElement("canvas");
-    canvas.width = 256;
-    canvas.height = 256;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
+  private isSkyboxType(value: any): value is string {
+    return typeof value === "string" && value.startsWith(SKYBOX_PREFIX);
+  }
 
-    const gradient = ctx.createRadialGradient(128, 128, 0, 128, 128, 128);
-    gradient.addColorStop(0, "rgba(255,255,255,1)");
-    gradient.addColorStop(0.16, "rgba(255,246,190,0.96)");
-    gradient.addColorStop(0.34, "rgba(255,202,98,0.5)");
-    gradient.addColorStop(0.62, "rgba(255,146,64,0.18)");
-    gradient.addColorStop(1, "rgba(255,146,64,0)");
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  private createSkyboxTransitionMesh() {
+    if (this.skyboxTransitionMesh && this.skyboxTransitionMaterial) return;
 
-    this.visibleSunTexture = new THREE.CanvasTexture(canvas);
-    this.visibleSunTexture.colorSpace = THREE.SRGBColorSpace;
-    this.visibleSunMaterial = new THREE.SpriteMaterial({
-      map: this.visibleSunTexture,
-      color: 0xffffff,
-      transparent: true,
-      opacity: 1,
+    this.skyboxTransitionMaterial = new THREE.ShaderMaterial({
+      uniforms: {
+        mapA: { value: null },
+        mapB: { value: null },
+        blend: { value: 0 }
+      },
+      vertexShader: `
+        varying vec3 vDirection;
+        void main() {
+          vDirection = position;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform samplerCube mapA;
+        uniform samplerCube mapB;
+        uniform float blend;
+        varying vec3 vDirection;
+        void main() {
+          vec3 dir = normalize(vDirection);
+          vec4 colorA = textureCube(mapA, dir);
+          vec4 colorB = textureCube(mapB, dir);
+          gl_FragColor = vec4(mix(colorA.rgb, colorB.rgb, clamp(blend, 0.0, 1.0)), 1.0);
+        }
+      `,
+      side: THREE.BackSide,
       depthWrite: false,
-      depthTest: true,
+      depthTest: false,
       fog: false
     });
-    this.visibleSun = new THREE.Sprite(this.visibleSunMaterial);
-    this.visibleSun.visible = false;
-    this.visibleSun.renderOrder = -5;
-    this.scene.add(this.visibleSun);
+
+    const geometry = new THREE.BoxGeometry(2, 2, 2);
+    this.skyboxTransitionMesh = new THREE.Mesh(geometry, this.skyboxTransitionMaterial);
+    this.skyboxTransitionMesh.visible = false;
+    this.skyboxTransitionMesh.frustumCulled = false;
+    this.skyboxTransitionMesh.renderOrder = -1000;
+    this.scene.add(this.skyboxTransitionMesh);
+  }
+
+  private hideSkyboxTransition() {
+    if (this.skyboxTransitionMesh) this.skyboxTransitionMesh.visible = false;
+    this.skyboxTransitionKey = null;
+  }
+
+  private updateSkyboxTransition(fromType: any, toType: any, blend: number, rotationRad: number) {
+    if (!this.isSkyboxType(fromType) || !this.isSkyboxType(toType) || fromType === toType || blend <= 0 || blend >= 1) {
+      this.hideSkyboxTransition();
+      return false;
+    }
+
+    const fromUrl = fromType.slice(SKYBOX_PREFIX.length);
+    const toUrl = toType.slice(SKYBOX_PREFIX.length);
+    const key = `${fromUrl}|${toUrl}`;
+    this.createSkyboxTransitionMesh();
+
+    if (!this.skyboxTransitionMesh || !this.skyboxTransitionMaterial) return false;
+
+    this.skyboxTransitionMesh.position.copy(this.camera.position);
+    this.skyboxTransitionMesh.rotation.set(0, rotationRad, 0);
+    this.skyboxTransitionMaterial.uniforms.blend.value = blend;
+
+    if (this.skyboxTransitionKey !== key) {
+      this.skyboxTransitionKey = key;
+      this.skyboxTransitionMesh.visible = false;
+      this.skyboxTransitionMaterial.uniforms.mapA.value = null;
+      this.skyboxTransitionMaterial.uniforms.mapB.value = null;
+      const requestId = ++this.skyboxTransitionRequestId;
+
+      Promise.all([
+        this.loadSkyboxFromAtlas(fromUrl),
+        this.loadSkyboxFromAtlas(toUrl)
+      ]).then(([textureA, textureB]) => {
+        if (requestId !== this.skyboxTransitionRequestId || this.skyboxTransitionKey !== key) return;
+        if (!this.skyboxTransitionMaterial || !this.skyboxTransitionMesh) return;
+        this.skyboxTransitionMaterial.uniforms.mapA.value = textureA;
+        this.skyboxTransitionMaterial.uniforms.mapB.value = textureB;
+        this.skyboxTransitionMaterial.needsUpdate = true;
+        this.skyboxTransitionMesh.visible = true;
+      }).catch((error) => {
+        console.warn("Failed to prepare skybox transition", error);
+      });
+    }
+
+    const textureA = this.skyboxTransitionMaterial.uniforms.mapA.value as THREE.CubeTexture | null;
+    const textureB = this.skyboxTransitionMaterial.uniforms.mapB.value as THREE.CubeTexture | null;
+    if (!textureA || !textureB) {
+      if (this.activeVisualSkyType !== fromType) this.setSky(fromType);
+      return true;
+    }
+
+    this.scene.background = null;
+    this.scene.environment = blend < 0.5 ? textureA : textureB;
+    this.activeSkyboxTexture = blend < 0.5 ? textureA : textureB;
+    this.activeVisualSkyType = `transition:${key}`;
+    this.skyboxTransitionMesh.visible = true;
+    return true;
   }
 
   setSky(type: any) {
@@ -389,8 +460,16 @@ export class SceneManager {
 
     // Check if we need to enable Sky Shader
     const isShaderSky = skyType === "shader" || lightMode === "cycle";
+    const isSkyboxCrossfading = isDynamicCycle && interpolated && interpolated.transitionMode !== "instant"
+      ? this.updateSkyboxTransition(interpolated.skyTypeFrom, interpolated.skyTypeTo, interpolated.transitionFactor ?? interpolated.factor ?? 0, skyRotRad)
+      : false;
     
-    if (isShaderSky) {
+    if (isSkyboxCrossfading) {
+      if (this.skyMesh) {
+        this.skyMesh.visible = false;
+      }
+    } else if (isShaderSky) {
+      this.hideSkyboxTransition();
       this.activeVisualSkyType = skyType;
       this.clearActiveSkybox();
       if (!this.skyMesh) {
@@ -410,10 +489,12 @@ export class SceneManager {
       uniforms["mieCoefficient"].value = visualConfig.skyMieCoefficient !== undefined ? Number(visualConfig.skyMieCoefficient) : 0.005;
       uniforms["mieDirectionalG"].value = visualConfig.skyMieDirectionalG !== undefined ? Number(visualConfig.skyMieDirectionalG) : 0.8;
     } else {
+      this.hideSkyboxTransition();
       if (this.skyMesh) {
         this.skyMesh.visible = false;
       }
       if (this.activeVisualSkyType !== skyType) {
+        this.hideSkyboxTransition();
         this.setSky(skyType);
       }
       // Apply background color/texture
@@ -568,56 +649,6 @@ export class SceneManager {
     if (isShaderSky && this.skyMesh) {
       this.skyMesh.material.uniforms["sunPosition"].value.copy(this.sunVec);
     }
-
-    this.updateVisibleSun(visualConfig, sunColor);
-  }
-
-  private updateVisibleSun(config: any, sunColor: string) {
-    if (!this.visibleSun || !this.visibleSunMaterial) return;
-
-    const skyType = config.skyType || "day";
-    const lightMode = config.lightMode || "day";
-    const isShaderSky = skyType === "shader" || lightMode === "cycle";
-    if (isShaderSky) {
-      this.visibleSun.visible = false;
-      return;
-    }
-
-    const horizonFade = THREE.MathUtils.smoothstep(this.sunVec.y, -0.04, 0.08);
-    if (horizonFade <= 0.001) {
-      this.visibleSun.visible = false;
-      return;
-    }
-
-    const cameraFar = this.camera?.far || this.currentRenderDistance || 1000;
-    this.visibleSunDistance = Math.max(60, Math.min(cameraFar * 0.82, 850));
-
-    const turbidity = config.skyTurbidity !== undefined ? Number(config.skyTurbidity) : 10;
-    const rayleigh = config.skyRayleigh !== undefined ? Number(config.skyRayleigh) : 2;
-    const mieCoefficient = config.skyMieCoefficient !== undefined ? Number(config.skyMieCoefficient) : 0.005;
-    const mieDirectionalG = config.skyMieDirectionalG !== undefined ? Number(config.skyMieDirectionalG) : 0.8;
-    const sunIntensity = config.sunIntensity !== undefined ? Number(config.sunIntensity) : 0.8;
-
-    const baseSize = THREE.MathUtils.clamp(
-      8 + rayleigh * 2.2 + turbidity * 0.45 + mieCoefficient * 380 + (1 - mieDirectionalG) * 10,
-      6,
-      38
-    );
-    const atmosphericSize = 1 + rayleigh * 0.035 + mieDirectionalG * 0.18 + turbidity * 0.006;
-    const scale = this.visibleSunDistance * (baseSize / 350) * atmosphericSize;
-    const hazeDimming = THREE.MathUtils.clamp(1.08 - turbidity / 30 + mieCoefficient * 3.5 + mieDirectionalG * 0.12, 0.22, 1.2);
-    const opacity = THREE.MathUtils.clamp((0.45 + sunIntensity * 0.55) * hazeDimming * horizonFade, 0, 1);
-
-    this.visibleSun.scale.setScalar(scale);
-    this.visibleSunMaterial.opacity = opacity;
-    this.visibleSunMaterial.color.set(sunColor || "#ffffff");
-    this.visibleSun.visible = opacity > 0.001;
-    this.placeVisibleSun();
-  }
-
-  private placeVisibleSun() {
-    if (!this.visibleSun || !this.visibleSun.visible) return;
-    this.visibleSun.position.copy(this.camera.position).addScaledVector(this.sunVec, this.visibleSunDistance);
   }
 
   updateShadowFollow(playerPos: any) {
@@ -647,7 +678,9 @@ export class SceneManager {
   }
 
   update() {
-    this.placeVisibleSun();
+    if (this.skyboxTransitionMesh && this.skyboxTransitionMesh.visible) {
+      this.skyboxTransitionMesh.position.copy(this.camera.position);
+    }
     this.renderer.render(this.scene, this.camera);
   }
 
@@ -668,8 +701,12 @@ export class SceneManager {
     this.loadedSkyboxTextures.forEach((texture) => texture.dispose());
     this.loadedSkyboxTextures.clear();
     this.skyboxCache.clear();
-    if (this.visibleSunTexture) this.visibleSunTexture.dispose();
-    if (this.visibleSunMaterial) this.visibleSunMaterial.dispose();
+    if (this.skyboxTransitionMesh) {
+      this.skyboxTransitionMesh.geometry.dispose();
+      this.skyboxTransitionMesh.material.dispose();
+      this.skyboxTransitionMesh = null;
+      this.skyboxTransitionMaterial = null;
+    }
 
     this.renderer.dispose();
     this.renderer.domElement.remove();

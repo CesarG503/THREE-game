@@ -304,6 +304,8 @@ export function interpolateTimelineState(
     visibleSunSize: lerpVisibleSunSize,
     visibleSunIntensity: lerpVisibleSunIntensity,
     transitionMode,
+    skyTypeFrom: k1.skyType,
+    skyTypeTo: k2.skyType,
     skyTurbidity: lerpSkyTurbidity,
     skyRayleigh: lerpSkyRayleigh,
     skyMieCoefficient: lerpSkyMieCoefficient,

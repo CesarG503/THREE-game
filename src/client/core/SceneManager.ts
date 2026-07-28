@@ -28,6 +28,7 @@ export class SceneManager {
   lastFrustumRenderDistance: number | null = null;
   private boundResize: () => void;
   private skyboxCache: Map<string, Promise<THREE.CubeTexture>>;
+  private skyboxTextureByUrl: Map<string, THREE.CubeTexture>;
   private loadedSkyboxTextures: Set<THREE.CubeTexture>;
   private activeSkyboxTexture: THREE.CubeTexture | null;
   private skyboxTransitionMesh: THREE.Mesh<THREE.BoxGeometry, THREE.ShaderMaterial> | null;
@@ -44,6 +45,7 @@ export class SceneManager {
     this.scene.fog = new THREE.Fog(0x87ceeb, 10, 50);
     this.scene.environment = null;
     this.skyboxCache = new Map();
+    this.skyboxTextureByUrl = new Map();
     this.loadedSkyboxTextures = new Set();
     this.activeSkyboxTexture = null;
     this.skyboxTransitionMesh = null;
@@ -178,11 +180,12 @@ export class SceneManager {
   }
 
   private updateSkyboxTransition(fromType: any, toType: any, blend: number, rotationRad: number) {
-    if (!this.isSkyboxType(fromType) || !this.isSkyboxType(toType) || fromType === toType || blend <= 0 || blend >= 1) {
+    if (!this.isSkyboxType(fromType) || !this.isSkyboxType(toType) || fromType === toType) {
       this.hideSkyboxTransition();
       return false;
     }
 
+    const clampedBlend = THREE.MathUtils.clamp(blend, 0, 1);
     const fromUrl = fromType.slice(SKYBOX_PREFIX.length);
     const toUrl = toType.slice(SKYBOX_PREFIX.length);
     const key = `${fromUrl}|${toUrl}`;
@@ -192,13 +195,21 @@ export class SceneManager {
 
     this.skyboxTransitionMesh.position.copy(this.camera.position);
     this.skyboxTransitionMesh.rotation.set(0, rotationRad, 0);
-    this.skyboxTransitionMaterial.uniforms.blend.value = blend;
 
     if (this.skyboxTransitionKey !== key) {
       this.skyboxTransitionKey = key;
-      this.skyboxTransitionMesh.visible = false;
-      this.skyboxTransitionMaterial.uniforms.mapA.value = null;
-      this.skyboxTransitionMaterial.uniforms.mapB.value = null;
+      const fallbackTexture = this.skyboxTextureByUrl.get(fromUrl);
+      if (fallbackTexture) {
+        this.skyboxTransitionMaterial.uniforms.mapA.value = fallbackTexture;
+        this.skyboxTransitionMaterial.uniforms.mapB.value = fallbackTexture;
+        this.skyboxTransitionMaterial.uniforms.blend.value = 0;
+        this.skyboxTransitionMesh.visible = true;
+        this.scene.background = null;
+        this.scene.environment = fallbackTexture;
+        this.activeSkyboxTexture = fallbackTexture;
+      } else {
+        this.skyboxTransitionMesh.visible = false;
+      }
       const requestId = ++this.skyboxTransitionRequestId;
 
       Promise.all([
@@ -224,8 +235,9 @@ export class SceneManager {
     }
 
     this.scene.background = null;
-    this.scene.environment = blend < 0.5 ? textureA : textureB;
-    this.activeSkyboxTexture = blend < 0.5 ? textureA : textureB;
+    this.skyboxTransitionMaterial.uniforms.blend.value = clampedBlend;
+    this.scene.environment = clampedBlend < 0.5 ? textureA : textureB;
+    this.activeSkyboxTexture = clampedBlend < 0.5 ? textureA : textureB;
     this.activeVisualSkyType = `transition:${key}`;
     this.skyboxTransitionMesh.visible = true;
     return true;
@@ -321,6 +333,7 @@ export class SceneManager {
           const texture = new THREE.CubeTexture(faces);
           texture.colorSpace = THREE.SRGBColorSpace;
           texture.needsUpdate = true;
+          this.skyboxTextureByUrl.set(atlasUrl, texture);
           this.loadedSkyboxTextures.add(texture);
           resolve(texture);
         } catch (error) {
@@ -460,11 +473,11 @@ export class SceneManager {
 
     // Check if we need to enable Sky Shader
     const isShaderSky = skyType === "shader" || lightMode === "cycle";
-    const isSkyboxCrossfading = isDynamicCycle && interpolated && interpolated.transitionMode !== "instant"
+    const isSkyboxTransitionManaged = isDynamicCycle && interpolated && interpolated.transitionMode !== "instant"
       ? this.updateSkyboxTransition(interpolated.skyTypeFrom, interpolated.skyTypeTo, interpolated.transitionFactor ?? interpolated.factor ?? 0, skyRotRad)
       : false;
     
-    if (isSkyboxCrossfading) {
+    if (isSkyboxTransitionManaged) {
       if (this.skyMesh) {
         this.skyMesh.visible = false;
       }

@@ -222,11 +222,25 @@ export function interpolateTimelineState(
 
   let k1 = sorted[sorted.length - 1];
   let k2 = sorted[0];
+  const boundaryEpsilon = 0.0001;
+  const exactIndex = sorted.findIndex((keyframe) => {
+    const diff = Math.min(
+      Math.abs(keyframe.time - normTime),
+      Math.abs(keyframe.time - (normTime - 24)),
+      Math.abs(keyframe.time - (normTime + 24))
+    );
+    return diff <= boundaryEpsilon;
+  });
 
-  for (let i = 0; i < sorted.length; i++) {
-    if (sorted[i].time <= normTime) {
-      k1 = sorted[i];
-      k2 = sorted[(i + 1) % sorted.length];
+  if (exactIndex !== -1 && sorted.length > 1) {
+    k1 = sorted[(exactIndex - 1 + sorted.length) % sorted.length];
+    k2 = sorted[exactIndex];
+  } else {
+    for (let i = 0; i < sorted.length; i++) {
+      if (sorted[i].time <= normTime) {
+        k1 = sorted[i];
+        k2 = sorted[(i + 1) % sorted.length];
+      }
     }
   }
 
@@ -280,7 +294,7 @@ export function interpolateTimelineState(
   };
 
   return {
-    skyType: pickFromNearest("skyType"),
+    skyType: transitionMode === "instant" ? pickFromNearest("skyType") : k1.skyType,
     lightMode: pickFromNearest("lightMode"),
     shadowQuality: pickFromNearest("shadowQuality"),
     sunColor: "#" + lerpSunCol.getHexString(),

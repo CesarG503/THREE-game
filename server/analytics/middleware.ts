@@ -53,6 +53,10 @@ const mapStateTransitionSchema = loadSchema("mapStateTransition.json");
 const queueEnterSchema = loadSchema("queueEnter.json");
 const queueLeaveSchema = loadSchema("queueLeave.json");
 const matchFormedSchema = loadSchema("matchFormed.json");
+const friendRequestSentSchema = loadSchema("friendRequestSent.json");
+const friendRequestAcceptedSchema = loadSchema("friendRequestAccepted.json");
+const gameInviteSentSchema = loadSchema("gameInviteSent.json");
+const gameInviteAcceptedSchema = loadSchema("gameInviteAccepted.json");
 
 // Register payload schemas under specific keys for reference
 ajv.addSchema(pageViewSchema, "pageView");
@@ -72,6 +76,10 @@ ajv.addSchema(mapStateTransitionSchema, "mapStateTransition");
 ajv.addSchema(queueEnterSchema, "queueEnter");
 ajv.addSchema(queueLeaveSchema, "queueLeave");
 ajv.addSchema(matchFormedSchema, "matchFormed");
+ajv.addSchema(friendRequestSentSchema, "friendRequestSent");
+ajv.addSchema(friendRequestAcceptedSchema, "friendRequestAccepted");
+ajv.addSchema(gameInviteSentSchema, "gameInviteSent");
+ajv.addSchema(gameInviteAcceptedSchema, "gameInviteAccepted");
 
 // Compile validators
 const validateEnvelope = ajv.compile(envelopeSchema);
@@ -92,6 +100,10 @@ const validateMapStateTransition = ajv.compile(mapStateTransitionSchema);
 const validateQueueEnter = ajv.compile(queueEnterSchema);
 const validateQueueLeave = ajv.compile(queueLeaveSchema);
 const validateMatchFormed = ajv.compile(matchFormedSchema);
+const validateFriendRequestSent = ajv.compile(friendRequestSentSchema);
+const validateFriendRequestAccepted = ajv.compile(friendRequestAcceptedSchema);
+const validateGameInviteSent = ajv.compile(gameInviteSentSchema);
+const validateGameInviteAccepted = ajv.compile(gameInviteAcceptedSchema);
 
 export interface ValidationErrorResponse {
   valid: boolean;
@@ -273,6 +285,42 @@ export function validateTelemetryEvent(event: any): ValidationErrorResponse {
           const field = err.instancePath || "/";
           return `payload: Field "${field}" ${err.message}`;
         }) || ["Invalid MatchFormed payload"];
+      }
+      break;
+    case "FriendRequestSent":
+      isValidPayload = validateFriendRequestSent(event.payload);
+      if (!isValidPayload) {
+        errors = validateFriendRequestSent.errors?.map((err: any) => {
+          const field = err.instancePath || "/";
+          return `payload: Field "${field}" ${err.message}`;
+        }) || ["Invalid FriendRequestSent payload"];
+      }
+      break;
+    case "FriendRequestAccepted":
+      isValidPayload = validateFriendRequestAccepted(event.payload);
+      if (!isValidPayload) {
+        errors = validateFriendRequestAccepted.errors?.map((err: any) => {
+          const field = err.instancePath || "/";
+          return `payload: Field "${field}" ${err.message}`;
+        }) || ["Invalid FriendRequestAccepted payload"];
+      }
+      break;
+    case "GameInviteSent":
+      isValidPayload = validateGameInviteSent(event.payload);
+      if (!isValidPayload) {
+        errors = validateGameInviteSent.errors?.map((err: any) => {
+          const field = err.instancePath || "/";
+          return `payload: Field "${field}" ${err.message}`;
+        }) || ["Invalid GameInviteSent payload"];
+      }
+      break;
+    case "GameInviteAccepted":
+      isValidPayload = validateGameInviteAccepted(event.payload);
+      if (!isValidPayload) {
+        errors = validateGameInviteAccepted.errors?.map((err: any) => {
+          const field = err.instancePath || "/";
+          return `payload: Field "${field}" ${err.message}`;
+        }) || ["Invalid GameInviteAccepted payload"];
       }
       break;
     default:

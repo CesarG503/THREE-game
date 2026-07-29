@@ -5,10 +5,10 @@
 
 export interface TelemetryEnvelope {
   id: string;
-  eventType: "PageView" | "SessionStart" | "SessionHeartbeat" | "SessionEnd" | "MatchJoin" | "MatchLeave" | "MatchStart" | "MatchEnd" | "UiImpression" | "UiClick" | "UiScrollDepth" | "QueueEnter" | "QueueLeave" | "MatchFormed";
+  eventType: "PageView" | "SessionStart" | "SessionHeartbeat" | "SessionEnd" | "MatchJoin" | "MatchLeave" | "MatchStart" | "MatchEnd" | "UiImpression" | "UiClick" | "UiScrollDepth" | "QueueEnter" | "QueueLeave" | "MatchFormed" | "FriendRequestSent" | "FriendRequestAccepted" | "GameInviteSent" | "GameInviteAccepted";
   userId?: string | null;
   timestamp: string;
-  payload: PageViewPayload | SessionStartPayload | SessionHeartbeatPayload | SessionEndPayload | MatchJoinPayload | MatchLeavePayload | MatchStartPayload | MatchEndPayload | UiImpressionPayload | UiClickPayload | UiScrollDepthPayload | QueueEnterPayload | QueueLeavePayload | MatchFormedPayload;
+  payload: PageViewPayload | SessionStartPayload | SessionHeartbeatPayload | SessionEndPayload | MatchJoinPayload | MatchLeavePayload | MatchStartPayload | MatchEndPayload | UiImpressionPayload | UiClickPayload | UiScrollDepthPayload | QueueEnterPayload | QueueLeavePayload | MatchFormedPayload | FriendRequestSentPayload | FriendRequestAcceptedPayload | GameInviteSentPayload | GameInviteAcceptedPayload;
 }
 
 export interface PageViewPayload {
@@ -25,6 +25,7 @@ export interface SessionStartPayload {
   userAgent: string;
   language?: string;
   screenResolution?: string;
+  acceptLanguage?: string | null;
 }
 
 export interface SessionHeartbeatPayload {
@@ -104,4 +105,24 @@ export interface MatchFormedPayload {
   queueIds: any[];
   latencyDisparity: number;
   playerPings?: any[];
+}
+
+export interface FriendRequestSentPayload {
+  receiverId: string;
+}
+
+export interface FriendRequestAcceptedPayload {
+  requestId: string;
+  senderId: string;
+}
+
+export interface GameInviteSentPayload {
+  receiverId: string;
+  roomId: string;
+}
+
+export interface GameInviteAcceptedPayload {
+  inviteId: string;
+  senderId: string;
+  roomId: string;
 }

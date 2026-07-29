@@ -98,6 +98,42 @@ export function validateEvent(event: {
       }
       break;
 
+    case "FriendRequestSent":
+      if (!payload.receiverId || typeof payload.receiverId !== "string") {
+        return { valid: false, reason: "FriendRequestSent missing receiverId" };
+      }
+      break;
+
+    case "FriendRequestAccepted":
+      if (!payload.requestId || typeof payload.requestId !== "string") {
+        return { valid: false, reason: "FriendRequestAccepted missing requestId" };
+      }
+      if (!payload.senderId || typeof payload.senderId !== "string") {
+        return { valid: false, reason: "FriendRequestAccepted missing senderId" };
+      }
+      break;
+
+    case "GameInviteSent":
+      if (!payload.receiverId || typeof payload.receiverId !== "string") {
+        return { valid: false, reason: "GameInviteSent missing receiverId" };
+      }
+      if (!payload.roomId || typeof payload.roomId !== "string") {
+        return { valid: false, reason: "GameInviteSent missing roomId" };
+      }
+      break;
+
+    case "GameInviteAccepted":
+      if (!payload.inviteId || typeof payload.inviteId !== "string") {
+        return { valid: false, reason: "GameInviteAccepted missing inviteId" };
+      }
+      if (!payload.senderId || typeof payload.senderId !== "string") {
+        return { valid: false, reason: "GameInviteAccepted missing senderId" };
+      }
+      if (!payload.roomId || typeof payload.roomId !== "string") {
+        return { valid: false, reason: "GameInviteAccepted missing roomId" };
+      }
+      break;
+
     default:
       // Unknown event types are allowed as long as they have valid structure,
       // but let's make sure they aren't totally empty if we require it.

@@ -167,6 +167,23 @@ export interface NotificationClickMessage extends BaseMessage {
   variant: "A" | "B"
 }
 
+export interface ChangePresenceMessage extends BaseMessage {
+  type: "changePresence"
+  userId?: string
+  status: "ONLINE" | "INVISIBLE" | "DND"
+}
+
+export interface SendGameInviteMessage extends BaseMessage {
+  type: "sendGameInvite"
+  targetUserId: string
+  roomId: string
+}
+
+export interface AcceptGameInviteMessage extends BaseMessage {
+  type: "acceptGameInvite"
+  inviteId: string
+}
+
 export type IncomingMessage =
   | JoinRoomMessage
   | PlayerUpdateMessage
@@ -182,6 +199,10 @@ export type IncomingMessage =
   | PlayerConfigUpdateMessage
   | SimulationControlMessage
   | NotificationClickMessage
+  | ChangePresenceMessage
+  | SendGameInviteMessage
+  | AcceptGameInviteMessage
+
 
 // ── Outgoing Messages ─────────────────────────────
 export interface WelcomeMessage extends BaseMessage {
@@ -229,6 +250,26 @@ export interface MatchmakingStatusMessage extends BaseMessage {
   region: string
 }
 
+export interface GameInviteReceivedMessage extends BaseMessage {
+  type: "game_invite_received"
+  inviteId: string
+  senderId: string
+  senderName: string
+  roomId: string
+  mapName: string | null
+}
+
+export interface GameInviteAcceptedMessage extends BaseMessage {
+  type: "game_invite_accepted"
+  inviteId: string
+  roomId: string
+}
+
+export interface GameInviteErrorMessage extends BaseMessage {
+  type: "game_invite_error"
+  message: string
+}
+
 export type OutgoingMessage =
   | WelcomeMessage
   | GameStateMessage
@@ -250,4 +291,7 @@ export type OutgoingMessage =
   | SimulationControlMessage
   | MatchmakingFoundMessage
   | MatchmakingStatusMessage
+  | GameInviteReceivedMessage
+  | GameInviteAcceptedMessage
+  | GameInviteErrorMessage
 

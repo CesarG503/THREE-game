@@ -12,8 +12,16 @@ import type {
   GameConfigUpdateMessage,
   PlayerConfigUpdateMessage,
   SimulationControlMessage,
+  ChangePresenceMessage,
+  SendGameInviteMessage,
+  AcceptGameInviteMessage,
   NotificationClickMessage,
 } from "../types.js"
+import { setUserVisibility } from "../services/SocialRecommender.js"
+import { handleUserVisibilityChange, sendToUser } from "../services/PresenceService.js"
+import { prisma } from "../db/prisma.js"
+import { notificationSystem } from "../services/NotificationSystem.js"
+import { createGameInvite, getGameInvite, deleteGameInvite } from "../services/GameInviteService.js"
 import { logger } from "../utils/Logger.js"
 import { eventBuffer } from "../analytics/eventBuffer.js"
 import crypto from "node:crypto"
@@ -252,5 +260,197 @@ export function registerHandlers(router: MessageRouter): void {
         variant: msg.variant,
       },
     })
+  })
+
+  // ── Presence Propagation (Fase 3) ──────────────────────────────────────
+
+  router.register<ChangePresenceMessage>("changePresence", async ({ ws }, msg) => {
+    if (!ws.userId) {
+      logger.warn("Handlers", "changePresence received from unauthenticated socket — dropped")
+      return
+    }
+
+    // CONTROL DE SEGURIDAD (Spoofing de Sockets)
+    if (msg.userId && msg.userId !== ws.userId) {
+      logger.warn("Security", `User ${ws.userId} tried to spoof presence change for user ${msg.userId}`)
+      return
+    }
+
+    if (!["ONLINE", "INVISIBLE", "DND"].includes(msg.status)) {
+      logger.warn("Handlers", `Invalid presence status received: ${msg.status}`)
+      return
+    }
+
+    await setUserVisibility(ws.userId, msg.status)
+    await handleUserVisibilityChange(ws.userId, msg.status)
+  })
+
+  // ── Game Invitations (Fase 4) ──────────────────────────────────────────
+
+  router.register<SendGameInviteMessage>("sendGameInvite", async ({ ws, room }, msg) => {
+    if (!ws.userId) {
+      logger.warn("Handlers", "sendGameInvite received from unauthenticated socket — dropped")
+      return
+    }
+
+    const { targetUserId, roomId } = msg
+    if (!targetUserId || !roomId) {
+      logger.warn("Handlers", "sendGameInvite missing targetUserId or roomId")
+      return
+    }
+
+    // 1. VALIDACIÓN DE DESTINO: Comprobar que la sala exista y tenga jugadores
+    if (room.getRoomSize(roomId) === 0) {
+      ws.send(JSON.stringify({
+        type: "game_invite_error",
+        message: "La sala especificada no existe o no tiene jugadores activos."
+      }))
+      return
+    }
+
+    // 2. VALIDACIÓN DE AMISTAD (Relación de Confianza): Validar que sean amigos con estado ACCEPTED
+    const friendship = await prisma.friendship.findFirst({
+      where: {
+        userId: ws.userId,
+        friendId: targetUserId
+      }
+    })
+
+    if (!friendship) {
+      logger.warn("Security", `User ${ws.userId} tried to invite non-friend ${targetUserId} to room ${roomId}`)
+      ws.send(JSON.stringify({
+        type: "game_invite_error",
+        message: "Solo puedes invitar a tus amigos aceptados."
+      }))
+      return
+    }
+
+    // 3. VALIDACIÓN DE ESTADO ONLINE: Verificar que el receptor esté en línea
+    if (!notificationSystem.isUserActive(targetUserId)) {
+      ws.send(JSON.stringify({
+        type: "game_invite_error",
+        message: "El usuario objetivo no se encuentra en línea."
+      }))
+      return
+    }
+
+    // 4. Obtener datos del emisor
+    const sender = await prisma.user.findUnique({
+      where: { id: ws.userId },
+      select: { username: true, displayName: true }
+    })
+    if (!sender) return
+
+    const senderName = sender.displayName || sender.username
+
+    // 5. Resolver nombre del mapa
+    let mapName: string | null = null
+    try {
+      const match = await prisma.match.findFirst({
+        where: {
+          roomId: roomId,
+          status: { in: ["RUNNING", "WAITING"] }
+        },
+        include: { map: true }
+      })
+      mapName = match?.map?.name || "Partida de Viper IO"
+    } catch (err) {
+      logger.error("Handlers", `Error resolving map name for room ${roomId}`, err)
+    }
+
+    // 6. Crear invitación con TTL 30s
+    const invite = await createGameInvite(ws.userId, targetUserId, roomId)
+
+    // 7. Enviar evento al receptor
+    sendToUser(targetUserId, {
+      type: "game_invite_received",
+      inviteId: invite.id,
+      senderId: ws.userId,
+      senderName,
+      roomId,
+      mapName
+    })
+
+    // Emit GameInviteSent telemetry
+    eventBuffer.push({
+      id: crypto.randomUUID(),
+      eventType: "GameInviteSent",
+      userId: ws.userId,
+      timestamp: new Date(),
+      payload: {
+        receiverId: targetUserId,
+        roomId: roomId
+      }
+    })
+
+    logger.info("Handlers", `Game invite sent from ${ws.userId} to ${targetUserId} for room ${roomId}`)
+  })
+
+  router.register<AcceptGameInviteMessage>("acceptGameInvite", async ({ ws, room }, msg) => {
+    if (!ws.userId) {
+      logger.warn("Handlers", "acceptGameInvite received from unauthenticated socket — dropped")
+      return
+    }
+
+    const { inviteId } = msg
+    if (!inviteId) {
+      logger.warn("Handlers", "acceptGameInvite missing inviteId")
+      return
+    }
+
+    // 1. Recuperar invitación
+    const invite = await getGameInvite(inviteId)
+    if (!invite) {
+      ws.send(JSON.stringify({
+        type: "game_invite_error",
+        message: "La invitación ha expirado o no es válida."
+      }))
+      return
+    }
+
+    // 2. CONTROL DE SEGURIDAD: Verificar propiedad (solo el targetUserId legítimo puede aceptarla)
+    if (invite.targetUserId !== ws.userId) {
+      logger.warn("Security", `User ${ws.userId} tried to accept invitation ${inviteId} intended for ${invite.targetUserId}`)
+      ws.send(JSON.stringify({
+        type: "game_invite_error",
+        message: "No tienes autorización para aceptar esta invitación."
+      }))
+      return
+    }
+
+    // 3. Validar que la sala de destino siga existiendo
+    if (room.getRoomSize(invite.roomId) === 0) {
+      ws.send(JSON.stringify({
+        type: "game_invite_error",
+        message: "La sala ya no existe o se ha cerrado."
+      }))
+      await deleteGameInvite(inviteId)
+      return
+    }
+
+    // 4. Consumir invitación
+    await deleteGameInvite(inviteId)
+
+    // 5. Retornar éxito al socket solicitante para que se una
+    ws.send(JSON.stringify({
+      type: "game_invite_accepted",
+      inviteId,
+      roomId: invite.roomId
+    }))
+
+    // Emit GameInviteAccepted telemetry
+    eventBuffer.push({
+      id: crypto.randomUUID(),
+      eventType: "GameInviteAccepted",
+      userId: ws.userId,
+      timestamp: new Date(),
+      payload: {
+        inviteId,
+        senderId: invite.senderId,
+        roomId: invite.roomId
+      }
+    })
+
+    logger.info("Handlers", `User ${ws.userId} accepted game invite ${inviteId} for room ${invite.roomId}`)
   })
 }

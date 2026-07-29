@@ -1,0 +1,18 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "inviteId": {
+      "type": "string"
+    },
+    "senderId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "roomId": {
+      "type": "string"
+    }
+  },
+  "required": ["inviteId", "senderId", "roomId"],
+  "additionalProperties": false
+}

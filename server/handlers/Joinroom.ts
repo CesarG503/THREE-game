@@ -3,8 +3,7 @@ import type { ExtendedWebSocket, JoinRoomMessage } from "../types.js"
 import { logger } from "../utils/Logger.js"
 import { eventBuffer } from "../analytics/eventBuffer.js"
 import crypto from "node:crypto"
-import { notificationSystem } from "../services/NotificationSystem.js"
-import { analyticsPrisma } from "../db/analyticsPrisma.js"
+import { handleUserConnect } from "../services/PresenceService.js"
 
 function generatePlayerId(): string {
   return "player_" + Math.random().toString(36).substring(2, 9)
@@ -41,34 +40,8 @@ export async function handleJoinRoom(
         ws.userId = user.id
         logger.info(`Room:${roomId}`, `Authenticated player ${playerId} as user ${user.id}`)
 
-        // Register connection in notification registry
-        notificationSystem.registerSocket(user.id, ws)
-
-        // Trigger online notification to high affinity friends
-        void (async () => {
-          try {
-            const affinities = await analyticsPrisma.socialAffinity.findMany({
-              where: {
-                OR: [
-                  { userId1: user.id },
-                  { userId2: user.id },
-                ],
-                affinity: { gt: 0.5 },
-              },
-            })
-
-            for (const aff of affinities) {
-              const friendId = aff.userId1 === user.id ? aff.userId2 : aff.userId1
-              if (notificationSystem.isUserActive(friendId)) {
-                notificationSystem.sendNotification(friendId, "friend_online", {
-                  friendName: user.displayName || user.username,
-                })
-              }
-            }
-          } catch (err) {
-            logger.error("JoinRoomTrigger", "Failed to trigger friend online notifications", err)
-          }
-        })()
+        // Register socket and handle real-time presence propagation (Fase 3)
+        await handleUserConnect(user.id, ws)
       }
     } catch (err) {
       logger.warn(`Room:${roomId}`, `Token verification failed for player ${playerId}:`, err)

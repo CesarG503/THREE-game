@@ -8,7 +8,7 @@
     },
     "eventType": {
       "type": "string",
-      "enum": ["PageView", "SessionStart", "MatchJoin", "MatchLeave", "SessionHeartbeat", "SessionEnd", "MatchStart", "MatchEnd", "UiImpression", "UiClick", "UiScrollDepth", "EditorSession", "EditorAction", "MapStateTransition", "QueueEnter", "QueueLeave", "MatchFormed"]
+      "enum": ["PageView", "SessionStart", "MatchJoin", "MatchLeave", "SessionHeartbeat", "SessionEnd", "MatchStart", "MatchEnd", "UiImpression", "UiClick", "UiScrollDepth", "EditorSession", "EditorAction", "MapStateTransition", "QueueEnter", "QueueLeave", "MatchFormed", "FriendRequestSent", "FriendRequestAccepted", "GameInviteSent", "GameInviteAccepted"]
     },
     "userId": {
       "type": ["string", "null"]

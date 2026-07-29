@@ -9,6 +9,7 @@ import { renderAuthScreen } from "./AuthScreen";
 import { clampText, clear, createButton, createElement, createIcon, formatRelativeDate, prependIcon } from "./platform/dom";
 import { injectPlatformStyles } from "./platform/styles";
 import { initUiTelemetry } from "./analytics-ui";
+import { renderSocialPanel, closeSocialSocket } from "./SocialPanel";
 
 const HIDDEN_IDS = [
 	"loading",
@@ -56,6 +57,7 @@ export function renderLobby(router: Router): () => void {
 	let skinStatus = "";
 	let authCleanup: (() => void) | null = null;
 	let skinPreviewCleanup: (() => void) | null = null;
+	let socialCleanup: (() => void) | null = null;
 	let disposed = false;
 	let unsubscribeRoute: () => void = () => {};
 
@@ -70,6 +72,11 @@ export function renderLobby(router: Router): () => void {
 		disposed = true;
 		if (authCleanup) authCleanup();
 		if (skinPreviewCleanup) skinPreviewCleanup();
+		if (socialCleanup) {
+			socialCleanup();
+			socialCleanup = null;
+		}
+		closeSocialSocket();
 		uiTelemetry.dispose();
 		unsubscribeRoute();
 		container.remove();
@@ -434,6 +441,22 @@ export function renderLobby(router: Router): () => void {
 		rail.appendChild(renderActivityPanel([...myMaps, ...publicMaps]));
 		rail.appendChild(renderRankingPanel([...myMaps, ...publicMaps]));
 		rail.appendChild(renderStatusPanel());
+
+		if (socialCleanup) {
+			socialCleanup();
+			socialCleanup = null;
+		}
+
+		if (auth) {
+			const socialContainer = createElement("div");
+			rail.appendChild(socialContainer);
+			socialCleanup = renderSocialPanel(socialContainer, auth, router);
+		} else {
+			const guestPanel = createElement("section", "vp-panel");
+			guestPanel.appendChild(createElement("h3", "vp-panel-title", "Social"));
+			guestPanel.appendChild(createElement("div", "vp-muted", "Inicia sesión para jugar con amigos y ver tu lista de amigos."));
+			rail.appendChild(guestPanel);
+		}
 
 		content.appendChild(feed);
 		content.appendChild(rail);

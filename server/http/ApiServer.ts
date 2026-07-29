@@ -24,8 +24,21 @@ import { getConversionFunnel } from "../analytics/reports/funnels.js"
 import { getMatchmakingMetrics } from "../analytics/reports/matchmaking.js"
 import { getCatalogPerformance } from "../analytics/reports/catalog_performance.js"
 import { getCreatorsActivityReport } from "../analytics/reports/creators_activity.js"
+import { getSocialEngagement } from "../analytics/reports/social_engagement.js"
 import { matchmaker } from "../services/Matchmaker.js"
 import { ewtCalculator } from "../services/matchmaking/ewt_calculator.js"
+import {
+  sendRequest,
+  acceptRequest,
+  rejectRequest,
+  removeFriend,
+  getFriendsList,
+  getPendingRequests,
+  SocialError,
+} from "../services/FriendshipService.js"
+import { handleUserVisibilityChange } from "../services/PresenceService.js"
+import { prisma } from "../db/prisma.js"
+import crypto from "node:crypto"
 
 const MAX_BODY_BYTES = 1024 * 1024 * 2
 
@@ -265,6 +278,35 @@ export async function handleHttpRequest(
     });
   }
 
+  if (req.method === "GET" && url.pathname === "/api/analytics/reports/social") {
+    return withApiError(res, async () => {
+      const rawStart = url.searchParams.get("startDate");
+      const rawEnd = url.searchParams.get("endDate");
+
+      let startDate: Date | undefined;
+      let endDate: Date | undefined;
+
+      if (rawStart) {
+        startDate = new Date(rawStart);
+        if (isNaN(startDate.getTime())) {
+          sendJson(res, 400, { error: "startDate invalido. Debe ser una fecha ISO valida." });
+          return;
+        }
+      }
+
+      if (rawEnd) {
+        endDate = new Date(rawEnd);
+        if (isNaN(endDate.getTime())) {
+          sendJson(res, 400, { error: "endDate invalido. Debe ser una fecha ISO valida." });
+          return;
+        }
+      }
+
+      const socialEngagement = await getSocialEngagement({ startDate, endDate });
+      sendJson(res, 200, { socialEngagement });
+    });
+  }
+
   if (req.method === "GET" && url.pathname === "/api/assets") {
     return withApiError(res, async () => {
       const user = await getOptionalRequestUser(req)
@@ -380,6 +422,108 @@ export async function handleHttpRequest(
     })
   }
 
+  // ── Social Friends Endpoints ───────────────────────────────────────────
+
+  if (req.method === "POST" && url.pathname === "/api/social/friends/request") {
+    return withJsonBody(req, res, async (body) => {
+      const user = await getRequiredRequestUser(req)
+      const data = body as { username?: string }
+      if (!data.username) {
+        sendJson(res, 400, { error: "El username es requerido" })
+        return
+      }
+
+      // Rate limiting (Seguridad): max 10 requests per user per minute
+      const ip = getClientIp(req)
+      if (await checkRateLimit(`social:request:${user.id}:${ip}`, 10, 60, true)) {
+        sendJson(res, 429, { error: "Demasiadas solicitudes. Intenta de nuevo más tarde." })
+        return
+      }
+
+      const request = await sendRequest(user.id, data.username)
+
+      // Emit FriendRequestSent telemetry
+      eventBuffer.push({
+        id: crypto.randomUUID(),
+        eventType: "FriendRequestSent",
+        userId: user.id,
+        timestamp: new Date(),
+        payload: { receiverId: request.receiverId },
+      })
+
+      sendJson(res, 201, request)
+    })
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/social/friends/requests") {
+    return withApiError(res, async () => {
+      const user = await getRequiredRequestUser(req)
+      const requests = await getPendingRequests(user.id)
+      sendJson(res, 200, { requests })
+    })
+  }
+
+  const acceptMatch = /^\/api\/social\/friends\/request\/([^/]+)\/accept$/.exec(url.pathname)
+  if (acceptMatch && req.method === "PUT") {
+    return withApiError(res, async () => {
+      const user = await getRequiredRequestUser(req)
+      const requestId = decodeURIComponent(acceptMatch[1] ?? "")
+
+      // Fetch request first to get senderId for telemetry
+      const request = await prisma.friendRequest.findUnique({
+        where: { id: requestId },
+      })
+      if (!request) {
+        sendJson(res, 404, { error: "Solicitud de amistad no encontrada" })
+        return
+      }
+
+      const result = await acceptRequest(user.id, requestId)
+
+      // Emit FriendRequestAccepted telemetry
+      eventBuffer.push({
+        id: crypto.randomUUID(),
+        eventType: "FriendRequestAccepted",
+        userId: user.id,
+        timestamp: new Date(),
+        payload: {
+          requestId: request.id,
+          senderId: request.senderId,
+        },
+      })
+
+      sendJson(res, 200, result)
+    })
+  }
+
+  const rejectMatch = /^\/api\/social\/friends\/request\/([^/]+)\/reject$/.exec(url.pathname)
+  if (rejectMatch && req.method === "PUT") {
+    return withApiError(res, async () => {
+      const user = await getRequiredRequestUser(req)
+      const requestId = decodeURIComponent(rejectMatch[1] ?? "")
+      const result = await rejectRequest(user.id, requestId)
+      sendJson(res, 200, result)
+    })
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/social/friends") {
+    return withApiError(res, async () => {
+      const user = await getRequiredRequestUser(req)
+      const friends = await getFriendsList(user.id)
+      sendJson(res, 200, { friends })
+    })
+  }
+
+  const deleteFriendMatch = /^\/api\/social\/friends\/([^/]+)$/.exec(url.pathname)
+  if (deleteFriendMatch && req.method === "DELETE") {
+    return withApiError(res, async () => {
+      const user = await getRequiredRequestUser(req)
+      const friendId = decodeURIComponent(deleteFriendMatch[1] ?? "")
+      const result = await removeFriend(user.id, friendId)
+      sendJson(res, 200, result)
+    })
+  }
+
   if (req.method === "POST" && url.pathname === "/api/presence/status") {
     return withJsonBody(req, res, async (body) => {
       const user = await getRequiredRequestUser(req)
@@ -389,6 +533,7 @@ export async function handleHttpRequest(
         return
       }
       await setUserVisibility(user.id, data.status as PlayerVisibility)
+      await handleUserVisibilityChange(user.id, data.status as any)
       sendJson(res, 200, { ok: true, status: data.status })
     })
   }
@@ -698,6 +843,11 @@ function handleApiError(res: ServerResponse, err: unknown): void {
   if (res.headersSent) return
 
   if (err instanceof AuthError) {
+    sendJson(res, err.status, { error: err.message })
+    return
+  }
+
+  if (err instanceof SocialError) {
     sendJson(res, err.status, { error: err.message })
     return
   }

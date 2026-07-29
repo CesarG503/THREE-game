@@ -21,6 +21,7 @@ import { alertService } from "./analytics/monitoring/alerts.js"
 import { matchmaker } from "./services/Matchmaker.js"
 import { ewtCalculator } from "./services/matchmaking/ewt_calculator.js"
 import { notificationSystem } from "./services/NotificationSystem.js"
+import { handleUserDisconnect } from "./services/PresenceService.js"
 import crypto from "node:crypto"
 
 // ── Bootstrap ──────────────────────────────────────────────────────────────
@@ -81,7 +82,7 @@ wss.on("connection", (ws: ExtendedWebSocket) => {
   ws.on("close", () => {
     const { playerId, roomId, connectedAt, userId } = ws
     if (userId) {
-      notificationSystem.unregisterSocket(userId, ws)
+      void handleUserDisconnect(userId, ws)
     }
     if (!playerId || !roomId) return
 

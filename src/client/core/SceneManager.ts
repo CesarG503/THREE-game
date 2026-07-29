@@ -168,6 +168,9 @@ export class SceneManager {
 
     const geometry = new THREE.BoxGeometry(2, 2, 2);
     this.skyboxTransitionMesh = new THREE.Mesh(geometry, this.skyboxTransitionMaterial);
+    this.skyboxTransitionMesh.name = "skyboxTransitionMesh";
+    this.skyboxTransitionMesh.userData.ignorePlacementRaycast = true;
+    this.skyboxTransitionMesh.raycast = () => {};
     this.skyboxTransitionMesh.visible = false;
     this.skyboxTransitionMesh.frustumCulled = false;
     this.skyboxTransitionMesh.renderOrder = -1000;
@@ -488,6 +491,9 @@ export class SceneManager {
       if (!this.skyMesh) {
         this.skyMesh = new Sky();
         this.skyMesh.scale.setScalar(450000);
+        this.skyMesh.name = "atmosphericSkyMesh";
+        this.skyMesh.userData.ignorePlacementRaycast = true;
+        this.skyMesh.raycast = () => {};
         (this.skyMesh.material as THREE.ShaderMaterial).fog = false;
         this.scene.add(this.skyMesh);
       }

@@ -677,6 +677,16 @@ export class PlacementManager {
         return true;
     }
 
+    shouldIgnorePlacementRaycast(object) {
+        let current = object;
+        while (current) {
+            if (current.userData?.ignorePlacementRaycast) return true;
+            if (current === this.placementGhost) return true;
+            current = current.parent;
+        }
+        return false;
+    }
+
     /**
      * Checks for collisions at the proposed position
      */
@@ -1054,6 +1064,8 @@ export class PlacementManager {
                 if (obj.userData && obj.userData.isPlayer) return false;
                 obj = obj.parent;
             }
+
+            if (this.shouldIgnorePlacementRaycast(h.object)) return false;
 
             // Ignore Aerial Collider if not active
             if (!this.aerialGridActive && h.object === this.aerialCollider) return false;
@@ -1908,6 +1920,7 @@ export class PlacementManager {
             if (h.distance >= 100) return false;
             if (h.object.type !== "Mesh") return false;
             if (h.object.userData.isPlayer) return false;
+            if (this.shouldIgnorePlacementRaycast(h.object)) return false;
             let parent = h.object;
             while (parent) {
                 if (parent === this.placementGhost || parent === targetObject) return false;

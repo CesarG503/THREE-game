@@ -188,19 +188,19 @@ export class CameraController {
 
     this.domElement.addEventListener("wheel", (e: WheelEvent) => {
       if (!this.isFirstPerson && !this.isPaused && e.shiftKey) {
-        let delta = e.deltaY;
-        if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
-          delta = e.deltaX;
-        }
+        e.preventDefault();
+
+        let delta = Math.abs(e.deltaY) > 0 ? e.deltaY : e.deltaX;
 
         if (e.deltaMode === 1) {
           delta *= 40;
         }
 
-        this.thirdPersonDistance += delta * 0.01;
+        const normalizedDelta = Math.sign(delta) * Math.max(Math.abs(delta), 32);
+        this.thirdPersonDistance += normalizedDelta * 0.0125;
         this.thirdPersonDistance = Math.max(this.minDistance, Math.min(this.maxDistance, this.thirdPersonDistance));
       }
-    });
+    }, { passive: false });
 
     this.domElement.addEventListener("contextmenu", (e: MouseEvent) => {
       e.preventDefault();

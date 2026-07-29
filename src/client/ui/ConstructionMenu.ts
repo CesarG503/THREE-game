@@ -1787,12 +1787,12 @@ export class ConstructionMenu {
         rowShadowQuality.appendChild(this.selectShadowQuality);
         rowLighting.appendChild(rowShadowQuality);
 
-        // Sun Position Sliders (Elevación & Azimut para sombras)
+        // Sun/Moon trajectory controls (shared by shader skies and skyboxes)
         const rowSunPositionGroup = document.createElement("div");
-        rowSunPositionGroup.style.cssText = "display: flex; flex-direction: column; gap: 8px; border-left: 2px solid #eab308; padding-left: 10px; margin-top: 5px;";
+        rowSunPositionGroup.style.cssText = "display: flex; flex-direction: column; gap: 8px; padding: 8px 0; margin-top: 2px;";
 
         const titleSunPos = document.createElement("span");
-        titleSunPos.textContent = "Posición del Sol (Ángulo y Sombras):";
+        titleSunPos.textContent = "Sistema solar/lunar (luz y sombras):";
         titleSunPos.style.fontSize = "13px";
         titleSunPos.style.fontWeight = "bold";
         titleSunPos.style.color = "#fbbf24";
@@ -1851,8 +1851,6 @@ export class ConstructionMenu {
         rowSunAzim.appendChild(labelAzimRow);
         rowSunAzim.appendChild(this.sliderSunAzimuth);
         rowSunPositionGroup.appendChild(rowSunAzim);
-
-        rowLighting.appendChild(rowSunPositionGroup);
 
         // Star Options Container
         const rowStarsGroup = document.createElement("div");
@@ -2153,14 +2151,15 @@ export class ConstructionMenu {
         this.rowCustomLights.appendChild(rowAmbL);
         rowLighting.appendChild(this.rowCustomLights);
 
-        // Visible Sun & Atmosphere controls container
+        // Solar/lunar trajectory and shader atmosphere controls
         this.rowSkyShader = document.createElement("div");
-        this.rowSkyShader.style.cssText = "display: flex; flex-direction: column; gap: 8px; border-left: 2px solid #2563eb; padding-left: 10px; margin-top: 5px;";
+        this.rowSkyShader.style.cssText = "display: flex; flex-direction: column; gap: 10px; border-left: 2px solid #f59e0b; padding-left: 10px; margin-top: 5px;";
 
         const skyShaderTitle = document.createElement("div");
-        skyShaderTitle.textContent = "Atmósfera y transición solar";
+        skyShaderTitle.textContent = "Trayectoria solar/lunar y atmósfera";
         skyShaderTitle.style.cssText = "font-size:12px; color:#ffffff; font-weight:bold; text-transform:uppercase; letter-spacing:0.04em;";
         this.rowSkyShader.appendChild(skyShaderTitle);
+        this.rowSkyShader.appendChild(rowSunPositionGroup);
 
         const transitionRow = document.createElement("div");
         transitionRow.style.cssText = "display:flex; justify-content:space-between; align-items:center; gap:8px; font-size:12px; color:#ddd;";
@@ -2185,6 +2184,14 @@ export class ConstructionMenu {
         transitionRow.appendChild(transitionLabel);
         transitionRow.appendChild(this.selectTransitionMode);
         this.rowSkyShader.appendChild(transitionRow);
+
+        this.shaderAtmosphereGroup = document.createElement("div");
+        this.shaderAtmosphereGroup.style.cssText = "display:flex; flex-direction:column; gap:8px; border-top:1px solid #334155; padding-top:10px;";
+
+        const atmosphereTitle = document.createElement("span");
+        atmosphereTitle.textContent = "Cielo atmosférico shader:";
+        atmosphereTitle.style.cssText = "font-size:12px; color:#93c5fd; font-weight:bold;";
+        this.shaderAtmosphereGroup.appendChild(atmosphereTitle);
 
         const createShaderSlider = (labelStr, key, minVal, maxVal, stepVal, unit = "") => {
             const wrap = document.createElement("div");
@@ -2215,7 +2222,7 @@ export class ConstructionMenu {
 
             wrap.appendChild(labelRow);
             wrap.appendChild(slider);
-            this.rowSkyShader.appendChild(wrap);
+            this.shaderAtmosphereGroup.appendChild(wrap);
 
             return { slider, valSpan };
         };
@@ -2226,6 +2233,7 @@ export class ConstructionMenu {
             mieCoefficient: createShaderSlider("Coeficiente Mie:", "skyMieCoefficient", 0, 0.1, 0.001),
             mieDirectionalG: createShaderSlider("Direccional G de Mie:", "skyMieDirectionalG", 0, 1, 0.05)
         };
+        this.rowSkyShader.appendChild(this.shaderAtmosphereGroup);
         rowLighting.appendChild(this.rowSkyShader);
 
         container.appendChild(rowLighting);
@@ -3320,6 +3328,9 @@ export class ConstructionMenu {
         if (this.inputAmbientColor) this.inputAmbientColor.value = selectedConfig.ambientColor || "#ffffff";
 
         if (this.rowSkyShader) this.rowSkyShader.style.display = "flex";
+        if (this.shaderAtmosphereGroup) {
+            this.shaderAtmosphereGroup.style.display = "flex";
+        }
         if (this.selectTransitionMode) this.selectTransitionMode.value = selectedConfig.transitionMode || "procedural";
         if (this.shaderSliders) {
             const turbidityVal = selectedConfig.skyTurbidity ?? 10;

@@ -3,6 +3,7 @@
 import { HUDConfigPanel } from './HUDConfigPanel'
 import { uploadAsset } from '../platform/api'
 import { GRAVITY_ORIENTATION_OPTIONS } from '../utils/GravityOrientation'
+import { AnimationRegistry } from '../character/models/animations/AnimationSystem'
 
 const DEFAULT_POLYGON_SKIN_URL = "https://raw.githubusercontent.com/InventivetalentDev/minecraft-assets/1.19.3/assets/minecraft/textures/entity/player/wide/steve.png"
 
@@ -380,7 +381,7 @@ export class PlayerConfigPanel {
             item.appendChild(nameSpan);
 
             // Delete Btn
-            if (p.id !== 'default') {
+            if (p.id !== 'default' && p.id !== 'admin_tester') {
                 const delBtn = document.createElement('button');
                 delBtn.textContent = "✕";
                 delBtn.style.cssText = "background:none; border:none; color:#f44; cursor:pointer;";
@@ -388,7 +389,7 @@ export class PlayerConfigPanel {
                     e.stopPropagation();
                     if (confirm(`¿Eliminar perfil "${p.name}"?`)) {
                         this.manager.removeProfile(p.id);
-                        if (this.selectedProfileId === p.id) this.selectedProfileId = 'default';
+                        if (this.selectedProfileId === p.id) this.selectedProfileId = 'admin_tester';
                         this.render();
                     }
                 };
@@ -432,7 +433,88 @@ export class PlayerConfigPanel {
         statsCol.innerHTML = "<h4 style='color:#aaa; border-bottom:1px solid #444;'>Estadísticas Base</h4>";
 
         this.createStatControl(statsCol, "Vida Total", 'maxHealth', profile, 1, 1000);
-        this.createStatControl(statsCol, "Velocidad Movimiento", 'speed', profile, 1, 50);
+
+        // Walk speed control with validation that runSpeed >= speed and crouchSpeed <= speed
+        this.createStatControl(statsCol, "Velocidad Movimiento", 'speed', profile, 1, 50, (newSpeed) => {
+            if (!profile.independentSpeeds) {
+                const currentRunSpeed = profile.runSpeed !== undefined ? profile.runSpeed : (profile.speed || 10) * 1.5;
+                if (currentRunSpeed < newSpeed) {
+                    this.manager.updateProfile(profile.id, { runSpeed: newSpeed });
+                }
+                const currentCrouchSpeed = profile.crouchSpeed !== undefined ? profile.crouchSpeed : (profile.speed || 10) * 0.5;
+                if (currentCrouchSpeed > newSpeed) {
+                    this.manager.updateProfile(profile.id, { crouchSpeed: newSpeed });
+                }
+            }
+            this.renderContent(); // Re-render to show matching speeds
+        });
+
+        // Crouch speed control with validation that crouchSpeed <= speed
+        this.createStatControl(statsCol, "Velocidad al agacharse", 'crouchSpeed', profile, 0.5, 30, (newCrouchSpeed) => {
+            if (!profile.independentSpeeds) {
+                const currentSpeed = profile.speed || 10;
+                if (newCrouchSpeed > currentSpeed) {
+                    this.manager.updateProfile(profile.id, { crouchSpeed: currentSpeed });
+                }
+            }
+            this.renderContent(); // Re-render to enforce constraint
+        });
+
+        // Run speed control with validation that runSpeed >= speed
+        this.createStatControl(statsCol, "Velocidad al correr", 'runSpeed', profile, 1, 60, (newRunSpeed) => {
+            if (!profile.independentSpeeds) {
+                const currentSpeed = profile.speed || 10;
+                if (newRunSpeed < currentSpeed) {
+                    this.manager.updateProfile(profile.id, { runSpeed: currentSpeed });
+                }
+            }
+            this.renderContent(); // Re-render to enforce constraint
+        });
+
+        // Stamina Max control
+        this.createStatControl(statsCol, "Tiempo de correr (Estamina)", 'staminaMax', profile, 1, 30);
+
+        // Run Cooldown Until Full Toggle Checkbox
+        const runStaminaRow = document.createElement('div');
+        runStaminaRow.style.cssText = "margin: 5px 0 15px 0; display: flex; align-items: center; gap: 10px;";
+        const runStaminaCheck = document.createElement('input');
+        runStaminaCheck.type = "checkbox";
+        runStaminaCheck.id = "run-stamina-full-toggle";
+        runStaminaCheck.checked = !!profile.runRequireFullStamina;
+        runStaminaCheck.onchange = (e) => {
+            this.manager.updateProfile(profile.id, { runRequireFullStamina: e.target.checked });
+        };
+        const runStaminaLabel = document.createElement('label');
+        runStaminaLabel.htmlFor = "run-stamina-full-toggle";
+        runStaminaLabel.textContent = "Volver a correr hasta que se llene la barra";
+        runStaminaLabel.style.color = "#ccc";
+        runStaminaLabel.style.fontSize = "12px";
+        runStaminaLabel.style.cursor = "pointer";
+        runStaminaRow.appendChild(runStaminaCheck);
+        runStaminaRow.appendChild(runStaminaLabel);
+        statsCol.appendChild(runStaminaRow);
+
+        // Independent Speeds Toggle Checkbox
+        const indyRow = document.createElement('div');
+        indyRow.style.cssText = "margin: 15px 0 5px 0; display: flex; align-items: center; gap: 10px;";
+        const indyCheck = document.createElement('input');
+        indyCheck.type = "checkbox";
+        indyCheck.id = "independent-speeds-toggle";
+        indyCheck.checked = !!profile.independentSpeeds;
+        indyCheck.onchange = (e) => {
+            this.manager.updateProfile(profile.id, { independentSpeeds: e.target.checked });
+            this.renderContent();
+        };
+        const indyLabel = document.createElement('label');
+        indyLabel.htmlFor = "independent-speeds-toggle";
+        indyLabel.textContent = "Desvincular Velocidades (Independientes)";
+        indyLabel.style.color = "#ccc";
+        indyLabel.style.fontSize = "12px";
+        indyLabel.style.cursor = "pointer";
+        indyRow.appendChild(indyCheck);
+        indyRow.appendChild(indyLabel);
+        statsCol.appendChild(indyRow);
+
         this.createStatControl(statsCol, "Fuerza de Salto", 'jumpForce', profile, 0, 50);
         // Multi-Jump Control (Conditional)
         const multiJumpControl = this.createStatControl(statsCol, "Saltos en el Aire", 'maxMultiJumps', profile, 0, 10);
@@ -461,6 +543,121 @@ export class PlayerConfigPanel {
         flightContainer.appendChild(flightCheck);
         flightContainer.appendChild(flightLabel);
         statsCol.appendChild(flightContainer);
+
+        // Hide HUD Toggle
+        const hideHUDContainer = document.createElement('div');
+        hideHUDContainer.style.marginTop = "10px";
+        hideHUDContainer.style.display = "flex";
+        hideHUDContainer.style.alignItems = "center";
+        hideHUDContainer.style.gap = "10px";
+
+        const hideHUDCheck = document.createElement('input');
+        hideHUDCheck.type = "checkbox";
+        hideHUDCheck.checked = profile.hideHUD || false;
+        hideHUDCheck.style.transform = "scale(1.2)";
+        hideHUDCheck.onchange = (e) => {
+            this.manager.updateProfile(profile.id, { hideHUD: e.target.checked });
+        };
+
+        const hideHUDLabel = document.createElement('label');
+        hideHUDLabel.textContent = "Ocultar HUD del Jugador";
+        hideHUDLabel.style.color = "#ddd";
+        hideHUDLabel.onclick = () => hideHUDCheck.click();
+
+        hideHUDContainer.appendChild(hideHUDCheck);
+        hideHUDContainer.appendChild(hideHUDLabel);
+        statsCol.appendChild(hideHUDContainer);
+
+        // Disable Interaction Toggle
+        const disableInteractionContainer = document.createElement('div');
+        disableInteractionContainer.style.marginTop = "10px";
+        disableInteractionContainer.style.display = "flex";
+        disableInteractionContainer.style.alignItems = "center";
+        disableInteractionContainer.style.gap = "10px";
+
+        const disableInteractionCheck = document.createElement('input');
+        disableInteractionCheck.type = "checkbox";
+        disableInteractionCheck.checked = profile.disableInteraction || false;
+        disableInteractionCheck.style.transform = "scale(1.2)";
+        disableInteractionCheck.onchange = (e) => {
+            this.manager.updateProfile(profile.id, { disableInteraction: e.target.checked });
+        };
+
+        const disableInteractionLabel = document.createElement('label');
+        disableInteractionLabel.textContent = "Deshabilitar Construcción / Interacción";
+        disableInteractionLabel.style.color = "#ddd";
+        disableInteractionLabel.onclick = () => disableInteractionCheck.click();
+
+        disableInteractionContainer.appendChild(disableInteractionCheck);
+        disableInteractionContainer.appendChild(disableInteractionLabel);
+        statsCol.appendChild(disableInteractionContainer);
+
+        // Flash Red on Damage Toggle (Visualizar Daño)
+        const flashDamageContainer = document.createElement('div');
+        flashDamageContainer.style.marginTop = "10px";
+        flashDamageContainer.style.display = "flex";
+        flashDamageContainer.style.alignItems = "center";
+        flashDamageContainer.style.gap = "10px";
+
+        const flashDamageCheck = document.createElement('input');
+        flashDamageCheck.type = "checkbox";
+        flashDamageCheck.checked = profile.flashOnDamage || false;
+        flashDamageCheck.style.transform = "scale(1.2)";
+
+        const flashDamageLabel = document.createElement('label');
+        flashDamageLabel.textContent = "Visualizar Daño (Parpadear Rojo)";
+        flashDamageLabel.style.color = "#ddd";
+        flashDamageLabel.style.cursor = "pointer";
+        flashDamageLabel.onclick = () => flashDamageCheck.click();
+
+        flashDamageContainer.appendChild(flashDamageCheck);
+        flashDamageContainer.appendChild(flashDamageLabel);
+        statsCol.appendChild(flashDamageContainer);
+
+        // Opacity container
+        const opacitySliderWrap = document.createElement('div');
+        opacitySliderWrap.style.display = flashDamageCheck.checked ? "block" : "none";
+        opacitySliderWrap.style.marginLeft = "20px";
+        opacitySliderWrap.style.marginTop = "5px";
+        this.createStatControl(opacitySliderWrap, "Opacidad de Daño (Rojo)", 'damageFlashIntensity', profile, 0.1, 1.0);
+        statsCol.appendChild(opacitySliderWrap);
+
+        flashDamageCheck.onchange = (e) => {
+            const checked = e.target.checked;
+            this.manager.updateProfile(profile.id, { flashOnDamage: checked });
+            opacitySliderWrap.style.display = checked ? "block" : "none";
+        };
+
+        // Respawn Delay Input
+        this.createStatControl(statsCol, "Delay para Reaparecer (s)", 'respawnDelay', profile, 0.1, 10);
+
+        // Explode on Death Toggle
+        const explodeDeathContainer = document.createElement('div');
+        explodeDeathContainer.style.marginTop = "10px";
+        explodeDeathContainer.style.display = "flex";
+        explodeDeathContainer.style.alignItems = "center";
+        explodeDeathContainer.style.gap = "10px";
+
+        const explodeDeathCheck = document.createElement('input');
+        explodeDeathCheck.type = "checkbox";
+        explodeDeathCheck.checked = profile.explodeOnDeath || false;
+        explodeDeathCheck.style.transform = "scale(1.2)";
+        explodeDeathCheck.onchange = (e) => {
+            this.manager.updateProfile(profile.id, { explodeOnDeath: e.target.checked });
+        };
+
+        const explodeDeathLabel = document.createElement('label');
+        explodeDeathLabel.textContent = "Explotar Cuerpo al Morir";
+        explodeDeathLabel.style.color = "#ddd";
+        explodeDeathLabel.style.cursor = "pointer";
+        explodeDeathLabel.onclick = () => explodeDeathCheck.click();
+
+        explodeDeathContainer.appendChild(explodeDeathCheck);
+        explodeDeathContainer.appendChild(explodeDeathLabel);
+        statsCol.appendChild(explodeDeathContainer);
+
+        // Body Parts Duration Input
+        this.createStatControl(statsCol, "Tiempo Duración Partes Suelo (s)", 'bodyPartsDuration', profile, 1, 60);
 
         const gravityContainer = document.createElement('div');
         gravityContainer.style.cssText = "margin-top:15px; display:flex; flex-direction:column; gap:6px;";
@@ -794,22 +991,79 @@ export class PlayerConfigPanel {
 
         // --- ANIMATIONS SECTION ---
         const animHeader = document.createElement('h4');
-        animHeader.textContent = "Animaciones";
+        animHeader.textContent = "Sistemas de Animación";
         animHeader.style.cssText = "color:#aaa; border-bottom:1px solid #444;";
         extraCol.appendChild(animHeader);
 
         const animContainer = document.createElement('div');
         animContainer.style.marginBottom = "15px";
 
+        // Animation System Selector
+        const systemLabel = document.createElement('label');
+        systemLabel.textContent = "Estilo de Animación";
+        systemLabel.style.display = "block";
+        systemLabel.style.color = "#ddd";
+        systemLabel.style.marginBottom = "5px";
+        animContainer.appendChild(systemLabel);
+
+        const systemSelect = document.createElement('select');
+        systemSelect.style.cssText = "background:#333; color:white; padding:5px; border:1px solid #555; width: 100%; box-sizing: border-box; margin-bottom: 10px;";
+        
+        const systems = AnimationRegistry.list();
+        systems.forEach(sys => {
+            const o = document.createElement('option');
+            o.value = sys.id;
+            o.textContent = sys.name;
+            if ((profile.animationStyle || 'classic') === sys.id) o.selected = true;
+            systemSelect.appendChild(o);
+        });
+
+        systemSelect.onchange = (e) => {
+            this.manager.updateProfile(profile.id, { animationStyle: e.target.value });
+            this.render(); // Re-render to update the list of animations
+        };
+        animContainer.appendChild(systemSelect);
+
+        // Limb Bending Selector
+        const bendingLabel = document.createElement('label');
+        bendingLabel.textContent = "Flexibilidad de Extremidades (Brazos/Piernas)";
+        bendingLabel.style.display = "block";
+        bendingLabel.style.color = "#ddd";
+        bendingLabel.style.marginBottom = "5px";
+        animContainer.appendChild(bendingLabel);
+
+        const bendingSelect = document.createElement('select');
+        bendingSelect.style.cssText = "background:#333; color:white; padding:5px; border:1px solid #555; width: 100%; box-sizing: border-box; margin-bottom: 10px;";
+
+        const bendingOptions = [
+            { v: 'none', t: "Rígida (Estilo Minecraft)" },
+            { v: 'jelly', t: "Gelatina (Dobleces en Curva)" },
+            { v: 'joint', t: "Articulada (Codos/Rodillas)" }
+        ];
+
+        bendingOptions.forEach(opt => {
+            const o = document.createElement('option');
+            o.value = opt.v;
+            o.textContent = opt.t;
+            if ((profile.limbBending || 'none') === opt.v) o.selected = true;
+            bendingSelect.appendChild(o);
+        });
+
+        bendingSelect.onchange = (e) => {
+            this.manager.updateProfile(profile.id, { limbBending: e.target.value });
+        };
+        animContainer.appendChild(bendingSelect);
+
+        // Jump Animation
         const jumpAnimLabel = document.createElement('label');
-        jumpAnimLabel.textContent = "Animación de Salto";
+        jumpAnimLabel.textContent = "Giro / Modificador de Salto (Jump)";
         jumpAnimLabel.style.display = "block";
         jumpAnimLabel.style.color = "#ddd";
         jumpAnimLabel.style.marginBottom = "5px";
         animContainer.appendChild(jumpAnimLabel);
 
         const jumpAnimSelect = document.createElement('select');
-        jumpAnimSelect.style.cssText = "background:#333; color:white; padding:5px; border:1px solid #555; width: 100%; box-sizing: border-box;";
+        jumpAnimSelect.style.cssText = "background:#333; color:white; padding:5px; border:1px solid #555; width: 100%; box-sizing: border-box; margin-bottom: 10px;";
 
         const jumpOptions = [
             { v: 'none', t: "Ninguna" },
@@ -824,7 +1078,6 @@ export class PlayerConfigPanel {
             jumpAnimSelect.appendChild(o);
         });
 
-        // Default to flip if undefined
         if (!profile.jumpAnimationType) {
             jumpAnimSelect.value = 'flip';
         }
@@ -832,20 +1085,18 @@ export class PlayerConfigPanel {
         jumpAnimSelect.onchange = (e) => {
             this.manager.updateProfile(profile.id, { jumpAnimationType: e.target.value });
         };
-
         animContainer.appendChild(jumpAnimSelect);
 
         // Fall Animation
         const fallAnimLabel = document.createElement('label');
-        fallAnimLabel.textContent = "Animación de Caída";
+        fallAnimLabel.textContent = "Giro / Modificador de Caída (Fall)";
         fallAnimLabel.style.display = "block";
         fallAnimLabel.style.color = "#ddd";
-        fallAnimLabel.style.marginTop = "10px";
         fallAnimLabel.style.marginBottom = "5px";
         animContainer.appendChild(fallAnimLabel);
 
         const fallAnimSelect = document.createElement('select');
-        fallAnimSelect.style.cssText = "background:#333; color:white; padding:5px; border:1px solid #555; width: 100%; box-sizing: border-box;";
+        fallAnimSelect.style.cssText = "background:#333; color:white; padding:5px; border:1px solid #555; width: 100%; box-sizing: border-box; margin-bottom: 15px;";
 
         const fallOptions = [
             { v: 'none', t: "Ninguna" },
@@ -860,7 +1111,6 @@ export class PlayerConfigPanel {
             fallAnimSelect.appendChild(o);
         });
 
-        // Default to none if undefined
         if (!profile.fallAnimationType) {
             fallAnimSelect.value = 'none';
         }
@@ -868,8 +1118,26 @@ export class PlayerConfigPanel {
         fallAnimSelect.onchange = (e) => {
             this.manager.updateProfile(profile.id, { fallAnimationType: e.target.value });
         };
-
         animContainer.appendChild(fallAnimSelect);
+
+        // Display list of existing animations in the active system
+        const listLabel = document.createElement('label');
+        listLabel.textContent = "Lista de Animaciones Disponibles";
+        listLabel.style.cssText = "display:block; color:#888; font-size:12px; margin-bottom:5px; font-weight:bold;";
+        animContainer.appendChild(listLabel);
+
+        const listWrap = document.createElement('div');
+        listWrap.style.cssText = "background:#1a1a1a; border:1px solid #444; border-radius:4px; padding:10px; max-height:150px; overflow-y:auto; font-size:11px; line-height: 1.4;";
+        
+        const activeSystem = AnimationRegistry.get(profile.animationStyle || 'classic') || AnimationRegistry.get('classic')!;
+        const systemAnims = activeSystem.getAnimations();
+        systemAnims.forEach(anim => {
+            const item = document.createElement('div');
+            item.style.marginBottom = "6px";
+            item.innerHTML = `<span style="color:#63d9ff; font-weight:bold;">${anim.name}:</span> <span style="color:#ddd;">${anim.description}</span>`;
+            listWrap.appendChild(item);
+        });
+        animContainer.appendChild(listWrap);
 
         extraCol.appendChild(animContainer);
 
@@ -988,6 +1256,8 @@ export class PlayerConfigPanel {
         applyBtn.style.cssText = "background: #44f; color: white; border: none; padding: 10px; width: 100%; cursor: pointer; border-radius: 4px; margin-top: 5px;";
         applyBtn.onclick = () => {
             this.manager.assignments.defaultProfileId = profile.id;
+            const myId = this.game?.networkManager?.playerId || "local";
+            this.manager.setPlayerProfile(myId, profile.id);
             this.manager.applyConfiguration();
             alert(`Rol "${profile.name}" aplicado al jugador.`);
         };
@@ -997,13 +1267,22 @@ export class PlayerConfigPanel {
         this.contentArea.appendChild(grid);
     }
 
-    createStatControl(container, label, key, profile, min, max) {
+    createStatControl(container, label, key, profile, min, max, onChange?: (val: number) => void) {
         const wrap = document.createElement('div');
         wrap.style.marginBottom = "15px";
 
         const render = () => {
             wrap.innerHTML = "";
             const mode = (profile.statModes && profile.statModes[key]) || 'standard';
+            // Set default value if undefined in old profile
+            if (profile[key] === undefined) {
+                if (key === 'runSpeed') profile[key] = (profile.speed || 10) * 1.5;
+                else if (key === 'crouchSpeed') profile[key] = (profile.speed || 10) * 0.5;
+                else if (key === 'staminaMax') profile[key] = 5.0;
+                else if (key === 'respawnDelay') profile[key] = 2.0;
+                else if (key === 'bodyPartsDuration') profile[key] = 5.0;
+                else if (key === 'damageFlashIntensity') profile[key] = 0.8;
+            }
             const value = profile[key];
 
             const header = document.createElement('div');
@@ -1032,6 +1311,7 @@ export class PlayerConfigPanel {
                     if (v > max) v = max;
                     if (v < min) v = min;
                     this.manager.updateProfile(profile.id, { [key]: v });
+                    if (onChange) onChange(v);
                 } else {
                     this.manager.updateProfile(profile.id, { statModes: profile.statModes });
                 }
@@ -1067,6 +1347,7 @@ export class PlayerConfigPanel {
                         if (n > max) n = max;
 
                         this.manager.updateProfile(profile.id, { [key]: n });
+                        if (onChange) onChange(n);
                         render();
                     };
 
@@ -1089,12 +1370,19 @@ export class PlayerConfigPanel {
                 range.type = "range";
                 range.min = min;
                 range.max = max;
+                range.step = (key === 'respawnDelay' || key === 'staminaMax' || key === 'crouchSpeed' || key === 'runSpeed' || key === 'bodyPartsDuration' || key === 'damageFlashIntensity') ? '0.1' : '1';
                 range.value = value;
                 range.style.width = "100%";
                 range.oninput = (e) => {
                     const v = parseFloat(e.target.value);
                     valDisp.textContent = v;
                     this.manager.updateProfile(profile.id, { [key]: v });
+                    // Apply immediately in-game without re-rendering editor to avoid breaking drag focus
+                    this.manager.applyConfiguration();
+                };
+                range.onchange = (e) => {
+                    const v = parseFloat(e.target.value);
+                    if (onChange) onChange(v);
                 };
                 wrap.appendChild(range);
 
@@ -1105,7 +1393,9 @@ export class PlayerConfigPanel {
                 input.value = value;
                 input.style.cssText = "width: 80px; background:#222; color:#0f0; border:1px solid #555; padding:5px; text-align:right;";
                 input.onchange = (e) => {
-                    this.manager.updateProfile(profile.id, { [key]: parseFloat(e.target.value) });
+                    const v = parseFloat(e.target.value);
+                    this.manager.updateProfile(profile.id, { [key]: v });
+                    if (onChange) onChange(v);
                 };
                 input.onkeydown = (e) => { if (e.key === 'e' || e.key === 'E') e.stopPropagation(); };
 

@@ -60,14 +60,11 @@ export function renderOrientationGizmo(this: any) {
 	renderer.setViewport(0, 0, width, height);
 }
 
-function getEditableMapObjects(scene: THREE.Scene, types: string[]) {
-	const objects: any[] = [];
-	scene.children.forEach((obj: any) => {
-		if (obj.userData?.isEditableMapObject && types.includes(obj.userData.mapObjectType)) {
-			objects.push(obj);
-		}
-	});
-	return objects;
+function getEditableMapObjects(game: any, types: string[]) {
+	if (!game.editableMapObjects) {
+		game.editableMapObjects = game.sceneManager.scene.children.filter((obj: any) => obj.userData?.isEditableMapObject);
+	}
+	return game.editableMapObjects.filter((obj: any) => types.includes(obj.userData.mapObjectType));
 }
 
 function updateMapImpulsePads(game: any) {
@@ -75,7 +72,7 @@ function updateMapImpulsePads(game: any) {
 
 	const charPos = game.character.getPosition();
 	const now = game.clock ? game.clock.getElapsedTime() : performance.now() / 1000;
-	const pads = getEditableMapObjects(game.sceneManager.scene, ["impulse_jump", "impulse_lateral"]);
+	const pads = getEditableMapObjects(game, ["impulse_jump", "impulse_lateral"]);
 
 	pads.forEach((pad: any) => {
 		if (!pad.userData.logicProperties) pad.userData.logicProperties = {};
@@ -103,12 +100,22 @@ function updateMapImpulsePads(game: any) {
 		const strength = Number(props.strength ?? (pad.userData.mapObjectType === "impulse_jump" ? 25 : 40));
 		let direction: THREE.Vector3;
 
+		const charUp = (typeof game.character.getGravityUpVector === "function") 
+			? game.character.getGravityUpVector() 
+			: new THREE.Vector3(0, 1, 0);
+
 		if (pad.userData.mapObjectType === "impulse_jump") {
-			direction = new THREE.Vector3(0, 1, 0);
+			direction = charUp.clone();
 		} else {
-			direction = new THREE.Vector3(0, 0, -1).applyQuaternion(pad.quaternion);
-			direction.y = 0;
-			if (direction.lengthSq() < 0.001) direction.set(0, 0, -1);
+			const padForward = new THREE.Vector3(0, 0, -1).applyQuaternion(pad.quaternion);
+			direction = padForward.clone().projectOnPlane(charUp);
+			if (direction.lengthSq() < 0.001) {
+				const padRight = new THREE.Vector3(1, 0, 0).applyQuaternion(pad.quaternion);
+				direction = padRight.projectOnPlane(charUp);
+				if (direction.lengthSq() < 0.001) {
+					direction.set(0, 0, -1).projectOnPlane(charUp);
+				}
+			}
 			direction.normalize();
 		}
 
@@ -123,7 +130,7 @@ function updateMapGravityPads(game: any) {
 
 	const charPos = game.character.getPosition();
 	const now = game.clock ? game.clock.getElapsedTime() : performance.now() / 1000;
-	const pads = getEditableMapObjects(game.sceneManager.scene, ["gravity_pad"]);
+	const pads = getEditableMapObjects(game, ["gravity_pad"]);
 
 	pads.forEach((pad: any) => {
 		if (!pad.userData.logicProperties) pad.userData.logicProperties = {};
@@ -168,7 +175,7 @@ function updateMapGravityPads(game: any) {
 function updateMapFarmingZones(game: any, dt: number) {
 	if (!game.itemDropManager || !game.sceneManager?.scene) return;
 
-	const zones = getEditableMapObjects(game.sceneManager.scene, ["farming_zone"]);
+	const zones = getEditableMapObjects(game, ["farming_zone"]);
 	zones.forEach((zone: any) => {
 		if (!zone.userData.logicProperties) zone.userData.logicProperties = {};
 		const props = zone.userData.logicProperties;
@@ -197,8 +204,8 @@ function updateMapFarmingZones(game: any, dt: number) {
 			);
 			localOffset.applyQuaternion(zone.quaternion);
 
-			const spawnPos = zone.position.clone().add(localOffset);
-			game.itemDropManager.dropItem(item, spawnPos, new THREE.Vector3(0, 1, 0));
+			const zoneUp = new THREE.Vector3(0, 1, 0).applyQuaternion(zone.quaternion).normalize();
+			game.itemDropManager.dropItem(item, spawnPos, zoneUp);
 		}
 	});
 
@@ -402,14 +409,18 @@ export function animate(this: any) {
 	}
 
 	// Camera Update
-	this.cameraController.update(
-		this.character.getPosition(),
-		this.character.getRotation(),
-		dt,
-		this.character.getGravityQuaternion ? this.character.getGravityQuaternion() : (this.character.getGravityUpVector ? this.character.getGravityUpVector() : null),
-		this.sceneManager.scene,
-		this.inputManager
-	);
+	if (this.logicCameraSystem?.isViewingLogicCamera) {
+		this.logicCameraSystem.update(dt);
+	} else {
+		this.cameraController.update(
+			this.character.getPosition(),
+			this.character.getRotation(),
+			dt,
+			this.character.getGravityQuaternion ? this.character.getGravityQuaternion() : (this.character.getGravityUpVector ? this.character.getGravityUpVector() : null),
+			this.sceneManager.scene,
+			this.inputManager
+		);
+	}
 
 	// Fall Death Logic
 	if (this.environmentConfig && this.environmentConfig.fallDeath && this.character.getPosition().y < this.environmentConfig.fallDeathY) {
@@ -430,10 +441,11 @@ export function animate(this: any) {
 				this._netAttackLatch = true;
 			}
 
+			const isRunning = this.character ? this.character.isRunning : false;
 			const isMoving = this.inputManager ? (this.inputManager.keys.forward || this.inputManager.keys.backward || this.inputManager.keys.left || this.inputManager.keys.right) : false;
-			const isCrouching = this.inputManager ? this.inputManager.keys.crouch : false;
+			const isCrouching = this.inputManager ? (this.inputManager.keys.crouch && !isRunning) : false;
 			const isAttacking = this.inputManager ? this.inputManager.keys.attack : false;
-			const isGrounded = this.character.characterController ? this.character.characterController.computedGrounded() : true;
+			const isGrounded = this.character ? this.character.grounded : true;
 
 			const sendAttacking = isAttacking || this._netAttackLatch;
 
@@ -449,6 +461,7 @@ export function animate(this: any) {
 				roleVisual: this.character.roleVisual || null,
 				isMoving: isMoving,
 				isCrouching: isCrouching,
+				isRunning: isRunning,
 				isAttacking: sendAttacking,
 				isGrounded: isGrounded,
 				verticalVelocity: this.character.verticalVelocity || 0,
@@ -456,6 +469,8 @@ export function animate(this: any) {
 				equippedWeapon: equippedWeapon,
 				equippedHand: equippedHand,
 				jumpAnimationType: this.character.polygonModelSkin ? this.character.polygonModelSkin.jumpAnimationType : "none",
+				animationStyle: this.character.polygonModelSkin ? this.character.polygonModelSkin.animationStyle : "classic",
+				limbBending: this.character.polygonModelSkin ? this.character.polygonModelSkin.limbBending : "none",
 				playerCollision: this.character.playerCollision || "push",
 				headPitch: this.character.headPitch || 0,
 				headYaw: this.character.headYaw || 0,

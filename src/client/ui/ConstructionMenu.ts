@@ -165,7 +165,14 @@ export class ConstructionMenu {
             { id_prefix: "ramp", name: "Rampa", type: "ramp", scale: { x: 4, y: 2, z: 4 } },
             { id_prefix: "stairs", name: "Gradas", type: "stairs", scale: { x: 4, y: 2, z: 4 } },
             { id_prefix: "ladder", name: "Escalera", type: "ladder", scale: { x: 1, y: 3, z: 0.5 } },
-            { id_prefix: "tall", name: "Torre", type: "pillar", scale: { x: 2, y: 10, z: 2 } }
+            { id_prefix: "tall", name: "Torre", type: "pillar", scale: { x: 2, y: 10, z: 2 } },
+            { id_prefix: "sphere_shape", name: "Esfera", type: "sphere", scale: { x: 2, y: 2, z: 2, radius: 1 } },
+            { id_prefix: "cylinder_shape", name: "Cilindro", type: "cylinder", scale: { x: 2, y: 3, z: 2, radius: 1 } },
+            { id_prefix: "cone_shape", name: "Cono", type: "cone", scale: { x: 2, y: 3, z: 2, radius: 1 } },
+            { id_prefix: "spiked_floor_shape", name: "Suelo de Pinchos", type: "spiked_floor", scale: { x: 5, y: 0.5, z: 5, spikeRadius: 0.15, spikeHeight: 0.4, spikeSpacing: 0.5 } },
+            { id_prefix: "circle_shape", name: "Círculo con Superficie", type: "circle", scale: { x: 3, y: 0.05, z: 3, radius: 1.5 } },
+            { id_prefix: "tube_shape", name: "Tubo Dobladizo", type: "tube", scale: { x: 1, y: 2, z: 1, radius: 0.5, length2: 2, bendAngleX: 0, bendAngleY: 90 } },
+            { id_prefix: "camera_prop", name: "Cámara (Decorativa)", type: "camera_prop", scale: { x: 0.7, y: 0.7, z: 0.7 } }
         ];
 
         // Single Color (White)
@@ -235,6 +242,32 @@ export class ConstructionMenu {
         };
         this.logicItems.push(mover);
 
+        // Damage Controller
+        const damageCtrl = new MapObjectItem(
+            "damage_controller",
+            "Controlador de Daño",
+            "damage_controller",
+            "",
+            0xFF3333,
+            { x: 0.5, y: 0.5, z: 0.5 }
+        );
+        damageCtrl.logicProperties = {
+            name: "Controlador de Daño",
+            enableDamage: true,
+            damage: 10,
+            instantKill: false,
+            percentDamage: 0,
+            maxDamage: 100,
+            enableDamageStopLimit: false,
+            damageStopLimit: 100,
+            damageCooldown: 1.0,
+            accumulatedDamage: 0,
+            enableKnockback: false,
+            knockbackForce: 15,
+            knockbackDirection: "automatic"
+        };
+        this.logicItems.push(damageCtrl);
+
         // Interaction Button
         const button = new MapObjectItem(
             "button",
@@ -269,6 +302,40 @@ export class ConstructionMenu {
         };
         this.logicItems.push(gravitySphere);
 
+        const logicCamera = new MapObjectItem(
+            "logic_camera",
+            "Camara",
+            "logic_camera",
+            "",
+            0x1F2937,
+            { x: 0.7, y: 0.7, z: 0.7 }
+        );
+        logicCamera.logicProperties = {
+            logicKind: "logic_camera",
+            name: "Camara",
+            mode: "fixed",
+            fov: 60,
+            far: 6,
+            aspect: 16 / 9,
+            eyeHeightOffset: 0
+        };
+        this.logicItems.push(logicCamera);
+
+        const cameraPanel = new MapObjectItem(
+            "camera_panel",
+            "Panel de Camaras",
+            "camera_panel",
+            "",
+            0x0F172A,
+            { x: 1.2, y: 0.12, z: 1.0 }
+        );
+        cameraPanel.logicProperties = {
+            logicKind: "camera_panel",
+            name: "Panel de Camaras",
+            cameraIds: [],
+            holdTime: 0
+        };
+        this.logicItems.push(cameraPanel);
         // Interactive Collision
         const collision = new MapObjectItem(
             "interactive_collision",
@@ -749,12 +816,14 @@ export class ConstructionMenu {
             this.tabLogic.style.fontWeight = "bold";
             this.tabLogic.style.color = "white";
             this.tabLogic.style.borderBottom = "2px solid white";
+            this.renderLogicLibraryGrid(this.logicGrid);
             this.refreshLogicList();
         } else if (tabName === "settings") {
             this.contentSettings.style.display = "flex";
             this.tabSettings.style.fontWeight = "bold";
             this.tabSettings.style.color = "white";
             this.tabSettings.style.borderBottom = "2px solid white";
+            this.refreshSettings();
         } else if (tabName === "gameConfig") {
             this.contentGameConfig.style.display = "flex";
             this.tabGameConfig.style.fontWeight = "bold";
@@ -776,6 +845,12 @@ export class ConstructionMenu {
     }
 
     renderSettings(container) {
+        let skyboxPreviewToken = 0;
+        let skyboxPreviewScene = null;
+        let skyboxPreviewCamera = null;
+        let skyboxPreviewRenderer = null;
+        let renderSkyboxPreview = () => {};
+
         if (this.skyboxPreviewCleanup) {
             this.skyboxPreviewCleanup();
             this.skyboxPreviewCleanup = null;
@@ -900,8 +975,8 @@ export class ConstructionMenu {
         labelSky.style.fontSize = "18px";
         labelSky.style.color = "#aaa";
 
-        const selectSky = document.createElement("select");
-        selectSky.style.cssText = `
+        this.selectSky = document.createElement("select");
+        this.selectSky.style.cssText = `
             padding: 8px;
             background: #333;
             color: white;
@@ -972,78 +1047,8 @@ export class ConstructionMenu {
             font-size: 13px;
             font-weight: bold;
             text-shadow: 0 1px 2px #000;
-            pointer-events: none;
         `;
         previewFrame.appendChild(previewLabel);
-
-        const skyboxPreviewScene = new THREE.Scene();
-        const skyboxPreviewCamera = new THREE.PerspectiveCamera(70, 1, 0.1, 10);
-        const skyboxPreviewRenderer = new THREE.WebGLRenderer({ antialias: true });
-        skyboxPreviewRenderer.outputColorSpace = THREE.SRGBColorSpace;
-        skyboxPreviewRenderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-        skyboxPreviewRenderer.domElement.style.width = "100%";
-        skyboxPreviewRenderer.domElement.style.height = "100%";
-        skyboxPreviewRenderer.domElement.style.display = "block";
-        skyboxPreviewViewport.appendChild(skyboxPreviewRenderer.domElement);
-
-        let previewYaw = -25;
-        let previewPitch = 0;
-        let previewDragging = false;
-        let previewDragX = 0;
-        let previewDragY = 0;
-        let skyboxPreviewToken = 0;
-        const renderSkyboxPreview = () => {
-            const width = Math.max(1, previewFrame.clientWidth || 320);
-            const height = Math.max(1, previewFrame.clientHeight || 220);
-            skyboxPreviewCamera.aspect = width / height;
-            skyboxPreviewCamera.rotation.order = "YXZ";
-            skyboxPreviewCamera.rotation.y = THREE.MathUtils.degToRad(previewYaw);
-            skyboxPreviewCamera.rotation.x = THREE.MathUtils.degToRad(previewPitch);
-            skyboxPreviewCamera.updateProjectionMatrix();
-            skyboxPreviewRenderer.setSize(width, height, false);
-            skyboxPreviewRenderer.render(skyboxPreviewScene, skyboxPreviewCamera);
-        };
-        const previewResizeObserver = new ResizeObserver(renderSkyboxPreview);
-        previewResizeObserver.observe(previewFrame);
-
-        skyboxPreviewViewport.addEventListener("pointerdown", (e) => {
-            previewDragging = true;
-            previewDragX = e.clientX;
-            previewDragY = e.clientY;
-            skyboxPreviewViewport.style.cursor = "grabbing";
-            skyboxPreviewViewport.setPointerCapture(e.pointerId);
-        });
-
-        skyboxPreviewViewport.addEventListener("pointermove", (e) => {
-            if (!previewDragging) return;
-            const dx = e.clientX - previewDragX;
-            const dy = e.clientY - previewDragY;
-            previewDragX = e.clientX;
-            previewDragY = e.clientY;
-            previewYaw -= dx * 0.22;
-            previewPitch = Math.max(-82, Math.min(82, previewPitch - dy * 0.18));
-            renderSkyboxPreview();
-        });
-
-        const stopSkyboxPreviewDrag = (e) => {
-            previewDragging = false;
-            skyboxPreviewViewport.style.cursor = "grab";
-            if (e && skyboxPreviewViewport.hasPointerCapture(e.pointerId)) {
-                skyboxPreviewViewport.releasePointerCapture(e.pointerId);
-            }
-        };
-        skyboxPreviewViewport.addEventListener("pointerup", stopSkyboxPreviewDrag);
-        skyboxPreviewViewport.addEventListener("pointercancel", stopSkyboxPreviewDrag);
-        skyboxPreviewViewport.addEventListener("pointerleave", () => {
-            if (!previewDragging) skyboxPreviewViewport.style.cursor = "grab";
-        });
-
-        this.skyboxPreviewCleanup = () => {
-            previewResizeObserver.disconnect();
-            skyboxPreviewScene.background = null;
-            skyboxPreviewRenderer.dispose();
-            skyboxPreviewRenderer.domElement.remove();
-        };
 
         const skyboxGrid = document.createElement("div");
         skyboxGrid.style.cssText = `
@@ -1079,7 +1084,7 @@ export class ConstructionMenu {
         const previewStatus = document.createElement("span");
         previewStatus.style.cssText = "color: #9ca3af; font-size: 13px;";
 
-        actionsRow.appendChild(selectSky);
+        actionsRow.appendChild(this.selectSky);
         actionsRow.appendChild(applySkyBtn);
         actionsRow.appendChild(previewStatus);
 
@@ -1096,9 +1101,9 @@ export class ConstructionMenu {
                 });
         };
 
-        const setPendingSky = (value) => {
+        this.setPendingSky = (value) => {
             pendingSkyType = value || "day";
-            selectSky.value = pendingSkyType;
+            this.selectSky.value = pendingSkyType;
             const skyboxUrl = getSkyboxUrlFromValue(pendingSkyType);
             const label = skyOptionLabels.get(pendingSkyType) || "Skybox guardado";
             previewLabel.textContent = label;
@@ -1118,7 +1123,7 @@ export class ConstructionMenu {
                 previewImage.style.backgroundPosition = "center";
             }
 
-            Array.from(skyboxGrid.children).forEach((child) => {
+            Array.from(skyboxGrid.children).forEach((child: any) => {
                 const isActive = child.dataset.skyValue === pendingSkyType;
                 child.style.borderColor = isActive ? "#60a5fa" : "#555";
                 child.style.boxShadow = isActive ? "0 0 0 2px rgba(96,165,250,0.35)" : "none";
@@ -1146,7 +1151,7 @@ export class ConstructionMenu {
             const el = document.createElement("option");
             el.value = opt.value;
             el.textContent = opt.text;
-            selectSky.appendChild(el);
+            this.selectSky.appendChild(el);
             return el;
         };
 
@@ -1201,7 +1206,7 @@ export class ConstructionMenu {
             `;
             card.appendChild(name);
 
-            card.onclick = () => setPendingSky(opt.value);
+            card.onclick = () => this.setPendingSky(opt.value);
             return card;
         };
 
@@ -1216,7 +1221,7 @@ export class ConstructionMenu {
         loadingSkyboxes.disabled = true;
         loadingSkyboxes.textContent = "Buscando skyboxes...";
         skyboxGroup.appendChild(loadingSkyboxes);
-        selectSky.appendChild(skyboxGroup);
+        this.selectSky.appendChild(skyboxGroup);
 
         let savedSkyOption = null;
         if (selectedSkyType.startsWith(SKYBOX_VALUE_PREFIX)) {
@@ -1249,18 +1254,88 @@ export class ConstructionMenu {
                     skyboxGrid.appendChild(createSkyCard(opt));
                 }
             });
-            setPendingSky(skyboxes.some(opt => opt.value === selectedSkyType) ? selectedSkyType : pendingSkyType);
+            this.setPendingSky(skyboxes.some(opt => opt.value === selectedSkyType) ? selectedSkyType : pendingSkyType);
         });
 
-        selectSky.addEventListener("change", (e) => {
-            setPendingSky(e.target.value);
+        this.selectSky.addEventListener("change", (e: any) => {
+            this.setPendingSky(e.target.value);
         });
         applySkyBtn.addEventListener("click", applyPendingSky);
 
         rowSky.appendChild(labelSky);
         rowSky.appendChild(actionsRow);
         rowSky.appendChild(previewWrap);
-        setPendingSky(selectedSkyType);
+
+        skyboxPreviewScene = new THREE.Scene();
+        skyboxPreviewCamera = new THREE.PerspectiveCamera(70, 1, 0.1, 10);
+        skyboxPreviewRenderer = new THREE.WebGLRenderer({ antialias: true });
+        skyboxPreviewRenderer.outputColorSpace = THREE.SRGBColorSpace;
+        skyboxPreviewRenderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+        skyboxPreviewRenderer.domElement.style.width = "100%";
+        skyboxPreviewRenderer.domElement.style.height = "100%";
+        skyboxPreviewRenderer.domElement.style.display = "block";
+        skyboxPreviewViewport.appendChild(skyboxPreviewRenderer.domElement);
+
+        let previewYaw = -25;
+        let previewPitch = 0;
+        let previewDragging = false;
+        let previewDragX = 0;
+        let previewDragY = 0;
+        
+        renderSkyboxPreview = () => {
+            const width = Math.max(1, previewFrame.clientWidth || 320);
+            const height = Math.max(1, previewFrame.clientHeight || 220);
+            skyboxPreviewCamera.aspect = width / height;
+            skyboxPreviewCamera.rotation.order = "YXZ";
+            skyboxPreviewCamera.rotation.y = THREE.MathUtils.degToRad(previewYaw);
+            skyboxPreviewCamera.rotation.x = THREE.MathUtils.degToRad(previewPitch);
+            skyboxPreviewCamera.updateProjectionMatrix();
+            skyboxPreviewRenderer.setSize(width, height, false);
+            skyboxPreviewRenderer.render(skyboxPreviewScene, skyboxPreviewCamera);
+        };
+        const previewResizeObserver = new ResizeObserver(renderSkyboxPreview);
+        previewResizeObserver.observe(previewFrame);
+
+        skyboxPreviewViewport.addEventListener("pointerdown", (e) => {
+            previewDragging = true;
+            previewDragX = e.clientX;
+            previewDragY = e.clientY;
+            skyboxPreviewViewport.style.cursor = "grabbing";
+            skyboxPreviewViewport.setPointerCapture(e.pointerId);
+        });
+
+        skyboxPreviewViewport.addEventListener("pointermove", (e) => {
+            if (!previewDragging) return;
+            const dx = e.clientX - previewDragX;
+            const dy = e.clientY - previewDragY;
+            previewDragX = e.clientX;
+            previewDragY = e.clientY;
+            previewYaw -= dx * 0.22;
+            previewPitch = Math.max(-82, Math.min(82, previewPitch - dy * 0.18));
+            renderSkyboxPreview();
+        });
+
+        const stopSkyboxPreviewDrag = (e) => {
+            previewDragging = false;
+            skyboxPreviewViewport.style.cursor = "grab";
+            if (e && skyboxPreviewViewport.hasPointerCapture(e.pointerId)) {
+                skyboxPreviewViewport.releasePointerCapture(e.pointerId);
+            }
+        };
+        skyboxPreviewViewport.addEventListener("pointerup", stopSkyboxPreviewDrag);
+        skyboxPreviewViewport.addEventListener("pointercancel", stopSkyboxPreviewDrag);
+        skyboxPreviewViewport.addEventListener("pointerleave", () => {
+            if (!previewDragging) skyboxPreviewViewport.style.cursor = "grab";
+        });
+
+        this.skyboxPreviewCleanup = () => {
+            previewResizeObserver.disconnect();
+            skyboxPreviewScene.background = null;
+            skyboxPreviewRenderer.dispose();
+            skyboxPreviewRenderer.domElement.remove();
+        };
+
+        this.setPendingSky(selectedSkyType);
         container.appendChild(rowSky);
 
         // Map Boundaries and Rules Config
@@ -1288,14 +1363,26 @@ export class ConstructionMenu {
         };
         rowMap.appendChild(btnOpenEditor);
 
+        this.checkInvisibleWalls = null as any;
+        this.checkWallsAdvanced = null as any;
+        this.rowWallsAdvanced = null as any;
+        this.rowWallsConfigure = null as any;
+        this.checkInvisibleCeilings = null as any;
+        this.checkCeilingsAdvanced = null as any;
+        this.rowCeilingsAdvanced = null as any;
+        this.rowCeilingsConfigure = null as any;
+
         const configChangeHandler = () => {
             if (this.game && this.game.environmentConfig) {
                 const newConfig = {
-                    mapSizeX: parseFloat(inputSizeX.value) || 100,
-                    mapSizeZ: parseFloat(inputSizeZ.value) || 100,
-                    invisibleWalls: checkInvisibleWalls.checked,
-                    fallDeath: checkFallDeath.checked,
-                    fallDeathY: parseFloat(inputFallY.value) || -20,
+                    mapSizeX: parseFloat(this.inputSizeX.value) || 100,
+                    mapSizeZ: parseFloat(this.inputSizeZ.value) || 100,
+                    invisibleWalls: this.checkInvisibleWalls.checked,
+                    invisibleWallsAdvanced: this.checkInvisibleWalls.checked,
+                    ceilingsEnabled: this.checkInvisibleCeilings.checked,
+                    ceilingsAdvanced: this.checkInvisibleCeilings.checked,
+                    fallDeath: this.checkFallDeath.checked,
+                    fallDeathY: parseFloat(this.inputFallY.value) || -20,
                     skyType: this.game.environmentConfig?.skyType || "day"
                 };
                 this.game.updateEnvironmentConfig(newConfig);
@@ -1307,69 +1394,151 @@ export class ConstructionMenu {
         };
 
         // Size X
-        const rowSizeX = document.createElement("div");
-        rowSizeX.style.cssText = "display: flex; align-items: center; justify-content: space-between;";
+        this.rowSizeX = document.createElement("div");
+        this.rowSizeX.style.cssText = "display: flex; align-items: center; justify-content: space-between;";
         const labelSizeX = document.createElement("label");
         labelSizeX.textContent = "Ancho del Mapa (X):";
-        const inputSizeX = document.createElement("input");
-        inputSizeX.type = "number";
-        inputSizeX.min = "10";
-        inputSizeX.step = "10";
-        inputSizeX.style.cssText = "padding: 5px; background: #333; color: white; border: 1px solid #555; border-radius: 4px; width: 80px; text-align: center;";
-        inputSizeX.value = this.game.environmentConfig ? this.game.environmentConfig.mapSizeX : 100;
+        this.inputSizeX = document.createElement("input");
+        this.inputSizeX.type = "number";
+        this.inputSizeX.min = "10";
+        this.inputSizeX.step = "10";
+        this.inputSizeX.style.cssText = "padding: 5px; background: #333; color: white; border: 1px solid #555; border-radius: 4px; width: 80px; text-align: center;";
+        this.inputSizeX.value = String(this.game.environmentConfig ? this.game.environmentConfig.mapSizeX : 100);
         if (this.game.environmentConfig && this.game.environmentConfig.shapeType === "custom") {
-            inputSizeX.disabled = true;
+            this.inputSizeX.disabled = true;
         }
-        inputSizeX.addEventListener("change", configChangeHandler);
-        rowSizeX.appendChild(labelSizeX);
-        rowSizeX.appendChild(inputSizeX);
-        rowMap.appendChild(rowSizeX);
+        this.inputSizeX.addEventListener("change", configChangeHandler);
+        this.rowSizeX.appendChild(labelSizeX);
+        this.rowSizeX.appendChild(this.inputSizeX);
+        rowMap.appendChild(this.rowSizeX);
 
         // Size Z
-        const rowSizeZ = document.createElement("div");
-        rowSizeZ.style.cssText = "display: flex; align-items: center; justify-content: space-between;";
+        this.rowSizeZ = document.createElement("div");
+        this.rowSizeZ.style.cssText = "display: flex; align-items: center; justify-content: space-between;";
         const labelSizeZ = document.createElement("label");
         labelSizeZ.textContent = "Largo del Mapa (Z):";
-        const inputSizeZ = document.createElement("input");
-        inputSizeZ.type = "number";
-        inputSizeZ.min = "10";
-        inputSizeZ.step = "10";
-        inputSizeZ.style.cssText = "padding: 5px; background: #333; color: white; border: 1px solid #555; border-radius: 4px; width: 80px; text-align: center;";
-        inputSizeZ.value = this.game.environmentConfig ? this.game.environmentConfig.mapSizeZ : 100;
+        this.inputSizeZ = document.createElement("input");
+        this.inputSizeZ.type = "number";
+        this.inputSizeZ.min = "10";
+        this.inputSizeZ.step = "10";
+        this.inputSizeZ.style.cssText = "padding: 5px; background: #333; color: white; border: 1px solid #555; border-radius: 4px; width: 80px; text-align: center;";
+        this.inputSizeZ.value = String(this.game.environmentConfig ? this.game.environmentConfig.mapSizeZ : 100);
         if (this.game.environmentConfig && (this.game.environmentConfig.shapeType === "custom" || this.game.environmentConfig.shapeType === "circle")) {
-            inputSizeZ.disabled = true;
+            this.inputSizeZ.disabled = true;
         }
-        inputSizeZ.addEventListener("change", configChangeHandler);
-        rowSizeZ.appendChild(labelSizeZ);
-        rowSizeZ.appendChild(inputSizeZ);
-        rowMap.appendChild(rowSizeZ);
+        this.inputSizeZ.addEventListener("change", configChangeHandler);
+        this.rowSizeZ.appendChild(labelSizeZ);
+        this.rowSizeZ.appendChild(this.inputSizeZ);
+        rowMap.appendChild(this.rowSizeZ);
 
         // Invisible Walls
         const rowWalls = document.createElement("div");
         rowWalls.style.cssText = "display: flex; align-items: center; justify-content: space-between;";
         const labelWalls = document.createElement("label");
-        labelWalls.textContent = "Paredes Invisibles en Límites:";
-        const checkInvisibleWalls = document.createElement("input");
-        checkInvisibleWalls.type = "checkbox";
-        checkInvisibleWalls.style.transform = "scale(1.5)";
-        checkInvisibleWalls.checked = this.game.environmentConfig ? this.game.environmentConfig.invisibleWalls : false;
-        checkInvisibleWalls.addEventListener("change", configChangeHandler);
+        labelWalls.textContent = "Paredes en Límites:";
+        this.checkInvisibleWalls = document.createElement("input");
+        this.checkInvisibleWalls.type = "checkbox";
+        this.checkInvisibleWalls.style.transform = "scale(1.5)";
+        this.checkInvisibleWalls.checked = this.game.environmentConfig ? this.game.environmentConfig.invisibleWalls : false;
         rowWalls.appendChild(labelWalls);
-        rowWalls.appendChild(checkInvisibleWalls);
+        rowWalls.appendChild(this.checkInvisibleWalls);
         rowMap.appendChild(rowWalls);
+
+        // Advanced Walls Toggle Row (Hidden, implicitly handled)
+        this.rowWallsAdvanced = document.createElement("div");
+        this.rowWallsAdvanced.style.display = "none";
+        this.checkWallsAdvanced = document.createElement("input");
+        this.checkWallsAdvanced.type = "checkbox";
+
+        // Advanced Walls Configure Row
+        this.rowWallsConfigure = document.createElement("div");
+        this.rowWallsConfigure.style.cssText = "display: none; align-items: center; justify-content: flex-end; margin-left: 15px; border-left: 2px solid #555; padding-left: 10px; margin-top: 5px; margin-bottom: 5px;";
+        const btnConfigureWalls = document.createElement("button");
+        btnConfigureWalls.textContent = "🛠 Configurar Paredes";
+        btnConfigureWalls.style.cssText = `
+            padding: 6px 12px; background: #FF9800; color: white; border: none; border-radius: 4px;
+            font-size: 13px; font-weight: bold; cursor: pointer; transition: background 0.2s;
+        `;
+        btnConfigureWalls.onmouseover = () => btnConfigureWalls.style.background = "#e68a00";
+        btnConfigureWalls.onmouseout = () => btnConfigureWalls.style.background = "#FF9800";
+        btnConfigureWalls.onclick = () => {
+            this.mapShapeEditor.open("walls");
+        };
+        this.rowWallsConfigure.appendChild(btnConfigureWalls);
+        rowMap.appendChild(this.rowWallsConfigure);
+
+        this.syncWallsVisibility = () => {
+            const hasWalls = this.checkInvisibleWalls.checked;
+            this.rowWallsConfigure.style.display = hasWalls ? "flex" : "none";
+        };
+
+        this.checkInvisibleWalls.addEventListener("change", () => {
+            this.syncWallsVisibility();
+            configChangeHandler();
+        });
+
+        setTimeout(this.syncWallsVisibility, 0);
+
+        // Ceilings (Techos)
+        const rowCeilings = document.createElement("div");
+        rowCeilings.style.cssText = "display: flex; align-items: center; justify-content: space-between; margin-top: 5px;";
+        const labelCeilings = document.createElement("label");
+        labelCeilings.textContent = "Techos:";
+        this.checkInvisibleCeilings = document.createElement("input");
+        this.checkInvisibleCeilings.type = "checkbox";
+        this.checkInvisibleCeilings.style.transform = "scale(1.5)";
+        this.checkInvisibleCeilings.checked = this.game.environmentConfig ? !!this.game.environmentConfig.ceilingsEnabled : false;
+        rowCeilings.appendChild(labelCeilings);
+        rowCeilings.appendChild(this.checkInvisibleCeilings);
+        rowMap.appendChild(rowCeilings);
+
+        // Advanced Ceilings Toggle Row (Hidden, implicitly handled)
+        this.rowCeilingsAdvanced = document.createElement("div");
+        this.rowCeilingsAdvanced.style.display = "none";
+        this.checkCeilingsAdvanced = document.createElement("input");
+        this.checkCeilingsAdvanced.type = "checkbox";
+
+        // Advanced Ceilings Configure Row
+        this.rowCeilingsConfigure = document.createElement("div");
+        this.rowCeilingsConfigure.style.cssText = "display: none; align-items: center; justify-content: flex-end; margin-left: 15px; border-left: 2px solid #555; padding-left: 10px; margin-top: 5px; margin-bottom: 5px;";
+        const btnConfigureCeilings = document.createElement("button");
+        btnConfigureCeilings.textContent = "🛠 Configurar Techos";
+        btnConfigureCeilings.style.cssText = `
+            padding: 6px 12px; background: #FF9800; color: white; border: none; border-radius: 4px;
+            font-size: 13px; font-weight: bold; cursor: pointer; transition: background 0.2s;
+        `;
+        btnConfigureCeilings.onmouseover = () => btnConfigureCeilings.style.background = "#e68a00";
+        btnConfigureCeilings.onmouseout = () => btnConfigureCeilings.style.background = "#FF9800";
+        btnConfigureCeilings.onclick = () => {
+            this.mapShapeEditor.open("ceilings");
+        };
+        this.rowCeilingsConfigure.appendChild(btnConfigureCeilings);
+        rowMap.appendChild(this.rowCeilingsConfigure);
+
+        this.syncCeilingsVisibility = () => {
+            const hasCeilings = this.checkInvisibleCeilings.checked;
+            this.rowCeilingsConfigure.style.display = hasCeilings ? "flex" : "none";
+        };
+
+        this.checkInvisibleCeilings.addEventListener("change", () => {
+            this.syncCeilingsVisibility();
+            configChangeHandler();
+        });
+
+        setTimeout(this.syncCeilingsVisibility, 0);
 
         // Fall Death Toggle
         const rowFall = document.createElement("div");
         rowFall.style.cssText = "display: flex; align-items: center; justify-content: space-between;";
         const labelFall = document.createElement("label");
         labelFall.textContent = "Muerte Instantánea por Caída:";
-        const checkFallDeath = document.createElement("input");
-        checkFallDeath.type = "checkbox";
-        checkFallDeath.style.transform = "scale(1.5)";
-        checkFallDeath.checked = this.game.environmentConfig ? this.game.environmentConfig.fallDeath : true;
-        checkFallDeath.addEventListener("change", configChangeHandler);
+        this.checkFallDeath = document.createElement("input");
+        this.checkFallDeath.type = "checkbox";
+        this.checkFallDeath.style.transform = "scale(1.5)";
+        this.checkFallDeath.checked = this.game.environmentConfig ? this.game.environmentConfig.fallDeath : true;
+        this.checkFallDeath.addEventListener("change", configChangeHandler);
         rowFall.appendChild(labelFall);
-        rowFall.appendChild(checkFallDeath);
+        rowFall.appendChild(this.checkFallDeath);
         rowMap.appendChild(rowFall);
 
         // Fall Death Y Limit
@@ -1377,17 +1546,55 @@ export class ConstructionMenu {
         rowFallY.style.cssText = "display: flex; align-items: center; justify-content: space-between;";
         const labelFallY = document.createElement("label");
         labelFallY.textContent = "Límite Y de Caída (Muerte):";
-        const inputFallY = document.createElement("input");
-        inputFallY.type = "number";
-        inputFallY.step = "5";
-        inputFallY.style.cssText = "padding: 5px; background: #333; color: white; border: 1px solid #555; border-radius: 4px; width: 80px; text-align: center;";
-        inputFallY.value = this.game.environmentConfig ? this.game.environmentConfig.fallDeathY : -20;
-        inputFallY.addEventListener("change", configChangeHandler);
+        this.inputFallY = document.createElement("input");
+        this.inputFallY.type = "number";
+        this.inputFallY.step = "5";
+        this.inputFallY.style.cssText = "padding: 5px; background: #333; color: white; border: 1px solid #555; border-radius: 4px; width: 80px; text-align: center;";
+        this.inputFallY.value = String(this.game.environmentConfig ? this.game.environmentConfig.fallDeathY : -20);
+        this.inputFallY.addEventListener("change", configChangeHandler);
         rowFallY.appendChild(labelFallY);
-        rowFallY.appendChild(inputFallY);
+        rowFallY.appendChild(this.inputFallY);
         rowMap.appendChild(rowFallY);
 
         container.appendChild(rowMap);
+    }
+
+    refreshSettings() {
+        if (!this.game || !this.game.environmentConfig) return;
+        const config = this.game.environmentConfig;
+
+        // Size Inputs and Row Visibilities
+        const isCustom = config.shapeType === "custom";
+        if (this.rowSizeX) this.rowSizeX.style.display = isCustom ? "none" : "flex";
+        if (this.rowSizeZ) this.rowSizeZ.style.display = isCustom ? "none" : "flex";
+
+        if (this.inputSizeX) this.inputSizeX.value = String(config.mapSizeX || 100);
+        if (this.inputSizeZ) this.inputSizeZ.value = String(config.mapSizeZ || 100);
+
+        // Disable input based on custom shape
+        if (this.inputSizeX) this.inputSizeX.disabled = isCustom;
+        if (this.inputSizeZ) this.inputSizeZ.disabled = isCustom || config.shapeType === "circle";
+
+        // Walls Config
+        if (this.checkInvisibleWalls) this.checkInvisibleWalls.checked = !!config.invisibleWalls;
+        if (this.checkWallsAdvanced) this.checkWallsAdvanced.checked = !!config.invisibleWallsAdvanced;
+
+        // Ceilings Config
+        if (this.checkInvisibleCeilings) this.checkInvisibleCeilings.checked = !!config.ceilingsEnabled;
+        if (this.checkCeilingsAdvanced) this.checkCeilingsAdvanced.checked = !!config.ceilingsAdvanced;
+
+        // Fall Death
+        if (this.checkFallDeath) this.checkFallDeath.checked = config.fallDeath !== false;
+        if (this.inputFallY) this.inputFallY.value = String(config.fallDeathY !== undefined ? config.fallDeathY : -20);
+
+        // Sync helper for UI rows visibility
+        if (this.syncWallsVisibility) this.syncWallsVisibility();
+        if (this.syncCeilingsVisibility) this.syncCeilingsVisibility();
+
+        // Skybox preview
+        if (config.skyType) {
+            if (this.setPendingSky) this.setPendingSky(config.skyType);
+        }
     }
 
     renderSaveLoad(container) {
@@ -2136,7 +2343,11 @@ renderLogicLibraryGrid(container) {
         const groups = [
             {
                 title: "Bases y Señales",
-                types: ["spawn_point", "movement_controller", "interaction_button", "interactive_collision", "target", "gravity_sphere"]
+                types: ["spawn_point", "movement_controller", "interaction_button", "interactive_collision", "target", "gravity_sphere", "damage_controller"]
+            },
+            {
+                title: "Camaras",
+                types: ["logic_camera", "camera_panel"]
             },
             {
                 title: "Pads y Zonas",
@@ -2653,6 +2864,224 @@ renderLogicLibraryGrid(container) {
         dimRow.appendChild(createDimInput("z", "Prof."));
 
         dimContainer.appendChild(dimRow);
+
+        // Radius row
+        const radiusRow = document.createElement("div");
+        radiusRow.style.cssText = "display: none; align-items: center; justify-content: space-between; gap: 10px; margin-top: 5px;";
+        const radiusLbl = document.createElement("span");
+        radiusLbl.textContent = "Radio:";
+        radiusLbl.style.fontSize = "12px";
+        radiusLbl.style.color = "#aaa";
+        const radiusInput = document.createElement("input");
+        radiusInput.type = "number";
+        radiusInput.step = "0.5";
+        radiusInput.min = "0.1";
+        radiusInput.style.cssText = "width: 80px; background: #333; color: white; border: 1px solid #555; border-radius: 4px; padding: 4px;";
+        radiusInput.addEventListener("input", (e: any) => {
+            const val = parseFloat(e.target.value);
+            if (!isNaN(val) && val > 0) {
+                if (this.currentDraftItem) {
+                    this.currentDraftItem.scale.radius = val;
+                    if (this.currentDraftItem.type === "sphere") {
+                        this.currentDraftItem.scale.x = val * 2;
+                        this.currentDraftItem.scale.y = val * 2;
+                        this.currentDraftItem.scale.z = val * 2;
+                    } else if (this.currentDraftItem.type === "circle") {
+                        this.currentDraftItem.scale.x = val * 2;
+                        this.currentDraftItem.scale.z = val * 2;
+                    } else if (this.currentDraftItem.type === "cylinder" || this.currentDraftItem.type === "tube" || this.currentDraftItem.type === "cone") {
+                        this.currentDraftItem.scale.x = val * 2;
+                        this.currentDraftItem.scale.z = val * 2;
+                    }
+                }
+            }
+        });
+        radiusRow.appendChild(radiusLbl);
+        radiusRow.appendChild(radiusInput);
+        this.inputRadius = radiusInput;
+        this.rowRadius = radiusRow;
+        dimContainer.appendChild(radiusRow);
+
+        // Length 1 (Height) row
+        const length1Row = document.createElement("div");
+        length1Row.style.cssText = "display: none; align-items: center; justify-content: space-between; gap: 10px; margin-top: 5px;";
+        const length1Lbl = document.createElement("span");
+        length1Lbl.textContent = "Largo 1 (Alto):";
+        length1Lbl.style.fontSize = "12px";
+        length1Lbl.style.color = "#aaa";
+        const length1Input = document.createElement("input");
+        length1Input.type = "number";
+        length1Input.step = "0.5";
+        length1Input.min = "0.1";
+        length1Input.style.cssText = "width: 80px; background: #333; color: white; border: 1px solid #555; border-radius: 4px; padding: 4px;";
+        length1Input.addEventListener("input", (e: any) => {
+            const val = parseFloat(e.target.value);
+            if (!isNaN(val) && val > 0) {
+                if (this.currentDraftItem) {
+                    this.currentDraftItem.scale.y = val;
+                }
+            }
+        });
+        length1Row.appendChild(length1Lbl);
+        length1Row.appendChild(length1Input);
+        this.inputLength1 = length1Input;
+        this.rowLength1 = length1Row;
+        dimContainer.appendChild(length1Row);
+
+        // Length 2 row
+        const length2Row = document.createElement("div");
+        length2Row.style.cssText = "display: none; align-items: center; justify-content: space-between; gap: 10px; margin-top: 5px;";
+        const length2Lbl = document.createElement("span");
+        length2Lbl.textContent = "Largo 2:";
+        length2Lbl.style.fontSize = "12px";
+        length2Lbl.style.color = "#aaa";
+        const length2Input = document.createElement("input");
+        length2Input.type = "number";
+        length2Input.step = "0.5";
+        length2Input.min = "0.1";
+        length2Input.style.cssText = "width: 80px; background: #333; color: white; border: 1px solid #555; border-radius: 4px; padding: 4px;";
+        length2Input.addEventListener("input", (e: any) => {
+            const val = parseFloat(e.target.value);
+            if (!isNaN(val) && val > 0) {
+                if (this.currentDraftItem) {
+                    this.currentDraftItem.scale.length2 = val;
+                }
+            }
+        });
+        length2Row.appendChild(length2Lbl);
+        length2Row.appendChild(length2Input);
+        this.inputLength2 = length2Input;
+        this.rowLength2 = length2Row;
+        dimContainer.appendChild(length2Row);
+
+        // Bend Angle X row
+        const bendXRow = document.createElement("div");
+        bendXRow.style.cssText = "display: none; align-items: center; justify-content: space-between; gap: 10px; margin-top: 5px;";
+        const bendXLbl = document.createElement("span");
+        bendXLbl.textContent = "Doblez Ángulo X (°):";
+        bendXLbl.style.fontSize = "12px";
+        bendXLbl.style.color = "#aaa";
+        const bendXInput = document.createElement("input");
+        bendXInput.type = "number";
+        bendXInput.step = "15";
+        bendXInput.style.cssText = "width: 80px; background: #333; color: white; border: 1px solid #555; border-radius: 4px; padding: 4px;";
+        bendXInput.addEventListener("input", (e: any) => {
+            const val = parseFloat(e.target.value);
+            if (!isNaN(val)) {
+                if (this.currentDraftItem) {
+                    this.currentDraftItem.scale.bendAngleX = val;
+                }
+            }
+        });
+        bendXRow.appendChild(bendXLbl);
+        bendXRow.appendChild(bendXInput);
+        this.inputBendAngleX = bendXInput;
+        this.rowBendAngleX = bendXRow;
+        dimContainer.appendChild(bendXRow);
+
+        // Bend Angle Y row
+        const bendYRow = document.createElement("div");
+        bendYRow.style.cssText = "display: none; align-items: center; justify-content: space-between; gap: 10px; margin-top: 5px;";
+        const bendYLbl = document.createElement("span");
+        bendYLbl.textContent = "Doblez Ángulo Y (°):";
+        bendYLbl.style.fontSize = "12px";
+        bendYLbl.style.color = "#aaa";
+        const bendYInput = document.createElement("input");
+        bendYInput.type = "number";
+        bendYInput.step = "15";
+        bendYInput.style.cssText = "width: 80px; background: #333; color: white; border: 1px solid #555; border-radius: 4px; padding: 4px;";
+        bendYInput.addEventListener("input", (e: any) => {
+            const val = parseFloat(e.target.value);
+            if (!isNaN(val)) {
+                if (this.currentDraftItem) {
+                    this.currentDraftItem.scale.bendAngleY = val;
+                }
+            }
+        });
+        bendYRow.appendChild(bendYLbl);
+        bendYRow.appendChild(bendYInput);
+        this.inputBendAngleY = bendYInput;
+        this.rowBendAngleY = bendYRow;
+        dimContainer.appendChild(bendYRow);
+
+        // Spike Radius row
+        const spikeRadiusRow = document.createElement("div");
+        spikeRadiusRow.style.cssText = "display: none; align-items: center; justify-content: space-between; gap: 10px; margin-top: 5px;";
+        const spikeRadiusLbl = document.createElement("span");
+        spikeRadiusLbl.textContent = "Radio Pinchos:";
+        spikeRadiusLbl.style.fontSize = "12px";
+        spikeRadiusLbl.style.color = "#aaa";
+        const spikeRadiusInput = document.createElement("input");
+        spikeRadiusInput.type = "number";
+        spikeRadiusInput.step = "0.05";
+        spikeRadiusInput.min = "0.01";
+        spikeRadiusInput.style.cssText = "width: 80px; background: #333; color: white; border: 1px solid #555; border-radius: 4px; padding: 4px;";
+        spikeRadiusInput.addEventListener("input", (e: any) => {
+            const val = parseFloat(e.target.value);
+            if (!isNaN(val) && val > 0) {
+                if (this.currentDraftItem) {
+                    this.currentDraftItem.scale.spikeRadius = val;
+                }
+            }
+        });
+        spikeRadiusRow.appendChild(spikeRadiusLbl);
+        spikeRadiusRow.appendChild(spikeRadiusInput);
+        this.inputSpikeRadius = spikeRadiusInput;
+        this.rowSpikeRadius = spikeRadiusRow;
+        dimContainer.appendChild(spikeRadiusRow);
+
+        // Spike Height row
+        const spikeHeightRow = document.createElement("div");
+        spikeHeightRow.style.cssText = "display: none; align-items: center; justify-content: space-between; gap: 10px; margin-top: 5px;";
+        const spikeHeightLbl = document.createElement("span");
+        spikeHeightLbl.textContent = "Alto Pinchos:";
+        spikeHeightLbl.style.fontSize = "12px";
+        spikeHeightLbl.style.color = "#aaa";
+        const spikeHeightInput = document.createElement("input");
+        spikeHeightInput.type = "number";
+        spikeHeightInput.step = "0.05";
+        spikeHeightInput.min = "0.01";
+        spikeHeightInput.style.cssText = "width: 80px; background: #333; color: white; border: 1px solid #555; border-radius: 4px; padding: 4px;";
+        spikeHeightInput.addEventListener("input", (e: any) => {
+            const val = parseFloat(e.target.value);
+            if (!isNaN(val) && val > 0) {
+                if (this.currentDraftItem) {
+                    this.currentDraftItem.scale.spikeHeight = val;
+                }
+            }
+        });
+        spikeHeightRow.appendChild(spikeHeightLbl);
+        spikeHeightRow.appendChild(spikeHeightInput);
+        this.inputSpikeHeight = spikeHeightInput;
+        this.rowSpikeHeight = spikeHeightRow;
+        dimContainer.appendChild(spikeHeightRow);
+
+        // Spike Spacing row
+        const spikeSpacingRow = document.createElement("div");
+        spikeSpacingRow.style.cssText = "display: none; align-items: center; justify-content: space-between; gap: 10px; margin-top: 5px;";
+        const spikeSpacingLbl = document.createElement("span");
+        spikeSpacingLbl.textContent = "Separación Pinchos:";
+        spikeSpacingLbl.style.fontSize = "12px";
+        spikeSpacingLbl.style.color = "#aaa";
+        const spikeSpacingInput = document.createElement("input");
+        spikeSpacingInput.type = "number";
+        spikeSpacingInput.step = "0.05";
+        spikeSpacingInput.min = "0.05";
+        spikeSpacingInput.style.cssText = "width: 80px; background: #333; color: white; border: 1px solid #555; border-radius: 4px; padding: 4px;";
+        spikeSpacingInput.addEventListener("input", (e: any) => {
+            const val = parseFloat(e.target.value);
+            if (!isNaN(val) && val > 0) {
+                if (this.currentDraftItem) {
+                    this.currentDraftItem.scale.spikeSpacing = val;
+                }
+            }
+        });
+        spikeSpacingRow.appendChild(spikeSpacingLbl);
+        spikeSpacingRow.appendChild(spikeSpacingInput);
+        this.inputSpikeSpacing = spikeSpacingInput;
+        this.rowSpikeSpacing = spikeSpacingRow;
+        dimContainer.appendChild(spikeSpacingRow);
+
         this.panelEditor.appendChild(dimContainer);
 
         // --- NEW: Weapon Controls
@@ -3824,6 +4253,92 @@ renderLogicLibraryGrid(container) {
         if (this.inputDimy) this.inputDimy.value = scaleCopy.y;
         if (this.inputDimz) this.inputDimz.value = scaleCopy.z;
 
+        // Toggle Custom Inputs based on shape type
+        const type = baseItem.type;
+        const dimLabel = this.editorDimContainer.querySelector("span");
+        const dimRow = this.editorDimContainer.querySelector("div");
+
+        // Hide spike rows by default
+        if (this.rowSpikeRadius) this.rowSpikeRadius.style.display = "none";
+        if (this.rowSpikeHeight) this.rowSpikeHeight.style.display = "none";
+        if (this.rowSpikeSpacing) this.rowSpikeSpacing.style.display = "none";
+
+        if (type === "sphere") {
+            if (dimLabel) dimLabel.textContent = "Parámetros de Esfera:";
+            if (dimRow) dimRow.style.display = "none";
+            this.rowRadius.style.display = "flex";
+            this.rowLength1.style.display = "none";
+            this.rowLength2.style.display = "none";
+            this.rowBendAngleX.style.display = "none";
+            this.rowBendAngleY.style.display = "none";
+            this.inputRadius.value = scaleCopy.radius || 1.0;
+        } else if (type === "cylinder") {
+            if (dimLabel) dimLabel.textContent = "Parámetros de Cilindro:";
+            if (dimRow) dimRow.style.display = "none";
+            this.rowRadius.style.display = "flex";
+            this.rowLength1.style.display = "flex";
+            this.rowLength2.style.display = "none";
+            this.rowBendAngleX.style.display = "none";
+            this.rowBendAngleY.style.display = "none";
+            this.inputRadius.value = scaleCopy.radius || 1.0;
+            this.inputLength1.value = scaleCopy.y || 2.0;
+        } else if (type === "cone") {
+            if (dimLabel) dimLabel.textContent = "Parámetros de Cono:";
+            if (dimRow) dimRow.style.display = "none";
+            this.rowRadius.style.display = "flex";
+            this.rowLength1.style.display = "flex";
+            this.rowLength2.style.display = "none";
+            this.rowBendAngleX.style.display = "none";
+            this.rowBendAngleY.style.display = "none";
+            this.inputRadius.value = scaleCopy.radius || 1.0;
+            this.inputLength1.value = scaleCopy.y || 3.0;
+        } else if (type === "spiked_floor") {
+            if (dimLabel) dimLabel.textContent = "Dimensiones de la Base:";
+            if (dimRow) dimRow.style.display = "flex";
+            if (this.rowRadius) this.rowRadius.style.display = "none";
+            if (this.rowLength1) this.rowLength1.style.display = "none";
+            if (this.rowLength2) this.rowLength2.style.display = "none";
+            if (this.rowBendAngleX) this.rowBendAngleX.style.display = "none";
+            if (this.rowBendAngleY) this.rowBendAngleY.style.display = "none";
+            if (this.rowSpikeRadius) this.rowSpikeRadius.style.display = "flex";
+            if (this.rowSpikeHeight) this.rowSpikeHeight.style.display = "flex";
+            if (this.rowSpikeSpacing) this.rowSpikeSpacing.style.display = "flex";
+            if (this.inputSpikeRadius) this.inputSpikeRadius.value = scaleCopy.spikeRadius || 0.15;
+            if (this.inputSpikeHeight) this.inputSpikeHeight.value = scaleCopy.spikeHeight || 0.4;
+            if (this.inputSpikeSpacing) this.inputSpikeSpacing.value = scaleCopy.spikeSpacing || 0.5;
+        } else if (type === "circle") {
+            if (dimLabel) dimLabel.textContent = "Parámetros de Círculo:";
+            if (dimRow) dimRow.style.display = "none";
+            this.rowRadius.style.display = "flex";
+            this.rowLength1.style.display = "flex";
+            this.rowLength2.style.display = "none";
+            this.rowBendAngleX.style.display = "none";
+            this.rowBendAngleY.style.display = "none";
+            this.inputRadius.value = scaleCopy.radius || 1.0;
+            this.inputLength1.value = scaleCopy.y || 0.05;
+        } else if (type === "tube") {
+            if (dimLabel) dimLabel.textContent = "Parámetros de Tubo:";
+            if (dimRow) dimRow.style.display = "none";
+            this.rowRadius.style.display = "flex";
+            this.rowLength1.style.display = "flex";
+            this.rowLength2.style.display = "flex";
+            this.rowBendAngleX.style.display = "flex";
+            this.rowBendAngleY.style.display = "flex";
+            this.inputRadius.value = scaleCopy.radius || 0.5;
+            this.inputLength1.value = scaleCopy.y || 2.0;
+            this.inputLength2.value = scaleCopy.length2 || 2.0;
+            this.inputBendAngleX.value = scaleCopy.bendAngleX !== undefined ? scaleCopy.bendAngleX : 0;
+            this.inputBendAngleY.value = scaleCopy.bendAngleY !== undefined ? scaleCopy.bendAngleY : 90;
+        } else {
+            if (dimLabel) dimLabel.textContent = "Dimensiones (X, Y, Z):";
+            if (dimRow) dimRow.style.display = "flex";
+            if (this.rowRadius) this.rowRadius.style.display = "none";
+            if (this.rowLength1) this.rowLength1.style.display = "none";
+            if (this.rowLength2) this.rowLength2.style.display = "none";
+            if (this.rowBendAngleX) this.rowBendAngleX.style.display = "none";
+            if (this.rowBendAngleY) this.rowBendAngleY.style.display = "none";
+        }
+
         // Update Logic Controls
         this.updateLogicControls(baseItem);
     }
@@ -3850,7 +4365,7 @@ renderLogicLibraryGrid(container) {
     updateLogicControls(baseItem) {
         this.editorLogicControlsContainer.innerHTML = "";
 
-        const logicTypes = ["spawn_point", "movement_controller", "interaction_button", "interactive_collision", "target", "impulse_jump", "impulse_lateral", "gravity_pad", "farming_zone", "gravity_sphere"];
+        const logicTypes = ["spawn_point", "movement_controller", "interaction_button", "interactive_collision", "target", "impulse_jump", "impulse_lateral", "gravity_pad", "farming_zone", "gravity_sphere", "logic_camera", "camera_panel", "damage_controller"];
         if (!logicTypes.includes(baseItem.type) && !baseItem.logicProperties) {
             this.editorLogicControlsContainer.style.display = "none";
             return;
@@ -3877,6 +4392,24 @@ renderLogicLibraryGrid(container) {
             this.createLogicDraftInput(this.editorLogicControlsContainer, "Velocidad:", "speed", "number", 2.0);
             this.createLogicDraftInput(this.editorLogicControlsContainer, "Bucle Infinito:", "loop", "boolean", true);
             this.createLogicDraftInput(this.editorLogicControlsContainer, "Activo al Inicio:", "active", "boolean", true);
+        } else if (type === "damage_controller") {
+            this.createLogicDraftInput(this.editorLogicControlsContainer, "Nombre:", "name", "text", "Controlador de Daño");
+            this.createLogicDraftInput(this.editorLogicControlsContainer, "Habilitar Daño:", "enableDamage", "boolean", true);
+            this.createLogicDraftInput(this.editorLogicControlsContainer, "Daño Base:", "damage", "number", 10);
+            this.createLogicDraftInput(this.editorLogicControlsContainer, "Daño Porcentual (%):", "percentDamage", "number", 0);
+            this.createLogicDraftInput(this.editorLogicControlsContainer, "Muerte Instantánea:", "instantKill", "boolean", false);
+            this.createLogicDraftInput(this.editorLogicControlsContainer, "Límite Máximo Daño:", "maxDamage", "number", 100);
+            this.createLogicDraftInput(this.editorLogicControlsContainer, "Habilitar Stop:", "enableDamageStopLimit", "boolean", false);
+            this.createLogicDraftInput(this.editorLogicControlsContainer, "Límite Daño Acumulado (Stop):", "damageStopLimit", "number", 100);
+            this.createLogicDraftInput(this.editorLogicControlsContainer, "Intervalo Cooldown (s):", "damageCooldown", "number", 1.0);
+            this.createLogicDraftInput(this.editorLogicControlsContainer, "Retroceso (Knockback):", "enableKnockback", "boolean", false);
+            this.createLogicDraftInput(this.editorLogicControlsContainer, "Fuerza Retroceso:", "knockbackForce", "number", 15);
+            this.createLogicDraftSelect(this.editorLogicControlsContainer, "Dirección Retroceso:", "knockbackDirection", [
+                { value: "automatic", label: "Automático" },
+                { value: "upward", label: "Solo hacia Arriba" },
+                { value: "away", label: "Alejar del centro" },
+                { value: "backward", label: "Empujar hacia atrás" }
+            ], "automatic");
         } else if (type === "interaction_button") {
             this.createLogicDraftInput(this.editorLogicControlsContainer, "Tiempo Retener (s):", "holdTime", "number", 1.0);
             this.createLogicDraftInput(this.editorLogicControlsContainer, "Un Solo Uso:", "oneShot", "boolean", false);
@@ -3885,6 +4418,26 @@ renderLogicLibraryGrid(container) {
             this.createLogicDraftInput(this.editorLogicControlsContainer, "Tiempo Retener (s):", "holdTime", "number", 0.5);
             this.createLogicDraftInput(this.editorLogicControlsContainer, "Un Solo Uso:", "oneShot", "boolean", false);
             this.createLogicDraftInput(this.editorLogicControlsContainer, "Modo Pulsación:", "pulsationMode", "boolean", false);
+        } else if (type === "logic_camera") {
+            this.createLogicDraftInput(this.editorLogicControlsContainer, "Nombre:", "name", "text", "Camara");
+            this.createLogicDraftSelect(this.editorLogicControlsContainer, "Modo:", "mode", [
+                { value: "fixed", label: "Fija" },
+                { value: "free_rotation", label: "Libre solo rotacion" }
+            ], "fixed");
+            this.createLogicDraftInput(this.editorLogicControlsContainer, "FOV:", "fov", "number", 60);
+            this.createLogicDraftInput(this.editorLogicControlsContainer, "Distancia foco:", "far", "number", 6);
+        } else if (type === "camera_panel") {
+            this.createLogicDraftInput(this.editorLogicControlsContainer, "Nombre:", "name", "text", "Panel de Camaras");
+            this.createLogicDraftInput(this.editorLogicControlsContainer, "Distancia Render Preview (m):", "previewFar", "number", 80);
+            this.createLogicDraftSelect(this.editorLogicControlsContainer, "Intervalo Actualización Previews:", "previewInterval", [
+                { value: "0", label: "Tiempo Real (60 FPS)" },
+                { value: "0.1", label: "Cada 0.1s" },
+                { value: "0.2", label: "Cada 0.2s" },
+                { value: "0.5", label: "Cada 0.5s" },
+                { value: "1", label: "Cada 1s" },
+                { value: "2", label: "Cada 2s" },
+                { value: "5", label: "Cada 5s" }
+            ], "0");
         } else if (type === "interactive_collision") {
             this.createLogicDraftInput(this.editorLogicControlsContainer, "Travesable (Sin colisión):", "isTraversable", "boolean", false);
             this.createLogicDraftInput(this.editorLogicControlsContainer, "Disparar al Tocar:", "triggerOnTouch", "boolean", false);
@@ -4383,7 +4936,18 @@ renderLogicLibraryGrid(container) {
                 if (this.game.cameraController) {
                     this.game.cameraController.lock();
                 } else {
-                    document.body.requestPointerLock();
+                    try {
+                        const promise = document.body.requestPointerLock();
+                        if (promise && typeof promise.catch === "function") {
+                            promise.catch((err) => {
+                                if (err.name !== "NotAllowedError" && err.name !== "SecurityError") {
+                                    console.warn("[ConstructionMenu] requestPointerLock failed:", err);
+                                }
+                            });
+                        }
+                    } catch (err) {
+                        console.warn("[ConstructionMenu] requestPointerLock threw error:", err);
+                    }
                 }
             }, 100);
         }
@@ -4422,6 +4986,8 @@ renderLogicLibraryGrid(container) {
                     (Array.isArray(obj.userData.logicProperties.sequences) && obj.userData.logicProperties.sequences.length > 0))
             ) {
                 type = "movement_object";
+            } else if (obj.userData.mapObjectType === "damage_controller" || (obj.userData.logicProperties && obj.userData.logicProperties.enableDamage === true)) {
+                type = "damage_controller";
             } else {
                 // Fallback to base type if it has some other unknown logic
                 type = obj.userData.mapObjectType || "Desconocido";

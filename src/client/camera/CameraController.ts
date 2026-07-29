@@ -145,7 +145,7 @@ export class CameraController {
       if (e.button === 2 && !this.isPaused) {
         this.isRightMouseDown = true;
         if (!this.alwaysRotateThirdPerson && !this.isUIOpen) {
-          this.domElement.requestPointerLock();
+          this.safeRequestPointerLock();
         }
       }
     });
@@ -218,10 +218,26 @@ export class CameraController {
     });
   }
 
+  safeRequestPointerLock() {
+    if (!this.domElement || typeof this.domElement.requestPointerLock !== "function") return;
+    try {
+      const promise = this.domElement.requestPointerLock();
+      if (promise && typeof promise.catch === "function") {
+        promise.catch((err) => {
+          if (err.name !== "NotAllowedError" && err.name !== "SecurityError") {
+            console.warn("[CameraController] requestPointerLock promise rejected:", err);
+          }
+        });
+      }
+    } catch (err) {
+      console.warn("[CameraController] requestPointerLock threw error:", err);
+    }
+  }
+
   lock() {
     if (this.isUIOpen) return;
     if (this.isFirstPerson || this.alwaysRotateThirdPerson) {
-      this.domElement.requestPointerLock();
+      this.safeRequestPointerLock();
     }
   }
 
@@ -235,7 +251,7 @@ export class CameraController {
     if (this.isPaused) {
       document.exitPointerLock();
     } else if (this.isFirstPerson || this.alwaysRotateThirdPerson) {
-      this.domElement.requestPointerLock();
+      this.safeRequestPointerLock();
     }
 
     const detail: CameraPauseEventDetail = {
@@ -293,7 +309,7 @@ export class CameraController {
       if (this.wasAlwaysRotate) {
         this.setAlwaysRotateThirdPerson(true);
         if (!this.isPaused) {
-          this.domElement.requestPointerLock();
+          this.safeRequestPointerLock();
         }
       }
     }
@@ -306,7 +322,7 @@ export class CameraController {
   resume() {
     this.isPaused = false;
     if (this.isFirstPerson || this.alwaysRotateThirdPerson || this.mode === 'free-fly') {
-      this.domElement.requestPointerLock();
+      this.safeRequestPointerLock();
     }
   }
 
@@ -320,11 +336,11 @@ export class CameraController {
     if (mode === 'free-fly') {
       this.freeFlyPosition.copy(this.camera.position);
       if (requestLock && !this.isPaused && !this.isUIOpen) {
-        this.domElement.requestPointerLock();
+        this.safeRequestPointerLock();
       }
     } else if (this.isFirstPerson) {
       if (requestLock && !this.isPaused && !this.isUIOpen) {
-        this.domElement.requestPointerLock();
+        this.safeRequestPointerLock();
       }
       this.fpYaw = this.theta;
       this.fpPitch = -this.phi;
@@ -446,6 +462,8 @@ export class CameraController {
           "gravity_pad",
           "farming_zone",
           "target",
+          "logic_camera",
+          "camera_panel",
           "logic_node",
           "marker",
           "waypoint",

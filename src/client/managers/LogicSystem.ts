@@ -4,6 +4,7 @@ import { LogicSequenceEditor } from "../ui/LogicSequenceEditor";
 import { InteractiveCollisionLogic } from "../ui/logic_items/InteractiveCollisionLogic";
 import { TargetLogic } from "../ui/logic_items/TargetLogic";
 import { DianaLogic } from "../ui/logic_items/DianaLogic";
+import { DamageLogic } from "../ui/logic_items/DamageLogic";
 import { PlayerConfigManager } from "./PlayerConfigManager";
 import { getActiveFarmingGroups } from "../ui/GameHUD";
 import { WaypointTransformGizmo } from "../editor/WaypointTransformGizmo";
@@ -39,6 +40,7 @@ export class LogicSystem {
 	interactiveCollisionLogic: any;
 	targetLogic: any;
 	dianaLogic: any;
+	damageLogic: any;
 	waypointGizmo: any;
 	selectedWaypoint: any;
 	waypointPanel: HTMLElement | null;
@@ -54,6 +56,7 @@ export class LogicSystem {
 		this.interactiveCollisionLogic = new InteractiveCollisionLogic(game, this);
 		this.targetLogic = new TargetLogic(game, this);
 		this.dianaLogic = new DianaLogic();
+		this.damageLogic = new DamageLogic();
 		this.selectedWaypoint = null;
 		this.waypointPanel = null;
 		this.waypointNavIndex = -1;
@@ -729,14 +732,18 @@ export class LogicSystem {
 				const isButton = child.userData.mapObjectType === "interaction_button";
 				const isCollision = child.userData.mapObjectType === "interactive_collision";
 				const isTarget = child.userData.mapObjectType === "target";
+				const isLogicCamera = child.userData.mapObjectType === "logic_camera";
+				const isCameraPanel = child.userData.mapObjectType === "camera_panel";
 				const isInteractiveZone = ["impulse_jump", "impulse_lateral", "gravity_pad", "farming_zone", "gravity_sphere"].includes(child.userData.mapObjectType);
 				const hasWaypoints = this.hasMovementLogic(child);
+				const isDamageController = child.userData.mapObjectType === "damage_controller";
+				const hasDamage = child.userData.logicProperties?.enableDamage === true;
 
-				if (isSpawn || isButton || isCollision || isTarget || isInteractiveZone || hasWaypoints) {
+				if (isSpawn || isButton || isCollision || isTarget || isLogicCamera || isCameraPanel || isInteractiveZone || hasWaypoints || isDamageController || hasDamage) {
 					logicObjects.push(child);
 				}
 			}
-		});
+			});
 		return logicObjects;
 	}
 
@@ -832,11 +839,19 @@ export class LogicSystem {
 
 				if (refreshCallback) refreshCallback();
 			});
-		}
+			}
 
-		if (object.userData.mapObjectType === "impulse_jump" || object.userData.mapObjectType === "impulse_lateral") {
-			this.renderImpulsePadUI(container, object, props);
-		}
+			if (object.userData.mapObjectType === "logic_camera") {
+				this.renderLogicCameraUI(container, object, props);
+			}
+
+			if (object.userData.mapObjectType === "camera_panel") {
+				this.renderCameraPanelUI(container, object, props);
+			}
+
+			if (object.userData.mapObjectType === "impulse_jump" || object.userData.mapObjectType === "impulse_lateral") {
+				this.renderImpulsePadUI(container, object, props);
+			}
 
 		if (object.userData.mapObjectType === "gravity_pad") {
 			this.renderGravityPadUI(container, object, props);
@@ -844,6 +859,18 @@ export class LogicSystem {
 
 		if (object.userData.mapObjectType === "farming_zone") {
 			this.renderFarmingZoneUI(container, object, props);
+		}
+
+		// Render damage logic options for any object
+		if (this.damageLogic) {
+			this.damageLogic.render(container, props, (key: string, value: any) => {
+				props[key] = value;
+				this.broadcastObjectLogicUpdate(object);
+				if (refreshCallback) refreshCallback();
+				if (key === "enableDamage" || key === "enableKnockback") {
+					this.renderPanel(container, object, refreshCallback);
+				}
+			});
 		}
 	}
 
@@ -855,8 +882,101 @@ export class LogicSystem {
 		const info = document.createElement("div");
 		info.textContent = `UUID: ${object.userData.uuid.substring(0, 8)}...`;
 		info.style.cssText = "font-size:10px; color:#aaa; margin-top:10px;";
-		container.appendChild(info);
-	}
+			container.appendChild(info);
+		}
+
+		renderLogicCameraUI(container: HTMLElement, object: any, props: any) {
+			if (props.logicKind === undefined) props.logicKind = "logic_camera";
+			if (props.name === undefined) props.name = "Camara";
+			if (props.mode === undefined) props.mode = "fixed";
+			if (props.fov === undefined) props.fov = 60;
+			if (props.far === undefined) props.far = 6;
+
+			const refreshVisual = () => {
+				if (typeof object.updateLogicCameraVisuals === "function") object.updateLogicCameraVisuals();
+				this.game?.logicCameraSystem?.showCameraPreview?.(object);
+				this.broadcastObjectLogicUpdate(object);
+			};
+
+			this.createInput(container, object, "name", props.name, "text", "Nombre");
+			this.createSelectInput(container, object, "mode", props.mode, [
+				{ value: "fixed", label: "Fija" },
+				{ value: "free_rotation", label: "Libre solo rotacion" }
+			], "Modo de Vista");
+			this.createInput(container, object, "fov", props.fov, "number", "FOV");
+			this.createInput(container, object, "far", props.far, "number", "Distancia del Foco");
+
+			const previewBtn = document.createElement("button");
+			previewBtn.textContent = "Ver Preview";
+			previewBtn.style.cssText = "width:100%; background:#064f9e; color:white; border:none; border-radius:4px; padding:7px; cursor:pointer; margin-top:8px;";
+			previewBtn.onclick = () => this.game?.logicCameraSystem?.showCameraPreview?.(object);
+			container.appendChild(previewBtn);
+
+			Array.from(container.querySelectorAll("input, select")).slice(-4).forEach((control: any) => {
+				const previous = control.onchange;
+				control.onchange = (event: any) => {
+					if (previous) previous(event);
+					refreshVisual();
+				};
+			});
+		}
+
+		renderCameraPanelUI(container: HTMLElement, object: any, props: any) {
+			if (props.logicKind === undefined) props.logicKind = "camera_panel";
+			if (props.name === undefined) props.name = "Panel de Camaras";
+			if (!Array.isArray(props.cameraIds)) props.cameraIds = [];
+			if (props.holdTime === undefined) props.holdTime = 0;
+
+			this.createInput(container, object, "name", props.name, "text", "Nombre");
+			this.renderCameraListSelector(container, object, props);
+
+			const info = document.createElement("div");
+			info.textContent = "Al estar cerca, presiona F para abrir este panel y cambiar de camara.";
+			info.style.cssText = "font-size:11px; color:#aaa; margin-top:8px; line-height:1.35;";
+			container.appendChild(info);
+		}
+
+		renderCameraListSelector(container: HTMLElement, object: any, props: any) {
+			const row = document.createElement("div");
+			row.style.cssText = "display:flex; flex-direction:column; gap:6px; margin-top:8px;";
+			const label = document.createElement("label");
+			label.textContent = "Camaras disponibles";
+			label.style.cssText = "color:#aaa; font-size:14px;";
+			row.appendChild(label);
+
+			const list = document.createElement("div");
+			list.style.cssText = "display:flex; flex-direction:column; gap:6px; background:#111; border:1px solid #444; border-radius:4px; padding:8px;";
+			const cameras = this.game?.logicCameraSystem?.getLogicCameras?.() || [];
+
+			if (cameras.length === 0) {
+				const empty = document.createElement("div");
+				empty.textContent = "No hay camaras en el mapa.";
+				empty.style.cssText = "font-size:11px; color:#888;";
+				list.appendChild(empty);
+			} else {
+				cameras.forEach((cameraObject: any, index: number) => {
+					const option = document.createElement("label");
+					option.style.cssText = "display:flex; align-items:center; gap:8px; color:#ddd; font-size:12px;";
+					const checkbox = document.createElement("input");
+					checkbox.type = "checkbox";
+					checkbox.checked = props.cameraIds.includes(cameraObject.userData.uuid);
+					checkbox.onchange = () => {
+						const ids = new Set(props.cameraIds);
+						if (checkbox.checked) ids.add(cameraObject.userData.uuid);
+						else ids.delete(cameraObject.userData.uuid);
+						props.cameraIds = Array.from(ids);
+						this.broadcastObjectLogicUpdate(object);
+					};
+					const name = cameraObject.userData.logicProperties?.name || cameraObject.userData.customName || `Camara ${index + 1}`;
+					option.appendChild(checkbox);
+					option.appendChild(document.createTextNode(name));
+					list.appendChild(option);
+				});
+			}
+
+			row.appendChild(list);
+			container.appendChild(row);
+		}
 
 	renderImpulsePadUI(container: HTMLElement, object: any, props: any) {
 		if (props.name === undefined) {
@@ -1443,6 +1563,11 @@ export class LogicSystem {
 			this.updateGameLogic(dt);
 		}
 
+		// Dynamically update accumulated damage display if panel is showing
+		if (this.editingObject && this.damageLogic && this.editingObject.userData.logicProperties) {
+			this.damageLogic.updateAccumulatedDamageDisplay(this.editingObject.userData.logicProperties);
+		}
+
 		if (!this.isEditingMap || !this.editingObject) return;
 
 		if (this.toolbar.activeTool === "waypoint") {
@@ -1698,7 +1823,10 @@ export class LogicSystem {
 			case "interaction_button": return "Botones Interactivos";
 			case "target": return "Diana Interactiva";
 			case "movement_controller": return "Animador";
+			case "damage_controller": return "Controlador de Daño";
 			case "interactive_collision": return "Colisión Interactiva";
+			case "logic_camera": return "Camara";
+			case "camera_panel": return "Panel de Camaras";
 			case "interactive_zones": return "Pads y Zonas";
 			case "impulse_jump": return "Pad de Salto";
 			case "impulse_lateral": return "Pad de Empuje";

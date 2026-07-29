@@ -5,6 +5,20 @@ import { RampUtils } from "../utils/RampUtils";
  * Gestor de Colocación de Objetos
  * Maneja la lógica de previsualización (ghost) y raycasting para colocar items.
  */
+export const getTubeSegments = (scale: any) => {
+    if (scale && scale.segments && Array.isArray(scale.segments) && scale.segments.length > 0) {
+        return scale.segments;
+    }
+    const length1 = (scale && scale.y) || 2.0;
+    const length2 = (scale && scale.length2) !== undefined ? scale.length2 : 2.0;
+    const bendAngleX = (scale && scale.bendAngleX) !== undefined ? scale.bendAngleX : 0;
+    const bendAngleY = (scale && scale.bendAngleY) !== undefined ? scale.bendAngleY : 90;
+    return [
+        { length: length1, bendAngleX: 0, bendAngleY: 0 },
+        { length: length2, bendAngleX: bendAngleX, bendAngleY: bendAngleY }
+    ];
+};
+
 export class PlacementManager {
     scene: THREE.Scene;
     camera: THREE.Camera;
@@ -28,9 +42,14 @@ export class PlacementManager {
     ghostRampMesh: THREE.Mesh | null;
     ghostStairsGroup: THREE.Group | null;
     ghostLadderGroup: THREE.Group | null;
+    ghostTubeGroup: THREE.Group | null;
+    ghostConeMesh: THREE.Mesh | null;
+    ghostSpikedFloorGroup: THREE.Group | null;
     ghostRampLastKey: string | null;
     ghostStairsLastKey: string | null;
     ghostLadderLastKey: string | null;
+    ghostTubeLastKey: string | null;
+    ghostSpikedFloorLastKey: string | null;
     ghostLabelSprite: THREE.Sprite | null;
     logicToolbar: HTMLDivElement | null;
     toolbarInputs: Record<string, HTMLInputElement>;
@@ -67,9 +86,14 @@ export class PlacementManager {
         this.ghostRampMesh = null;
         this.ghostStairsGroup = null;
         this.ghostLadderGroup = null;
+        this.ghostTubeGroup = null;
+        this.ghostConeMesh = null;
+        this.ghostSpikedFloorGroup = null;
         this.ghostRampLastKey = null;
         this.ghostStairsLastKey = null;
         this.ghostLadderLastKey = null;
+        this.ghostTubeLastKey = null;
+        this.ghostSpikedFloorLastKey = null;
         this.ghostLabelSprite = null;
 
         // Texturas precargadas
@@ -165,6 +189,20 @@ export class PlacementManager {
         // 4. Ghost LADDER
         this.ghostLadderGroup = new THREE.Group();
         this.placementGhost.add(this.ghostLadderGroup);
+
+        // 5. Ghost TUBE
+        this.ghostTubeGroup = new THREE.Group();
+        this.placementGhost.add(this.ghostTubeGroup);
+
+        // 6. Ghost CONE
+        const coneGeo = new THREE.ConeGeometry(1, 1, 32);
+        this.ghostConeMesh = new THREE.Mesh(coneGeo, material);
+        this.ghostConeMesh.visible = false;
+        this.placementGhost.add(this.ghostConeMesh);
+
+        // 7. Ghost SPIKED FLOOR
+        this.ghostSpikedFloorGroup = new THREE.Group();
+        this.placementGhost.add(this.ghostSpikedFloorGroup);
 
 
         // Flecha / Icono indicador (Solo para Pads viejos)
@@ -704,6 +742,22 @@ export class PlacementManager {
         } else if (item.type === "target") {
             const diameter = (this.currentTargetProperties && this.currentTargetProperties.radius) ? this.currentTargetProperties.radius * 2 : (item.scale.x || 2);
             size.set(diameter, item.scale.y || 0.2, diameter);
+        } else if (item.type === "sphere") {
+            const r = item.scale.radius || item.scale.x / 2 || 1.0;
+            size.set(r * 2, r * 2, r * 2);
+        } else if (item.type === "cylinder") {
+            const r = item.scale.radius || item.scale.x / 2 || 1.0;
+            const h = item.scale.y || 1.0;
+            size.set(r * 2, h, r * 2);
+        } else if (item.type === "circle") {
+            const r = item.scale.radius || item.scale.x / 2 || 1.0;
+            const h = item.scale.y || 0.05;
+            size.set(r * 2, h, r * 2);
+        } else if (item.type === "tube") {
+            const r = item.scale.radius || 0.5;
+            const segments = getTubeSegments(item.scale);
+            const totalLen = segments.reduce((sum, s) => sum + (s.length || 2.0), 0);
+            size.set(r * 2, totalLen, r * 2);
         } else if (item.constructor.name === "MapObjectItem") {
             size.set(item.scale.x || 1, item.scale.y || 1, item.scale.z || 1);
         } else if (item.id.includes("pad")) {
@@ -789,6 +843,70 @@ export class PlacementManager {
         this.ghostRampMesh.scale.set(1, 1, 1);
     }
 
+    rebuildSpikedFloorGhost(item) {
+        if (!this.ghostSpikedFloorGroup) return;
+
+        const spikeRadius = item.scale.spikeRadius !== undefined ? item.scale.spikeRadius : 0.15;
+        const spikeHeight = item.scale.spikeHeight !== undefined ? item.scale.spikeHeight : 0.4;
+        const spikeSpacing = item.scale.spikeSpacing !== undefined ? item.scale.spikeSpacing : 0.5;
+        const spikeColor = item.scale.spikeColor !== undefined ? item.scale.spikeColor : "#dc2626";
+
+        const key = `${item.scale.x}_${item.scale.y}_${item.scale.z}_${spikeRadius}_${spikeHeight}_${spikeSpacing}_${spikeColor}`;
+        if (this.ghostSpikedFloorLastKey === key && this.ghostSpikedFloorGroup.children.length > 0) return;
+
+        this.ghostSpikedFloorLastKey = key;
+
+        // Clear existing
+        while (this.ghostSpikedFloorGroup.children.length > 0) {
+            this.ghostSpikedFloorGroup.remove(this.ghostSpikedFloorGroup.children[0]);
+        }
+
+        // 1. Base floor box
+        const baseGeo = new THREE.BoxGeometry(item.scale.x, item.scale.y, item.scale.z);
+        const baseMesh = new THREE.Mesh(baseGeo, this.ghostBaseMat);
+        baseMesh.raycast = () => { };
+        this.ghostSpikedFloorGroup.add(baseMesh);
+
+        // 2. Add spikes
+        const buffer = spikeRadius * 1.5;
+        const availableW = item.scale.x - 2 * buffer;
+        const availableD = item.scale.z - 2 * buffer;
+
+        const numX = availableW > 0 ? Math.max(1, Math.floor(availableW / spikeSpacing) + 1) : 1;
+        const numZ = availableD > 0 ? Math.max(1, Math.floor(availableD / spikeSpacing) + 1) : 1;
+
+        const spikeGeo = new THREE.ConeGeometry(spikeRadius, spikeHeight, 8);
+        const spikeMat = new THREE.MeshBasicMaterial({
+            color: new THREE.Color(spikeColor),
+            transparent: true,
+            opacity: 0.4,
+            wireframe: true
+        });
+
+        for (let i = 0; i < numX; i++) {
+            for (let j = 0; j < numZ; j++) {
+                let xPos = 0;
+                if (numX > 1) {
+                    xPos = -availableW / 2 + (i * (availableW / (numX - 1)));
+                } else {
+                    xPos = 0;
+                }
+
+                let zPos = 0;
+                if (numZ > 1) {
+                    zPos = -availableD / 2 + (j * (availableD / (numZ - 1)));
+                } else {
+                    zPos = 0;
+                }
+
+                const spike = new THREE.Mesh(spikeGeo, spikeMat);
+                spike.position.set(xPos, item.scale.y / 2 + spikeHeight / 2, zPos);
+                spike.raycast = () => { };
+                this.ghostSpikedFloorGroup.add(spike);
+            }
+        }
+    }
+
     rebuildLadderGhost(item) {
         const key = `${item.scale.x}_${item.scale.y}_${item.scale.z}`;
         if (this.ghostLadderLastKey === key && this.ghostLadderGroup.children.length > 0) return;
@@ -824,8 +942,56 @@ export class PlacementManager {
             const rung = new THREE.Mesh(rungGeo, this.ghostBaseMat);
             // Start from bottom (0) + first step. 
             // Pivot is now at Y=0 (Bottom of ladder)
-            rung.position.set(0, (i + 1) * 0.4, 0);
+        rung.position.set(0, (i + 1) * 0.4, 0);
             this.ghostLadderGroup.add(rung);
+        }
+    }
+
+    rebuildTubeGhost(item) {
+        const radius = item.scale.radius || 0.5;
+        const segments = getTubeSegments(item.scale);
+
+        const key = JSON.stringify(segments) + "_" + radius;
+        if (this.ghostTubeLastKey === key && this.ghostTubeGroup && this.ghostTubeGroup.children.length > 0) return;
+
+        this.ghostTubeLastKey = key;
+
+        // Clear existing
+        while (this.ghostTubeGroup.children.length > 0) {
+            this.ghostTubeGroup.remove(this.ghostTubeGroup.children[0]);
+        }
+
+        let parentGroup = this.ghostTubeGroup;
+
+        for (let i = 0; i < segments.length; i++) {
+            const seg = segments[i];
+            const segLength = seg.length || 2.0;
+
+            const cylGeo = new THREE.CylinderGeometry(radius, radius, segLength, 16);
+            const mesh = new THREE.Mesh(cylGeo, this.ghostBaseMat);
+            mesh.raycast = () => {};
+            mesh.position.set(0, segLength / 2, 0);
+            parentGroup.add(mesh);
+
+            if (i < segments.length - 1) {
+                const elbowGeo = new THREE.SphereGeometry(radius, 16, 16);
+                const elbowMesh = new THREE.Mesh(elbowGeo, this.ghostBaseMat);
+                elbowMesh.raycast = () => {};
+                elbowMesh.position.set(0, segLength, 0);
+                parentGroup.add(elbowMesh);
+
+                const nextSeg = segments[i + 1];
+                const childGroup = new THREE.Group();
+                childGroup.position.set(0, segLength, 0);
+                childGroup.rotation.set(
+                    (nextSeg.bendAngleX || 0) * Math.PI / 180,
+                    (nextSeg.bendAngleY || 0) * Math.PI / 180,
+                    0,
+                    "YXZ"
+                );
+                parentGroup.add(childGroup);
+                parentGroup = childGroup;
+            }
         }
     }
 
@@ -909,7 +1075,11 @@ export class PlacementManager {
 
             // --- MOVEMENT CONTROLLER LOGIC ---
             if (item.type === "movement_controller") {
-                const isTargetObject = hit.object.userData && hit.object.userData.isEditableMapObject;
+                let targetObj = hit.object;
+                while (targetObj && (!targetObj.userData || !targetObj.userData.isEditableMapObject)) {
+                    targetObj = targetObj.parent;
+                }
+                const isTargetObject = !!targetObj;
 
                 if (!isTargetObject) {
                     this.placementGhost.visible = false;
@@ -920,7 +1090,7 @@ export class PlacementManager {
                 this.placementGhost.visible = true;
 
                 // 1. Match Target Size
-                const targetBox = new THREE.Box3().setFromObject(hit.object);
+                const targetBox = new THREE.Box3().setFromObject(targetObj);
                 const targetSize = new THREE.Vector3();
                 targetBox.getSize(targetSize);
                 const targetCenter = new THREE.Vector3();
@@ -931,6 +1101,11 @@ export class PlacementManager {
                 if (this.ghostRampMesh) this.ghostRampMesh.visible = false;
                 if (this.ghostStairsGroup) this.ghostStairsGroup.visible = false;
                 if (this.ghostLadderGroup) this.ghostLadderGroup.visible = false;
+                if (this.ghostSphereMesh) this.ghostSphereMesh.visible = false;
+                if (this.ghostCylinderMesh) this.ghostCylinderMesh.visible = false;
+                if (this.ghostTubeGroup) this.ghostTubeGroup.visible = false;
+                if (this.ghostConeMesh) this.ghostConeMesh.visible = false;
+                if (this.ghostSpikedFloorGroup) this.ghostSpikedFloorGroup.visible = false;
 
                 // Use Box Mesh for highlight
                 this.ghostBoxMesh.visible = true;
@@ -943,7 +1118,7 @@ export class PlacementManager {
                 // Position at Center of Target
                 this.placementGhost.position.copy(targetCenter);
                 this.placementGhost.rotation.set(0, 0, 0);
-                this.placementGhost.quaternion.copy(hit.object.quaternion);
+                this.placementGhost.quaternion.copy(targetObj.quaternion);
 
                 // 2. Text Label
                 if (!this.ghostLabelSprite) {
@@ -954,10 +1129,73 @@ export class PlacementManager {
                 this.ghostLabelSprite.position.set(0, targetSize.y / 2 + 0.5, 0); // Above object
 
                 // Update text
-                const logicProps = hit.object.userData.logicProperties;
+                const logicProps = targetObj.userData.logicProperties;
                 const hasLogic = logicProps && (logicProps.waypoints || (Array.isArray(logicProps.sequences) && logicProps.sequences.length > 0));
                 const txt = hasLogic ? "Aplicado!" : "Aplicar";
                 const col = hasLogic ? "#00FF00" : "#FFFF00";
+                this.updateLabelSprite(this.ghostLabelSprite, txt, col);
+
+                this.lastValidPosition = hit.point;
+                return hit.point;
+            } else if (item.type === "damage_controller") {
+                let targetObj = hit.object;
+                while (targetObj && (!targetObj.userData || !targetObj.userData.isEditableMapObject)) {
+                    targetObj = targetObj.parent;
+                }
+                const isTargetObject = !!targetObj;
+
+                if (!isTargetObject) {
+                    this.placementGhost.visible = false;
+                    this.lastValidPosition = null;
+                    return null;
+                }
+
+                this.placementGhost.visible = true;
+
+                // 1. Match Target Size
+                const targetBox = new THREE.Box3().setFromObject(targetObj);
+                const targetSize = new THREE.Vector3();
+                targetBox.getSize(targetSize);
+                const targetCenter = new THREE.Vector3();
+                targetBox.getCenter(targetCenter);
+
+                this.ghostBaseMat.visible = true;
+                this.ghostArrow.visible = false;
+                if (this.ghostRampMesh) this.ghostRampMesh.visible = false;
+                if (this.ghostStairsGroup) this.ghostStairsGroup.visible = false;
+                if (this.ghostLadderGroup) this.ghostLadderGroup.visible = false;
+                if (this.ghostSphereMesh) this.ghostSphereMesh.visible = false;
+                if (this.ghostCylinderMesh) this.ghostCylinderMesh.visible = false;
+                if (this.ghostTubeGroup) this.ghostTubeGroup.visible = false;
+                if (this.ghostConeMesh) this.ghostConeMesh.visible = false;
+                if (this.ghostSpikedFloorGroup) this.ghostSpikedFloorGroup.visible = false;
+
+                // Use Box Mesh for highlight
+                this.ghostBoxMesh.visible = true;
+                this.ghostBoxMesh.scale.copy(targetSize);
+
+                // Color Red for Damage Logic Highlighting
+                this.ghostBaseMat.color.setHex(0xff3333);
+                this.ghostBaseMat.opacity = 0.5;
+
+                // Position at Center of Target
+                this.placementGhost.position.copy(targetCenter);
+                this.placementGhost.rotation.set(0, 0, 0);
+                this.placementGhost.quaternion.copy(targetObj.quaternion);
+
+                // 2. Text Label
+                if (!this.ghostLabelSprite) {
+                    this.ghostLabelSprite = this.createLabelSprite("Aplicar", "#FFFF00");
+                    this.placementGhost.add(this.ghostLabelSprite);
+                }
+                this.ghostLabelSprite.visible = true;
+                this.ghostLabelSprite.position.set(0, targetSize.y / 2 + 0.5, 0); // Above object
+
+                // Update text
+                const logicProps = targetObj.userData.logicProperties;
+                const hasLogic = logicProps && logicProps.enableDamage === true;
+                const txt = hasLogic ? "Aplicado!" : "Aplicar Daño";
+                const col = hasLogic ? "#00FF00" : "#ffaa00";
                 this.updateLabelSprite(this.ghostLabelSprite, txt, col);
 
                 this.lastValidPosition = hit.point;
@@ -1088,7 +1326,7 @@ export class PlacementManager {
 
             const gridSize = this.gridSize || 1;
             let targetPos = hit.point.clone();
-            const surfaceAlignedTypes = ["interaction_button", "target", "gravity_pad", "impulse_jump", "impulse_lateral", "farming_zone"];
+            const surfaceAlignedTypes = ["interaction_button", "target", "gravity_pad", "impulse_jump", "impulse_lateral", "farming_zone", "logic_camera", "camera_panel", "camera_prop", "cone", "spiked_floor"];
 
             // --- Snapping Logic ---
             if (this.snapToGrid || this.aerialGridActive) {
@@ -1301,9 +1539,13 @@ export class PlacementManager {
                 this.ghostBaseMat.visible = true;
                 this.ghostRampMesh.visible = false;
                 this.ghostBoxMesh.visible = false;
-                if (this.ghostStairsGroup) {
-                    this.ghostStairsGroup.visible = false;
-                }
+                this.ghostSphereMesh.visible = false;
+                this.ghostCylinderMesh.visible = false;
+                if (this.ghostStairsGroup) this.ghostStairsGroup.visible = false;
+                if (this.ghostLadderGroup) this.ghostLadderGroup.visible = false;
+                if (this.ghostTubeGroup) this.ghostTubeGroup.visible = false;
+                if (this.ghostConeMesh) this.ghostConeMesh.visible = false;
+                if (this.ghostSpikedFloorGroup) this.ghostSpikedFloorGroup.visible = false;
 
                 if (item.type === "impulse_jump" || item.type === "impulse_lateral") {
                     const isJump = (item.type === "impulse_jump");
@@ -1341,21 +1583,73 @@ export class PlacementManager {
                     this.ghostStairsGroup.visible = true;
                     this.rebuildStairsGhost(item);
                 } else {
-                    // Standard Box
-                    this.ghostBoxMesh.visible = true;
-                    if (item.type === "interaction_button") {
-                        // Use correct visual size for ghost
-                        this.ghostBoxMesh.scale.set(realSize.x, realSize.y, realSize.z);
-                    } else if (item.type === "target") {
-                        this.ghostBoxMesh.scale.set(realSize.x, realSize.y, realSize.z);
+                    if (item.type === "logic_camera" || item.type === "camera_prop") {
+                        if (this.cameraGhostFrustum) {
+                            this.placementGhost.remove(this.cameraGhostFrustum);
+                            this.cameraGhostFrustum.geometry?.dispose?.();
+                            this.cameraGhostFrustum = null;
+                        }
+
+                        const makeFrustum = (fov = 60, far = 6, aspect = 16 / 9) => {
+                            const near = 0.35;
+                            const fovRad = THREE.MathUtils.degToRad(fov);
+                            const nearH = Math.tan(fovRad / 2) * near;
+                            const nearW = nearH * aspect;
+                            const farH = Math.tan(fovRad / 2) * far;
+                            const farW = farH * aspect;
+                            const points = [
+                                new THREE.Vector3(0, 0, 0), new THREE.Vector3(-farW, farH, -far),
+                                new THREE.Vector3(0, 0, 0), new THREE.Vector3(farW, farH, -far),
+                                new THREE.Vector3(0, 0, 0), new THREE.Vector3(farW, -farH, -far),
+                                new THREE.Vector3(0, 0, 0), new THREE.Vector3(-farW, -farH, -far),
+                                new THREE.Vector3(-nearW, nearH, -near), new THREE.Vector3(nearW, nearH, -near),
+                                new THREE.Vector3(nearW, nearH, -near), new THREE.Vector3(nearW, -nearH, -near),
+                                new THREE.Vector3(nearW, -nearH, -near), new THREE.Vector3(-nearW, -nearH, -near),
+                                new THREE.Vector3(-nearW, -nearH, -near), new THREE.Vector3(-nearW, nearH, -near),
+                                new THREE.Vector3(-farW, farH, -far), new THREE.Vector3(farW, farH, -far),
+                                new THREE.Vector3(farW, farH, -far), new THREE.Vector3(farW, -farH, -far),
+                                new THREE.Vector3(farW, -farH, -far), new THREE.Vector3(-farW, -farH, -far),
+                                new THREE.Vector3(-farW, -farH, -far), new THREE.Vector3(-farW, farH, -far)
+                            ];
+                            const geometry = new THREE.BufferGeometry().setFromPoints(points);
+                            const helperLineMat = new THREE.LineBasicMaterial({
+                                color: 0x38bdf8,
+                                transparent: true,
+                                opacity: 0.8
+                            });
+                            return new THREE.LineSegments(geometry, helperLineMat);
+                        };
+
+                        const props = item.logicProperties || {};
+                        this.cameraGhostFrustum = makeFrustum(Number(props.fov ?? 60), Number(props.far ?? 6), Number(props.aspect ?? 16 / 9));
+                        this.placementGhost.add(this.cameraGhostFrustum);
+
+                        this.ghostBoxMesh.visible = true;
+                        this.ghostBoxMesh.scale.set(0.35, 0.25, 0.25);
+                        this.ghostBoxMesh.position.y = 0;
                     } else {
-                        this.ghostBoxMesh.scale.set(item.scale.x, item.scale.y, item.scale.z);
-                    }
-                    // Reset Y because targetPos is Center now
-                    this.ghostBoxMesh.position.y = 0;
+                        if (this.cameraGhostFrustum) {
+                            this.placementGhost.remove(this.cameraGhostFrustum);
+                            this.cameraGhostFrustum.geometry?.dispose?.();
+                            this.cameraGhostFrustum = null;
+                        }
 
-
-                    // --- INTERACTIVE COLLISION GHOST UPDATE ---
+                        // Standard Box
+                        if (["sphere", "cylinder", "circle", "tube", "cone", "spiked_floor"].includes(item.type)) {
+                            this.ghostBoxMesh.visible = false;
+                        } else {
+                            this.ghostBoxMesh.visible = true;
+                            if (item.type === "interaction_button") {
+                                // Use correct visual size for ghost
+                                this.ghostBoxMesh.scale.set(realSize.x, realSize.y, realSize.z);
+                            } else if (item.type === "target") {
+                                this.ghostBoxMesh.scale.set(realSize.x, realSize.y, realSize.z);
+                            } else {
+                                this.ghostBoxMesh.scale.set(item.scale.x, item.scale.y, item.scale.z);
+                            }
+                            this.ghostBoxMesh.position.y = 0;
+                        }
+                       // --- INTERACTIVE COLLISION GHOST UPDATE ---
                     if (item.type === "interactive_collision") {
                         // Ensure Spawn Ghost is Hidden
                         this.ghostCylinderMesh.visible = false;
@@ -1416,18 +1710,68 @@ export class PlacementManager {
                             this.ghostBoxMesh.scale.set(props.x, props.y, props.z);
                             this.ghostBoxMesh.position.y = 0;
                         }
-                    } else {
+                    } else if (item.type === "sphere") {
+                        this.ghostBoxMesh.visible = false;
+                        this.ghostCylinderMesh.visible = false;
+                        if (this.ghostTubeGroup) this.ghostTubeGroup.visible = false;
+                        this.ghostSphereMesh.visible = true;
+                        const r = item.scale.radius || item.scale.x / 2 || 1.0;
+                        this.ghostSphereMesh.scale.set(r, r, r);
+                        this.ghostSphereMesh.position.y = 0;
+                    } else if (item.type === "cylinder") {
+                        this.ghostBoxMesh.visible = false;
+                        this.ghostSphereMesh.visible = false;
+                        if (this.ghostTubeGroup) this.ghostTubeGroup.visible = false;
+                        this.ghostCylinderMesh.visible = true;
+                        const r = item.scale.radius || item.scale.x / 2 || 1.0;
+                        const h = item.scale.y || 1.0;
+                        this.ghostCylinderMesh.scale.set(r, h, r);
+                        this.ghostCylinderMesh.position.y = 0;
+                    } else if (item.type === "circle") {
+                        this.ghostBoxMesh.visible = false;
+                        this.ghostSphereMesh.visible = false;
+                        if (this.ghostTubeGroup) this.ghostTubeGroup.visible = false;
+                        this.ghostCylinderMesh.visible = true;
+                        const r = item.scale.radius || item.scale.x / 2 || 1.0;
+                        const h = item.scale.y || 0.05;
+                        this.ghostCylinderMesh.scale.set(r, h, r);
+                        this.ghostCylinderMesh.position.y = 0;
+                    } else if (item.type === "cone") {
+                        this.ghostBoxMesh.visible = false;
                         this.ghostSphereMesh.visible = false;
                         this.ghostCylinderMesh.visible = false;
+                        if (this.ghostTubeGroup) this.ghostTubeGroup.visible = false;
+                        if (this.ghostSpikedFloorGroup) this.ghostSpikedFloorGroup.visible = false;
+                        this.ghostConeMesh.visible = true;
+                        const r = item.scale.radius || item.scale.x / 2 || 1.0;
+                        const h = item.scale.y || 1.0;
+                        this.ghostConeMesh.scale.set(r, h, r);
+                        this.ghostConeMesh.position.y = 0;
+                    } else if (item.type === "spiked_floor") {
+                        this.ghostBoxMesh.visible = false;
+                        this.ghostSphereMesh.visible = false;
+                        this.ghostCylinderMesh.visible = false;
+                        if (this.ghostTubeGroup) this.ghostTubeGroup.visible = false;
+                        if (this.ghostConeMesh) this.ghostConeMesh.visible = false;
+                        this.rebuildSpikedFloorGhost(item);
+                        if (this.ghostSpikedFloorGroup) this.ghostSpikedFloorGroup.visible = true;
+                    } else if (item.type === "tube") {
+                        this.ghostBoxMesh.visible = false;
+                        this.ghostSphereMesh.visible = false;
+                        this.ghostCylinderMesh.visible = false;
+                        this.rebuildTubeGhost(item);
+                        if (this.ghostTubeGroup) this.ghostTubeGroup.visible = true;
                     }
-
                 }
+            }
             } else {
                 // Pads
                 this.ghostBoxMesh.position.y = 0;
                 // Ensure other meshes are hidden for pads if reused
                 if (this.ghostRampMesh) this.ghostRampMesh.visible = false;
                 if (this.ghostStairsGroup) this.ghostStairsGroup.visible = false;
+                if (this.ghostConeMesh) this.ghostConeMesh.visible = false;
+                if (this.ghostSpikedFloorGroup) this.ghostSpikedFloorGroup.visible = false;
                 this.ghostBoxMesh.visible = true;
             }
 
@@ -1464,7 +1808,10 @@ export class PlacementManager {
 
             // Return Base Position (Bottom Center) for Spawner
             const basePos = targetPos.clone();
-            basePos.y -= realSize.y / 2;
+            const isSurfaceAligned = surfaceAlignedTypes.includes(item.type);
+            if (!isSurfaceAligned) {
+                basePos.y -= realSize.y / 2;
+            }
 
             // ALWAYS update lastValidPosition with the SNAPPED position
             // regardless of collision validity.

@@ -43,6 +43,14 @@ export interface HUDConfig {
     jumpWidth?: number;
     jumpHeight?: number;
     jumpShowText?: boolean;
+
+    showStamina?: boolean;
+    staminaStyle?: 'bar' | 'circle';
+    staminaPos?: UIPosition;
+    staminaOrientation?: 'horizontal' | 'vertical';
+    staminaWidth?: number;
+    staminaHeight?: number;
+    staminaShowText?: boolean;
     
     showInventory?: boolean;
     inventoryPos?: UIPosition;

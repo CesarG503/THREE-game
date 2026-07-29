@@ -6,6 +6,7 @@ import { RampUtils } from "../utils/RampUtils";
 import { applyMapObjectTexture, normalizeTextureSettings, type MapTextureSettings } from "../utils/TextureMapping";
 import type { ItemContext } from "../types";
 import { normalizeGravityOrientation } from "../utils/GravityOrientation";
+import { MapAssetManager } from "../map/MapAssetManager";
 
 type MapObjectScale = {
   x: number;
@@ -13,6 +14,23 @@ type MapObjectScale = {
   z: number;
   shapeType?: string;
   radius?: number;
+  length2?: number;
+  bendAngleX?: number;
+  bendAngleY?: number;
+};
+
+export const getTubeSegments = (scale: any) => {
+  if (scale && scale.segments && Array.isArray(scale.segments) && scale.segments.length > 0) {
+    return scale.segments;
+  }
+  const length1 = (scale && scale.y) || 2.0;
+  const length2 = (scale && scale.length2) !== undefined ? scale.length2 : 2.0;
+  const bendAngleX = (scale && scale.bendAngleX) !== undefined ? scale.bendAngleX : 0;
+  const bendAngleY = (scale && scale.bendAngleY) !== undefined ? scale.bendAngleY : 90;
+  return [
+    { length: length1, bendAngleX: 0, bendAngleY: 0 },
+    { length: length2, bendAngleX: bendAngleX, bendAngleY: bendAngleY }
+  ];
 };
 
 export class MapObjectItem extends Item {
@@ -122,6 +140,18 @@ export class MapObjectItem extends Item {
 
       ctx.textAlign = "center";
       ctx.fillText("MOV", 32, 48);
+    } else if (this.type === "damage_controller") {
+      ctx.fillStyle = "#ef4444";
+      ctx.beginPath();
+      ctx.arc(32, 32, 24, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = "white";
+      ctx.font = "bold 14px Arial";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("DMG", 32, 32);
     } else if (this.type === "interaction_button") {
       ctx.fillStyle = "#555";
       ctx.fillRect(16, 40, 32, 16);
@@ -137,6 +167,38 @@ export class MapObjectItem extends Item {
       ctx.font = "bold 16px Arial";
       ctx.textAlign = "center";
       ctx.fillText("F", 32, 38);
+    } else if (this.type === "logic_camera" || this.type === "camera_prop") {
+      ctx.fillStyle = "#1f2937";
+      ctx.fillRect(14, 24, 30, 18);
+      ctx.strokeRect(14, 24, 30, 18);
+
+      ctx.beginPath();
+      ctx.moveTo(44, 28);
+      ctx.lineTo(56, 22);
+      ctx.lineTo(56, 44);
+      ctx.lineTo(44, 38);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = "#93c5fd";
+      ctx.font = "bold 12px Arial";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("CAM", 30, 33);
+    } else if (this.type === "camera_panel") {
+      ctx.fillStyle = "#111827";
+      ctx.fillRect(12, 14, 40, 36);
+      ctx.strokeRect(12, 14, 40, 36);
+
+      ctx.fillStyle = "#38bdf8";
+      ctx.fillRect(17, 20, 30, 18);
+
+      ctx.fillStyle = "white";
+      ctx.font = "bold 14px Arial";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("F", 32, 46);
     } else if (this.type === "interactive_collision") {
       ctx.fillStyle = "rgba(0, 136, 255, 0.5)";
       ctx.strokeStyle = "#00FFFF";
@@ -289,6 +351,69 @@ export class MapObjectItem extends Item {
         ctx.lineTo(44, i);
       }
       ctx.stroke();
+    } else if (this.type === "sphere") {
+      ctx.beginPath();
+      ctx.arc(32, 32, 24, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.ellipse(32, 32, 24, 8, 0, 0, Math.PI * 2);
+      ctx.stroke();
+    } else if (this.type === "cylinder") {
+      ctx.beginPath();
+      ctx.ellipse(32, 16, 16, 6, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillRect(16, 16, 32, 32);
+      ctx.beginPath();
+      ctx.moveTo(16, 16);
+      ctx.lineTo(16, 48);
+      ctx.moveTo(48, 16);
+      ctx.lineTo(48, 48);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.ellipse(32, 48, 16, 6, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    } else if (this.type === "circle") {
+      ctx.beginPath();
+      ctx.ellipse(32, 32, 24, 12, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    } else if (this.type === "tube") {
+      ctx.lineWidth = 6;
+      ctx.beginPath();
+      ctx.moveTo(24, 52);
+      ctx.lineTo(24, 28);
+      ctx.quadraticCurveTo(24, 24, 28, 24);
+      ctx.lineTo(52, 24);
+      ctx.stroke();
+      ctx.lineWidth = 2;
+    } else if (this.type === "cone") {
+      ctx.beginPath();
+      ctx.moveTo(32, 8);
+      ctx.lineTo(56, 56);
+      ctx.lineTo(8, 56);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.ellipse(32, 56, 24, 8, 0, 0, Math.PI * 2);
+      ctx.stroke();
+    } else if (this.type === "spiked_floor") {
+      ctx.fillRect(8, 40, 48, 16);
+      ctx.strokeRect(8, 40, 48, 16);
+      ctx.beginPath();
+      ctx.moveTo(16, 40);
+      ctx.lineTo(20, 24);
+      ctx.lineTo(24, 40);
+      ctx.moveTo(28, 40);
+      ctx.lineTo(32, 24);
+      ctx.lineTo(36, 40);
+      ctx.moveTo(40, 40);
+      ctx.lineTo(44, 24);
+      ctx.lineTo(48, 40);
+      ctx.stroke();
     } else {
       ctx.fillRect(8, 20, 48, 24);
       ctx.strokeRect(8, 20, 48, 24);
@@ -298,16 +423,27 @@ export class MapObjectItem extends Item {
   }
 
   use(context: ItemContext) {
+    const findEditableTarget = (intersects: any[]) => {
+      for (const hit of intersects) {
+        let curr = hit.object;
+        while (curr) {
+          if (curr.userData && curr.userData.isEditableMapObject) {
+            return curr;
+          }
+          curr = curr.parent;
+        }
+      }
+      return null;
+    };
+
     if (this.type === "interactive_collision") {
       if (context.isRightClick) {
         const raycaster = new THREE.Raycaster();
         raycaster.set(context.origin, context.direction);
         const intersects = raycaster.intersectObjects(context.scene.children, true);
-        const hit = intersects.find((h: any) => h.object.userData && h.object.userData.isEditableMapObject);
+        const target = findEditableTarget(intersects);
 
-        if (hit) {
-          const target = hit.object;
-
+        if (target) {
           if (!target.userData.logicProperties) target.userData.logicProperties = {};
 
           target.userData.originalMapObjectType = target.userData.mapObjectType;
@@ -335,7 +471,7 @@ export class MapObjectItem extends Item {
       }
     }
 
-    if (context.isRightClick && this.type !== "movement_controller") {
+    if (context.isRightClick && this.type !== "movement_controller" && this.type !== "damage_controller") {
       return false;
     }
 
@@ -373,11 +509,9 @@ export class MapObjectItem extends Item {
       raycaster.set(context.origin, context.direction);
 
       const intersects = raycaster.intersectObjects(context.scene.children, true);
-      const hit = intersects.find((h: any) => h.object.userData && h.object.userData.isEditableMapObject);
+      const target = findEditableTarget(intersects);
 
-      if (hit) {
-        const target = hit.object;
-
+      if (target) {
         if (!target.userData.logicProperties) {
           target.userData.logicProperties = {};
         }
@@ -400,6 +534,45 @@ export class MapObjectItem extends Item {
           alert(`Transformado en Objeto Móvil: ${target.userData.mapObjectType}`);
         } else {
           alert(`Este objeto ya tiene lógica de movimiento.`);
+        }
+
+        return true;
+      }
+      return false;
+    }
+
+    if (this.type === "damage_controller") {
+      const raycaster = new THREE.Raycaster();
+      raycaster.set(context.origin, context.direction);
+
+      const intersects = raycaster.intersectObjects(context.scene.children, true);
+      const target = findEditableTarget(intersects);
+
+      if (target) {
+        if (!target.userData.logicProperties) {
+          target.userData.logicProperties = {};
+        }
+
+        const logicProps = target.userData.logicProperties;
+        if (!logicProps.enableDamage) {
+          const dmgDefaults = this.logicProperties || {};
+          logicProps.name = target.userData.name || target.userData.mapObjectType;
+          logicProps.enableDamage = true;
+          logicProps.damage = dmgDefaults.damage !== undefined ? dmgDefaults.damage : 10;
+          logicProps.instantKill = !!dmgDefaults.instantKill;
+          logicProps.percentDamage = dmgDefaults.percentDamage !== undefined ? dmgDefaults.percentDamage : 0;
+          logicProps.maxDamage = dmgDefaults.maxDamage !== undefined ? dmgDefaults.maxDamage : 100;
+          logicProps.enableDamageStopLimit = !!dmgDefaults.enableDamageStopLimit;
+          logicProps.damageStopLimit = dmgDefaults.damageStopLimit !== undefined ? dmgDefaults.damageStopLimit : 100;
+          logicProps.damageCooldown = dmgDefaults.damageCooldown !== undefined ? dmgDefaults.damageCooldown : 1.0;
+          logicProps.accumulatedDamage = dmgDefaults.accumulatedDamage !== undefined ? dmgDefaults.accumulatedDamage : 0;
+          logicProps.enableKnockback = !!dmgDefaults.enableKnockback;
+          logicProps.knockbackForce = dmgDefaults.knockbackForce !== undefined ? dmgDefaults.knockbackForce : 15;
+          logicProps.knockbackDirection = dmgDefaults.knockbackDirection || "automatic";
+
+          alert(`Controlador de Daño aplicado a: ${target.userData.name || target.userData.mapObjectType}`);
+        } else {
+          alert(`Este objeto ya tiene el controlador de daño habilitado.`);
         }
 
         return true;
@@ -545,20 +718,26 @@ export class MapObjectItem extends Item {
       object3D.add(arrow);
 
       collidersDesc.push(col);
-    } else if (this.type === "movement_controller") {
+    } else if (this.type === "movement_controller" || this.type === "damage_controller") {
       const geometry = new THREE.SphereGeometry(this.scale.x, 16, 16);
       const material = new THREE.MeshStandardMaterial({
-        color: this.color,
+        color: this.color || (this.type === "damage_controller" ? 0xff3333 : 0x00FFFF),
         transparent: true,
         opacity: 0.7,
         wireframe: true
       });
       object3D = new THREE.Mesh(geometry, material);
 
-      const core = new THREE.Mesh(new THREE.BoxGeometry(this.scale.x, this.scale.x, this.scale.x), new THREE.MeshBasicMaterial({ color: 0xffffff }));
+      const core = new THREE.Mesh(
+        new THREE.BoxGeometry(this.scale.x, this.scale.x, this.scale.x),
+        new THREE.MeshBasicMaterial({ color: this.type === "damage_controller" ? 0xff3333 : 0xffffff })
+      );
       object3D.add(core);
 
       const col = RAPIER.ColliderDesc.ball(this.scale.x);
+      if (this.type === "damage_controller") {
+        col.setSensor(true);
+      }
       collidersDesc.push(col);
     } else if (this.type === "interaction_button") {
       const group = new THREE.Group();
@@ -590,6 +769,161 @@ export class MapObjectItem extends Item {
       if (this.logicProperties.holdTime === undefined) this.logicProperties.holdTime = 0;
       if (this.logicProperties.oneShot === undefined) this.logicProperties.oneShot = false;
       if (this.logicProperties.triggered === undefined) this.logicProperties.triggered = false;
+    } else if (this.type === "camera_prop") {
+      const group: any = new THREE.Group();
+      const bodyColor = this.color !== undefined ? this.color : 0x1f2937;
+      const bodyMat = new THREE.MeshStandardMaterial({
+        color: bodyColor,
+        roughness: 0.45,
+        metalness: 0.15
+      });
+      const lensMat = new THREE.MeshStandardMaterial({
+        color: 0x111827,
+        emissive: 0x0f172a,
+        emissiveIntensity: 0.4,
+        roughness: 0.3
+      });
+
+      const body = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.35, 0.35), bodyMat);
+      body.castShadow = true;
+      group.add(body);
+
+      const lens = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.2, 0.28, 24), lensMat);
+      lens.rotation.x = Math.PI / 2;
+      lens.position.z = -0.3;
+      lens.castShadow = true;
+      group.add(lens);
+
+      const mount = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.5, 12), bodyMat);
+      mount.position.y = -0.4;
+      group.add(mount);
+
+      const base = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.06, 24), bodyMat);
+      base.position.y = -0.66;
+      group.add(base);
+
+      object3D = group;
+
+      const col = RAPIER.ColliderDesc.cuboid(0.28, 0.45, 0.28);
+      collidersDesc.push(col);
+    } else if (this.type === "logic_camera") {
+      const group: any = new THREE.Group();
+      const isEditor = window.location.pathname.includes("/editor");
+
+      const helperMat = new THREE.MeshBasicMaterial({
+        color: 0x8bd3ff,
+        wireframe: true,
+        transparent: true,
+        opacity: 0.6
+      });
+      const helperMesh = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.25, 0.25), helperMat);
+      helperMesh.visible = isEditor;
+      group.add(helperMesh);
+
+      const frustumLineMat = new THREE.LineBasicMaterial({
+        color: 0x8bd3ff,
+        transparent: true,
+        opacity: 0.55
+      });
+
+      const makeFrustum = (fov = 60, far = 6, aspect = 16 / 9) => {
+        const near = 0.35;
+        const fovRad = THREE.MathUtils.degToRad(fov);
+        const nearH = Math.tan(fovRad / 2) * near;
+        const nearW = nearH * aspect;
+        const farH = Math.tan(fovRad / 2) * far;
+        const farW = farH * aspect;
+        const points = [
+          new THREE.Vector3(0, 0, 0), new THREE.Vector3(-farW, farH, -far),
+          new THREE.Vector3(0, 0, 0), new THREE.Vector3(farW, farH, -far),
+          new THREE.Vector3(0, 0, 0), new THREE.Vector3(farW, -farH, -far),
+          new THREE.Vector3(0, 0, 0), new THREE.Vector3(-farW, -farH, -far),
+          new THREE.Vector3(-nearW, nearH, -near), new THREE.Vector3(nearW, nearH, -near),
+          new THREE.Vector3(nearW, nearH, -near), new THREE.Vector3(nearW, -nearH, -near),
+          new THREE.Vector3(nearW, -nearH, -near), new THREE.Vector3(-nearW, -nearH, -near),
+          new THREE.Vector3(-nearW, -nearH, -near), new THREE.Vector3(-nearW, nearH, -near),
+          new THREE.Vector3(-farW, farH, -far), new THREE.Vector3(farW, farH, -far),
+          new THREE.Vector3(farW, farH, -far), new THREE.Vector3(farW, -farH, -far),
+          new THREE.Vector3(farW, -farH, -far), new THREE.Vector3(-farW, -farH, -far),
+          new THREE.Vector3(-farW, -farH, -far), new THREE.Vector3(-farW, farH, -far)
+        ];
+        const geometry = new THREE.BufferGeometry().setFromPoints(points);
+        return new THREE.LineSegments(geometry, frustumLineMat);
+      };
+
+      group.updateLogicCameraVisuals = () => {
+        if (group.userData.cameraFrustumLines) {
+          group.remove(group.userData.cameraFrustumLines);
+          group.userData.cameraFrustumLines.geometry?.dispose?.();
+        }
+        const props = group.userData.logicProperties || this.logicProperties || {};
+        const frustum = makeFrustum(Number(props.fov ?? 60), Number(props.far ?? 6), Number(props.aspect ?? 16 / 9));
+        frustum.userData.ignoreRaycast = true;
+        frustum.visible = window.location.pathname.includes("/editor");
+        group.userData.cameraFrustumLines = frustum;
+        group.add(frustum);
+
+        helperMesh.visible = window.location.pathname.includes("/editor");
+      };
+
+      object3D = group;
+
+      if (!this.logicProperties) this.logicProperties = {};
+      if (this.logicProperties.logicKind === undefined) this.logicProperties.logicKind = "logic_camera";
+      if (this.logicProperties.name === undefined) this.logicProperties.name = "Camara";
+      if (this.logicProperties.mode === undefined) this.logicProperties.mode = "fixed";
+      if (this.logicProperties.fov === undefined) this.logicProperties.fov = 60;
+      if (this.logicProperties.far === undefined) this.logicProperties.far = 6;
+      if (this.logicProperties.aspect === undefined) this.logicProperties.aspect = 16 / 9;
+      if (this.logicProperties.eyeHeightOffset === undefined) this.logicProperties.eyeHeightOffset = 0;
+
+      // Note: No collider for logic_camera to avoid physical interactions.
+    } else if (this.type === "camera_panel") {
+      const group = new THREE.Group();
+      const panelColor = this.color !== undefined ? this.color : 0x0f172a;
+      const frameMat = new THREE.MeshStandardMaterial({
+        color: panelColor,
+        roughness: 0.5,
+        metalness: 0.1
+      });
+      const screenMat = new THREE.MeshStandardMaterial({
+        color: 0x082f49,
+        emissive: 0x0284c7,
+        emissiveIntensity: 0.55,
+        roughness: 0.25
+      });
+
+      const frame = new THREE.Mesh(new THREE.BoxGeometry(this.scale.x, this.scale.y, this.scale.z), frameMat);
+      frame.castShadow = true;
+      frame.receiveShadow = true;
+      group.add(frame);
+
+      const screen = new THREE.Mesh(
+        new THREE.PlaneGeometry(this.scale.x * 0.72, this.scale.z * 0.58),
+        screenMat
+      );
+      screen.position.y = this.scale.y / 2 + 0.004;
+      screen.position.z = this.scale.z * 0.08;
+      screen.rotation.x = -Math.PI / 2;
+      group.add(screen);
+
+      const keyPlate = new THREE.Mesh(
+        new THREE.BoxGeometry(this.scale.x * 0.3, 0.02, this.scale.z * 0.13),
+        new THREE.MeshBasicMaterial({ color: 0xe5e7eb })
+      );
+      keyPlate.position.set(0, this.scale.y / 2 + 0.012, -this.scale.z * 0.33);
+      group.add(keyPlate);
+
+      object3D = group;
+
+      const col = RAPIER.ColliderDesc.cuboid(this.scale.x / 2, this.scale.y / 2, this.scale.z / 2);
+      collidersDesc.push(col);
+
+      if (!this.logicProperties) this.logicProperties = {};
+      if (this.logicProperties.logicKind === undefined) this.logicProperties.logicKind = "camera_panel";
+      if (this.logicProperties.name === undefined) this.logicProperties.name = "Panel de Camaras";
+      if (!Array.isArray(this.logicProperties.cameraIds)) this.logicProperties.cameraIds = [];
+      if (this.logicProperties.holdTime === undefined) this.logicProperties.holdTime = 0;
     } else if (this.type === "interactive_collision") {
       const shapeType = this.scale.shapeType || "box";
       const radius = this.scale.radius || 1.0;
@@ -702,15 +1036,18 @@ export class MapObjectItem extends Item {
       object3D = new THREE.Mesh(geometry, material);
       object3D.receiveShadow = true;
 
-      const textureLoader = new THREE.TextureLoader();
       const texturePath = isJump ? "/assets/textures/salto.png" : "/assets/textures/impulso.png";
-      const texture = textureLoader.load(texturePath);
       const arrowGeometry = new THREE.PlaneGeometry(this.scale.x * 0.8, this.scale.z * 0.8);
       const arrowMaterial = new THREE.MeshBasicMaterial({
-        map: texture,
         transparent: true,
         opacity: 0.85,
         side: THREE.DoubleSide
+      });
+      MapAssetManager.loadTexture(texturePath).then((texture) => {
+        arrowMaterial.map = texture;
+        arrowMaterial.needsUpdate = true;
+      }).catch((err) => {
+        console.error("Failed to load pad texture:", texturePath, err);
       });
       const arrowMesh = new THREE.Mesh(arrowGeometry, arrowMaterial);
       arrowMesh.position.y = this.scale.y / 2 + 0.01;
@@ -836,6 +1173,269 @@ export class MapObjectItem extends Item {
       if (this.logicProperties.oneShot === undefined) this.logicProperties.oneShot = false;
       if (this.logicProperties.pulsationMode === undefined) this.logicProperties.pulsationMode = false;
       if (this.logicProperties.triggered === undefined) this.logicProperties.triggered = false;
+    } else if (this.type === "sphere") {
+      const radius = this.scale.radius !== undefined ? this.scale.radius : (this.scale.x / 2 || 1.0);
+      const geometry = new THREE.SphereGeometry(radius, 32, 32);
+      const material = new THREE.MeshStandardMaterial({
+        color: this.color,
+        transparent: this.opacity !== undefined && this.opacity < 1.0,
+        opacity: this.opacity !== undefined ? this.opacity : 1.0
+      });
+      object3D = new THREE.Mesh(geometry, material);
+      object3D.castShadow = true;
+      object3D.receiveShadow = true;
+
+      const col = RAPIER.ColliderDesc.ball(radius);
+      collidersDesc.push(col);
+
+      object3D.userData.shapeType = "sphere";
+      object3D.userData.radius = radius;
+    } else if (this.type === "cylinder") {
+      const radius = this.scale.radius !== undefined ? this.scale.radius : (this.scale.x / 2 || 1.0);
+      const height = this.scale.y || 1.0;
+      const geometry = new THREE.CylinderGeometry(radius, radius, height, 32);
+      const material = new THREE.MeshStandardMaterial({
+        color: this.color,
+        transparent: this.opacity !== undefined && this.opacity < 1.0,
+        opacity: this.opacity !== undefined ? this.opacity : 1.0
+      });
+      object3D = new THREE.Mesh(geometry, material);
+      object3D.castShadow = true;
+      object3D.receiveShadow = true;
+
+      const col = RAPIER.ColliderDesc.cylinder(height / 2, radius);
+      collidersDesc.push(col);
+
+      object3D.userData.shapeType = "cylinder";
+      object3D.userData.radius = radius;
+    } else if (this.type === "circle") {
+      const radius = this.scale.radius !== undefined ? this.scale.radius : (this.scale.x / 2 || 1.0);
+      const height = this.scale.y !== undefined ? this.scale.y : 0.05;
+      const geometry = new THREE.CylinderGeometry(radius, radius, height, 32);
+      const material = new THREE.MeshStandardMaterial({
+        color: this.color,
+        transparent: this.opacity !== undefined && this.opacity < 1.0,
+        opacity: this.opacity !== undefined ? this.opacity : 1.0
+      });
+      object3D = new THREE.Mesh(geometry, material);
+      object3D.castShadow = true;
+      object3D.receiveShadow = true;
+
+      const col = RAPIER.ColliderDesc.cylinder(height / 2, radius);
+      collidersDesc.push(col);
+
+      object3D.userData.shapeType = "circle";
+      object3D.userData.radius = radius;
+    } else if (this.type === "cone") {
+      const radius = this.scale.radius !== undefined ? this.scale.radius : (this.scale.x / 2 || 1.0);
+      const height = this.scale.y || 1.0;
+      const geometry = new THREE.ConeGeometry(radius, height, 32);
+      const material = new THREE.MeshStandardMaterial({
+        color: this.color,
+        transparent: this.opacity !== undefined && this.opacity < 1.0,
+        opacity: this.opacity !== undefined ? this.opacity : 1.0
+      });
+      object3D = new THREE.Mesh(geometry, material);
+      object3D.castShadow = true;
+      object3D.receiveShadow = true;
+
+      const col = RAPIER.ColliderDesc.cone(height / 2, radius);
+      collidersDesc.push(col);
+
+      object3D.userData.shapeType = "cone";
+      object3D.userData.radius = radius;
+    } else if (this.type === "spiked_floor") {
+      const group = new THREE.Group();
+      const baseGeo = new THREE.BoxGeometry(this.scale.x, this.scale.y, this.scale.z);
+      const material = new THREE.MeshStandardMaterial({
+        color: this.color,
+        transparent: this.opacity !== undefined && this.opacity < 1.0,
+        opacity: this.opacity !== undefined ? this.opacity : 1.0
+      });
+      const baseMesh = new THREE.Mesh(baseGeo, material);
+      baseMesh.castShadow = true;
+      baseMesh.receiveShadow = true;
+      group.add(baseMesh);
+
+      const spikeRadius = this.scale.spikeRadius !== undefined ? this.scale.spikeRadius : 0.15;
+      const spikeHeight = this.scale.spikeHeight !== undefined ? this.scale.spikeHeight : 0.4;
+      const spikeSpacing = this.scale.spikeSpacing !== undefined ? this.scale.spikeSpacing : 0.5;
+      const spikeColor = this.scale.spikeColor !== undefined ? this.scale.spikeColor : "#dc2626";
+      const spikeTexturePath = this.scale.spikeTexturePath || null;
+
+      const buffer = spikeRadius * 1.5;
+      const availableW = this.scale.x - 2 * buffer;
+      const availableD = this.scale.z - 2 * buffer;
+
+      const numX = availableW > 0 ? Math.max(1, Math.floor(availableW / spikeSpacing) + 1) : 1;
+      const numZ = availableD > 0 ? Math.max(1, Math.floor(availableD / spikeSpacing) + 1) : 1;
+
+      const spikeGeo = new THREE.ConeGeometry(spikeRadius, spikeHeight, 8);
+      const spikeMat = new THREE.MeshStandardMaterial({
+        color: new THREE.Color(spikeColor),
+        roughness: 0.8
+      });
+
+      for (let i = 0; i < numX; i++) {
+        for (let j = 0; j < numZ; j++) {
+          let xPos = 0;
+          if (numX > 1) {
+            xPos = -availableW / 2 + (i * (availableW / (numX - 1)));
+          } else {
+            xPos = 0;
+          }
+
+          let zPos = 0;
+          if (numZ > 1) {
+            zPos = -availableD / 2 + (j * (availableD / (numZ - 1)));
+          } else {
+            zPos = 0;
+          }
+
+          const spike = new THREE.Mesh(spikeGeo, spikeMat);
+          spike.userData.isSpike = true;
+          spike.position.set(xPos, this.scale.y / 2 + spikeHeight / 2, zPos);
+          spike.castShadow = true;
+          spike.receiveShadow = true;
+          group.add(spike);
+        }
+      }
+
+      // Load texture for spikes
+      if (spikeTexturePath) {
+        MapAssetManager.loadTexture(spikeTexturePath)
+          .then((texture) => {
+            group.children.forEach(c => {
+              if (c.userData && c.userData.isSpike) {
+                c.material.map = texture.clone();
+                c.material.map.wrapS = THREE.RepeatWrapping;
+                c.material.map.wrapT = THREE.RepeatWrapping;
+                c.material.map.repeat.set(1, 1);
+                c.material.needsUpdate = true;
+              }
+            });
+          })
+          .catch((err) => {
+            console.error("Failed to load spike texture:", spikeTexturePath, err);
+          });
+      }
+
+      object3D = group;
+
+      const col = RAPIER.ColliderDesc.cuboid(this.scale.x / 2, this.scale.y / 2, this.scale.z / 2);
+      collidersDesc.push(col);
+
+      if (!this.logicProperties) this.logicProperties = {};
+      if (this.logicProperties.enableDamage === undefined) this.logicProperties.enableDamage = true;
+      if (this.logicProperties.damage === undefined) this.logicProperties.damage = 10;
+      if (this.logicProperties.damageCooldown === undefined) this.logicProperties.damageCooldown = 0.5;
+
+      object3D.userData.shapeType = "spiked_floor";
+    } else if (this.type === "tube") {
+      const radius = this.scale.radius !== undefined ? this.scale.radius : 0.5;
+      const segments = getTubeSegments(this.scale);
+
+      const group = new THREE.Group();
+      let parentGroup = group;
+
+      for (let i = 0; i < segments.length; i++) {
+        const seg = segments[i];
+        const segLength = seg.length || 2.0;
+
+        const segColor = seg.color !== undefined ? seg.color : this.color;
+        const segOpacity = seg.opacity !== undefined ? seg.opacity : (this.opacity !== undefined ? this.opacity : 1.0);
+        const segTexSettings = seg.textureSettings || this.textureSettings;
+
+        const material = new THREE.MeshStandardMaterial({
+          color: segColor,
+          transparent: segOpacity < 1.0,
+          opacity: segOpacity
+        });
+
+        // Cylinder mesh
+        const cylGeo = new THREE.CylinderGeometry(radius, radius, segLength, 32);
+        const mesh = new THREE.Mesh(cylGeo, material);
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+        mesh.userData.isTubeSegment = true;
+        mesh.userData.segmentIndex = i;
+        mesh.position.set(0, segLength / 2, 0);
+        parentGroup.add(mesh);
+
+        // Load segment texture asynchronously
+        const segTexPath = seg.texturePath || this.texturePath;
+        if (segTexPath) {
+          MapAssetManager.loadTexture(segTexPath)
+            .then((texture) => {
+              applyMapObjectTexture(mesh, texture, this.scale, segTexSettings);
+            })
+            .catch(err => console.error("Failed to load segment texture:", err));
+        }
+
+        let elbowMesh: THREE.Mesh | null = null;
+        if (i < segments.length - 1) {
+          const elbowGeo = new THREE.SphereGeometry(radius, 32, 32);
+          elbowMesh = new THREE.Mesh(elbowGeo, material);
+          elbowMesh.castShadow = true;
+          elbowMesh.receiveShadow = true;
+          elbowMesh.userData.isTubeElbow = true;
+          elbowMesh.userData.segmentIndex = i;
+          elbowMesh.position.set(0, segLength, 0);
+          parentGroup.add(elbowMesh);
+
+          if (segTexPath) {
+            MapAssetManager.loadTexture(segTexPath)
+              .then((texture) => {
+                if (elbowMesh) applyMapObjectTexture(elbowMesh, texture, this.scale, segTexSettings);
+              })
+              .catch(err => {});
+          }
+
+          // Next group
+          const nextSeg = segments[i + 1];
+          const childGroup = new THREE.Group();
+          childGroup.position.set(0, segLength, 0);
+          childGroup.rotation.set(
+            (nextSeg.bendAngleX || 0) * Math.PI / 180,
+            (nextSeg.bendAngleY || 0) * Math.PI / 180,
+            0,
+            "YXZ"
+          );
+          childGroup.userData.isTubeGroup = true;
+          childGroup.userData.segmentIndex = i + 1;
+          parentGroup.add(childGroup);
+          parentGroup = childGroup;
+        }
+      }
+
+      object3D = group;
+
+      // Extract absolute local matrices to register colliders in Rapier
+      group.updateMatrixWorld(true);
+      group.traverse((child: any) => {
+        if (child.isMesh && (child.userData.isTubeSegment || child.userData.isTubeElbow)) {
+          const localMat = group.matrixWorld.clone().invert().multiply(child.matrixWorld);
+          const pos = new THREE.Vector3();
+          const quat = new THREE.Quaternion();
+          const scaleVec = new THREE.Vector3();
+          localMat.decompose(pos, quat, scaleVec);
+
+          if (child.userData.isTubeSegment) {
+            const idx = child.userData.segmentIndex;
+            const segLength = segments[idx].length || 2.0;
+            const col = RAPIER.ColliderDesc.cylinder(segLength / 2, radius)
+              .setTranslation(pos.x, pos.y, pos.z)
+              .setRotation(quat);
+            collidersDesc.push(col);
+          } else if (child.userData.isTubeElbow) {
+            const col = RAPIER.ColliderDesc.ball(radius)
+              .setTranslation(pos.x, pos.y, pos.z);
+            collidersDesc.push(col);
+          }
+        }
+      });
+
+      object3D.userData.shapeType = "tube";
     } else {
       const geometry = new THREE.BoxGeometry(this.scale.x, this.scale.y, this.scale.z);
       const material = new THREE.MeshStandardMaterial({
@@ -851,19 +1451,24 @@ export class MapObjectItem extends Item {
       collidersDesc.push(col);
     }
 
-    object3D.position.copy(position);
-    if (this.type !== "interaction_button" && this.type !== "spawn_point" && !isCenterPosition) {
-      object3D.position.y += this.scale.y / 2;
-    }
+     object3D.position.copy(position);
+     const surfaceAlignedTypes = ["interaction_button", "target", "gravity_pad", "impulse_jump", "impulse_lateral", "farming_zone", "logic_camera", "camera_panel", "camera_prop", "cone", "spiked_floor"];
+     const isSurfaceAligned = surfaceAlignedTypes.includes(this.type);
+     if (!isSurfaceAligned && this.type !== "spawn_point" && this.type !== "tube" && !isCenterPosition) {
+       object3D.position.y += this.scale.y / 2;
+     }
 
     object3D.rotation.copy(rotation);
     object3D.scale.set(1, 1, 1);
 
     if (this.texturePath) {
-      const textureLoader = new THREE.TextureLoader();
-      textureLoader.load(this.texturePath, (texture: any) => {
-        applyMapObjectTexture(object3D, texture, this.scale, this.textureSettings);
-      });
+      MapAssetManager.loadTexture(this.texturePath)
+        .then((texture) => {
+          applyMapObjectTexture(object3D, texture, this.scale, this.textureSettings);
+        })
+        .catch((err) => {
+          console.error("Failed to load map object texture:", this.texturePath, err);
+        });
     }
 
     object3D.userData.isEditableMapObject = true;
@@ -874,7 +1479,7 @@ export class MapObjectItem extends Item {
     object3D.userData.originalUUID = object3D.userData.uuid;
     object3D.userData.color = this.color;
     object3D.userData.opacity = this.opacity !== undefined ? this.opacity : 1.0;
-    object3D.userData.originalScale = { x: this.scale.x, y: this.scale.y, z: this.scale.z };
+    object3D.userData.originalScale = { ...this.scale };
     object3D.userData.originalRotY = object3D.rotation.y;
     object3D.userData.texturePath = this.texturePath;
     object3D.userData.textureAssetId = this.textureAssetId;
@@ -882,6 +1487,10 @@ export class MapObjectItem extends Item {
 
     if (this.logicProperties) {
       object3D.userData.logicProperties = { ...this.logicProperties };
+    }
+
+    if (typeof object3D.updateLogicCameraVisuals === "function") {
+      object3D.updateLogicCameraVisuals();
     }
 
     scene.add(object3D);

@@ -13,19 +13,73 @@ import {
     scalePixelPosition
 } from './modules/HUDResponsiveUtils'
 
+function ensureStaminaHUDDefaults(hudSettings: any) {
+    if (!hudSettings) return;
+
+    if (hudSettings.showStamina === undefined) {
+        hudSettings.showStamina = true;
+    }
+    if (hudSettings.staminaStyle === undefined) {
+        hudSettings.staminaStyle = 'bar';
+    }
+    if (!hudSettings.staminaPos) {
+        hudSettings.staminaPos = {
+            left: "33.69%",
+            top: "94.77%"
+        };
+    }
+    if (hudSettings.staminaShowText === undefined) {
+        hudSettings.staminaShowText = false;
+    }
+    if (hudSettings.staminaOrientation === undefined) {
+        hudSettings.staminaOrientation = "horizontal";
+    }
+    if (hudSettings.staminaWidth === undefined) {
+        hudSettings.staminaWidth = 277;
+    }
+    if (hudSettings.staminaHeight === undefined) {
+        hudSettings.staminaHeight = 5;
+    }
+
+    if (hudSettings.layerOrder && !hudSettings.layerOrder.includes('stamina')) {
+        const idx = hudSettings.layerOrder.indexOf('inventory');
+        if (idx !== -1) {
+            hudSettings.layerOrder.splice(idx, 0, 'stamina');
+        } else {
+            hudSettings.layerOrder.push('stamina');
+        }
+    }
+
+    if (!hudSettings.hudAnchors) {
+        hudSettings.hudAnchors = {};
+    }
+    if (!hudSettings.hudAnchors.stamina) {
+        hudSettings.hudAnchors.stamina = {
+            parentId: "inventory",
+            pos: {
+                left: "5.912%",
+                top: "63.000%"
+            }
+        };
+    }
+}
+
 export class GameHUD {
     container: HTMLElement;
     timerElement: HTMLElement | null;
     healthElement: HTMLElement | null;
     jumpElement: HTMLElement | null;
+    staminaElement: HTMLElement | null;
     inventoryElement: HTMLElement | null;
     settings: HUDConfig;
     resizeTimer: number | null;
     layoutFrameId: number | null;
     lastHealth: { current: number; max: number } | null;
     lastJump: { current: number; max: number } | null;
+    lastStamina: { current: number; max: number } | null;
     onViewportChange: () => void;
     isDestroyed: boolean;
+    game: any;
 
     constructor() {
         this.container = document.createElement('div')
@@ -40,6 +94,7 @@ export class GameHUD {
         this.timerElement = null
         this.healthElement = null
         this.jumpElement = null
+        this.staminaElement = null
         this.inventoryElement = null
 
         this.settings = {}
@@ -47,6 +102,7 @@ export class GameHUD {
         this.layoutFrameId = null
         this.lastHealth = null
         this.lastJump = null
+        this.lastStamina = null
         this.isDestroyed = false
 
         this.onViewportChange = () => {
@@ -66,11 +122,29 @@ export class GameHUD {
     createHUD(settings: HUDConfig) {
         if (this.isDestroyed) return
         this.settings = settings || {};
+        ensureStaminaHUDDefaults(this.settings);
         const sharedInventory = document.getElementById('inventory-container')
+
+        // Hide HUD check based on player role profile
+        const profile = this.game?.playerConfigManager?.getCurrentProfile?.();
+        if (profile?.hideHUD) {
+            if (this.healthElement) { this.healthElement.remove(); this.healthElement = null; }
+            if (this.jumpElement) { this.jumpElement.remove(); this.jumpElement = null; }
+            if (this.staminaElement) { this.staminaElement.remove(); this.staminaElement = null; }
+            if (this.inventoryElement && this.inventoryElement.id !== 'inventory-container') {
+                this.inventoryElement.remove();
+                this.inventoryElement = null;
+            }
+            if (sharedInventory) {
+                sharedInventory.style.display = 'none';
+            }
+            return;
+        }
 
         // Clear existing (except timer)
         if (this.healthElement) this.healthElement.remove();
         if (this.jumpElement) this.jumpElement.remove();
+        if (this.staminaElement) this.staminaElement.remove();
         // Do not remove inventoryElement as it is a shared DOM element
         if (this.inventoryElement && this.inventoryElement.id !== 'inventory-container') {
             this.inventoryElement.remove();
@@ -85,7 +159,7 @@ export class GameHUD {
             sharedInventory.style.display = 'none'
         }
 
-        const layerOrder = this.settings.layerOrder || ['health', 'jump', 'inventory'];
+        const layerOrder = this.settings.layerOrder || ['health', 'jump', 'stamina', 'inventory'];
         // User wants: Last in list = Bottom Layer
         // DOM: First appended = Bottom Layer
         // So we append in reverse order of the list (Last -> First)
@@ -99,6 +173,7 @@ export class GameHUD {
             const id = layerOrder[i];
             if (id === 'health' && this.settings.showHealth) this.createHealth(this.settings);
             else if (id === 'jump' && this.settings.showJump) this.createJump(this.settings);
+            else if (id === 'stamina' && this.settings.showStamina) this.createStamina(this.settings);
             else if (id === 'inventory' && this.settings.showInventory) this.createInventory(this.settings);
         }
 
@@ -110,6 +185,7 @@ export class GameHUD {
         this.keepHUDInsideViewport()
         if (this.lastHealth) this.updateHealth(this.lastHealth.current, this.lastHealth.max)
         if (this.lastJump) this.updateJump(this.lastJump.current, this.lastJump.max)
+        if (this.lastStamina) this.updateStamina(this.lastStamina.current, this.lastStamina.max)
         this.applyLayerOrder()
         this.scheduleLayoutStabilization()
     }
@@ -220,6 +296,53 @@ export class GameHUD {
         this.applyPosition(el, s.jumpPos);
         this.container.appendChild(el);
         this.jumpElement = el;
+    }
+
+    createStamina(s: HUDConfig) {
+        const el = document.createElement('div');
+        el.id = 'hud-stamina';
+        el.style.cssText = `display: flex; align-items: center; position: absolute; pointer-events: none;`;
+
+        // Orientation
+        if (s.staminaOrientation === 'vertical') {
+            el.style.flexDirection = 'column-reverse';
+        } else {
+            el.style.flexDirection = 'row';
+        }
+
+        if (s.staminaStyle === 'bar') {
+            const w = fitLength(s.staminaWidth || 200, this.container, 'x', 2);
+            const h = fitLength(s.staminaHeight || 8, this.container, 'y', 1);
+            const isVert = s.staminaOrientation === 'vertical';
+            const fillDir = isVert ? 'to top' : '90deg';
+            const showText = s.staminaShowText && w >= 32 && h >= 8;
+            const fontSize = clamp(Math.round(Math.min(w, h) / 1.5), 6, 18);
+
+            el.innerHTML = `
+                <div style="width: ${w}px; height: ${h}px; background: rgba(0,0,0,0.7); border-radius: ${Math.min(w, h) / 2}px; overflow:hidden; position:relative; box-sizing:border-box;">
+                    <div id="stamina-bar-fill" style="width: 100%; height: 100%; background: linear-gradient(${fillDir}, #ffcc00, #ff5500); transform-origin: ${isVert ? 'bottom' : 'left'};"></div>
+                     ${showText ?
+                    `<div id="stamina-text" style="position:absolute; top:0; left:0; width:100%; height:100%; display:flex; align-items:center; justify-content:center; color:white; font-size:${fontSize}px; font-weight:bold; text-shadow:1px 1px 1px black;">1</div>`
+                    : ''}
+                </div>
+            `;
+        } else {
+            const size = scaleHUDValue(50, this.container, 34, 50);
+            const center = size / 2;
+            const radius = Math.max(10, Math.round(size * 0.4));
+            const stroke = Math.max(3, Math.round(size * 0.1));
+            const dash = 2 * Math.PI * radius;
+            el.innerHTML = `
+               <svg width="${size}" height="${size}" data-radius="${radius}" style="transform: rotate(-90deg)">
+                   <circle cx="${center}" cy="${center}" r="${radius}" stroke="rgba(0,0,0,0.5)" stroke-width="${stroke}" fill="transparent"/>
+                   <circle id="stamina-circle-fill" cx="${center}" cy="${center}" r="${radius}" stroke="#ffcc00" stroke-width="${stroke}" fill="transparent" stroke-dasharray="${dash}" stroke-dashoffset="${dash}"/>
+               </svg>
+            `;
+        }
+
+        this.applyPosition(el, s.staminaPos);
+        this.container.appendChild(el);
+        this.staminaElement = el;
     }
 
     createInventory(s: HUDConfig) {
@@ -452,6 +575,53 @@ export class GameHUD {
         }
     }
 
+    updateStamina(current: number, max: number) {
+        this.lastStamina = { current, max };
+        if (!this.staminaElement) return;
+
+        // Ensure valid numbers
+        current = typeof current === 'number' ? current : 0;
+        max = (typeof max === 'number' && max > 0) ? max : 1;
+
+        if (this.settings.staminaStyle === 'bar') {
+            const fill = this.staminaElement.querySelector<HTMLElement>('#stamina-bar-fill');
+            const text = this.staminaElement.querySelector<HTMLElement>('#stamina-text');
+            const percentage = Math.max(0, Math.min(100, (current / max) * 100));
+
+            if (fill) {
+                const isVert = this.settings.staminaOrientation === 'vertical';
+                const prop = isVert ? 'height' : 'width';
+
+                // API v4: animate(targets, parameters)
+                animate(fill, {
+                    [prop]: `${percentage}%`,
+                    easing: 'easeOutQuad',
+                    duration: 100
+                });
+            }
+            if (text) {
+                text.textContent = Math.round(current).toString();
+            }
+
+        } else {
+            // Circle
+            const circle = this.staminaElement.querySelector<HTMLElement>('#stamina-circle-fill');
+            if (circle) {
+                const svg = circle.closest('svg');
+                const radius = parseFloat(svg?.getAttribute('data-radius') || '20');
+                const circumference = 2 * Math.PI * radius;
+                const offset = circumference - ((current / max) * circumference);
+
+                // API v4: animate(targets, parameters)
+                animate(circle, {
+                    strokeDashoffset: offset.toString(),
+                    easing: 'linear',
+                    duration: 100
+                });
+            }
+        }
+    }
+
     applyPosition(el: HTMLElement, pos?: UIPosition) {
         if (!pos) return;
         
@@ -505,6 +675,7 @@ export class GameHUD {
     getHudElement(id: string) {
         if (id === 'health') return this.healthElement;
         if (id === 'jump') return this.jumpElement;
+        if (id === 'stamina') return this.staminaElement;
         if (id === 'inventory') return this.inventoryElement;
         if (id.startsWith('fz_')) return document.getElementById(`fz-counter-${id.substring(3)}`);
         return null;
@@ -514,6 +685,7 @@ export class GameHUD {
         const ids: string[] = [];
         if (this.healthElement) ids.push('health');
         if (this.jumpElement) ids.push('jump');
+        if (this.staminaElement) ids.push('stamina');
         Array.from(this.container.querySelectorAll<HTMLElement>('[id^="fz-counter-"]')).forEach(el => {
             ids.push(`fz_${el.id.substring('fz-counter-'.length)}`);
         });
@@ -521,7 +693,7 @@ export class GameHUD {
     }
 
     getResolvedLayerOrder() {
-        const layerOrder = [...(this.settings.layerOrder || ['health', 'jump', 'inventory'])];
+        const layerOrder = [...(this.settings.layerOrder || ['health', 'jump', 'stamina', 'inventory'])];
         this.getRenderedHudIds().forEach(id => {
             if (!layerOrder.includes(id)) layerOrder.push(id);
         });
@@ -610,6 +782,7 @@ export class GameHUD {
         const elementById = new Map<string, HTMLElement | null>([
             ['health', this.healthElement],
             ['jump', this.jumpElement],
+            ['stamina', this.staminaElement],
             ['inventory', this.inventoryElement]
         ]);
 
@@ -617,7 +790,7 @@ export class GameHUD {
             elementById.set(`fz_${el.id.substring('fz-counter-'.length)}`, el);
         });
 
-        const layerOrder = [...(this.settings.layerOrder || ['health', 'jump', 'inventory'])];
+        const layerOrder = [...(this.settings.layerOrder || ['health', 'jump', 'stamina', 'inventory'])];
         elementById.forEach((_, id) => {
             if (!layerOrder.includes(id)) layerOrder.push(id);
         });
@@ -706,11 +879,13 @@ export class GameHUD {
 
         this.healthElement?.remove()
         this.jumpElement?.remove()
+        this.staminaElement?.remove()
         this.timerElement?.remove()
         this.container.remove()
 
         this.healthElement = null
         this.jumpElement = null
+        this.staminaElement = null
         this.timerElement = null
         this.inventoryElement = null
     }

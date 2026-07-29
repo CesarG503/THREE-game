@@ -10,6 +10,7 @@ export type MapTextureSettings = {
   offsetX?: number;
   offsetY?: number;
   rotation?: number;
+  globalRotation?: number;
   patternVariation?: boolean;
 };
 
@@ -21,6 +22,7 @@ export const DEFAULT_TEXTURE_SETTINGS: Required<MapTextureSettings> = {
   offsetX: 0,
   offsetY: 0,
   rotation: 0,
+  globalRotation: 0,
   patternVariation: false,
 };
 
@@ -43,6 +45,7 @@ export function normalizeTextureSettings(settings?: MapTextureSettings | null): 
   merged.offsetX = Number(merged.offsetX) || 0;
   merged.offsetY = Number(merged.offsetY) || 0;
   merged.rotation = Number(merged.rotation) || 0;
+  merged.globalRotation = Number(merged.globalRotation) || 0;
   merged.patternVariation = Boolean(merged.patternVariation);
   return merged;
 }
@@ -56,7 +59,7 @@ function getMeshDimensions(mesh: any, fallbackDimensions: any) {
   };
 }
 
-function remapBoxUVs(geometry: THREE.BufferGeometry, dimensions: any, settings: Required<MapTextureSettings>) {
+export function remapBoxUVs(geometry: THREE.BufferGeometry, dimensions: any, settings: Required<MapTextureSettings>) {
   const uv = geometry.getAttribute("uv") as THREE.BufferAttribute | undefined;
   const position = geometry.getAttribute("position") as THREE.BufferAttribute | undefined;
   const normal = geometry.getAttribute("normal") as THREE.BufferAttribute | undefined;
@@ -66,6 +69,10 @@ function remapBoxUVs(geometry: THREE.BufferGeometry, dimensions: any, settings: 
   const sy = Math.max(0.001, dimensions.y || 1);
   const sz = Math.max(0.001, dimensions.z || 1);
   const tile = Math.max(0.1, settings.tileSize);
+
+  const angleRad = THREE.MathUtils.degToRad(settings.globalRotation || 0);
+  const cos = Math.cos(angleRad);
+  const sin = Math.sin(angleRad);
 
   for (let i = 0; i < uv.count; i++) {
     const nx = Math.abs(normal.getX(i));
@@ -79,14 +86,20 @@ function remapBoxUVs(geometry: THREE.BufferGeometry, dimensions: any, settings: 
     let v = 0;
 
     if (ny >= nx && ny >= nz) {
-      u = (px + sx / 2) / tile;
-      v = (pz + sz / 2) / tile;
+      const rx = px * cos - pz * sin;
+      const rz = px * sin + pz * cos;
+      u = (rx + sx / 2) / tile;
+      v = (rz + sz / 2) / tile;
     } else if (nx >= nz) {
-      u = (pz + sz / 2) / tile;
-      v = (py + sy / 2) / tile;
+      const rz = pz * cos - py * sin;
+      const ry = pz * sin + py * cos;
+      u = (rz + sz / 2) / tile;
+      v = (ry + sy / 2) / tile;
     } else {
-      u = (px + sx / 2) / tile;
-      v = (py + sy / 2) / tile;
+      const rx = px * cos - py * sin;
+      const ry = px * sin + py * cos;
+      u = (rx + sx / 2) / tile;
+      v = (ry + sy / 2) / tile;
     }
 
     uv.setXY(i, u, v);
@@ -256,6 +269,7 @@ export function applyMapObjectTexture(object3D: any, texture: THREE.Texture, fal
 
   const applyToMesh = (mesh: any) => {
     if (!mesh?.isMesh || !mesh.material) return;
+    if (mesh.userData && mesh.userData.isSpike) return;
     const dimensions = getMeshDimensions(mesh, fallbackDimensions);
 
     if (normalized.fitMode === "auto" && mesh.geometry?.type === "BoxGeometry") {
@@ -265,7 +279,7 @@ export function applyMapObjectTexture(object3D: any, texture: THREE.Texture, fal
     const patternTexture = normalized.patternVariation
       ? createDeterministicPatternTexture(texture, normalized, mesh, object3D, dimensions)
       : null;
-    const meshTexture = patternTexture || (normalized.patternVariation ? texture.clone() : texture);
+    const meshTexture = patternTexture || texture.clone();
     configureTexture(meshTexture, normalized, getStableTextureVariant(mesh, object3D));
 
     const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
@@ -280,4 +294,52 @@ export function applyMapObjectTexture(object3D: any, texture: THREE.Texture, fal
   } else {
     applyToMesh(object3D);
   }
+}
+
+export function applyWorldSpaceUVs(geometry: THREE.BufferGeometry, settings: Required<MapTextureSettings>) {
+  const uv = geometry.getAttribute("uv") as THREE.BufferAttribute | undefined;
+  const position = geometry.getAttribute("position") as THREE.BufferAttribute | undefined;
+  const normal = geometry.getAttribute("normal") as THREE.BufferAttribute | undefined;
+  if (!uv || !position || !normal) return;
+
+  const tile = Math.max(0.1, settings.tileSize);
+  const globalRotRad = THREE.MathUtils.degToRad(settings.globalRotation || 0);
+  const cos = Math.cos(globalRotRad);
+  const sin = Math.sin(globalRotRad);
+
+  for (let i = 0; i < uv.count; i++) {
+    const nx = Math.abs(normal.getX(i));
+    const ny = Math.abs(normal.getY(i));
+    const nz = Math.abs(normal.getZ(i));
+    const px = position.getX(i);
+    const py = position.getY(i);
+    const pz = position.getZ(i);
+
+    let u = 0;
+    let v = 0;
+
+    if (ny >= nx && ny >= nz) {
+      // Top/Bottom faces: project on X-Z plane
+      const rx = px * cos - pz * sin;
+      const rz = px * sin + pz * cos;
+      u = rx / tile;
+      v = rz / tile;
+    } else if (nx >= nz) {
+      // East/West faces: project on Z-Y plane
+      const rz = pz * cos - py * sin;
+      const ry = pz * sin + py * cos;
+      u = rz / tile;
+      v = ry / tile;
+    } else {
+      // North/South faces: project on X-Y plane
+      const rx = px * cos - py * sin;
+      const ry = px * sin + py * cos;
+      u = rx / tile;
+      v = ry / tile;
+    }
+
+    uv.setXY(i, u, v);
+  }
+
+  uv.needsUpdate = true;
 }

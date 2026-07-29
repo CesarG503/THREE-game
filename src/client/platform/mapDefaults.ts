@@ -24,6 +24,20 @@ export interface SavedMapData {
 			rotation?: number;
 			patternVariation?: boolean;
 		};
+		shapeType?: "rect" | "circle" | "custom";
+		customGrid?: string[];
+		customCellSize?: number;
+		groundGroups?: any[];
+		customGridGroups?: Record<string, string>;
+		customGridShapes?: Record<string, string>;
+		invisibleWallsAdvanced?: boolean;
+		invisibleWallsGroups?: any[];
+		customGridWallGroups?: Record<string, string>;
+		ceilingsEnabled?: boolean;
+		ceilingsAdvanced?: boolean;
+		ceilingGroups?: any[];
+		customGridCeilingGroups?: Record<string, string>;
+		customGridCeilingShapes?: Record<string, string>;
 	};
 	playerConfig: {
 		roles: unknown[];
@@ -45,12 +59,56 @@ export function createEmptyMapData(): SavedMapData {
 			mapSizeX: 100,
 			mapSizeZ: 100,
 			invisibleWalls: false,
+			ceilingsEnabled: false,
+			ceilingsAdvanced: false,
 			fallDeath: true,
 			fallDeathY: -20,
 			skyType: DEFAULT_SKYBOX_TYPE,
 			groundTexturePath: null,
 			groundTextureAssetId: null,
 			groundTextureSettings: { fitMode: "auto", tileSize: 5, repeatX: 1, repeatY: 1, offsetX: 0, offsetY: 0, rotation: 0, patternVariation: false },
+			groundGroups: [
+				{
+					id: "default",
+					name: "Suelo 1",
+					color: "#FF9800",
+					color3D: "#FF9800",
+					texturePath: null,
+					textureAssetId: null,
+					textureSettings: { fitMode: "auto", tileSize: 5, repeatX: 1, repeatY: 1, offsetX: 0, offsetY: 0, rotation: 0, patternVariation: false }
+				}
+			],
+			customGridGroups: {},
+			customGridShapes: {},
+			invisibleWallsAdvanced: false,
+			invisibleWallsGroups: [
+				{
+					id: "default",
+					name: "Pared 1",
+					color: "#FF5722",
+					color3D: "#FF5722",
+					texturePath: null,
+					textureAssetId: null,
+					textureSettings: { fitMode: "auto", tileSize: 5, repeatX: 1, repeatY: 1, offsetX: 0, offsetY: 0, rotation: 0, patternVariation: false },
+					height: 10,
+					opacity: 1.0,
+					transparent: false
+				}
+			],
+			customGridWallGroups: {},
+			ceilingGroups: [
+				{
+					id: "default",
+					name: "Techo 1",
+					color: "#E040FB",
+					color3D: "#E040FB",
+					texturePath: null,
+					textureAssetId: null,
+					textureSettings: { fitMode: "auto", tileSize: 5, repeatX: 1, repeatY: 1, offsetX: 0, offsetY: 0, rotation: 0, patternVariation: false }
+				}
+			],
+			customGridCeilingGroups: {},
+			customGridCeilingShapes: {},
 		},
 		playerConfig: {
 			roles: [],

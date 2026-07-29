@@ -1,8 +1,8 @@
 import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
-import { GLBModel } from "./models/GLBModel";
-import { PolygonModel } from "./models/PolygonModel";
-import { PolygonModelSkin } from "./models/PolygonModelSkin";
+import { GLBModel } from "./models/glb/GLBModel";
+import { PolygonModel } from "./models/polygon/PolygonModel";
+import { PolygonModelSkin } from "./models/polygon/PolygonModelSkin";
 import { ParticleSystem } from "../effects/ParticleSystem";
 import { InputManager } from "../input/InputManager";
 import type { CharacterStats, JumpConfig, FlightConfig, PlayerCollisionMode, RemotePlayerState } from "../types";
@@ -78,6 +78,13 @@ export class CharacterController {
   capsuleHalfHeight: number;
   capsuleRadius: number;
   capsuleCenterOffset: number;
+  runRequireFullStamina: boolean;
+  staminaNeedsFullCharge: boolean;
+  flashOnDamage: boolean;
+  respawnDelay: number;
+  explodeOnDeath: boolean;
+  bodyPartsDuration: number;
+  damageFlashIntensity: number;
 
 
   constructor(scene: THREE.Scene, world: RAPIER.World, camera: THREE.Camera, cameraController: any) {
@@ -96,6 +103,15 @@ export class CharacterController {
 
     // Settings
     this.speed = 10;
+    this.runSpeed = 15;
+    this.crouchSpeed = 5.0;
+    this.independentSpeeds = false;
+    this.staminaMax = 5.0;
+    this.stamina = 5.0;
+    this.runRequireFullStamina = true;
+    this.staminaNeedsFullCharge = false;
+    this.isRunning = false;
+    this.runningIgnoresShift = false;
     this.jumpForce = 20;
     this.grounded = false;
     this.verticalVelocity = 0;
@@ -148,7 +164,12 @@ export class CharacterController {
     this.gravityContactPreserveTime = 0;
     this.capsuleHalfHeight = 0.5;
     this.capsuleRadius = 0.4;
-    this.capsuleCenterOffset = 0.9;
+    this.capsuleCenterOffset = 0.82;
+    this.flashOnDamage = false;
+    this.respawnDelay = 2.0;
+    this.explodeOnDeath = false;
+    this.bodyPartsDuration = 5.0;
+    this.damageFlashIntensity = 0.8;
 
     this.initPhysics();
     this.particleSystem = new ParticleSystem(scene);
@@ -260,7 +281,7 @@ export class CharacterController {
     const colliderDesc = RAPIER.ColliderDesc.capsule(this.capsuleHalfHeight, this.capsuleRadius).setTranslation(0, this.capsuleCenterOffset, 0);
     this.collider = this.world.createCollider(colliderDesc, this.rigidBody);
 
-    this.characterController = this.world.createCharacterController(0.1);
+    this.characterController = this.world.createCharacterController(0.02);
     this.characterController.enableAutostep(0.6, 0.25, true);
     this.characterController.enableSnapToGround(0.5);
     this.characterController.setApplyImpulsesToDynamicBodies(true);
@@ -588,7 +609,7 @@ export class CharacterController {
         const hasInput = moveDir.lengthSq() > 0;
         this.glbModel.update(dt, hasInput);
         this.polygonModel.update(dt, hasInput);
-        this.polygonModelSkin.update(dt, hasInput, input.keys.crouch, input.keys.attack, false, this.verticalVelocity);
+        this.polygonModelSkin.update(dt, hasInput, input.keys.crouch, input.keys.attack, false, this.verticalVelocity, false, false, false);
         if (this.particleSystem) this.particleSystem.update(dt);
 
         return;
@@ -610,6 +631,60 @@ export class CharacterController {
     const desiredTranslation = new THREE.Vector3();
     const hasInput = moveDir.lengthSq() > 0;
 
+    const wasRunning = this.isRunning;
+
+    // Handle Sprinting & Crouch input overrides
+    if (input.doubleShiftTapped) {
+      if (hasInput && this.stamina > 0 && !this.isRunning) {
+        if (!this.runRequireFullStamina || !this.staminaNeedsFullCharge) {
+          this.isRunning = true;
+          this.runningIgnoresShift = true;
+        }
+      } else {
+        this.isRunning = false;
+      }
+      input.doubleShiftTapped = false;
+    }
+
+    if (!input.keys.crouch) {
+      this.runningIgnoresShift = false;
+    }
+
+    if (this.isRunning && input.keys.crouch && !this.runningIgnoresShift) {
+      this.isRunning = false;
+    }
+
+    if (!hasInput || this.stamina <= 0) {
+      this.isRunning = false;
+    }
+
+    // If we stopped running, mark that we need a full charge to run again
+    if (wasRunning && !this.isRunning) {
+      this.staminaNeedsFullCharge = true;
+    }
+
+    // Stamina consumption / regeneration
+    if (this.isRunning) {
+      this.stamina = Math.max(0, this.stamina - dt);
+    } else {
+      this.stamina = Math.min(this.staminaMax, this.stamina + dt * (this.staminaMax / 4));
+    }
+
+    if (this.stamina >= this.staminaMax) {
+      this.staminaNeedsFullCharge = false;
+    }
+
+    this.emit("staminaChanged", { current: this.stamina, max: this.staminaMax });
+
+    const isCrouchingActive = input.keys.crouch && !this.isRunning;
+
+    let currentSpeed = this.speed;
+    if (this.isRunning) {
+      currentSpeed = this.runSpeed;
+    } else if (isCrouchingActive) {
+      currentSpeed = this.crouchSpeed !== undefined ? this.crouchSpeed : this.speed / 2;
+    }
+
     const shouldAimAlign = this.cameraController && (this.cameraController.isFirstPerson || this.isHoldingAimWeapon());
 
     if (hasInput && this.cameraController) {
@@ -622,7 +697,7 @@ export class CharacterController {
         .projectOnPlane(up);
 
       if (desiredTranslation.lengthSq() > 0.0001) {
-        desiredTranslation.normalize().multiplyScalar(this.speed * dt);
+        desiredTranslation.normalize().multiplyScalar(currentSpeed * dt);
       }
 
       if (shouldAimAlign) {
@@ -657,11 +732,11 @@ export class CharacterController {
 
     const isSuperman = isUsingJetpackCameraDir || isUsingJetpackShiftFlight;
     const noPitchTilt = !!isUsingJetpackCameraDir;
-    const visualCrouch = input.keys.crouch && !isSuperman;
+    const visualCrouch = isCrouchingActive && !isSuperman;
 
     this.glbModel.update(dt, hasInput);
     this.polygonModel.update(dt, hasInput);
-    this.polygonModelSkin.update(dt, hasInput, visualCrouch, input.keys.attack, isGrounded, this.verticalVelocity, isSuperman, noPitchTilt);
+    this.polygonModelSkin.update(dt, hasInput, visualCrouch, input.keys.attack, isGrounded, this.verticalVelocity, isSuperman, noPitchTilt, this.isRunning);
 
     if (this.particleSystem) this.particleSystem.update(dt);
 
@@ -847,6 +922,7 @@ export class CharacterController {
           this.verticalVelocity = this.jumpForce;
           this.jumpCount++;
           console.log(`Multi-Jump: ${this.jumpCount}/${this.maxMultiJumps}`);
+          this.polygonModelSkin?.triggerAirJump?.();
 
           this.emit("jumpChanged", {
             current: this.maxMultiJumps - this.jumpCount,
@@ -1087,13 +1163,36 @@ export class CharacterController {
   }
 
   setStats(stats: Partial<CharacterStats & JumpConfig & FlightConfig & { playerCollision: PlayerCollisionMode; gravityOrientation: GravityOrientation; gravityTransitionDuration: number }>) {
+    if (stats.independentSpeeds !== undefined) this.independentSpeeds = stats.independentSpeeds;
     if (stats.speed !== undefined) this.speed = stats.speed;
+    if (stats.runSpeed !== undefined) {
+      this.runSpeed = this.independentSpeeds ? stats.runSpeed : Math.max(stats.speed ?? this.speed, stats.runSpeed);
+    }
+    if (stats.crouchSpeed !== undefined) {
+      this.crouchSpeed = this.independentSpeeds ? stats.crouchSpeed : Math.min(stats.speed ?? this.speed, stats.crouchSpeed);
+    }
+    if (stats.staminaMax !== undefined) {
+      this.staminaMax = stats.staminaMax;
+      this.stamina = stats.staminaMax;
+      this.staminaNeedsFullCharge = false;
+    }
+    if (stats.runRequireFullStamina !== undefined) {
+      this.runRequireFullStamina = stats.runRequireFullStamina;
+      if (!this.runRequireFullStamina) {
+        this.staminaNeedsFullCharge = false;
+      }
+    }
     if (stats.jumpForce !== undefined) this.jumpForce = stats.jumpForce;
     if (stats.maxHealth !== undefined) {
       this.maxHealth = stats.maxHealth;
       this.currentHealth = this.maxHealth;
     }
     if (stats.respawns !== undefined) this.respawns = stats.respawns;
+    if (stats.flashOnDamage !== undefined) this.flashOnDamage = stats.flashOnDamage;
+    if (stats.respawnDelay !== undefined) this.respawnDelay = stats.respawnDelay;
+    if (stats.explodeOnDeath !== undefined) this.explodeOnDeath = stats.explodeOnDeath;
+    if (stats.bodyPartsDuration !== undefined) this.bodyPartsDuration = stats.bodyPartsDuration;
+    if (stats.damageFlashIntensity !== undefined) this.damageFlashIntensity = stats.damageFlashIntensity;
     if (stats.canFly !== undefined) this.canFly = stats.canFly;
     if (stats.maxMultiJumps !== undefined) this.maxMultiJumps = stats.maxMultiJumps;
 
@@ -1144,9 +1243,71 @@ export class CharacterController {
 
     this.emit("healthChanged", { current: this.currentHealth, max: this.maxHealth });
 
+    if (this.flashOnDamage) {
+      this.flashDamageVisuals();
+    }
+
     if (this.currentHealth <= 0) {
       this.die();
     }
+  }
+
+  getActiveModelGroup() {
+    if (this.currentType === "glb") return this.glbModel?.model;
+    if (this.currentType === "polygon") return this.polygonModel?.model;
+    if (this.currentType === "skin") return this.polygonModelSkin?.model;
+    return null;
+  }
+
+  flashDamageVisuals() {
+    const activeModel = this.getActiveModelGroup();
+    if (!activeModel) return;
+
+    const flashDuration = 100; // ms
+    const flashes = 3;
+    let count = 0;
+
+    const interval = setInterval(() => {
+      count++;
+      const isRed = count % 2 === 1;
+
+      activeModel.traverse((child: any) => {
+        if (!child.isMesh || !child.material || child.userData?.isRoleOutline || child.userData?.isRoleVisual) return;
+        const materials = Array.isArray(child.material) ? child.material : [child.material];
+        materials.forEach((mat: any) => {
+          if (isRed) {
+            if (mat.emissive) {
+              if (mat.userData.originalEmissive === undefined) {
+                mat.userData.originalEmissive = mat.emissive.clone();
+                mat.userData.originalEmissiveIntensity = mat.emissiveIntensity;
+              }
+              mat.emissive.setHex(0xff0000);
+              mat.emissiveIntensity = this.damageFlashIntensity !== undefined ? this.damageFlashIntensity : 0.8;
+            }
+          } else {
+            if (mat.emissive && mat.userData.originalEmissive !== undefined) {
+              mat.emissive.copy(mat.userData.originalEmissive);
+              mat.emissiveIntensity = mat.userData.originalEmissiveIntensity;
+            }
+          }
+        });
+      });
+
+      if (count >= flashes * 2) {
+        clearInterval(interval);
+        // Reset to original
+        activeModel.traverse((child: any) => {
+          if (!child.isMesh || !child.material || child.userData?.isRoleOutline || child.userData?.isRoleVisual) return;
+          const materials = Array.isArray(child.material) ? child.material : [child.material];
+          materials.forEach((mat: any) => {
+            if (mat.emissive && mat.userData.originalEmissive !== undefined) {
+              mat.emissive.copy(mat.userData.originalEmissive);
+              mat.emissiveIntensity = mat.userData.originalEmissiveIntensity;
+            }
+          });
+        });
+      }
+    }, flashDuration);
   }
 
   die() {
@@ -1154,9 +1315,17 @@ export class CharacterController {
     this.isDead = true;
     console.log("Player Died!");
 
+    if (this.explodeOnDeath) {
+      const duration = this.bodyPartsDuration !== undefined ? this.bodyPartsDuration : 5;
+      if (this.currentType === "skin" && this.polygonModelSkin) {
+        this.polygonModelSkin.explodeBodyParts(duration);
+      }
+    }
+
     if (this.respawns === -1 || this.respawns > 0) {
       if (this.respawns > 0) this.respawns--;
-      setTimeout(() => this.respawn(), 2000);
+      const delay = (this.respawnDelay !== undefined ? this.respawnDelay : 2) * 1000;
+      setTimeout(() => this.respawn(), delay);
     } else {
       console.log("Game Over - No Respawns Left");
       alert("¡Has muerto definitivamente!");
@@ -1176,6 +1345,15 @@ export class CharacterController {
 
     this.rigidBody.setTranslation({ x: respawnPos.x, y: respawnPos.y, z: respawnPos.z }, true);
     this.rigidBody.setLinvel({ x: 0, y: 0, z: 0 }, true);
+
+    // Restore visual model visibility
+    if (this.currentType === "glb" && this.glbModel) {
+      this.glbModel.setVisible(true);
+    } else if (this.currentType === "polygon" && this.polygonModel) {
+      this.polygonModel.setVisible(true);
+    } else if (this.currentType === "skin" && this.polygonModelSkin) {
+      this.polygonModelSkin.setVisible(true);
+    }
 
     console.log("Respawned at", respawnPos);
   }

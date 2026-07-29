@@ -1,8 +1,8 @@
 import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
-import { GLBModel } from "../character/models/GLBModel";
-import { PolygonModel } from "../character/models/PolygonModel";
-import { PolygonModelSkin } from "../character/models/PolygonModelSkin";
+import { GLBModel } from "../character/models/glb/GLBModel";
+import { PolygonModel } from "../character/models/polygon/PolygonModel";
+import { PolygonModelSkin } from "../character/models/polygon/PolygonModelSkin";
 import { GunItem } from "../items/GunItem";
 import { WEAPONS_CONFIG } from "../items/WeaponSettings";
 import { PelotaItem } from "../items/PelotaItem";
@@ -235,6 +235,14 @@ export class RemotePlayer {
             this.polygonModelSkin.setJumpAnimationType(state.jumpAnimationType);
         }
 
+        if (state.animationStyle !== undefined) {
+            this.polygonModelSkin.setAnimationStyle(state.animationStyle);
+        }
+
+        if (state.limbBending !== undefined) {
+            this.polygonModelSkin.setLimbBending(state.limbBending);
+        }
+
         if (state.equippedWeapon !== this.equippedWeaponName || state.equippedHand !== this.equippedHandName) {
             const weaponChanged = state.equippedWeapon !== this.equippedWeaponName;
             this.equippedWeaponName = state.equippedWeapon;
@@ -375,6 +383,7 @@ export class RemotePlayer {
                                this.currentWeaponInstance.pointerFollowEnabled && 
                                !this.currentWeaponInstance.shiftFlightEnabled);
         const visualCrouch = !!(this.state.isCrouching && !isSuperman);
+        const isRunning = !!this.state.isRunning;
 
         this.polygonModelSkin.update(
             dt,
@@ -384,7 +393,8 @@ export class RemotePlayer {
             (this.state.isGrounded !== undefined ? this.state.isGrounded : true),
             this.state.verticalVelocity || 0,
             isSuperman,
-            noPitchTilt
+            noPitchTilt,
+            isRunning
         );
         if (this.currentWeaponInstance && typeof this.currentWeaponInstance.updateAnim === "function") {
             this.currentWeaponInstance.updateAnim(dt, 0);

@@ -9,7 +9,7 @@ export interface ICharacterModel {
     setRotation(rot: number): void;
     getPosition(): Vector3;
     setHeldItem(item: any): void;
-    update(dt: number, isMoving: boolean, isCrouching?: boolean, isAttacking?: boolean, isGrounded?: boolean, verticalVelocity?: number, isSuperman?: boolean): void;
+    update(dt: number, isMoving: boolean, isCrouching?: boolean, isAttacking?: boolean, isGrounded?: boolean, verticalVelocity?: number, isSuperman?: boolean, noPitchTilt?: boolean, isRunning?: boolean): void;
 
     // Métodos opcionales específicos
     switchAnimation?: (name: string) => void;
@@ -23,11 +23,21 @@ export interface ICharacterModel {
 
 export interface CharacterStats {
     speed: number;
+    runSpeed?: number;
+    crouchSpeed?: number;
+    independentSpeeds?: boolean;
+    staminaMax?: number;
+    runRequireFullStamina?: boolean;
     jumpForce: number;
     maxHealth: number;
     respawns: number;
     canFly: boolean;
     maxMultiJumps: number;
+    flashOnDamage?: boolean;
+    respawnDelay?: number;
+    explodeOnDeath?: boolean;
+    bodyPartsDuration?: number;
+    damageFlashIntensity?: number;
 }
 
 export interface JumpConfig {

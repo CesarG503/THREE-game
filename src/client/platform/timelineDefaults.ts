@@ -38,6 +38,113 @@ export interface TimelineKeyframe {
 
 const DEFAULT_STATE_SKY_TYPE = "shader";
 
+export interface SolarCycleSettings {
+  solarPathEnabled?: boolean;
+  solarPathSunriseTime?: number;
+  solarPathSunsetTime?: number;
+  solarPathMaxElevation?: number;
+  solarPathNightDepth?: number;
+  solarPathAzimuthStart?: number;
+  solarPathAzimuthEnd?: number;
+}
+
+export const DEFAULT_SOLAR_CYCLE_SETTINGS: Required<SolarCycleSettings> = {
+  solarPathEnabled: true,
+  solarPathSunriseTime: 6,
+  solarPathSunsetTime: 18,
+  solarPathMaxElevation: 75,
+  solarPathNightDepth: 35,
+  solarPathAzimuthStart: 90,
+  solarPathAzimuthEnd: 270
+};
+
+function normalizeHour(value: number) {
+  return ((value % 24) + 24) % 24;
+}
+
+function elapsedHours(from: number, to: number) {
+  return normalizeHour(to - from);
+}
+
+export function normalizeSolarCycleSettings(source: Partial<SolarCycleSettings> | undefined = {}) {
+  const sunrise = THREE.MathUtils.clamp(
+    Number(source.solarPathSunriseTime ?? DEFAULT_SOLAR_CYCLE_SETTINGS.solarPathSunriseTime),
+    0,
+    23.5
+  );
+  const sunset = THREE.MathUtils.clamp(
+    Number(source.solarPathSunsetTime ?? DEFAULT_SOLAR_CYCLE_SETTINGS.solarPathSunsetTime),
+    sunrise + 0.5,
+    24
+  );
+
+  return {
+    solarPathEnabled: source.solarPathEnabled !== false,
+    solarPathSunriseTime: Math.round(sunrise * 10) / 10,
+    solarPathSunsetTime: Math.round(sunset * 10) / 10,
+    solarPathMaxElevation: THREE.MathUtils.clamp(
+      Number(source.solarPathMaxElevation ?? DEFAULT_SOLAR_CYCLE_SETTINGS.solarPathMaxElevation),
+      5,
+      90
+    ),
+    solarPathNightDepth: THREE.MathUtils.clamp(
+      Number(source.solarPathNightDepth ?? DEFAULT_SOLAR_CYCLE_SETTINGS.solarPathNightDepth),
+      5,
+      80
+    ),
+    solarPathAzimuthStart: normalizeHour(
+      Number(source.solarPathAzimuthStart ?? DEFAULT_SOLAR_CYCLE_SETTINGS.solarPathAzimuthStart) / 15
+    ) * 15,
+    solarPathAzimuthEnd: normalizeHour(
+      Number(source.solarPathAzimuthEnd ?? DEFAULT_SOLAR_CYCLE_SETTINGS.solarPathAzimuthEnd) / 15
+    ) * 15
+  };
+}
+
+export function calculateSolarCyclePosition(
+  source: Partial<SolarCycleSettings> | undefined,
+  timeOfDay: number
+) {
+  const settings = normalizeSolarCycleSettings(source);
+  const time = normalizeHour(timeOfDay);
+  const sunrise = settings.solarPathSunriseTime;
+  const sunset = settings.solarPathSunsetTime;
+  const dayLength = Math.max(0.5, sunset - sunrise);
+  const dayElapsed = time - sunrise;
+  const isDay = dayElapsed >= 0 && dayElapsed <= dayLength;
+
+  if (isDay) {
+    const dayProgress = THREE.MathUtils.clamp(dayElapsed / dayLength, 0, 1);
+    const sunElevation = Math.sin(dayProgress * Math.PI) * settings.solarPathMaxElevation;
+    const sunAzimuth = THREE.MathUtils.lerp(settings.solarPathAzimuthStart, settings.solarPathAzimuthEnd, dayProgress);
+    return {
+      sunElevation,
+      sunAzimuth: normalizeHour(sunAzimuth / 15) * 15,
+      dayProgress,
+      nightProgress: 0,
+      isDay: true,
+      settings
+    };
+  }
+
+  const nightStart = sunset;
+  const nightLength = Math.max(0.5, 24 - dayLength);
+  const nightElapsed = elapsedHours(nightStart, time);
+  const nightProgress = THREE.MathUtils.clamp(nightElapsed / nightLength, 0, 1);
+  const sunElevation = -Math.sin(nightProgress * Math.PI) * settings.solarPathNightDepth;
+  const endToStart = settings.solarPathAzimuthStart + 360 - settings.solarPathAzimuthEnd;
+  const sunAzimuth = settings.solarPathAzimuthEnd + endToStart * nightProgress;
+
+  return {
+    sunElevation,
+    sunAzimuth: normalizeHour(sunAzimuth / 15) * 15,
+    dayProgress: 0,
+    nightProgress,
+    isDay: false,
+    settings
+  };
+}
+
 export const DEFAULT_DAY_NIGHT_TIMELINE: TimelineKeyframe[] = [
   {
     id: "night",

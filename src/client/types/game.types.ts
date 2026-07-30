@@ -39,6 +39,13 @@ export interface EnvironmentConfig {
 	enableStarsCycle?: boolean;
 	sunElevation?: number;
 	sunAzimuth?: number;
+	solarPathEnabled?: boolean;
+	solarPathSunriseTime?: number;
+	solarPathSunsetTime?: number;
+	solarPathMaxElevation?: number;
+	solarPathNightDepth?: number;
+	solarPathAzimuthStart?: number;
+	solarPathAzimuthEnd?: number;
 	lightMode?: string;
 	shadowQuality?: string;
 	enableDayNightCycle?: boolean;

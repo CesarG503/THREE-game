@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { Sky } from "three/addons/objects/Sky.js";
 import { getSkyboxPresetDefaults } from "../platform/skyboxPresets";
-import { interpolateTimelineState } from "../platform/timelineDefaults";
+import { calculateSolarCyclePosition, interpolateTimelineState } from "../platform/timelineDefaults";
 
 const SKYBOX_PREFIX = "skybox:";
 const SKYBOX_FACE_LAYOUT = {
@@ -561,6 +561,8 @@ export class SceneManager {
     let ambientColor = visualConfig.ambientColor || "#ffffff";
     let sunElevation = visualConfig.sunElevation !== undefined ? Number(visualConfig.sunElevation) : 45; // Degrees
     let sunAzimuth = visualConfig.sunAzimuth !== undefined ? Number(visualConfig.sunAzimuth) : 180;
+    const solarPathActive = config.solarPathEnabled !== false;
+    const solarTime = config.timeOfDay !== undefined ? Number(config.timeOfDay) : 12;
 
     if (isDynamicCycle && interpolated) {
       sunIntensity = visualConfig.sunIntensity;
@@ -572,11 +574,9 @@ export class SceneManager {
       this.scene.environmentIntensity = visualConfig.environmentIntensity;
       this.scene.backgroundIntensity = visualConfig.backgroundIntensity;
     } else if (lightMode === "cycle") {
-      const time = config.timeOfDay !== undefined ? config.timeOfDay : 12; // 0 to 24
-      
-      const angle = (time / 24) * Math.PI * 2 - Math.PI / 2;
-      sunElevation = Math.sin(angle) * 90;
-      sunAzimuth = 180;
+      const solarPosition = calculateSolarCyclePosition(config, solarTime);
+      sunElevation = solarPosition.sunElevation;
+      sunAzimuth = solarPosition.sunAzimuth;
       
       const isNight = sunElevation < -5;
       const isGoldenHour = sunElevation >= -5 && sunElevation <= 15;
@@ -621,6 +621,12 @@ export class SceneManager {
       ambientColor = visualConfig.ambientColor || "#ffffff";
       sunElevation = visualConfig.sunElevation !== undefined ? Number(visualConfig.sunElevation) : 45;
       sunAzimuth = visualConfig.sunAzimuth !== undefined ? Number(visualConfig.sunAzimuth) : 180;
+    }
+
+    if (solarPathActive && (isDynamicCycle || config.timeOfDay !== undefined || lightMode === "cycle")) {
+      const solarPosition = calculateSolarCyclePosition(config, solarTime);
+      sunElevation = solarPosition.sunElevation;
+      sunAzimuth = solarPosition.sunAzimuth;
     }
 
     // Star Visibility Evaluation

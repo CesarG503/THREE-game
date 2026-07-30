@@ -42,6 +42,13 @@ export interface SavedMapData {
 		dayNightProfiles?: any[];
 		activeTimelineProfileId?: string;
 		selectedEnvironmentStateId?: string | null;
+		solarPathEnabled?: boolean;
+		solarPathSunriseTime?: number;
+		solarPathSunsetTime?: number;
+		solarPathMaxElevation?: number;
+		solarPathNightDepth?: number;
+		solarPathAzimuthStart?: number;
+		solarPathAzimuthEnd?: number;
 		enableVisibleSun?: boolean;
 		visibleSunSize?: number;
 		visibleSunIntensity?: number;
@@ -72,6 +79,13 @@ export function createEmptyMapData(): SavedMapData {
 			fallDeath: true,
 			fallDeathY: -20,
 			skyType: DEFAULT_SKYBOX_TYPE,
+			solarPathEnabled: true,
+			solarPathSunriseTime: 6,
+			solarPathSunsetTime: 18,
+			solarPathMaxElevation: 75,
+			solarPathNightDepth: 35,
+			solarPathAzimuthStart: 90,
+			solarPathAzimuthEnd: 270,
 			groundTexturePath: null,
 			groundTextureAssetId: null,
 			groundTextureSettings: { fitMode: "auto", tileSize: 5, repeatX: 1, repeatY: 1, offsetX: 0, offsetY: 0, rotation: 0, patternVariation: false },

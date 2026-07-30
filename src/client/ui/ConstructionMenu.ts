@@ -18,6 +18,8 @@ import { GRAVITY_ORIENTATION_OPTIONS } from "../utils/GravityOrientation";
 import { getSkyboxPresetDefaults } from "../platform/skyboxPresets";
 import {
   formatTimeOfDayHHMM,
+  calculateSolarCyclePosition,
+  normalizeSolarCycleSettings,
   interpolateTimelineState,
   normalizeTimeline,
   normalizeTimelineKeyframe,
@@ -1798,59 +1800,103 @@ export class ConstructionMenu {
         titleSunPos.style.color = "#fbbf24";
         rowSunPositionGroup.appendChild(titleSunPos);
 
-        // Sun Elevation Slider
-        const rowSunElev = document.createElement("div");
-        rowSunElev.style.cssText = "display: flex; flex-direction: column; gap: 2px;";
-        const labelElevRow = document.createElement("div");
-        labelElevRow.style.cssText = "display: flex; justify-content: space-between; font-size:12px; color:#ccc;";
-        const labelElev = document.createElement("span");
-        labelElev.textContent = "Elevación del Sol (Altura):";
-        this.valSunElevation = document.createElement("span");
-        this.valSunElevation.style.color = "#ffaa00";
-        labelElevRow.appendChild(labelElev);
-        labelElevRow.appendChild(this.valSunElevation);
+        const solarPreviewWrap = document.createElement("div");
+        solarPreviewWrap.style.cssText = "display:flex; flex-direction:column; gap:8px; background:#101318; border:1px solid #334155; border-radius:6px; padding:8px;";
 
-        this.sliderSunElevation = document.createElement("input");
-        this.sliderSunElevation.type = "range";
-        this.sliderSunElevation.min = "0";
-        this.sliderSunElevation.max = "90";
-        this.sliderSunElevation.step = "1";
-        this.sliderSunElevation.style.cssText = "cursor:pointer; width:100%;";
-        this.sliderSunElevation.addEventListener("input", (e: any) => {
-            const val = parseFloat(e.target.value);
-            this.updateSelectedEnvironmentState({ sunElevation: val });
-            this.valSunElevation.textContent = val + "°";
+        this.solarPathCanvas = document.createElement("canvas");
+        this.solarPathCanvas.height = 190;
+        this.solarPathCanvas.style.cssText = "width:100%; height:190px; display:block; border-radius:4px; background:#0b1020; cursor:crosshair;";
+        this.solarPathCanvas.addEventListener("pointerdown", (e) => {
+            this.solarPathCanvas.setPointerCapture(e.pointerId);
+            this.solarPathDragTarget = this.pickSolarPathDragTarget(e);
+            this.updateSolarPathFromPointer(e);
         });
-        rowSunElev.appendChild(labelElevRow);
-        rowSunElev.appendChild(this.sliderSunElevation);
-        rowSunPositionGroup.appendChild(rowSunElev);
-
-        // Sun Azimuth Slider
-        const rowSunAzim = document.createElement("div");
-        rowSunAzim.style.cssText = "display: flex; flex-direction: column; gap: 2px;";
-        const labelAzimRow = document.createElement("div");
-        labelAzimRow.style.cssText = "display: flex; justify-content: space-between; font-size:12px; color:#ccc;";
-        const labelAzim = document.createElement("span");
-        labelAzim.textContent = "Azimut / Dirección del Sol:";
-        this.valSunAzimuth = document.createElement("span");
-        this.valSunAzimuth.style.color = "#ffaa00";
-        labelAzimRow.appendChild(labelAzim);
-        labelAzimRow.appendChild(this.valSunAzimuth);
-
-        this.sliderSunAzimuth = document.createElement("input");
-        this.sliderSunAzimuth.type = "range";
-        this.sliderSunAzimuth.min = "0";
-        this.sliderSunAzimuth.max = "360";
-        this.sliderSunAzimuth.step = "1";
-        this.sliderSunAzimuth.style.cssText = "cursor:pointer; width:100%;";
-        this.sliderSunAzimuth.addEventListener("input", (e: any) => {
-            const val = parseFloat(e.target.value);
-            this.updateSelectedEnvironmentState({ sunAzimuth: val });
-            this.valSunAzimuth.textContent = val + "°";
+        this.solarPathCanvas.addEventListener("pointermove", (e) => {
+            if (!this.solarPathDragTarget) return;
+            this.updateSolarPathFromPointer(e);
         });
-        rowSunAzim.appendChild(labelAzimRow);
-        rowSunAzim.appendChild(this.sliderSunAzimuth);
-        rowSunPositionGroup.appendChild(rowSunAzim);
+        const endSolarDrag = (e) => {
+            if (this.solarPathCanvas.hasPointerCapture?.(e.pointerId)) {
+                this.solarPathCanvas.releasePointerCapture(e.pointerId);
+            }
+            this.solarPathDragTarget = null;
+        };
+        this.solarPathCanvas.addEventListener("pointerup", endSolarDrag);
+        this.solarPathCanvas.addEventListener("pointercancel", endSolarDrag);
+        solarPreviewWrap.appendChild(this.solarPathCanvas);
+
+        const solarStatsRow = document.createElement("div");
+        solarStatsRow.style.cssText = "display:grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap:6px;";
+        const makeSolarStat = (label: string, color: string) => {
+            const wrap = document.createElement("div");
+            wrap.style.cssText = "display:flex; flex-direction:column; gap:2px; background:#0f172a; border:1px solid #263244; border-radius:4px; padding:6px; min-width:0;";
+            const labelEl = document.createElement("span");
+            labelEl.textContent = label;
+            labelEl.style.cssText = "font-size:10px; color:#94a3b8;";
+            const valueEl = document.createElement("span");
+            valueEl.style.cssText = `font-size:12px; font-family:monospace; font-weight:bold; color:${color}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;`;
+            wrap.appendChild(labelEl);
+            wrap.appendChild(valueEl);
+            solarStatsRow.appendChild(wrap);
+            return valueEl;
+        };
+        this.valSolarPathTime = makeSolarStat("Hora", "#38bdf8");
+        this.valSunElevation = makeSolarStat("Elevación", "#fbbf24");
+        this.valSunAzimuth = makeSolarStat("Azimut", "#a7f3d0");
+        solarPreviewWrap.appendChild(solarStatsRow);
+        rowSunPositionGroup.appendChild(solarPreviewWrap);
+
+        const solarControlsGrid = document.createElement("div");
+        solarControlsGrid.style.cssText = "display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap:8px;";
+        this.solarPathControls = {};
+
+        const createSolarPathSlider = (labelStr, key, minVal, maxVal, stepVal, formatter = (v) => String(v)) => {
+            const wrap = document.createElement("div");
+            wrap.style.cssText = "display:flex; flex-direction:column; gap:3px; min-width:0;";
+            const labelRow = document.createElement("div");
+            labelRow.style.cssText = "display:flex; justify-content:space-between; gap:8px; font-size:11px; color:#cbd5e1;";
+            const labelEl = document.createElement("span");
+            labelEl.textContent = labelStr;
+            labelEl.style.cssText = "overflow:hidden; text-overflow:ellipsis; white-space:nowrap;";
+            const valEl = document.createElement("span");
+            valEl.style.cssText = "font-family:monospace; color:#fbbf24; white-space:nowrap;";
+            labelRow.appendChild(labelEl);
+            labelRow.appendChild(valEl);
+
+            const slider = document.createElement("input");
+            slider.type = "range";
+            slider.min = String(minVal);
+            slider.max = String(maxVal);
+            slider.step = String(stepVal);
+            slider.style.cssText = "width:100%; cursor:pointer;";
+            slider.addEventListener("input", (e: any) => {
+                const config = this.game.environmentConfig || {};
+                let val = parseFloat(e.target.value);
+                const update: any = { solarPathEnabled: true };
+                if (key === "solarPathSunriseTime") {
+                    val = Math.min(val, Number(config.solarPathSunsetTime ?? 18) - 0.5);
+                } else if (key === "solarPathSunsetTime") {
+                    val = Math.max(val, Number(config.solarPathSunriseTime ?? 6) + 0.5);
+                }
+                update[key] = Math.round(val * 10) / 10;
+                this.game.updateEnvironmentConfig(update);
+                this.refreshSettings();
+            });
+
+            wrap.appendChild(labelRow);
+            wrap.appendChild(slider);
+            solarControlsGrid.appendChild(wrap);
+            this.solarPathControls[key] = { slider, valEl, formatter };
+            return { slider, valEl };
+        };
+
+        createSolarPathSlider("Amanecer", "solarPathSunriseTime", 0, 23.5, 0.1, (v) => formatTimeOfDayHHMM(v));
+        createSolarPathSlider("Atardecer", "solarPathSunsetTime", 0.5, 24, 0.1, (v) => formatTimeOfDayHHMM(v));
+        createSolarPathSlider("Altura máxima", "solarPathMaxElevation", 5, 90, 1, (v) => `${Math.round(v)}°`);
+        createSolarPathSlider("Profundidad noche", "solarPathNightDepth", 5, 80, 1, (v) => `${Math.round(v)}°`);
+        createSolarPathSlider("Azimut inicial", "solarPathAzimuthStart", 0, 360, 1, (v) => `${Math.round(v)}°`);
+        createSolarPathSlider("Azimut final", "solarPathAzimuthEnd", 0, 360, 1, (v) => `${Math.round(v)}°`);
+        rowSunPositionGroup.appendChild(solarControlsGrid);
 
         // Star Options Container
         const rowStarsGroup = document.createElement("div");
@@ -2561,6 +2607,242 @@ export class ConstructionMenu {
         return skyType || "Día";
     }
 
+    getSolarPathCanvasLayout() {
+        const canvas = this.solarPathCanvas;
+        const rect = canvas?.getBoundingClientRect?.();
+        const width = Math.max(280, Math.round(rect?.width || canvas?.clientWidth || 320));
+        const height = Math.max(170, Math.round(rect?.height || 190));
+        const margin = 28;
+        const horizonY = height * 0.62;
+        const topY = 18;
+        const bottomY = height - 22;
+        const dayHeight = horizonY - topY;
+        const nightHeight = bottomY - horizonY;
+        const toX = (time) => {
+            const normalized = Math.abs(time - 24) < 0.0001 ? 24 : (((time % 24) + 24) % 24);
+            return margin + (normalized / 24) * (width - margin * 2);
+        };
+        const toY = (elevation) => {
+            if (elevation >= 0) return horizonY - (Math.min(elevation, 90) / 90) * dayHeight;
+            return horizonY + (Math.min(Math.abs(elevation), 80) / 80) * nightHeight;
+        };
+        const fromXToTime = (x) => {
+            const t = ((THREE.MathUtils.clamp(x, margin, width - margin) - margin) / (width - margin * 2)) * 24;
+            return Math.round(t * 10) / 10;
+        };
+        const fromYToElevation = (y) => {
+            const value = ((horizonY - THREE.MathUtils.clamp(y, topY, horizonY - 4)) / dayHeight) * 90;
+            return Math.round(THREE.MathUtils.clamp(value, 5, 90));
+        };
+        return { width, height, margin, horizonY, topY, bottomY, dayHeight, nightHeight, toX, toY, fromXToTime, fromYToElevation };
+    }
+
+    getSolarPathPointerPoint(e: PointerEvent) {
+        const canvas = this.solarPathCanvas;
+        const rect = canvas.getBoundingClientRect();
+        const layout = this.getSolarPathCanvasLayout();
+        return {
+            x: ((e.clientX - rect.left) / Math.max(1, rect.width)) * layout.width,
+            y: ((e.clientY - rect.top) / Math.max(1, rect.height)) * layout.height,
+            layout
+        };
+    }
+
+    pickSolarPathDragTarget(e: PointerEvent) {
+        const config = this.game?.environmentConfig || {};
+        const settings = normalizeSolarCycleSettings(config);
+        const currentTime = config.timeOfDay !== undefined ? Number(config.timeOfDay) : 12;
+        const { x, y, layout } = this.getSolarPathPointerPoint(e);
+        const solarNow = calculateSolarCyclePosition(config, currentTime);
+        const peakTime = settings.solarPathSunriseTime + (settings.solarPathSunsetTime - settings.solarPathSunriseTime) / 2;
+        const handles = [
+            { id: "sunrise", x: layout.toX(settings.solarPathSunriseTime), y: layout.horizonY },
+            { id: "sunset", x: layout.toX(settings.solarPathSunsetTime), y: layout.horizonY },
+            { id: "peak", x: layout.toX(peakTime), y: layout.toY(settings.solarPathMaxElevation) },
+            { id: "time", x: layout.toX(currentTime), y: layout.toY(solarNow.sunElevation) }
+        ];
+
+        let best = handles[3];
+        let bestDist = Infinity;
+        handles.forEach(handle => {
+            const dist = Math.hypot(handle.x - x, handle.y - y);
+            if (dist < bestDist) {
+                best = handle;
+                bestDist = dist;
+            }
+        });
+        return bestDist <= 24 ? best.id : "time";
+    }
+
+    updateSolarPathFromPointer(e: PointerEvent) {
+        if (!this.game?.environmentConfig || !this.solarPathCanvas) return;
+        const config = this.game.environmentConfig;
+        const { x, y, layout } = this.getSolarPathPointerPoint(e);
+        const settings = normalizeSolarCycleSettings(config);
+        const target = this.solarPathDragTarget || "time";
+        const update: any = { solarPathEnabled: true };
+
+        if (target === "sunrise") {
+            update.solarPathSunriseTime = Math.min(layout.fromXToTime(x), settings.solarPathSunsetTime - 0.5);
+        } else if (target === "sunset") {
+            update.solarPathSunsetTime = Math.max(layout.fromXToTime(x), settings.solarPathSunriseTime + 0.5);
+        } else if (target === "peak") {
+            update.solarPathMaxElevation = layout.fromYToElevation(y);
+        } else {
+            update.timeOfDay = layout.fromXToTime(x);
+            update.enableDayNightCycle = false;
+            update.isCycleSimulating = false;
+        }
+
+        this.game.updateEnvironmentConfig(update);
+        this.refreshSettings();
+    }
+
+    drawSolarPathPreview() {
+        const canvas = this.solarPathCanvas;
+        if (!canvas || !this.game?.environmentConfig) return;
+
+        const config = this.game.environmentConfig;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
+
+        const layout = this.getSolarPathCanvasLayout();
+        const dpr = window.devicePixelRatio || 1;
+        const pixelWidth = Math.round(layout.width * dpr);
+        const pixelHeight = Math.round(layout.height * dpr);
+        if (canvas.width !== pixelWidth || canvas.height !== pixelHeight) {
+            canvas.width = pixelWidth;
+            canvas.height = pixelHeight;
+        }
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.clearRect(0, 0, layout.width, layout.height);
+
+        const bg = ctx.createLinearGradient(0, 0, 0, layout.height);
+        bg.addColorStop(0, "#172554");
+        bg.addColorStop(0.55, "#0f172a");
+        bg.addColorStop(1, "#020617");
+        ctx.fillStyle = bg;
+        ctx.fillRect(0, 0, layout.width, layout.height);
+
+        ctx.strokeStyle = "rgba(148, 163, 184, 0.24)";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(layout.margin, layout.horizonY);
+        ctx.lineTo(layout.width - layout.margin, layout.horizonY);
+        ctx.stroke();
+
+        [0, 6, 12, 18, 24].forEach(hour => {
+            const x = layout.toX(hour);
+            ctx.strokeStyle = "rgba(148, 163, 184, 0.12)";
+            ctx.beginPath();
+            ctx.moveTo(x, layout.topY);
+            ctx.lineTo(x, layout.bottomY);
+            ctx.stroke();
+            ctx.fillStyle = "#94a3b8";
+            ctx.font = "10px monospace";
+            ctx.textAlign = "center";
+            ctx.fillText(hour === 24 ? "24" : String(hour).padStart(2, "0"), x, layout.height - 7);
+        });
+
+        const drawPathSegment = (day: boolean) => {
+            ctx.beginPath();
+            let started = false;
+            for (let i = 0; i <= 144; i++) {
+                const time = (i / 144) * 24;
+                const solar = calculateSolarCyclePosition(config, time);
+                if (solar.isDay !== day) {
+                    started = false;
+                    continue;
+                }
+                const x = layout.toX(time);
+                const y = layout.toY(solar.sunElevation);
+                if (!started) {
+                    ctx.moveTo(x, y);
+                    started = true;
+                } else {
+                    ctx.lineTo(x, y);
+                }
+            }
+            ctx.strokeStyle = day ? "#fbbf24" : "#93c5fd";
+            ctx.lineWidth = day ? 3 : 2;
+            ctx.stroke();
+        };
+        drawPathSegment(false);
+        drawPathSegment(true);
+
+        const timeline = normalizeTimeline(config.dayNightTimeline);
+        timeline.forEach(kf => {
+            const solar = calculateSolarCyclePosition(config, kf.time);
+            const x = layout.toX(kf.time);
+            const y = layout.toY(solar.sunElevation);
+            ctx.fillStyle = kf.id === config.selectedEnvironmentStateId ? "#22d3ee" : "#e5e7eb";
+            ctx.beginPath();
+            ctx.arc(x, y, kf.id === config.selectedEnvironmentStateId ? 4.5 : 3.5, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = "#cbd5e1";
+            ctx.font = "10px sans-serif";
+            ctx.textAlign = "center";
+            ctx.fillText(String(kf.label || "").slice(0, 3), x, Math.min(layout.height - 28, y + 16));
+        });
+
+        const settings = normalizeSolarCycleSettings(config);
+        const currentTime = config.timeOfDay !== undefined ? Number(config.timeOfDay) : 12;
+        const solarNow = calculateSolarCyclePosition(config, currentTime);
+        const peakTime = settings.solarPathSunriseTime + (settings.solarPathSunsetTime - settings.solarPathSunriseTime) / 2;
+        const handles = [
+            { label: "A", x: layout.toX(settings.solarPathSunriseTime), y: layout.horizonY, color: "#fb923c" },
+            { label: "T", x: layout.toX(settings.solarPathSunsetTime), y: layout.horizonY, color: "#f97316" },
+            { label: "H", x: layout.toX(peakTime), y: layout.toY(settings.solarPathMaxElevation), color: "#fde68a" }
+        ];
+        handles.forEach(handle => {
+            ctx.fillStyle = handle.color;
+            ctx.strokeStyle = "#0f172a";
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(handle.x, handle.y, 7, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+            ctx.fillStyle = "#111827";
+            ctx.font = "bold 9px sans-serif";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText(handle.label, handle.x, handle.y + 0.5);
+            ctx.textBaseline = "alphabetic";
+        });
+
+        const currentX = layout.toX(currentTime);
+        const currentY = layout.toY(solarNow.sunElevation);
+        const radius = solarNow.isDay ? 10 : 8;
+        const glow = ctx.createRadialGradient(currentX, currentY, 1, currentX, currentY, radius * 2.4);
+        glow.addColorStop(0, solarNow.isDay ? "#fef3c7" : "#e0f2fe");
+        glow.addColorStop(0.55, solarNow.isDay ? "#facc15" : "#93c5fd");
+        glow.addColorStop(1, "rgba(250, 204, 21, 0)");
+        ctx.fillStyle = glow;
+        ctx.beginPath();
+        ctx.arc(currentX, currentY, radius * 2.4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = solarNow.isDay ? "#fde047" : "#bfdbfe";
+        ctx.beginPath();
+        ctx.arc(currentX, currentY, radius, 0, Math.PI * 2);
+        ctx.fill();
+
+        if (this.valSolarPathTime) this.valSolarPathTime.textContent = formatTimeOfDayHHMM(currentTime);
+        if (this.valSunElevation) this.valSunElevation.textContent = `${solarNow.sunElevation.toFixed(1)}°`;
+        if (this.valSunAzimuth) this.valSunAzimuth.textContent = `${solarNow.sunAzimuth.toFixed(0)}°`;
+
+        if (this.solarPathControls) {
+            Object.entries(this.solarPathControls).forEach(([key, control]: any) => {
+                const value = settings[key];
+                if (control?.slider && document.activeElement !== control.slider) {
+                    control.slider.value = String(value);
+                }
+                if (control?.valEl) {
+                    control.valEl.textContent = control.formatter ? control.formatter(value) : String(value);
+                }
+            });
+        }
+    }
+
     renderTimelineProfilesAndCards(forceRebuild = false) {
         if (!this.game || !this.game.environmentConfig) return;
         const ctx = this.getTimelineStateContext();
@@ -3187,6 +3469,8 @@ export class ConstructionMenu {
                         return chip;
                     };
                     configChips.appendChild(makeChip(skyLabel, kf.skyType === "shader" ? "#60a5fa" : "#94a3b8"));
+                    const solarAtState = calculateSolarCyclePosition(config, kf.time);
+                    configChips.appendChild(makeChip(`Órbita ${solarAtState.sunElevation.toFixed(0)}°`, solarAtState.isDay ? "#fbbf24" : "#93c5fd"));
                     configChips.appendChild(makeChip(`Sol ${Number(kf.sunIntensity ?? 0).toFixed(2)}`, "#fbbf24"));
                     configChips.appendChild(makeChip((kf.transitionMode || "procedural") === "instant" ? "Golpe" : "Procedural", (kf.transitionMode || "procedural") === "instant" ? "#fb7185" : "#4ade80"));
                     configChips.appendChild(makeChip(`Mie ${Number(kf.skyMieCoefficient ?? 0.005).toFixed(3)}`, "#38bdf8"));
@@ -3258,17 +3542,7 @@ export class ConstructionMenu {
         if (this.selectLightMode) this.selectLightMode.value = selectedConfig.lightMode || config.lightMode || "day";
         if (this.selectShadowQuality) this.selectShadowQuality.value = config.shadowQuality || "medium";
 
-        // Refresh Sun position sliders
-        if (this.sliderSunElevation) {
-            const elevVal = selectedConfig.sunElevation !== undefined ? Number(selectedConfig.sunElevation) : 45;
-            this.sliderSunElevation.value = String(elevVal);
-            if (this.valSunElevation) this.valSunElevation.textContent = elevVal + "°";
-        }
-        if (this.sliderSunAzimuth) {
-            const azimVal = selectedConfig.sunAzimuth !== undefined ? Number(selectedConfig.sunAzimuth) : 180;
-            this.sliderSunAzimuth.value = String(azimVal);
-            if (this.valSunAzimuth) this.valSunAzimuth.textContent = azimVal + "°";
-        }
+        this.drawSolarPathPreview();
 
         // Refresh Star checkboxes
         if (this.checkStarsNight) this.checkStarsNight.checked = config.enableStarsNight !== false;

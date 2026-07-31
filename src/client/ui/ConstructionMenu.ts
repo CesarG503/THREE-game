@@ -1800,6 +1800,23 @@ export class ConstructionMenu {
         titleSunPos.style.color = "#fbbf24";
         rowSunPositionGroup.appendChild(titleSunPos);
 
+        const rowSolarVisual = document.createElement("div");
+        rowSolarVisual.style.cssText = "display:flex; align-items:center; justify-content:space-between; gap:10px; background:#111827; border:1px solid #263244; border-radius:4px; padding:7px 8px;";
+        const labelSolarVisual = document.createElement("label");
+        labelSolarVisual.textContent = "Disco procedural sol/luna";
+        labelSolarVisual.style.cssText = "font-size:12px; color:#e5e7eb; cursor:pointer;";
+        this.checkSolarVisual = document.createElement("input");
+        this.checkSolarVisual.type = "checkbox";
+        this.checkSolarVisual.style.transform = "scale(1.15)";
+        this.checkSolarVisual.addEventListener("change", (e: any) => {
+            this.game.updateEnvironmentConfig({ enableSolarVisual: e.target.checked });
+            this.refreshSettings();
+        });
+        labelSolarVisual.onclick = () => this.checkSolarVisual.click();
+        rowSolarVisual.appendChild(labelSolarVisual);
+        rowSolarVisual.appendChild(this.checkSolarVisual);
+        rowSunPositionGroup.appendChild(rowSolarVisual);
+
         const solarPreviewWrap = document.createElement("div");
         solarPreviewWrap.style.cssText = "display:flex; flex-direction:column; gap:8px; background:#101318; border:1px solid #334155; border-radius:6px; padding:8px;";
 
@@ -3542,6 +3559,7 @@ export class ConstructionMenu {
         if (this.selectLightMode) this.selectLightMode.value = selectedConfig.lightMode || config.lightMode || "day";
         if (this.selectShadowQuality) this.selectShadowQuality.value = config.shadowQuality || "medium";
 
+        if (this.checkSolarVisual) this.checkSolarVisual.checked = config.enableSolarVisual !== false;
         this.drawSolarPathPreview();
 
         // Refresh Star checkboxes

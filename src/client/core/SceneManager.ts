@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { Sky } from "three/addons/objects/Sky.js";
+import { SunMoonVisual } from "./SunMoonVisual";
 import { getSkyboxPresetDefaults } from "../platform/skyboxPresets";
 import { calculateSolarCyclePosition, interpolateTimelineState } from "../platform/timelineDefaults";
 
@@ -23,6 +24,7 @@ export class SceneManager {
   stars: THREE.Points | null;
   currentRenderDistance: number | undefined;
   skyMesh: Sky | null = null;
+  sunMoonVisual: SunMoonVisual;
   sunVec: THREE.Vector3;
   lastShadowQuality: string | null = null;
   lastFrustumRenderDistance: number | null = null;
@@ -58,6 +60,7 @@ export class SceneManager {
 
     this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
     this.camera.position.set(0, 5, 10);
+    this.sunMoonVisual = new SunMoonVisual(this.scene, this.camera);
 
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
     this.renderer.setSize(window.innerWidth, window.innerHeight);
@@ -674,6 +677,12 @@ export class SceneManager {
     if (isShaderSky && this.skyMesh) {
       this.skyMesh.material.uniforms["sunPosition"].value.copy(this.sunVec);
     }
+
+    this.sunMoonVisual.setState(this.sunVec, {
+      enabled: config.enableSolarVisual !== false,
+      useShaderSky: isShaderSky && !!this.skyMesh?.visible,
+      sunIntensity
+    });
   }
 
   updateShadowFollow(playerPos: any) {
@@ -706,11 +715,13 @@ export class SceneManager {
     if (this.skyboxTransitionMesh && this.skyboxTransitionMesh.visible) {
       this.skyboxTransitionMesh.position.copy(this.camera.position);
     }
+    this.sunMoonVisual.updateCameraPosition();
     this.renderer.render(this.scene, this.camera);
   }
 
   dispose() {
     window.removeEventListener("resize", this.boundResize);
+    this.sunMoonVisual.dispose();
 
     this.scene.traverse((object: any) => {
       if (object.geometry) object.geometry.dispose();

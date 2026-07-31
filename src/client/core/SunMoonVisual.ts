@@ -1,0 +1,185 @@
+import * as THREE from "three";
+
+export interface SunMoonVisualState {
+  enabled: boolean;
+  useShaderSky: boolean;
+  sunIntensity: number;
+}
+
+export class SunMoonVisual {
+  private scene: THREE.Scene;
+  private camera: THREE.PerspectiveCamera;
+  private group: THREE.Group;
+  private sunSprite: THREE.Sprite;
+  private moonSprite: THREE.Sprite;
+  private sunMaterial: THREE.SpriteMaterial;
+  private moonMaterial: THREE.SpriteMaterial;
+  private sunTexture: THREE.CanvasTexture;
+  private moonTexture: THREE.CanvasTexture;
+  private sunDirection: THREE.Vector3;
+  private enabled: boolean;
+  private useShaderSky: boolean;
+  private sunIntensity: number;
+
+  constructor(scene: THREE.Scene, camera: THREE.PerspectiveCamera) {
+    this.scene = scene;
+    this.camera = camera;
+    this.sunDirection = new THREE.Vector3(0, 1, 0);
+    this.enabled = true;
+    this.useShaderSky = false;
+    this.sunIntensity = 1;
+
+    this.group = new THREE.Group();
+    this.group.name = "sunMoonVisual";
+    this.group.userData.ignorePlacementRaycast = true;
+
+    this.sunTexture = this.createSunTexture();
+    this.moonTexture = this.createMoonTexture();
+
+    this.sunMaterial = new THREE.SpriteMaterial({
+      map: this.sunTexture,
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+      depthTest: true,
+      fog: false
+    });
+
+    this.moonMaterial = new THREE.SpriteMaterial({
+      map: this.moonTexture,
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+      depthTest: true,
+      fog: false
+    });
+
+    this.sunSprite = this.createSprite("proceduralSun", this.sunMaterial);
+    this.moonSprite = this.createSprite("proceduralMoon", this.moonMaterial);
+    this.group.add(this.sunSprite);
+    this.group.add(this.moonSprite);
+    this.scene.add(this.group);
+  }
+
+  setState(direction: THREE.Vector3, state: SunMoonVisualState) {
+    this.sunDirection.copy(direction).normalize();
+    this.enabled = state.enabled;
+    this.useShaderSky = state.useShaderSky;
+    this.sunIntensity = state.sunIntensity;
+    this.updateCameraPosition();
+  }
+
+  updateCameraPosition() {
+    const shouldRender = this.enabled && !this.useShaderSky;
+    const sunY = this.sunDirection.y;
+    const sunOpacity = shouldRender
+      ? THREE.MathUtils.smoothstep(sunY, -0.05, 0.12) * THREE.MathUtils.clamp(0.45 + this.sunIntensity * 0.45, 0.45, 0.95)
+      : 0;
+    const moonOpacity = shouldRender
+      ? (1 - THREE.MathUtils.smoothstep(sunY, -0.12, 0.08)) * 0.82
+      : 0;
+
+    this.sunMaterial.opacity = sunOpacity;
+    this.moonMaterial.opacity = moonOpacity;
+    this.sunSprite.visible = sunOpacity > 0.01;
+    this.moonSprite.visible = moonOpacity > 0.01;
+
+    if (!this.sunSprite.visible && !this.moonSprite.visible) return;
+
+    const cameraFar = Number.isFinite(this.camera.far) ? this.camera.far : 1000;
+    const distance = Math.max(20, Math.min(cameraFar * 0.72, 620));
+    const sunPos = this.camera.position.clone().addScaledVector(this.sunDirection, distance);
+    const moonDirection = this.sunDirection.clone().multiplyScalar(-1).normalize();
+    const moonPos = this.camera.position.clone().addScaledVector(moonDirection, distance);
+
+    this.sunSprite.position.copy(sunPos);
+    this.moonSprite.position.copy(moonPos);
+    this.sunSprite.scale.setScalar(distance * 0.075);
+    this.moonSprite.scale.setScalar(distance * 0.045);
+  }
+
+  dispose() {
+    this.scene.remove(this.group);
+    this.group.clear();
+    this.sunMaterial.dispose();
+    this.moonMaterial.dispose();
+    this.sunTexture.dispose();
+    this.moonTexture.dispose();
+  }
+
+  private createSprite(name: string, material: THREE.SpriteMaterial) {
+    const sprite = new THREE.Sprite(material);
+    sprite.name = name;
+    sprite.renderOrder = -900;
+    sprite.userData.ignorePlacementRaycast = true;
+    sprite.raycast = () => {};
+    return sprite;
+  }
+
+  private createSunTexture() {
+    const canvas = document.createElement("canvas");
+    canvas.width = 256;
+    canvas.height = 256;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Could not create sun texture");
+
+    const glow = ctx.createRadialGradient(128, 128, 4, 128, 128, 122);
+    glow.addColorStop(0, "rgba(255,255,255,1)");
+    glow.addColorStop(0.18, "rgba(255,236,160,0.98)");
+    glow.addColorStop(0.36, "rgba(255,188,66,0.62)");
+    glow.addColorStop(0.72, "rgba(255,138,26,0.22)");
+    glow.addColorStop(1, "rgba(255,138,26,0)");
+    ctx.fillStyle = glow;
+    ctx.fillRect(0, 0, 256, 256);
+
+    const disk = ctx.createRadialGradient(118, 112, 8, 128, 128, 42);
+    disk.addColorStop(0, "#ffffff");
+    disk.addColorStop(0.32, "#fff3b0");
+    disk.addColorStop(1, "#fbbf24");
+    ctx.fillStyle = disk;
+    ctx.beginPath();
+    ctx.arc(128, 128, 38, 0, Math.PI * 2);
+    ctx.fill();
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.needsUpdate = true;
+    return texture;
+  }
+
+  private createMoonTexture() {
+    const canvas = document.createElement("canvas");
+    canvas.width = 256;
+    canvas.height = 256;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Could not create moon texture");
+
+    const glow = ctx.createRadialGradient(128, 128, 16, 128, 128, 118);
+    glow.addColorStop(0, "rgba(226,240,255,0.98)");
+    glow.addColorStop(0.32, "rgba(147,197,253,0.45)");
+    glow.addColorStop(1, "rgba(147,197,253,0)");
+    ctx.fillStyle = glow;
+    ctx.fillRect(0, 0, 256, 256);
+
+    const disk = ctx.createRadialGradient(112, 102, 8, 128, 128, 42);
+    disk.addColorStop(0, "#f8fbff");
+    disk.addColorStop(0.65, "#dbeafe");
+    disk.addColorStop(1, "#93c5fd");
+    ctx.fillStyle = disk;
+    ctx.beginPath();
+    ctx.arc(128, 128, 36, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.globalCompositeOperation = "destination-out";
+    ctx.fillStyle = "rgba(0,0,0,0.72)";
+    ctx.beginPath();
+    ctx.arc(145, 118, 34, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalCompositeOperation = "source-over";
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.needsUpdate = true;
+    return texture;
+  }
+}

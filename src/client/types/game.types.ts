@@ -46,6 +46,7 @@ export interface EnvironmentConfig {
 	solarPathNightDepth?: number;
 	solarPathAzimuthStart?: number;
 	solarPathAzimuthEnd?: number;
+	enableSolarVisual?: boolean;
 	lightMode?: string;
 	shadowQuality?: string;
 	enableDayNightCycle?: boolean;

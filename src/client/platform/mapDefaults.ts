@@ -49,6 +49,7 @@ export interface SavedMapData {
 		solarPathNightDepth?: number;
 		solarPathAzimuthStart?: number;
 		solarPathAzimuthEnd?: number;
+		enableSolarVisual?: boolean;
 		enableVisibleSun?: boolean;
 		visibleSunSize?: number;
 		visibleSunIntensity?: number;
@@ -86,6 +87,7 @@ export function createEmptyMapData(): SavedMapData {
 			solarPathNightDepth: 35,
 			solarPathAzimuthStart: 90,
 			solarPathAzimuthEnd: 270,
+			enableSolarVisual: true,
 			groundTexturePath: null,
 			groundTextureAssetId: null,
 			groundTextureSettings: { fitMode: "auto", tileSize: 5, repeatX: 1, repeatY: 1, offsetX: 0, offsetY: 0, rotation: 0, patternVariation: false },

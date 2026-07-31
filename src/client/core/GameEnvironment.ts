@@ -54,6 +54,7 @@ export function updateEnvironmentConfig(this: any, config: any) {
 	Object.entries(DEFAULT_SOLAR_CYCLE_SETTINGS).forEach(([key, value]) => {
 		if (this.environmentConfig[key] === undefined) this.environmentConfig[key] = value;
 	});
+	if (this.environmentConfig.enableSolarVisual === undefined) this.environmentConfig.enableSolarVisual = true;
 
 	const normalizedProfiles = (this.environmentConfig.dayNightProfiles && this.environmentConfig.dayNightProfiles.length > 0
 		? this.environmentConfig.dayNightProfiles

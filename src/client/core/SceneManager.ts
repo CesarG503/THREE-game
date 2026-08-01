@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { Sky } from "three/addons/objects/Sky.js";
 import { SunMoonVisual } from "./SunMoonVisual";
 import { getSkyboxPresetDefaults } from "../platform/skyboxPresets";
-import { calculateSolarCyclePosition, interpolateTimelineState } from "../platform/timelineDefaults";
+import { DEFAULT_SOLAR_VISUAL_SETTINGS, calculateSolarCyclePosition, interpolateTimelineState } from "../platform/timelineDefaults";
 
 const SKYBOX_PREFIX = "skybox:";
 const SKYBOX_FACE_LAYOUT = {
@@ -566,6 +566,7 @@ export class SceneManager {
     let sunAzimuth = visualConfig.sunAzimuth !== undefined ? Number(visualConfig.sunAzimuth) : 180;
     const solarPathActive = config.solarPathEnabled !== false;
     const solarTime = config.timeOfDay !== undefined ? Number(config.timeOfDay) : 12;
+    const solarVisualPosition = calculateSolarCyclePosition(config, solarTime);
 
     if (isDynamicCycle && interpolated) {
       sunIntensity = visualConfig.sunIntensity;
@@ -681,7 +682,17 @@ export class SceneManager {
     this.sunMoonVisual.setState(this.sunVec, {
       enabled: config.enableSolarVisual !== false,
       useShaderSky: isShaderSky && !!this.skyMesh?.visible,
-      sunIntensity
+      sunIntensity,
+      dayProgress: solarVisualPosition.dayProgress,
+      sunIsDay: solarVisualPosition.isDay,
+      sunSizeSunrise: config.solarVisualSunriseSize ?? DEFAULT_SOLAR_VISUAL_SETTINGS.solarVisualSunriseSize,
+      sunSizeNoon: config.solarVisualNoonSize ?? DEFAULT_SOLAR_VISUAL_SETTINGS.solarVisualNoonSize,
+      sunSizeSunset: config.solarVisualSunsetSize ?? DEFAULT_SOLAR_VISUAL_SETTINGS.solarVisualSunsetSize,
+      moonSize: config.solarVisualMoonSize ?? DEFAULT_SOLAR_VISUAL_SETTINGS.solarVisualMoonSize,
+      sunColorSunrise: config.solarVisualSunriseColor || DEFAULT_SOLAR_VISUAL_SETTINGS.solarVisualSunriseColor,
+      sunColorNoon: config.solarVisualNoonColor || DEFAULT_SOLAR_VISUAL_SETTINGS.solarVisualNoonColor,
+      sunColorSunset: config.solarVisualSunsetColor || DEFAULT_SOLAR_VISUAL_SETTINGS.solarVisualSunsetColor,
+      moonColor: config.solarVisualMoonColor || DEFAULT_SOLAR_VISUAL_SETTINGS.solarVisualMoonColor
     });
   }
 

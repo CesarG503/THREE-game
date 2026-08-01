@@ -58,6 +58,30 @@ export const DEFAULT_SOLAR_CYCLE_SETTINGS: Required<SolarCycleSettings> = {
   solarPathAzimuthEnd: 270
 };
 
+export interface SolarVisualSettings {
+  enableSolarVisual?: boolean;
+  solarVisualSunriseSize?: number;
+  solarVisualNoonSize?: number;
+  solarVisualSunsetSize?: number;
+  solarVisualMoonSize?: number;
+  solarVisualSunriseColor?: string;
+  solarVisualNoonColor?: string;
+  solarVisualSunsetColor?: string;
+  solarVisualMoonColor?: string;
+}
+
+export const DEFAULT_SOLAR_VISUAL_SETTINGS: Required<SolarVisualSettings> = {
+  enableSolarVisual: true,
+  solarVisualSunriseSize: 0.9,
+  solarVisualNoonSize: 0.72,
+  solarVisualSunsetSize: 1.0,
+  solarVisualMoonSize: 0.85,
+  solarVisualSunriseColor: "#ffd08a",
+  solarVisualNoonColor: "#ffffff",
+  solarVisualSunsetColor: "#ff9a5c",
+  solarVisualMoonColor: "#dbeafe"
+};
+
 function normalizeHour(value: number) {
   return ((value % 24) + 24) % 24;
 }

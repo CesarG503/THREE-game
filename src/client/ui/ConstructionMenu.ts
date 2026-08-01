@@ -18,6 +18,7 @@ import { GRAVITY_ORIENTATION_OPTIONS } from "../utils/GravityOrientation";
 import { getSkyboxPresetDefaults } from "../platform/skyboxPresets";
 import {
   formatTimeOfDayHHMM,
+  DEFAULT_SOLAR_VISUAL_SETTINGS,
   calculateSolarCyclePosition,
   normalizeSolarCycleSettings,
   interpolateTimelineState,
@@ -1817,6 +1818,71 @@ export class ConstructionMenu {
         rowSolarVisual.appendChild(this.checkSolarVisual);
         rowSunPositionGroup.appendChild(rowSolarVisual);
 
+        const solarVisualGrid = document.createElement("div");
+        solarVisualGrid.style.cssText = "display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap:8px; background:#0f172a; border:1px solid #263244; border-radius:6px; padding:8px;";
+        this.solarVisualControls = {};
+
+        const createSolarVisualSlider = (labelStr, key, minVal, maxVal, stepVal) => {
+            const wrap = document.createElement("div");
+            wrap.style.cssText = "display:flex; flex-direction:column; gap:3px; min-width:0;";
+            const labelRow = document.createElement("div");
+            labelRow.style.cssText = "display:flex; justify-content:space-between; gap:8px; font-size:11px; color:#cbd5e1;";
+            const labelEl = document.createElement("span");
+            labelEl.textContent = labelStr;
+            labelEl.style.cssText = "overflow:hidden; text-overflow:ellipsis; white-space:nowrap;";
+            const valEl = document.createElement("span");
+            valEl.style.cssText = "font-family:monospace; color:#fbbf24; white-space:nowrap;";
+            labelRow.appendChild(labelEl);
+            labelRow.appendChild(valEl);
+            const slider = document.createElement("input");
+            slider.type = "range";
+            slider.min = String(minVal);
+            slider.max = String(maxVal);
+            slider.step = String(stepVal);
+            slider.style.cssText = "width:100%; cursor:pointer;";
+            slider.addEventListener("input", (e: any) => {
+                const update: any = {};
+                update[key] = parseFloat(e.target.value);
+                this.game.updateEnvironmentConfig(update);
+                this.refreshSettings();
+            });
+            wrap.appendChild(labelRow);
+            wrap.appendChild(slider);
+            solarVisualGrid.appendChild(wrap);
+            this.solarVisualControls[key] = { type: "range", input: slider, valEl };
+        };
+
+        const createSolarVisualColor = (labelStr, key) => {
+            const wrap = document.createElement("label");
+            wrap.style.cssText = "display:flex; align-items:center; justify-content:space-between; gap:8px; font-size:11px; color:#cbd5e1; min-width:0; cursor:pointer;";
+            const labelEl = document.createElement("span");
+            labelEl.textContent = labelStr;
+            labelEl.style.cssText = "overflow:hidden; text-overflow:ellipsis; white-space:nowrap;";
+            const input = document.createElement("input");
+            input.type = "color";
+            input.style.cssText = "width:34px; height:24px; background:transparent; border:none; padding:0; cursor:pointer;";
+            input.addEventListener("input", (e: any) => {
+                const update: any = {};
+                update[key] = e.target.value;
+                this.game.updateEnvironmentConfig(update);
+                this.refreshSettings();
+            });
+            wrap.appendChild(labelEl);
+            wrap.appendChild(input);
+            solarVisualGrid.appendChild(wrap);
+            this.solarVisualControls[key] = { type: "color", input };
+        };
+
+        createSolarVisualSlider("Tamaño sol amanecer", "solarVisualSunriseSize", 0.2, 3.5, 0.05);
+        createSolarVisualSlider("Tamaño sol mediodía", "solarVisualNoonSize", 0.2, 3.5, 0.05);
+        createSolarVisualSlider("Tamaño sol atardecer", "solarVisualSunsetSize", 0.2, 3.5, 0.05);
+        createSolarVisualSlider("Tamaño luna", "solarVisualMoonSize", 0.2, 3.5, 0.05);
+        createSolarVisualColor("Color amanecer", "solarVisualSunriseColor");
+        createSolarVisualColor("Color mediodía", "solarVisualNoonColor");
+        createSolarVisualColor("Color atardecer", "solarVisualSunsetColor");
+        createSolarVisualColor("Color luna", "solarVisualMoonColor");
+        rowSunPositionGroup.appendChild(solarVisualGrid);
+
         const solarPreviewWrap = document.createElement("div");
         solarPreviewWrap.style.cssText = "display:flex; flex-direction:column; gap:8px; background:#101318; border:1px solid #334155; border-radius:6px; padding:8px;";
 
@@ -3560,6 +3626,18 @@ export class ConstructionMenu {
         if (this.selectShadowQuality) this.selectShadowQuality.value = config.shadowQuality || "medium";
 
         if (this.checkSolarVisual) this.checkSolarVisual.checked = config.enableSolarVisual !== false;
+        if (this.solarVisualControls) {
+            Object.entries(this.solarVisualControls).forEach(([key, control]: any) => {
+                const defaultValue = DEFAULT_SOLAR_VISUAL_SETTINGS[key];
+                const value = config[key] ?? defaultValue;
+                if (control.type === "range") {
+                    if (document.activeElement !== control.input) control.input.value = String(value);
+                    if (control.valEl) control.valEl.textContent = Number(value).toFixed(2) + "x";
+                } else if (control.type === "color") {
+                    if (document.activeElement !== control.input) control.input.value = value || defaultValue || "#ffffff";
+                }
+            });
+        }
         this.drawSolarPathPreview();
 
         // Refresh Star checkboxes

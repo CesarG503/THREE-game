@@ -47,6 +47,14 @@ export interface EnvironmentConfig {
 	solarPathAzimuthStart?: number;
 	solarPathAzimuthEnd?: number;
 	enableSolarVisual?: boolean;
+	solarVisualSunriseSize?: number;
+	solarVisualNoonSize?: number;
+	solarVisualSunsetSize?: number;
+	solarVisualMoonSize?: number;
+	solarVisualSunriseColor?: string;
+	solarVisualNoonColor?: string;
+	solarVisualSunsetColor?: string;
+	solarVisualMoonColor?: string;
 	lightMode?: string;
 	shadowQuality?: string;
 	enableDayNightCycle?: boolean;

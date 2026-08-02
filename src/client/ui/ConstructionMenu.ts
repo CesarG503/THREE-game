@@ -1804,7 +1804,7 @@ export class ConstructionMenu {
         const rowSolarVisual = document.createElement("div");
         rowSolarVisual.style.cssText = "display:flex; align-items:center; justify-content:space-between; gap:10px; background:#111827; border:1px solid #263244; border-radius:4px; padding:7px 8px;";
         const labelSolarVisual = document.createElement("label");
-        labelSolarVisual.textContent = "Disco procedural sol/luna";
+        labelSolarVisual.textContent = "Sol y luna visibles";
         labelSolarVisual.style.cssText = "font-size:12px; color:#e5e7eb; cursor:pointer;";
         this.checkSolarVisual = document.createElement("input");
         this.checkSolarVisual.type = "checkbox";
@@ -2318,7 +2318,7 @@ export class ConstructionMenu {
         this.shaderAtmosphereGroup.style.cssText = "display:flex; flex-direction:column; gap:8px; border-top:1px solid #334155; padding-top:10px;";
 
         const atmosphereTitle = document.createElement("span");
-        atmosphereTitle.textContent = "Cielo atmosférico shader:";
+        atmosphereTitle.textContent = "Atmósfera del sol en este estado:";
         atmosphereTitle.style.cssText = "font-size:12px; color:#93c5fd; font-weight:bold;";
         this.shaderAtmosphereGroup.appendChild(atmosphereTitle);
 

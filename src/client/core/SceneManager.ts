@@ -61,6 +61,7 @@ export class SceneManager {
     this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
     this.camera.position.set(0, 5, 10);
     this.sunMoonVisual = new SunMoonVisual(this.scene, this.camera);
+    this.skyMesh = this.sunMoonVisual.atmosphere;
 
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
     this.renderer.setSize(window.innerWidth, window.innerHeight);
@@ -491,25 +492,10 @@ export class SceneManager {
       this.hideSkyboxTransition();
       this.activeVisualSkyType = skyType;
       this.clearActiveSkybox();
-      if (!this.skyMesh) {
-        this.skyMesh = new Sky();
-        this.skyMesh.scale.setScalar(450000);
-        this.skyMesh.name = "atmosphericSkyMesh";
-        this.skyMesh.userData.ignorePlacementRaycast = true;
-        this.skyMesh.raycast = () => {};
-        (this.skyMesh.material as THREE.ShaderMaterial).fog = false;
-        this.scene.add(this.skyMesh);
-      }
       this.skyMesh.visible = true;
       this.scene.background = null;
       this.scene.environment = null;
       
-      // Update Sky Shader uniforms
-      const uniforms = this.skyMesh.material.uniforms;
-      uniforms["turbidity"].value = visualConfig.skyTurbidity !== undefined ? Number(visualConfig.skyTurbidity) : 10;
-      uniforms["rayleigh"].value = visualConfig.skyRayleigh !== undefined ? Number(visualConfig.skyRayleigh) : 2;
-      uniforms["mieCoefficient"].value = visualConfig.skyMieCoefficient !== undefined ? Number(visualConfig.skyMieCoefficient) : 0.005;
-      uniforms["mieDirectionalG"].value = visualConfig.skyMieDirectionalG !== undefined ? Number(visualConfig.skyMieDirectionalG) : 0.8;
     } else {
       this.hideSkyboxTransition();
       if (this.skyMesh) {
@@ -675,13 +661,13 @@ export class SceneManager {
     const theta = THREE.MathUtils.degToRad(sunAzimuth);
     this.sunVec.setFromSphericalCoords(1, phi, theta);
     
-    if (isShaderSky && this.skyMesh) {
-      this.skyMesh.material.uniforms["sunPosition"].value.copy(this.sunVec);
-    }
-
     this.sunMoonVisual.setState(this.sunVec, {
       enabled: config.enableSolarVisual !== false,
-      useShaderSky: isShaderSky && !!this.skyMesh?.visible,
+      useShaderSky: isShaderSky && !isSkyboxTransitionManaged,
+      skyTurbidity: visualConfig.skyTurbidity ?? 10,
+      skyRayleigh: visualConfig.skyRayleigh ?? 2,
+      skyMieCoefficient: visualConfig.skyMieCoefficient ?? 0.005,
+      skyMieDirectionalG: visualConfig.skyMieDirectionalG ?? 0.8,
       sunIntensity,
       dayProgress: solarVisualPosition.dayProgress,
       sunIsDay: solarVisualPosition.isDay,

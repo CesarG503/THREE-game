@@ -51,6 +51,10 @@ export interface EnvironmentConfig {
 	solarVisualNoonSize?: number;
 	solarVisualSunsetSize?: number;
 	solarVisualMoonSize?: number;
+	solarVisualSunGlowIntensity?: number;
+	solarVisualSunGlowSize?: number;
+	solarVisualMoonGlowIntensity?: number;
+	solarVisualMoonGlowSize?: number;
 	solarVisualSunriseColor?: string;
 	solarVisualNoonColor?: string;
 	solarVisualSunsetColor?: string;

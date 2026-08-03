@@ -19,6 +19,7 @@ export class SolarAtmosphere extends Sky {
       solarEnabled: { value: true },
       solarRadius: { value: 0.008 },
       solarColor: { value: new THREE.Color() },
+      solarEdgeSoftness: { value: 0.025 },
       solarStrength: { value: 1 }
     });
     // Zero scattering and G=1 are valid slider endpoints; keep the model finite.
@@ -31,6 +32,7 @@ export class SolarAtmosphere extends Sky {
       uniform bool solarEnabled;
       uniform float solarRadius;
       uniform vec3 solarColor;
+      uniform float solarEdgeSoftness;
       uniform float solarStrength;
     ` + material.fragmentShader
       .replaceAll("( vBetaR + vBetaM )", "max( vBetaR + vBetaM, vec3(1e-9) )")
@@ -44,7 +46,7 @@ export class SolarAtmosphere extends Sky {
         float daylight = smoothstep(-0.10, 0.03, vSunDirection.y);
         float horizon = smoothstep(-0.006, 0.003, direction.y);
         float angle = acos(clamp(cosTheta, -1.0, 1.0));
-        float edge = max(fwidth(angle), solarRadius * 0.025);
+        float edge = max(fwidth(angle), solarRadius * solarEdgeSoftness);
         float disk = (1.0 - smoothstep(solarRadius - edge, solarRadius + edge, angle))
           * horizon * smoothstep(-0.04, 0.01, vSunDirection.y);
         if (!solarEnabled) disk = 0.0;

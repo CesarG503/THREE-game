@@ -1829,7 +1829,7 @@ export class ConstructionMenu {
             labelRow.style.cssText = "display:flex; justify-content:space-between; gap:8px; font-size:11px; color:#cbd5e1;";
             const labelEl = document.createElement("span");
             labelEl.textContent = labelStr;
-            labelEl.style.cssText = "overflow:hidden; text-overflow:ellipsis; white-space:nowrap;";
+            labelEl.style.cssText = "min-width:0; overflow-wrap:anywhere;";
             const valEl = document.createElement("span");
             valEl.style.cssText = "font-family:monospace; color:#fbbf24; white-space:nowrap;";
             labelRow.appendChild(labelEl);
@@ -1839,6 +1839,7 @@ export class ConstructionMenu {
             slider.min = String(minVal);
             slider.max = String(maxVal);
             slider.step = String(stepVal);
+            slider.setAttribute("aria-label", labelStr);
             slider.style.cssText = "width:100%; cursor:pointer;";
             slider.addEventListener("input", (e: any) => {
                 const update: any = {};
@@ -1877,6 +1878,10 @@ export class ConstructionMenu {
         createSolarVisualSlider("Tamaño sol mediodía", "solarVisualNoonSize", 0.2, 3.5, 0.05);
         createSolarVisualSlider("Tamaño sol atardecer", "solarVisualSunsetSize", 0.2, 3.5, 0.05);
         createSolarVisualSlider("Tamaño luna", "solarVisualMoonSize", 0.2, 3.5, 0.05);
+        createSolarVisualSlider("Brillo del halo solar", "solarVisualSunGlowIntensity", 0, 4, 0.05);
+        createSolarVisualSlider("Extensión del halo solar", "solarVisualSunGlowSize", 0.2, 4, 0.05);
+        createSolarVisualSlider("Brillo del halo lunar", "solarVisualMoonGlowIntensity", 0, 4, 0.05);
+        createSolarVisualSlider("Extensión del halo lunar", "solarVisualMoonGlowSize", 0.2, 4, 0.05);
         createSolarVisualColor("Color amanecer", "solarVisualSunriseColor");
         createSolarVisualColor("Color mediodía", "solarVisualNoonColor");
         createSolarVisualColor("Color atardecer", "solarVisualSunsetColor");

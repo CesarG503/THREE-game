@@ -64,6 +64,10 @@ export interface SolarVisualSettings {
   solarVisualNoonSize?: number;
   solarVisualSunsetSize?: number;
   solarVisualMoonSize?: number;
+  solarVisualSunGlowIntensity?: number;
+  solarVisualSunGlowSize?: number;
+  solarVisualMoonGlowIntensity?: number;
+  solarVisualMoonGlowSize?: number;
   solarVisualSunriseColor?: string;
   solarVisualNoonColor?: string;
   solarVisualSunsetColor?: string;
@@ -76,6 +80,10 @@ export const DEFAULT_SOLAR_VISUAL_SETTINGS: Required<SolarVisualSettings> = {
   solarVisualNoonSize: 0.72,
   solarVisualSunsetSize: 1.0,
   solarVisualMoonSize: 0.85,
+  solarVisualSunGlowIntensity: 1,
+  solarVisualSunGlowSize: 1,
+  solarVisualMoonGlowIntensity: 0.45,
+  solarVisualMoonGlowSize: 1,
   solarVisualSunriseColor: "#ffd08a",
   solarVisualNoonColor: "#ffffff",
   solarVisualSunsetColor: "#ff9a5c",

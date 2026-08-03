@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { SolarAtmosphere } from "./SolarAtmosphere";
+import { CelestialGlow } from "./CelestialGlow";
 
 export interface SunMoonVisualState {
   enabled: boolean;
@@ -19,6 +20,10 @@ export interface SunMoonVisualState {
   skyRayleigh: number;
   skyMieCoefficient: number;
   skyMieDirectionalG: number;
+  sunGlowIntensity: number;
+  sunGlowSize: number;
+  moonGlowIntensity: number;
+  moonGlowSize: number;
 }
 
 export class SunMoonVisual {
@@ -43,6 +48,13 @@ export class SunMoonVisual {
   private sunColorNoon: THREE.Color;
   private sunColorSunset: THREE.Color;
   private moonColor: THREE.Color;
+  private sunGlow = new CelestialGlow("sunGlow");
+  private moonGlow = new CelestialGlow("moonGlow", true);
+  private sunGlowIntensity = 1;
+  private sunGlowSize = 1;
+  private moonGlowIntensity = 0.45;
+  private moonGlowSize = 1;
+  private glowColor = new THREE.Color();
 
   constructor(scene: THREE.Scene, camera: THREE.PerspectiveCamera) {
     this.scene = scene;
@@ -81,6 +93,7 @@ export class SunMoonVisual {
     this.moonSprite = this.createSprite("proceduralMoon", this.moonMaterial);
     this.group.add(this.atmosphere);
     this.group.add(this.moonSprite);
+    this.group.add(this.sunGlow, this.moonGlow);
     this.scene.add(this.group);
   }
 
@@ -104,6 +117,10 @@ export class SunMoonVisual {
     uniforms.rayleigh.value = this.clampScale(state.skyRayleigh, 0, 4, 2);
     uniforms.mieCoefficient.value = this.clampScale(state.skyMieCoefficient, 0, 0.1, 0.005);
     uniforms.mieDirectionalG.value = this.clampScale(state.skyMieDirectionalG, 0, 1, 0.8);
+    this.sunGlowIntensity = this.clampScale(state.sunGlowIntensity, 0, 4, 1);
+    this.sunGlowSize = this.clampScale(state.sunGlowSize, 0.2, 4, 1);
+    this.moonGlowIntensity = this.clampScale(state.moonGlowIntensity, 0, 4, 0.45);
+    this.moonGlowSize = this.clampScale(state.moonGlowSize, 0.2, 4, 1);
     this.updateCameraPosition();
   }
 
@@ -122,11 +139,13 @@ export class SunMoonVisual {
     uniforms.solarRadius.value = 0.075 * (38 / 256) * this.getSunSize();
     uniforms.solarColor.value.copy(this.getSunColor());
     uniforms.solarStrength.value = THREE.MathUtils.clamp(0.8 + this.sunIntensity * 0.4, 0.8, 1.6);
+    const aerosol = Math.min(3, Math.sqrt(uniforms.mieCoefficient.value / 0.005) * (0.5 + uniforms.turbidity.value * 0.125));
+    const concentration = 1.8 - uniforms.mieDirectionalG.value * 1.5;
+    const glowSpread = this.sunGlowSize * concentration * (0.65 + aerosol * 0.35);
+    uniforms.solarEdgeSoftness.value = 0.025 + Math.min(0.35, this.sunGlowIntensity * glowSpread * 0.12);
     this.moonMaterial.opacity = moonOpacity;
     this.moonMaterial.color.copy(this.moonColor);
     this.moonSprite.visible = moonOpacity > 0.01;
-
-    if (!this.moonSprite.visible) return;
 
     const cameraFar = Number.isFinite(this.camera.far) ? this.camera.far : 1000;
     const distance = Math.max(20, Math.min(cameraFar * 0.72, 620));
@@ -135,6 +154,28 @@ export class SunMoonVisual {
 
     this.moonSprite.position.copy(moonPos);
     this.moonSprite.scale.setScalar(distance * 0.045 * this.moonSize);
+
+    // Match the atmospheric disk's wavelength-dependent extinction at the horizon.
+    const elevation = Math.max(0, sunY);
+    const zenithDegrees = THREE.MathUtils.radToDeg(Math.acos(elevation));
+    const airMass = 1 / (elevation + 0.15 * Math.pow(93.885 - zenithDegrees, -1.253));
+    const rayleigh = uniforms.rayleigh.value * 8400 * airMass;
+    const mie = uniforms.turbidity.value * uniforms.mieCoefficient.value * 0.434 * 2e-18 * 1250 * airMass;
+    // Normalize by red transmission, as in SolarAtmosphere, avoiding horizon underflow.
+    this.glowColor.setRGB(1,
+      Math.exp(-(1.3562911419845635e-5 - 5.804542996261093e-6) * rayleigh - (2.7798023919660528e14 - 1.8399918514433978e14) * mie),
+      Math.exp(-(3.0265902468824876e-5 - 5.804542996261093e-6) * rayleigh - (4.0790479543861094e14 - 1.8399918514433978e14) * mie)
+    ).multiply(uniforms.solarColor.value);
+    const sunVisibility = this.enabled ? THREE.MathUtils.smoothstep(sunY, -0.04, 0.01) : 0;
+    this.sunGlow.position.copy(this.camera.position).addScaledVector(this.sunDirection, distance);
+    this.sunGlow.quaternion.copy(this.camera.quaternion);
+    this.sunGlow.setGlow(distance * uniforms.solarRadius.value,
+      sunVisibility * this.sunGlowIntensity * (0.55 + aerosol * 0.45) * uniforms.solarStrength.value,
+      glowSpread, this.glowColor);
+    this.moonGlow.position.copy(moonPos);
+    this.moonGlow.quaternion.copy(this.camera.quaternion);
+    this.moonGlow.setGlow(distance * 0.045 * (36 / 256) * this.moonSize,
+      moonOpacity * this.moonGlowIntensity, this.moonGlowSize, this.moonColor);
   }
 
   dispose() {
@@ -144,6 +185,8 @@ export class SunMoonVisual {
     this.atmosphere.geometry.dispose();
     this.moonMaterial.dispose();
     this.moonTexture.dispose();
+    this.sunGlow.dispose();
+    this.moonGlow.dispose();
   }
 
   private createSprite(name: string, material: THREE.SpriteMaterial) {
@@ -193,13 +236,6 @@ export class SunMoonVisual {
     const ctx = canvas.getContext("2d");
     if (!ctx) throw new Error("Could not create moon texture");
 
-    const glow = ctx.createRadialGradient(128, 128, 16, 128, 128, 118);
-    glow.addColorStop(0, "rgba(226,240,255,0.98)");
-    glow.addColorStop(0.32, "rgba(147,197,253,0.45)");
-    glow.addColorStop(1, "rgba(147,197,253,0)");
-    ctx.fillStyle = glow;
-    ctx.fillRect(0, 0, 256, 256);
-
     const disk = ctx.createRadialGradient(112, 102, 8, 128, 128, 42);
     disk.addColorStop(0, "#f8fbff");
     disk.addColorStop(0.65, "#dbeafe");
@@ -209,7 +245,7 @@ export class SunMoonVisual {
     ctx.arc(128, 128, 36, 0, Math.PI * 2);
     ctx.fill();
 
-    // The crescent shadow must not erase the halo outside the lunar disk.
+    // Keep the crescent shadow inside the disk; the adjustable halo is a separate layer.
     ctx.save();
     ctx.beginPath();
     ctx.arc(128, 128, 36, 0, Math.PI * 2);

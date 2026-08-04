@@ -16,9 +16,10 @@ import { listAssets, uploadAsset } from "../platform/api";
 import { getDefaultTextureSettings, normalizeTextureSettings } from "../utils/TextureMapping";
 import { GRAVITY_ORIENTATION_OPTIONS } from "../utils/GravityOrientation";
 import { getSkyboxPresetDefaults } from "../platform/skyboxPresets";
+import { SolarVisualTimelineEditor } from "./SolarVisualTimelineEditor";
+import { sampleSolarVisualPoints, formatSolarPointTime } from "../platform/solarVisualTimeline";
 import {
   formatTimeOfDayHHMM,
-  DEFAULT_SOLAR_VISUAL_SETTINGS,
   calculateSolarCyclePosition,
   normalizeSolarCycleSettings,
   interpolateTimelineState,
@@ -1818,90 +1819,27 @@ export class ConstructionMenu {
         rowSolarVisual.appendChild(this.checkSolarVisual);
         rowSunPositionGroup.appendChild(rowSolarVisual);
 
-        const solarVisualGrid = document.createElement("div");
-        solarVisualGrid.style.cssText = "display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap:8px; background:#0f172a; border:1px solid #263244; border-radius:6px; padding:8px;";
-        this.solarVisualControls = {};
-
-        const createSolarVisualSlider = (labelStr, key, minVal, maxVal, stepVal) => {
-            const wrap = document.createElement("div");
-            wrap.style.cssText = "display:flex; flex-direction:column; gap:3px; min-width:0;";
-            const labelRow = document.createElement("div");
-            labelRow.style.cssText = "display:flex; justify-content:space-between; gap:8px; font-size:11px; color:#cbd5e1;";
-            const labelEl = document.createElement("span");
-            labelEl.textContent = labelStr;
-            labelEl.style.cssText = "min-width:0; overflow-wrap:anywhere;";
-            const valEl = document.createElement("span");
-            valEl.style.cssText = "font-family:monospace; color:#fbbf24; white-space:nowrap;";
-            labelRow.appendChild(labelEl);
-            labelRow.appendChild(valEl);
-            const slider = document.createElement("input");
-            slider.type = "range";
-            slider.min = String(minVal);
-            slider.max = String(maxVal);
-            slider.step = String(stepVal);
-            slider.setAttribute("aria-label", labelStr);
-            slider.style.cssText = "width:100%; cursor:pointer;";
-            slider.addEventListener("input", (e: any) => {
-                const update: any = {};
-                update[key] = parseFloat(e.target.value);
-                this.game.updateEnvironmentConfig(update);
-                this.refreshSettings();
-            });
-            wrap.appendChild(labelRow);
-            wrap.appendChild(slider);
-            solarVisualGrid.appendChild(wrap);
-            this.solarVisualControls[key] = { type: "range", input: slider, valEl };
-        };
-
-        const createSolarVisualColor = (labelStr, key) => {
-            const wrap = document.createElement("label");
-            wrap.style.cssText = "display:flex; align-items:center; justify-content:space-between; gap:8px; font-size:11px; color:#cbd5e1; min-width:0; cursor:pointer;";
-            const labelEl = document.createElement("span");
-            labelEl.textContent = labelStr;
-            labelEl.style.cssText = "overflow:hidden; text-overflow:ellipsis; white-space:nowrap;";
-            const input = document.createElement("input");
-            input.type = "color";
-            input.style.cssText = "width:34px; height:24px; background:transparent; border:none; padding:0; cursor:pointer;";
-            input.addEventListener("input", (e: any) => {
-                const update: any = {};
-                update[key] = e.target.value;
-                this.game.updateEnvironmentConfig(update);
-                this.refreshSettings();
-            });
-            wrap.appendChild(labelEl);
-            wrap.appendChild(input);
-            solarVisualGrid.appendChild(wrap);
-            this.solarVisualControls[key] = { type: "color", input };
-        };
-
-        createSolarVisualSlider("Tamaño sol amanecer", "solarVisualSunriseSize", 0.2, 3.5, 0.05);
-        createSolarVisualSlider("Tamaño sol mediodía", "solarVisualNoonSize", 0.2, 3.5, 0.05);
-        createSolarVisualSlider("Tamaño sol atardecer", "solarVisualSunsetSize", 0.2, 3.5, 0.05);
-        createSolarVisualSlider("Tamaño luna", "solarVisualMoonSize", 0.2, 3.5, 0.05);
-        createSolarVisualSlider("Brillo del halo solar", "solarVisualSunGlowIntensity", 0, 4, 0.05);
-        createSolarVisualSlider("Extensión del halo solar", "solarVisualSunGlowSize", 0.2, 4, 0.05);
-        createSolarVisualSlider("Brillo del halo lunar", "solarVisualMoonGlowIntensity", 0, 4, 0.05);
-        createSolarVisualSlider("Extensión del halo lunar", "solarVisualMoonGlowSize", 0.2, 4, 0.05);
-        createSolarVisualColor("Color amanecer", "solarVisualSunriseColor");
-        createSolarVisualColor("Color mediodía", "solarVisualNoonColor");
-        createSolarVisualColor("Color atardecer", "solarVisualSunsetColor");
-        createSolarVisualColor("Color luna", "solarVisualMoonColor");
-        rowSunPositionGroup.appendChild(solarVisualGrid);
-
         const solarPreviewWrap = document.createElement("div");
         solarPreviewWrap.style.cssText = "display:flex; flex-direction:column; gap:8px; background:#101318; border:1px solid #334155; border-radius:6px; padding:8px;";
 
         this.solarPathCanvas = document.createElement("canvas");
         this.solarPathCanvas.height = 190;
-        this.solarPathCanvas.style.cssText = "width:100%; height:190px; display:block; border-radius:4px; background:#0b1020; cursor:crosshair;";
+        this.solarPathCanvas.style.cssText = "width:100%; height:190px; display:block; border-radius:4px; background:#0b1020; cursor:crosshair; touch-action:none;";
+        this.solarPathCanvas.setAttribute("aria-label", "Trayectoria y puntos del sol o la luna");
         this.solarPathCanvas.addEventListener("pointerdown", (e) => {
             this.solarPathCanvas.setPointerCapture(e.pointerId);
+            this.solarPathPointerStart = { x: e.clientX, y: e.clientY };
             this.solarPathDragTarget = this.pickSolarPathDragTarget(e);
-            this.updateSolarPathFromPointer(e);
+            if (this.solarPathDragTarget !== "point") this.updateSolarPathFromPointer(e);
         });
         this.solarPathCanvas.addEventListener("pointermove", (e) => {
             if (!this.solarPathDragTarget) return;
+            if (Math.hypot(e.clientX - this.solarPathPointerStart.x, e.clientY - this.solarPathPointerStart.y) < 4) return;
             this.updateSolarPathFromPointer(e);
+        });
+        this.solarPathCanvas.addEventListener("dblclick", (e) => {
+            const { x, layout } = this.getSolarPathPointerPoint(e);
+            this.solarVisualEditor.addPoint(layout.fromXToTime(x));
         });
         const endSolarDrag = (e) => {
             if (this.solarPathCanvas.hasPointerCapture?.(e.pointerId)) {
@@ -1933,6 +1871,13 @@ export class ConstructionMenu {
         this.valSunAzimuth = makeSolarStat("Azimut", "#a7f3d0");
         solarPreviewWrap.appendChild(solarStatsRow);
         rowSunPositionGroup.appendChild(solarPreviewWrap);
+        this.solarVisualEditor = new SolarVisualTimelineEditor({
+            getConfig: () => this.game.environmentConfig || {},
+            update: (patch) => this.game.updateEnvironmentConfig(patch),
+            refresh: () => this.refreshSettings()
+        });
+        this.solarVisualEditor.element.insertBefore(solarPreviewWrap, this.solarVisualEditor.element.children[1]);
+        rowSunPositionGroup.appendChild(this.solarVisualEditor.element);
 
         const solarControlsGrid = document.createElement("div");
         solarControlsGrid.style.cssText = "display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap:8px;";
@@ -1984,7 +1929,12 @@ export class ConstructionMenu {
         createSolarPathSlider("Profundidad noche", "solarPathNightDepth", 5, 80, 1, (v) => `${Math.round(v)}°`);
         createSolarPathSlider("Azimut inicial", "solarPathAzimuthStart", 0, 360, 1, (v) => `${Math.round(v)}°`);
         createSolarPathSlider("Azimut final", "solarPathAzimuthEnd", 0, 360, 1, (v) => `${Math.round(v)}°`);
-        rowSunPositionGroup.appendChild(solarControlsGrid);
+        const orbitDetails = document.createElement("details");
+        const orbitSummary = document.createElement("summary");
+        orbitSummary.textContent = "Órbita de 24 horas";
+        orbitSummary.style.cssText = "cursor:pointer;color:#ccc;font-size:12px;padding:8px 0;";
+        orbitDetails.append(orbitSummary, solarControlsGrid);
+        rowSunPositionGroup.appendChild(orbitDetails);
 
         // Star Options Container
         const rowStarsGroup = document.createElement("div");
@@ -2716,7 +2666,7 @@ export class ConstructionMenu {
         };
         const fromXToTime = (x) => {
             const t = ((THREE.MathUtils.clamp(x, margin, width - margin) - margin) / (width - margin * 2)) * 24;
-            return Math.round(t * 10) / 10;
+            return Math.round(t * 60) / 60;
         };
         const fromYToElevation = (y) => {
             const value = ((horizonY - THREE.MathUtils.clamp(y, topY, horizonY - 4)) / dayHeight) * 90;
@@ -2738,49 +2688,38 @@ export class ConstructionMenu {
 
     pickSolarPathDragTarget(e: PointerEvent) {
         const config = this.game?.environmentConfig || {};
-        const settings = normalizeSolarCycleSettings(config);
-        const currentTime = config.timeOfDay !== undefined ? Number(config.timeOfDay) : 12;
         const { x, y, layout } = this.getSolarPathPointerPoint(e);
-        const solarNow = calculateSolarCyclePosition(config, currentTime);
-        const peakTime = settings.solarPathSunriseTime + (settings.solarPathSunsetTime - settings.solarPathSunriseTime) / 2;
-        const handles = [
-            { id: "sunrise", x: layout.toX(settings.solarPathSunriseTime), y: layout.horizonY },
-            { id: "sunset", x: layout.toX(settings.solarPathSunsetTime), y: layout.horizonY },
-            { id: "peak", x: layout.toX(peakTime), y: layout.toY(settings.solarPathMaxElevation) },
-            { id: "time", x: layout.toX(currentTime), y: layout.toY(solarNow.sunElevation) }
-        ];
-
-        let best = handles[3];
-        let bestDist = Infinity;
-        handles.forEach(handle => {
-            const dist = Math.hypot(handle.x - x, handle.y - y);
-            if (dist < bestDist) {
-                best = handle;
-                bestDist = dist;
-            }
+        const editor = this.solarVisualEditor;
+        if (!editor) return "time";
+        const sign = editor.body === "moon" ? -1 : 1;
+        let nearest = null;
+        let distance = 14;
+        editor.timeline[editor.body].forEach(point => {
+            const position = calculateSolarCyclePosition(config, point.time);
+            const d = Math.hypot(layout.toX(point.time) - x, layout.toY(position.sunElevation * sign) - y);
+            if (d < distance) { nearest = point; distance = d; }
         });
-        return bestDist <= 24 ? best.id : "time";
+        if (nearest) {
+            editor.selectPoint(nearest.id);
+            return "point";
+        }
+        return "time";
     }
 
     updateSolarPathFromPointer(e: PointerEvent) {
         if (!this.game?.environmentConfig || !this.solarPathCanvas) return;
         const config = this.game.environmentConfig;
         const { x, y, layout } = this.getSolarPathPointerPoint(e);
-        const settings = normalizeSolarCycleSettings(config);
         const target = this.solarPathDragTarget || "time";
-        const update: any = { solarPathEnabled: true };
-
-        if (target === "sunrise") {
-            update.solarPathSunriseTime = Math.min(layout.fromXToTime(x), settings.solarPathSunsetTime - 0.5);
-        } else if (target === "sunset") {
-            update.solarPathSunsetTime = Math.max(layout.fromXToTime(x), settings.solarPathSunriseTime + 0.5);
-        } else if (target === "peak") {
-            update.solarPathMaxElevation = layout.fromYToElevation(y);
-        } else {
-            update.timeOfDay = layout.fromXToTime(x);
-            update.enableDayNightCycle = false;
-            update.isCycleSimulating = false;
+        if (target === "point") {
+            this.solarVisualEditor.updatePoint({ time: layout.fromXToTime(x) });
+            return;
         }
+        const update = {
+            timeOfDay: layout.fromXToTime(x),
+            enableDayNightCycle: false,
+            isCycleSimulating: false
+        };
 
         this.game.updateEnvironmentConfig(update);
         this.refreshSettings();
@@ -2793,6 +2732,9 @@ export class ConstructionMenu {
         const config = this.game.environmentConfig;
         const ctx = canvas.getContext("2d");
         if (!ctx) return;
+        const editor = this.solarVisualEditor;
+        const body = editor?.body || "sun";
+        const sign = body === "moon" ? -1 : 1;
 
         const layout = this.getSolarPathCanvasLayout();
         const dpr = window.devicePixelRatio || 1;
@@ -2838,12 +2780,12 @@ export class ConstructionMenu {
             for (let i = 0; i <= 144; i++) {
                 const time = (i / 144) * 24;
                 const solar = calculateSolarCyclePosition(config, time);
-                if (solar.isDay !== day) {
+                if ((solar.sunElevation * sign >= 0) !== day) {
                     started = false;
                     continue;
                 }
                 const x = layout.toX(time);
-                const y = layout.toY(solar.sunElevation);
+                const y = layout.toY(solar.sunElevation * sign);
                 if (!started) {
                     ctx.moveTo(x, y);
                     started = true;
@@ -2851,72 +2793,68 @@ export class ConstructionMenu {
                     ctx.lineTo(x, y);
                 }
             }
-            ctx.strokeStyle = day ? "#fbbf24" : "#93c5fd";
+            ctx.strokeStyle = day ? (body === "sun" ? "#fbbf24" : "#93c5fd") : "#64748b";
+            ctx.setLineDash(day ? [] : [4, 4]);
             ctx.lineWidth = day ? 3 : 2;
             ctx.stroke();
+            ctx.setLineDash([]);
         };
         drawPathSegment(false);
         drawPathSegment(true);
 
-        const timeline = normalizeTimeline(config.dayNightTimeline);
-        timeline.forEach(kf => {
-            const solar = calculateSolarCyclePosition(config, kf.time);
-            const x = layout.toX(kf.time);
-            const y = layout.toY(solar.sunElevation);
-            ctx.fillStyle = kf.id === config.selectedEnvironmentStateId ? "#22d3ee" : "#e5e7eb";
-            ctx.beginPath();
-            ctx.arc(x, y, kf.id === config.selectedEnvironmentStateId ? 4.5 : 3.5, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.fillStyle = "#cbd5e1";
-            ctx.font = "10px sans-serif";
-            ctx.textAlign = "center";
-            ctx.fillText(String(kf.label || "").slice(0, 3), x, Math.min(layout.height - 28, y + 16));
-        });
-
         const settings = normalizeSolarCycleSettings(config);
         const currentTime = config.timeOfDay !== undefined ? Number(config.timeOfDay) : 12;
         const solarNow = calculateSolarCyclePosition(config, currentTime);
-        const peakTime = settings.solarPathSunriseTime + (settings.solarPathSunsetTime - settings.solarPathSunriseTime) / 2;
-        const handles = [
-            { label: "A", x: layout.toX(settings.solarPathSunriseTime), y: layout.horizonY, color: "#fb923c" },
-            { label: "T", x: layout.toX(settings.solarPathSunsetTime), y: layout.horizonY, color: "#f97316" },
-            { label: "H", x: layout.toX(peakTime), y: layout.toY(settings.solarPathMaxElevation), color: "#fde68a" }
-        ];
-        handles.forEach(handle => {
-            ctx.fillStyle = handle.color;
-            ctx.strokeStyle = "#0f172a";
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.arc(handle.x, handle.y, 7, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.stroke();
-            ctx.fillStyle = "#111827";
-            ctx.font = "bold 9px sans-serif";
-            ctx.textAlign = "center";
-            ctx.textBaseline = "middle";
-            ctx.fillText(handle.label, handle.x, handle.y + 0.5);
-            ctx.textBaseline = "alphabetic";
-        });
-
         const currentX = layout.toX(currentTime);
-        const currentY = layout.toY(solarNow.sunElevation);
-        const radius = solarNow.isDay ? 10 : 8;
-        const glow = ctx.createRadialGradient(currentX, currentY, 1, currentX, currentY, radius * 2.4);
-        glow.addColorStop(0, solarNow.isDay ? "#fef3c7" : "#e0f2fe");
-        glow.addColorStop(0.55, solarNow.isDay ? "#facc15" : "#93c5fd");
-        glow.addColorStop(1, "rgba(250, 204, 21, 0)");
+        const currentY = layout.toY(solarNow.sunElevation * sign);
+        const pointVisual = editor ? sampleSolarVisualPoints(editor.timeline[body], currentTime) : null;
+        const radius = Math.min(12, Math.max(4, 6 * (pointVisual?.size ?? 1)));
+        const haloRadius = Math.min(48, radius * (1.4 + (pointVisual?.glowSize ?? 1) * 0.8));
+        const tint = pointVisual?.color || "#ffffff";
+        const glow = ctx.createRadialGradient(currentX, currentY, 1, currentX, currentY, haloRadius);
+        glow.addColorStop(0, tint);
+        glow.addColorStop(0.55, tint + "80");
+        glow.addColorStop(1, tint + "00");
+        ctx.save();
+        ctx.globalAlpha = Math.min(1, (pointVisual?.glowIntensity ?? 1) * 0.7);
         ctx.fillStyle = glow;
         ctx.beginPath();
-        ctx.arc(currentX, currentY, radius * 2.4, 0, Math.PI * 2);
+        ctx.arc(currentX, currentY, haloRadius, 0, Math.PI * 2);
         ctx.fill();
-        ctx.fillStyle = solarNow.isDay ? "#fde047" : "#bfdbfe";
+        ctx.restore();
+        ctx.fillStyle = pointVisual?.color || "#ffffff";
         ctx.beginPath();
         ctx.arc(currentX, currentY, radius, 0, Math.PI * 2);
         ctx.fill();
 
+        ctx.strokeStyle = "rgba(255,255,255,0.4)";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(currentX, layout.topY);
+        ctx.lineTo(currentX, layout.bottomY);
+        ctx.stroke();
+        editor?.timeline[body].forEach((point, index) => {
+            const position = calculateSolarCyclePosition(config, point.time);
+            const x = layout.toX(point.time);
+            const y = layout.toY(position.sunElevation * sign);
+            const selected = point.id === editor.selectedId;
+            ctx.fillStyle = selected ? "#22d3ee" : point.color;
+            ctx.strokeStyle = selected ? "#ffffff" : "#111827";
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(x, y, selected ? 7 : 5, 0, Math.PI * 2);
+            ctx.fill(); ctx.stroke();
+            if (selected) {
+                ctx.font = "bold 10px monospace";
+                ctx.textAlign = "center";
+                ctx.fillStyle = "#ffffff";
+                ctx.fillText(`${index + 1} · ${formatSolarPointTime(point.time)}`, Math.max(34, Math.min(layout.width - 34, x)), Math.max(12, y - 12));
+            }
+        });
+
         if (this.valSolarPathTime) this.valSolarPathTime.textContent = formatTimeOfDayHHMM(currentTime);
-        if (this.valSunElevation) this.valSunElevation.textContent = `${solarNow.sunElevation.toFixed(1)}°`;
-        if (this.valSunAzimuth) this.valSunAzimuth.textContent = `${solarNow.sunAzimuth.toFixed(0)}°`;
+        if (this.valSunElevation) this.valSunElevation.textContent = `${(solarNow.sunElevation * sign).toFixed(1)}°`;
+        if (this.valSunAzimuth) this.valSunAzimuth.textContent = `${((solarNow.sunAzimuth + (body === "moon" ? 180 : 0)) % 360).toFixed(0)}°`;
 
         if (this.solarPathControls) {
             Object.entries(this.solarPathControls).forEach(([key, control]: any) => {
@@ -3631,18 +3569,7 @@ export class ConstructionMenu {
         if (this.selectShadowQuality) this.selectShadowQuality.value = config.shadowQuality || "medium";
 
         if (this.checkSolarVisual) this.checkSolarVisual.checked = config.enableSolarVisual !== false;
-        if (this.solarVisualControls) {
-            Object.entries(this.solarVisualControls).forEach(([key, control]: any) => {
-                const defaultValue = DEFAULT_SOLAR_VISUAL_SETTINGS[key];
-                const value = config[key] ?? defaultValue;
-                if (control.type === "range") {
-                    if (document.activeElement !== control.input) control.input.value = String(value);
-                    if (control.valEl) control.valEl.textContent = Number(value).toFixed(2) + "x";
-                } else if (control.type === "color") {
-                    if (document.activeElement !== control.input) control.input.value = value || defaultValue || "#ffffff";
-                }
-            });
-        }
+        this.solarVisualEditor?.refresh();
         this.drawSolarPathPreview();
 
         // Refresh Star checkboxes

@@ -1,3 +1,5 @@
+import { normalizeSolarVisualTimeline } from "./solarVisualTimeline";
+
 export interface SavedMapData {
 	gameVersion: string;
 	timestamp: number;
@@ -54,6 +56,7 @@ export interface SavedMapData {
 		solarVisualNoonSize?: number;
 		solarVisualSunsetSize?: number;
 		solarVisualMoonSize?: number;
+		solarVisualTimeline?: import("./solarVisualTimeline").SolarVisualTimeline;
 		solarVisualSunGlowIntensity?: number;
 		solarVisualSunGlowSize?: number;
 		solarVisualMoonGlowIntensity?: number;
@@ -100,6 +103,7 @@ export function createEmptyMapData(): SavedMapData {
 			solarPathAzimuthStart: 90,
 			solarPathAzimuthEnd: 270,
 			enableSolarVisual: true,
+			solarVisualTimeline: normalizeSolarVisualTimeline(),
 			solarVisualSunriseSize: 0.9,
 			solarVisualNoonSize: 0.72,
 			solarVisualSunsetSize: 1.0,

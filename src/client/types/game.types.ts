@@ -51,6 +51,7 @@ export interface EnvironmentConfig {
 	solarVisualNoonSize?: number;
 	solarVisualSunsetSize?: number;
 	solarVisualMoonSize?: number;
+	solarVisualTimeline?: import("../platform/solarVisualTimeline").SolarVisualTimeline;
 	solarVisualSunGlowIntensity?: number;
 	solarVisualSunGlowSize?: number;
 	solarVisualMoonGlowIntensity?: number;

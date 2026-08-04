@@ -6,15 +6,9 @@ export interface SunMoonVisualState {
   enabled: boolean;
   useShaderSky: boolean;
   sunIntensity: number;
-  dayProgress: number;
-  sunIsDay: boolean;
-  sunSizeSunrise: number;
-  sunSizeNoon: number;
-  sunSizeSunset: number;
+  sunSize: number;
   moonSize: number;
-  sunColorSunrise: string;
-  sunColorNoon: string;
-  sunColorSunset: string;
+  sunColor: string;
   moonColor: string;
   skyTurbidity: number;
   skyRayleigh: number;
@@ -38,15 +32,9 @@ export class SunMoonVisual {
   private enabled: boolean;
   private useShaderSky: boolean;
   private sunIntensity: number;
-  private dayProgress: number;
-  private sunIsDay: boolean;
-  private sunSizeSunrise: number;
-  private sunSizeNoon: number;
-  private sunSizeSunset: number;
+  private sunSize: number;
   private moonSize: number;
-  private sunColorSunrise: THREE.Color;
-  private sunColorNoon: THREE.Color;
-  private sunColorSunset: THREE.Color;
+  private sunColor: THREE.Color;
   private moonColor: THREE.Color;
   private sunGlow = new CelestialGlow("sunGlow");
   private moonGlow = new CelestialGlow("moonGlow", true);
@@ -63,15 +51,9 @@ export class SunMoonVisual {
     this.enabled = true;
     this.useShaderSky = false;
     this.sunIntensity = 1;
-    this.dayProgress = 0.5;
-    this.sunIsDay = true;
-    this.sunSizeSunrise = 0.9;
-    this.sunSizeNoon = 0.72;
-    this.sunSizeSunset = 1.0;
+    this.sunSize = 0.72;
     this.moonSize = 0.85;
-    this.sunColorSunrise = new THREE.Color("#ffd08a");
-    this.sunColorNoon = new THREE.Color("#ffffff");
-    this.sunColorSunset = new THREE.Color("#ff9a5c");
+    this.sunColor = new THREE.Color("#ffffff");
     this.moonColor = new THREE.Color("#dbeafe");
 
     this.group = new THREE.Group();
@@ -102,15 +84,9 @@ export class SunMoonVisual {
     this.enabled = state.enabled;
     this.useShaderSky = state.useShaderSky;
     this.sunIntensity = state.sunIntensity;
-    this.dayProgress = THREE.MathUtils.clamp(state.dayProgress ?? 0.5, 0, 1);
-    this.sunIsDay = state.sunIsDay !== false;
-    this.sunSizeSunrise = this.clampScale(state.sunSizeSunrise, 0.2, 3.5, 0.9);
-    this.sunSizeNoon = this.clampScale(state.sunSizeNoon, 0.2, 3.5, 0.72);
-    this.sunSizeSunset = this.clampScale(state.sunSizeSunset, 0.2, 3.5, 1.0);
+    this.sunSize = this.clampScale(state.sunSize, 0.2, 3.5, 0.72);
     this.moonSize = this.clampScale(state.moonSize, 0.2, 3.5, 0.85);
-    this.sunColorSunrise.set(state.sunColorSunrise || "#ffd08a");
-    this.sunColorNoon.set(state.sunColorNoon || "#ffffff");
-    this.sunColorSunset.set(state.sunColorSunset || "#ff9a5c");
+    this.sunColor.set(state.sunColor || "#ffffff");
     this.moonColor.set(state.moonColor || "#dbeafe");
     const uniforms = this.atmosphere.material.uniforms;
     uniforms.turbidity.value = this.clampScale(state.skyTurbidity, 0, 20, 10);
@@ -136,8 +112,8 @@ export class SunMoonVisual {
     uniforms.fullSky.value = this.useShaderSky;
     uniforms.solarEnabled.value = this.enabled;
     uniforms.sunPosition.value.copy(this.sunDirection);
-    uniforms.solarRadius.value = 0.075 * (38 / 256) * this.getSunSize();
-    uniforms.solarColor.value.copy(this.getSunColor());
+    uniforms.solarRadius.value = 0.075 * (38 / 256) * this.sunSize;
+    uniforms.solarColor.value.copy(this.sunColor);
     uniforms.solarStrength.value = THREE.MathUtils.clamp(0.8 + this.sunIntensity * 0.4, 0.8, 1.6);
     const aerosol = Math.min(3, Math.sqrt(uniforms.mieCoefficient.value / 0.005) * (0.5 + uniforms.turbidity.value * 0.125));
     const concentration = 1.8 - uniforms.mieDirectionalG.value * 1.5;
@@ -201,32 +177,6 @@ export class SunMoonVisual {
   private clampScale(value: number, min: number, max: number, fallback: number) {
     const n = Number(value);
     return Number.isFinite(n) ? THREE.MathUtils.clamp(n, min, max) : fallback;
-  }
-
-  private getSunSize() {
-    return this.blendDayValue(this.sunSizeSunrise, this.sunSizeNoon, this.sunSizeSunset);
-  }
-
-  private blendDayValue(sunriseValue: number, noonValue: number, sunsetValue: number) {
-    const t = THREE.MathUtils.clamp(this.dayProgress, 0, 1);
-    if (t < 0.32) {
-      return THREE.MathUtils.lerp(sunriseValue, noonValue, THREE.MathUtils.smoothstep(t, 0, 0.32));
-    }
-    if (t > 0.72) {
-      return THREE.MathUtils.lerp(noonValue, sunsetValue, THREE.MathUtils.smoothstep(t, 0.72, 1));
-    }
-    return noonValue;
-  }
-
-  private getSunColor() {
-    const t = THREE.MathUtils.clamp(this.dayProgress, 0, 1);
-    if (t < 0.32) {
-      return this.sunColorSunrise.clone().lerp(this.sunColorNoon, THREE.MathUtils.smoothstep(t, 0, 0.32));
-    }
-    if (t > 0.72) {
-      return this.sunColorNoon.clone().lerp(this.sunColorSunset, THREE.MathUtils.smoothstep(t, 0.72, 1));
-    }
-    return this.sunColorNoon.clone();
   }
 
   private createMoonTexture() {

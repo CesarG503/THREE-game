@@ -8,6 +8,7 @@ import { MapMaterialCache } from "../map/MapMaterialCache";
 import { MapGeometryBuilder, createPrismGeometryForShape } from "../map/MapGeometryBuilder";
 import { MapPhysicsBuilder } from "../map/MapPhysicsBuilder";
 import { DEFAULT_DAY_NIGHT_PROFILES, DEFAULT_SOLAR_CYCLE_SETTINGS, DEFAULT_SOLAR_VISUAL_SETTINGS, normalizeTimeline } from "../platform/timelineDefaults";
+import { normalizeSolarVisualTimeline } from "../platform/solarVisualTimeline";
 
 export function buildEnvironment(this: any) {
 	this.levelBuilder = new LevelBuilder(this.sceneManager.scene, this.world);
@@ -57,6 +58,7 @@ export function updateEnvironmentConfig(this: any, config: any) {
 	Object.entries(DEFAULT_SOLAR_VISUAL_SETTINGS).forEach(([key, value]) => {
 		if (this.environmentConfig[key] === undefined) this.environmentConfig[key] = value;
 	});
+	this.environmentConfig.solarVisualTimeline = normalizeSolarVisualTimeline(this.environmentConfig);
 
 	const normalizedProfiles = (this.environmentConfig.dayNightProfiles && this.environmentConfig.dayNightProfiles.length > 0
 		? this.environmentConfig.dayNightProfiles

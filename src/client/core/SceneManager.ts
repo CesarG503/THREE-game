@@ -1,8 +1,9 @@
 import * as THREE from "three";
 import { Sky } from "three/addons/objects/Sky.js";
 import { SunMoonVisual } from "./SunMoonVisual";
+import { normalizeSolarVisualTimeline, sampleSolarVisualPoints } from "../platform/solarVisualTimeline";
 import { getSkyboxPresetDefaults } from "../platform/skyboxPresets";
-import { DEFAULT_SOLAR_VISUAL_SETTINGS, calculateSolarCyclePosition, interpolateTimelineState } from "../platform/timelineDefaults";
+import { calculateSolarCyclePosition, interpolateTimelineState } from "../platform/timelineDefaults";
 
 const SKYBOX_PREFIX = "skybox:";
 const SKYBOX_FACE_LAYOUT = {
@@ -552,7 +553,6 @@ export class SceneManager {
     let sunAzimuth = visualConfig.sunAzimuth !== undefined ? Number(visualConfig.sunAzimuth) : 180;
     const solarPathActive = config.solarPathEnabled !== false;
     const solarTime = config.timeOfDay !== undefined ? Number(config.timeOfDay) : 12;
-    const solarVisualPosition = calculateSolarCyclePosition(config, solarTime);
 
     if (isDynamicCycle && interpolated) {
       sunIntensity = visualConfig.sunIntensity;
@@ -661,6 +661,9 @@ export class SceneManager {
     const theta = THREE.MathUtils.degToRad(sunAzimuth);
     this.sunVec.setFromSphericalCoords(1, phi, theta);
     
+    const visualTimeline = normalizeSolarVisualTimeline(config);
+    const sunVisual = sampleSolarVisualPoints(visualTimeline.sun, solarTime);
+    const moonVisual = sampleSolarVisualPoints(visualTimeline.moon, solarTime);
     this.sunMoonVisual.setState(this.sunVec, {
       enabled: config.enableSolarVisual !== false,
       useShaderSky: isShaderSky && !isSkyboxTransitionManaged,
@@ -669,20 +672,14 @@ export class SceneManager {
       skyMieCoefficient: visualConfig.skyMieCoefficient ?? 0.005,
       skyMieDirectionalG: visualConfig.skyMieDirectionalG ?? 0.8,
       sunIntensity,
-      dayProgress: solarVisualPosition.dayProgress,
-      sunIsDay: solarVisualPosition.isDay,
-      sunSizeSunrise: config.solarVisualSunriseSize ?? DEFAULT_SOLAR_VISUAL_SETTINGS.solarVisualSunriseSize,
-      sunSizeNoon: config.solarVisualNoonSize ?? DEFAULT_SOLAR_VISUAL_SETTINGS.solarVisualNoonSize,
-      sunSizeSunset: config.solarVisualSunsetSize ?? DEFAULT_SOLAR_VISUAL_SETTINGS.solarVisualSunsetSize,
-      moonSize: config.solarVisualMoonSize ?? DEFAULT_SOLAR_VISUAL_SETTINGS.solarVisualMoonSize,
-      sunGlowIntensity: config.solarVisualSunGlowIntensity ?? DEFAULT_SOLAR_VISUAL_SETTINGS.solarVisualSunGlowIntensity,
-      sunGlowSize: config.solarVisualSunGlowSize ?? DEFAULT_SOLAR_VISUAL_SETTINGS.solarVisualSunGlowSize,
-      moonGlowIntensity: config.solarVisualMoonGlowIntensity ?? DEFAULT_SOLAR_VISUAL_SETTINGS.solarVisualMoonGlowIntensity,
-      moonGlowSize: config.solarVisualMoonGlowSize ?? DEFAULT_SOLAR_VISUAL_SETTINGS.solarVisualMoonGlowSize,
-      sunColorSunrise: config.solarVisualSunriseColor || DEFAULT_SOLAR_VISUAL_SETTINGS.solarVisualSunriseColor,
-      sunColorNoon: config.solarVisualNoonColor || DEFAULT_SOLAR_VISUAL_SETTINGS.solarVisualNoonColor,
-      sunColorSunset: config.solarVisualSunsetColor || DEFAULT_SOLAR_VISUAL_SETTINGS.solarVisualSunsetColor,
-      moonColor: config.solarVisualMoonColor || DEFAULT_SOLAR_VISUAL_SETTINGS.solarVisualMoonColor
+      sunSize: sunVisual.size,
+      moonSize: moonVisual.size,
+      sunGlowIntensity: sunVisual.glowIntensity,
+      sunGlowSize: sunVisual.glowSize,
+      moonGlowIntensity: moonVisual.glowIntensity,
+      moonGlowSize: moonVisual.glowSize,
+      sunColor: sunVisual.color,
+      moonColor: moonVisual.color
     });
   }
 

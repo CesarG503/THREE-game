@@ -2,6 +2,7 @@ import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
 import { animate } from "animejs";
 import { MapObjectItem } from "../items/MapObjectItem";
+import { normalizeSolarVisualTimeline } from "../platform/solarVisualTimeline";
 import {
 	applyAnimatedObjectScale,
 	getWaypointPosition,
@@ -102,7 +103,10 @@ export function loadMap(this: any, jsonData: any) {
 	}
 
 	if (jsonData.hasOwnProperty("environmentConfig")) {
-		this.updateEnvironmentConfig(jsonData.environmentConfig);
+		this.updateEnvironmentConfig({
+			...jsonData.environmentConfig,
+			solarVisualTimeline: normalizeSolarVisualTimeline(jsonData.environmentConfig || {})
+		});
 		if (this.constructionMenu && typeof this.constructionMenu.refreshSettings === "function") {
 			this.constructionMenu.refreshSettings();
 		}

@@ -2,6 +2,7 @@ import * as THREE from "three";
 import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { Item } from "./Item";
+import { consumeFuel } from "./Fuel";
 import { PI } from "three/src/nodes/TSL.js";
 
 export class JetpackItem extends Item {
@@ -133,10 +134,7 @@ export class JetpackItem extends Item {
   }
 
   consumeFuel(dt: number) {
-    this.consumableUse -= dt;
-    if (this.consumableUse <= 0) {
-      this.consumableUse = 0;
-    }
+    consumeFuel(this, dt);
   }
 
   clone() {

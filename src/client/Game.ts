@@ -4,6 +4,7 @@ import { SceneManager } from "./core/SceneManager";
 import { InputManager } from "./input/InputManager";
 import { CameraController } from "./camera/CameraController";
 import { ScopeController } from "./camera/ScopeController";
+import { VehicleSystem } from "./vehicles/VehicleSystem";
 import { CharacterController } from "./character/CharacterController";
 import { NetworkManager } from "./network/NetworkManager";
 import { ChatManager } from "./network/ChatManager";
@@ -51,6 +52,7 @@ export class Game {
 	gameMode: any;
 	roomId: any;
 	character: any;
+	vehicleSystem: VehicleSystem;
 	playerConfigManager: any;
 	hud: any;
 	floatingTextManager: any;
@@ -217,6 +219,7 @@ export class Game {
 		this.setupOrientationGizmo();
 
 		this.character.cameraController = this.cameraController;
+		this.vehicleSystem = new VehicleSystem(this);
 
 		this.networkManager = new NetworkManager(this.sceneManager.scene, this.world, this.roomId, (id: any) => {
 			console.log("Player joined", id);
@@ -339,6 +342,10 @@ export class Game {
 		};
 
 		this.networkManager.onPlayerAction = (playerId: any, actionType: any, data: any) => {
+			if (actionType === "motorbikePark") {
+				this.vehicleSystem?.receivePark(playerId, data);
+				return;
+			}
 			if (actionType === "dropItem") {
 				const newItem = createItemFromNetworkData(data.itemData);
 
@@ -781,6 +788,7 @@ export class Game {
 		this.projectiles?.forEach((projectile: any) => projectile.destroy?.());
 		this.itemDropManager?.droppedItems?.forEach((item: any) => item.dispose?.());
 		this.fxBlasterSystem?.Destroy?.();
+		this.vehicleSystem?.dispose();
 		this.character?.dispose?.();
 			this.hud?.destroy?.();
 			this.objectInspector?.destroy?.();

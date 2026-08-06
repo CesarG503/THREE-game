@@ -10,6 +10,8 @@ import { WEAPONS_CONFIG } from "../items/WeaponSettings";
 import { MapShapeEditor } from "./MapShapeEditor";
 import { AdvancedWeaponConfigPanel } from "./AdvancedWeaponConfigPanel";
 import { getActiveFarmingGroups } from "./GameHUD";
+import { MOTORBIKE_SIZE, normalizeMotorbikeSettings } from "../vehicles/MotorbikeSettings";
+import { MotorbikeLogic } from "./logic_items/MotorbikeLogic";
 import { JetpackItem } from "../items/JetpackItem";
 import { savePlatformMapForRoom } from "../platform/mapRuntime";
 import { listAssets, uploadAsset } from "../platform/api";
@@ -212,6 +214,10 @@ export class ConstructionMenu {
         WEAPONS_CONFIG.forEach(cfg => {
             this.libraryItems.push(new GunItem(cfg));
         });
+
+        const motorbike = new MapObjectItem("motorbike", "Motocicleta", "motorbike", "", 0xffffff, { ...MOTORBIKE_SIZE });
+        motorbike.logicProperties = normalizeMotorbikeSettings();
+        this.libraryItems.push(motorbike);
 
         // Add Consumables to Library
         this.libraryItems.push(new JetpackItem());
@@ -623,10 +629,12 @@ export class ConstructionMenu {
         };
 
         // Create Sections
-        const sectionConstruction = createCollapsibleSection("Construcción", item => item.type !== "weapon" && item.type !== "consumable" && item.type !== "collectible");
+        const sectionConstruction = createCollapsibleSection("Construcción", item => item.type !== "weapon" && item.type !== "consumable" && item.type !== "collectible" && item.type !== "motorbike");
         const sectionWeapons = createCollapsibleSection("Armas", item => item.type === "weapon");
         const sectionConsumables = createCollapsibleSection("Consumibles", item => item.type === "consumable");
 
+        const sectionVehicles = createCollapsibleSection("Vehículos", item => item.type === "motorbike");
+        this.libraryLeftCol.appendChild(sectionVehicles);
         this.libraryLeftCol.appendChild(sectionConstruction);
         this.libraryLeftCol.appendChild(sectionWeapons);
         this.libraryLeftCol.appendChild(sectionConsumables);
@@ -6505,7 +6513,12 @@ export class ConstructionMenu {
 
         const type = baseItem.type;
 
-        if (type === "spawn_point") {
+        if (type === "motorbike") {
+            header.textContent = "Propiedades de la motocicleta";
+            new MotorbikeLogic().render(this.editorLogicControlsContainer, this.currentDraftItem.logicProperties, (key, value) => {
+                this.currentDraftItem.logicProperties[key] = value;
+            });
+        } else if (type === "spawn_point") {
             this.createLogicDraftInput(this.editorLogicControlsContainer, "Equipo:", "team", "number", 1);
             this.createLogicDraftInput(this.editorLogicControlsContainer, "Capacidad:", "capacity", "number", 1);
             this.createLogicDraftInput(this.editorLogicControlsContainer, "Orden:", "order", "number", 1);

@@ -11,6 +11,7 @@ import { DianaLogic } from "./DianaLogic"
 import { LogicCameraLogic } from "./LogicCameraLogic"
 import { CameraPanelLogic } from "./CameraPanelLogic"
 import { DamageLogic } from "./DamageLogic"
+import { MotorbikeLogic } from "./MotorbikeLogic"
 import { LightLogic } from "./LightLogic"
 
 export class LogicItemsManager {
@@ -31,7 +32,8 @@ export class LogicItemsManager {
             new CameraPanelLogic(game, logicSystem),
             new EventSubscriptionLogic(),
             new DamageLogic(),
-            new LightLogic()
+            new LightLogic(),
+            new MotorbikeLogic()
         ]
     }
 

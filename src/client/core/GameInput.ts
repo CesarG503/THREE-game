@@ -92,6 +92,8 @@ export function setupGameInput(this: Game) {
 		}
 
 		if (key === "f") {
+			if (e.repeat) return;
+			if (this.vehicleSystem?.interact()) return;
 			const charPos = this.character.getPosition();
 
 			let openedCameraPanel = false;

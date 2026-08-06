@@ -362,7 +362,9 @@ export function animate(this: any) {
 		}
 	}
 
-	this.character.update(dt, this.inputManager, remotePlayers);
+	if (!this.vehicleSystem?.update(dt)) {
+		this.character.update(dt, this.inputManager, remotePlayers);
+	}
 
 	// Update 3D Gravity Helper Group
 	if (this.gravityQteActive && this.gravityHelperGroup && this.character) {
@@ -469,6 +471,7 @@ export function animate(this: any) {
 	// Network Update
 	if (this.networkManager) {
 		this.networkManager.update(dt);
+		this.vehicleSystem?.syncRemote(dt);
 
 		if (this.character) {
 			if (!this._netAttackLatch && this.inputManager && this.inputManager.keys.attack) {
@@ -488,6 +491,7 @@ export function animate(this: any) {
 			const equippedHand = (currentItem && currentItem.equippedHand) ? currentItem.equippedHand : "right";
 
 			const playerState = {
+				motorbike: this.vehicleSystem?.getNetworkState() || null,
 				modelType: this.character.currentType || "skin",
 				skinUrl: this.character.polygonModelSkin ? this.character.polygonModelSkin.skinUrl : null,
 				skinAssetId: this.character.activeSkinAssetId || null,

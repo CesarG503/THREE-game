@@ -1,3 +1,4 @@
+import { RiderPose } from "../vehicles/RiderPose";
 import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
 import { GLBModel } from "../character/models/glb/GLBModel";
@@ -11,6 +12,8 @@ import type { GunConfig } from "../types";
 import { getGravityQuaternion, normalizeGravityOrientation, type GravityOrientation } from "../utils/GravityOrientation";
 
 export class RemotePlayer {
+    private riderPose = new RiderPose();
+    private wasRiding = false;
     scene: any;
     world: any;
     playerId: any;
@@ -367,6 +370,22 @@ export class RemotePlayer {
 
         if (this.polygonModelSkin.setHeadRotation) {
             this.polygonModelSkin.setHeadRotation(this.state.headPitch || 0, this.state.headYaw || 0);
+        }
+
+        const ride = this.state.motorbike;
+        if (ride && [ride.speed, ride.steering, ride.lean, ride.riderLean].every(Number.isFinite)) {
+            if (this.collider) this.collider.setSensor(true);
+            this.wasRiding = true;
+            this.glbModel.model?.rotateZ(ride.lean);
+            this.polygonModel.model?.rotateZ(-ride.lean);
+            this.polygonModelSkin.model?.rotateZ(-ride.lean);
+            this.riderPose.apply(this, dt, ride.speed, ride.steering, ride.riderLean);
+            return;
+        }
+        if (this.wasRiding) {
+            this.riderPose.reset();
+            this.wasRiding = false;
+            this.applyCollisionProfile();
         }
 
         const isLocallyMoving = (this.currentPosition.distanceTo(this.targetPosition) > 0.05);

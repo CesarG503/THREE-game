@@ -1,3 +1,4 @@
+import { createMotorbikeModel } from "../vehicles/MotorbikeModel";
 import * as THREE from "three";
 import { RampUtils } from "../utils/RampUtils";
 
@@ -20,6 +21,7 @@ export const getTubeSegments = (scale: any) => {
 };
 
 export class PlacementManager {
+    ghostMotorbike: ReturnType<typeof createMotorbikeModel> | null = null;
     scene: THREE.Scene;
     camera: THREE.Camera;
     placementGhost: THREE.Group | null;
@@ -1013,6 +1015,7 @@ export class PlacementManager {
      * @returns {THREE.Vector3|null} - Punto de impacto válido o null
      */
     update(item, rotationIndex, playerPosition) {
+        if (this.ghostMotorbike) this.ghostMotorbike.visible = false;
         this.currentItem = item;
         this.rotationIndex = rotationIndex;
 
@@ -1787,6 +1790,16 @@ export class PlacementManager {
                 this.ghostBoxMesh.visible = true;
             }
 
+            if (item.type === "motorbike") {
+                if (!this.ghostMotorbike) {
+                    this.ghostMotorbike = createMotorbikeModel(item.scale);
+                    this.placementGhost.add(this.ghostMotorbike);
+                }
+                this.ghostMotorbike.visible = true;
+                this.ghostMotorbike.resizeMotorbike(item.scale);
+                this.ghostBoxMesh.visible = false;
+            }
+
             // Apply rotation to ghost group
             if (this.lastValidQuaternion) {
                 this.placementGhost.quaternion.copy(this.lastValidQuaternion);
@@ -1864,6 +1877,7 @@ export class PlacementManager {
      * Updates ghost for Logic Map Editor (References a live scene object instead of inventory item)
      */
     updateLogicGhost(targetObject, playerPosition, rotationIndex) {
+        if (this.ghostMotorbike) this.ghostMotorbike.visible = false;
         if (!targetObject) {
             this.placementGhost.visible = false;
             return null;

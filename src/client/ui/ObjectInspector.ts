@@ -1594,7 +1594,9 @@ export class ObjectInspector {
 
         let newGeo
         // Detect type (Naively)
-        if (this.selectedObject.userData.mapObjectType === 'ramp') {
+        if (this.selectedObject.userData.mapObjectType === 'motorbike') {
+            this.selectedObject.resizeMotorbike?.(dims);
+        } else if (this.selectedObject.userData.mapObjectType === 'ramp') {
             newGeo = RampUtils.createGeometry(dims)
         } else if (this.selectedObject.userData.mapObjectType === 'stairs') {
             // Rebuild Stairs

@@ -1,5 +1,7 @@
 import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
+import { createMotorbikeModel } from "../vehicles/MotorbikeModel";
+import { normalizeMotorbikeSettings } from "../vehicles/MotorbikeSettings";
 import { Item } from "./Item";
 import { StairsUtils } from "../utils/StairsUtils";
 import { RampUtils } from "../utils/RampUtils";
@@ -70,6 +72,7 @@ export class MapObjectItem extends Item {
   }
 
   generateIcon() {
+    if (this.type === "motorbike") return "/assets/vehiculos/motorbike-icon.png";
     if (this.type === "impulse_jump") {
       return "/assets/textures/salto.png";
     }
@@ -630,7 +633,11 @@ export class MapObjectItem extends Item {
     let object3D: any;
     const collidersDesc: any[] = [];
 
-    if (this.type === "stairs") {
+    if (this.type === "motorbike") {
+      this.logicProperties = normalizeMotorbikeSettings(this.logicProperties);
+      object3D = createMotorbikeModel(this.scale);
+      collidersDesc.push(RAPIER.ColliderDesc.cuboid(this.scale.x / 2, this.scale.y / 2, this.scale.z / 2));
+    } else if (this.type === "stairs") {
       const steps = StairsUtils.calculateSteps(this.scale);
 
       const group = new THREE.Group();
@@ -941,7 +948,7 @@ export class MapObjectItem extends Item {
 
         if (currentType === "point") {
           lightObj = new THREE.PointLight(lightColor, intensity, distance, decay);
-          
+
           // Wireframe sphere representing point light range
           if (distance > 0 && window.location.pathname.includes("/editor")) {
             const rangeGeo = new THREE.SphereGeometry(distance, 16, 16);
@@ -951,7 +958,7 @@ export class MapObjectItem extends Item {
           }
         } else if (currentType === "spot") {
           lightObj = new THREE.SpotLight(lightColor, intensity, distance, angle, penumbra, decay);
-          
+
           // Wireframe cone representing spotlight beam
           if (distance > 0 && window.location.pathname.includes("/editor")) {
             const height = distance;
@@ -1143,7 +1150,7 @@ export class MapObjectItem extends Item {
       const geometry = new THREE.BoxGeometry(this.scale.x, this.scale.y, this.scale.z);
       const defaultColor = isJump ? 0x00ffff : 0x00ff00;
       const padColor = this.color !== undefined ? this.color : defaultColor;
-      
+
       const parsedColor = new THREE.Color(padColor);
       const emissiveColor = parsedColor.clone().multiplyScalar(0.25);
 
@@ -1509,7 +1516,7 @@ export class MapObjectItem extends Item {
               .then((texture) => {
                 if (elbowMesh) applyMapObjectTexture(elbowMesh, texture, this.scale, segTexSettings);
               })
-              .catch(err => {});
+              .catch(err => { });
           }
 
           // Next group
@@ -1572,12 +1579,12 @@ export class MapObjectItem extends Item {
       collidersDesc.push(col);
     }
 
-     object3D.position.copy(position);
-     const surfaceAlignedTypes = ["interaction_button", "target", "gravity_pad", "impulse_jump", "impulse_lateral", "farming_zone", "logic_camera", "camera_panel", "camera_prop", "cone", "spiked_floor"];
-     const isSurfaceAligned = surfaceAlignedTypes.includes(this.type);
-     if (!isSurfaceAligned && this.type !== "spawn_point" && this.type !== "tube" && !isCenterPosition) {
-       object3D.position.y += this.scale.y / 2;
-     }
+    object3D.position.copy(position);
+    const surfaceAlignedTypes = ["interaction_button", "target", "gravity_pad", "impulse_jump", "impulse_lateral", "farming_zone", "logic_camera", "camera_panel", "camera_prop", "cone", "spiked_floor"];
+    const isSurfaceAligned = surfaceAlignedTypes.includes(this.type);
+    if (!isSurfaceAligned && this.type !== "spawn_point" && this.type !== "tube" && !isCenterPosition) {
+      object3D.position.y += this.scale.y / 2;
+    }
 
     object3D.rotation.copy(rotation);
     object3D.scale.set(1, 1, 1);

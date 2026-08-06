@@ -195,6 +195,7 @@ export function loadMap(this: any, jsonData: any) {
 }
 
 export function useCurrentItem(this: any, isRightClickOrItem: any = false) {
+	if (this.vehicleSystem?.mounted) return;
 	const profile = this.playerConfigManager?.getCurrentProfile?.();
 	if (profile?.disableInteraction) return;
 

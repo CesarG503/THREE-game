@@ -5,6 +5,12 @@ import { normalizeMotorbikeSettings } from './MotorbikeSettings';
 import { RiderPose } from './RiderPose';
 import type { MotorbikeVisual } from './MotorbikeModel';
 
+/** XYZ Euler.y folds at ±90°. Derive the full heading from the actual forward vector. */
+export function getMotorbikeHeading(bike: THREE.Object3D): number {
+  const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(bike.quaternion);
+  return Math.atan2(-forward.x, -forward.z);
+}
+
 export class VehicleSystem {
   mounted: MotorbikeVisual | null = null;
   speed = 0;
@@ -173,7 +179,7 @@ export class VehicleSystem {
     if (powered) consumeFuel(bike.userData.logicProperties, dt, props.fuelConsumption);
     const steeringTarget = this.paused ? 0 : Number(keys.left) - Number(keys.right);
     this.steering = THREE.MathUtils.lerp(this.steering, steeringTarget, 1 - Math.exp(-10 * dt));
-    const yaw = bike.rotation.y + this.steering * THREE.MathUtils.degToRad(props.turnSpeed) * Math.min(Math.abs(this.speed) / 4, 1) * Math.sign(this.speed) * dt;
+    const yaw = getMotorbikeHeading(bike) + this.steering * THREE.MathUtils.degToRad(props.turnSpeed) * Math.min(Math.abs(this.speed) / 4, 1) * Math.sign(this.speed) * dt;
     const rotation = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
     const collider = body.collider(0);
     // Test the rotated footprint as well as sweeping the translation.
@@ -215,7 +221,7 @@ export class VehicleSystem {
     character.rigidBody.setTranslation(position, true);
     character.rigidBody.setNextKinematicTranslation(position);
     this.lastRiderPosition.copy(position);
-    character.currentRotation = bike.rotation.y;
+    character.currentRotation = getMotorbikeHeading(bike);
     character.grounded = true;
     character.isRunning = false;
     character.updateModelVisuals();
@@ -231,7 +237,7 @@ export class VehicleSystem {
     return {
       uuid: bike.userData.uuid,
       position: { x: bike.position.x, y: bike.position.y, z: bike.position.z },
-      yaw: bike.rotation.y,
+      yaw: getMotorbikeHeading(bike),
       fuel: bike.userData.logicProperties.consumableUse,
       speed: this.speed, steering: this.steering, lean: this.lean,
       riderLean: bike.userData.logicProperties.riderLean,

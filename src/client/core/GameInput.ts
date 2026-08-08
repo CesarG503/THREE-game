@@ -93,7 +93,13 @@ export function setupGameInput(this: Game) {
 
 		if (key === "f") {
 			if (e.repeat) return;
-			if (this.vehicleSystem?.interact()) return;
+			const vehicleHoldTime = this.vehicleSystem?.nearestMountHoldTime?.();
+			if (this.vehicleSystem?.mounted || vehicleHoldTime === 0) {
+				if (this.vehicleSystem?.interact()) return;
+			} else if (vehicleHoldTime && vehicleHoldTime > 0) {
+				this.isFKeyDown = true;
+				return;
+			}
 			const charPos = this.character.getPosition();
 
 			let openedCameraPanel = false;

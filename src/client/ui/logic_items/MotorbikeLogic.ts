@@ -5,7 +5,7 @@ export class MotorbikeLogic {
   render(container: HTMLElement, props: any, update: (key: string, value: number) => void) {
     if (props?.vehicleKind !== 'motorbike') return;
     const hint = document.createElement('p');
-    hint.textContent = 'F: subir / bajar · W/S: acelerar / reversa · A/D: girar · Espacio: frenar. El combustible se gasta al acelerar.';
+    hint.textContent = 'F: subir / bajar · W/S: acelerar / reversa · A/D: girar · Espacio: frenar. El combustible se gasta al acelerar. Tiempo F en 0 sube al instante.';
     hint.style.cssText = 'font-size:12px;color:#a5d8ff;line-height:1.5';
     container.appendChild(hint);
     const inputs = new Map<string, HTMLInputElement>();

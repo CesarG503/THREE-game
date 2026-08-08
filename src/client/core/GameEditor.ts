@@ -543,8 +543,10 @@ export function updateButtonInteraction(this: any, dt: number) {
 	let minDistSq = 9.0;
 
 	this.sceneManager.scene.children.forEach((obj: any) => {
-		if (obj.userData.mapObjectType === "interaction_button" || obj.userData.mapObjectType === "gravity_sphere" || obj.userData.mapObjectType === "camera_panel") {
+		if (obj.userData.mapObjectType === "interaction_button" || obj.userData.mapObjectType === "gravity_sphere" || obj.userData.mapObjectType === "camera_panel" || obj.userData.mapObjectType === "motorbike") {
 			const props = obj.userData.logicProperties;
+			if (!props) return;
+			if (obj.userData.mapObjectType === "motorbike" && (this.vehicleSystem?.mounted || obj.userData.vehicleDriver)) return;
 			if (props && props.oneShot && props.triggered) return;
 
 			const dSq = obj.position.distanceToSquared(charPos);
@@ -559,7 +561,9 @@ export function updateButtonInteraction(this: any, dt: number) {
 		promptEl.style.display = "flex";
 
 		const btnPos = nearest.position.clone();
-		btnPos.y += 0.5;
+		btnPos.y += nearest.userData.mapObjectType === "motorbike"
+			? Math.max(0.7, (nearest.userData.originalScale?.y || 1.25) * 0.65)
+			: 0.5;
 		btnPos.project(this.sceneManager.camera);
 
 		const x = (btnPos.x * 0.5 + 0.5) * window.innerWidth;
@@ -610,7 +614,9 @@ export function updateButtonInteraction(this: any, dt: number) {
 					(progressCircle as unknown as SVGElement).style.strokeDashoffset = String(offset);
 
 					if (props._currentHoldTime >= holdTime) {
-						if (nearest.userData.mapObjectType === "gravity_sphere") {
+						if (nearest.userData.mapObjectType === "motorbike") {
+							this.vehicleSystem?.interact?.();
+						} else if (nearest.userData.mapObjectType === "gravity_sphere") {
 							this.triggerGravitySphere(nearest);
 						} else if (nearest.userData.mapObjectType === "camera_panel") {
 							this.logicCameraSystem?.showCameraPanel?.(nearest);

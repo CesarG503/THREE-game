@@ -71,6 +71,13 @@ export class VehicleSystem {
     return nearest;
   }
 
+  nearestMountHoldTime(): number | null {
+    const bike = this.nearest();
+    if (!bike) return null;
+    bike.userData.logicProperties = normalizeMotorbikeSettings(bike.userData.logicProperties);
+    return bike.userData.logicProperties.holdTime;
+  }
+
   interact(): boolean {
     if (this.mounted) {
       this.dismount();
@@ -154,9 +161,7 @@ export class VehicleSystem {
   /** Returns true while the vehicle owns movement and avatar animation. */
   update(delta: number): boolean {
     if (!this.mounted) {
-      const nearest = this.nearest();
-      if (nearest) this.show('F · Subir a la motocicleta');
-      else if (this.hud) this.hud.style.display = 'none';
+      if (this.hud) this.hud.style.display = 'none';
       return false;
     }
     const bike = this.mounted;

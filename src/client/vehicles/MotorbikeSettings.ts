@@ -13,6 +13,7 @@ export const MOTORBIKE_FIELDS = [
   { key: 'seatOffsetZ', label: 'Posición longitudinal del asiento (m)', value: 0.22, min: -3, max: 3, step: 0.05 },
   { key: 'riderLean', label: 'Inclinación del conductor (°)', value: 12, min: 0, max: 40, step: 1 },
   { key: 'maxLean', label: 'Inclinación máxima al girar (°)', value: 18, min: 0, max: 35, step: 1 },
+  { key: 'holdTime', label: 'Tiempo manteniendo F para subir (s)', value: 0, min: 0, max: 10, step: 0.1 },
 ] as const;
 
 export type MotorbikeSettings = Record<(typeof MOTORBIKE_FIELDS)[number]['key'], number> & { vehicleKind: 'motorbike' };

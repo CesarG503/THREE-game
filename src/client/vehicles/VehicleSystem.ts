@@ -3,6 +3,7 @@ import RAPIER from '@dimforge/rapier3d-compat';
 import { consumeFuel } from '../items/Fuel';
 import { normalizeMotorbikeSettings } from './MotorbikeSettings';
 import { RiderPose } from './RiderPose';
+import { VehicleFall } from './VehicleFall';
 import type { MotorbikeVisual } from './MotorbikeModel';
 
 /** XYZ Euler.y folds at ±90°. Derive the full heading from the actual forward vector. */
@@ -19,6 +20,8 @@ export class VehicleSystem {
   private lean = 0;
   private controller: RAPIER.KinematicCharacterController;
   private pose = new RiderPose();
+  private fall = new VehicleFall();
+  private coasting = new Map<MotorbikeVisual, { speed: number; verticalSpeed: number; local: boolean }>();
   private wasSensor = false;
   private hud: HTMLDivElement | null = null;
   private fuelBar: HTMLProgressElement | null = null;
@@ -51,7 +54,7 @@ export class VehicleSystem {
   }
   nearest(): MotorbikeVisual | null {
     const character = this.game.character;
-    if (character.isDead || this.paused) return null;
+    if (character.isDead || this.paused || this.fall.active) return null;
     const position = character.getPosition();
     let nearest: MotorbikeVisual | null = null;
     let distance = 9;
@@ -91,7 +94,11 @@ export class VehicleSystem {
     bike.userData.logicProperties = normalizeMotorbikeSettings(bike.userData.logicProperties);
     bike.userData.vehicleDriver = this.game.networkManager?.playerId || 'local';
     bike.userData.rigidBody.setBodyType(RAPIER.RigidBodyType.KinematicPositionBased, true);
-    this.speed = this.verticalSpeed = this.steering = this.lean = 0;
+    const motion = this.coasting.get(bike);
+    this.speed = motion?.speed ?? 0;
+    this.verticalSpeed = motion?.verticalSpeed ?? 0;
+    this.coasting.delete(bike);
+    this.steering = this.lean = 0;
     this.wasSensor = character.collider.isSensor();
     character.collider.setSensor(true);
     character.isFlying = character.isClimbing = character.isUsingJetpack = character.isSuperman = false;
@@ -132,12 +139,12 @@ export class VehicleSystem {
       this.show('No hay espacio libre para bajar. Mueve la moto e intenta de nuevo.');
       return false;
     }
-    if (bike.userData.rigidBody?.isValid()) {
-      bike.userData.rigidBody.setBodyType(RAPIER.RigidBodyType.Fixed, true);
-      bike.userData.rigidBody.setLinvel({ x: 0, y: 0, z: 0 }, true);
-    }
     const finalState = this.getNetworkState();
+    const props = normalizeMotorbikeSettings(bike.userData.logicProperties);
+    const exitSpeed = this.speed;
+    const velocity = new THREE.Vector3(0, 0, -exitSpeed).applyQuaternion(bike.quaternion);
     delete bike.userData.vehicleDriver;
+    this.startCoasting(bike, exitSpeed, this.verticalSpeed, true);
     if (finalState && this.game.networkManager?.isConnected) {
       this.game.networkManager.sendPlayerAction('motorbikePark', finalState);
     }
@@ -153,6 +160,12 @@ export class VehicleSystem {
     character.momentum.set(0, 0, 0);
     this.pose.reset();
     character.updateModelVisuals();
+    if (!force && props.dismountPenaltyEnabled && Math.abs(exitSpeed) * 3.6 >= props.dismountFallSpeed) {
+      this.fall.start(character, velocity);
+      const damage = character.maxHealth * props.dismountDamagePercent / 100;
+      if (damage > 0) character.takeDamage(damage);
+      if (character.isDead) this.fall.reset(character);
+    }
     this.speed = this.lean = 0;
     if (this.hud) this.hud.style.display = 'none';
     return true;
@@ -160,9 +173,11 @@ export class VehicleSystem {
 
   /** Returns true while the vehicle owns movement and avatar animation. */
   update(delta: number): boolean {
+    const dt = Number.isFinite(delta) ? Math.min(0.05, Math.max(0, delta)) : 0;
+    this.updateCoasting(dt);
     if (!this.mounted) {
       if (this.hud) this.hud.style.display = 'none';
-      return false;
+      return this.fall.update(this.game.character, this.controller, this.paused ? 0 : dt);
     }
     const bike = this.mounted;
     const character = this.game.character;
@@ -171,7 +186,6 @@ export class VehicleSystem {
       this.dismount(true);
       return false;
     }
-    const dt = Math.min(0.05, Math.max(0, delta));
     const props = normalizeMotorbikeSettings(bike.userData.logicProperties);
     Object.assign(bike.userData.logicProperties, props);
     const keys = this.game.inputManager.keys;
@@ -195,25 +209,71 @@ export class VehicleSystem {
       body.setRotation(rotation, true);
       bike.quaternion.copy(rotation);
     }
-    this.verticalSpeed = Math.max(-40, this.verticalSpeed - 22 * dt);
-    const desired = new THREE.Vector3(0, 0, -this.speed * dt).applyQuaternion(bike.quaternion);
-    desired.y = this.verticalSpeed * dt;
-    this.controller.computeColliderMovement(collider, desired, RAPIER.QueryFilterFlags.EXCLUDE_SENSORS, undefined,
-      (other: RAPIER.Collider) => other !== character.collider);
-    const movement = this.controller.computedMovement();
-    const position = body.translation();
-    const next = new THREE.Vector3(position.x + movement.x, position.y + movement.y, position.z + movement.z);
-    body.setNextKinematicTranslation(next);
-    bike.position.copy(next);
-    if (this.controller.computedGrounded()) this.verticalSpeed = 0;
-    const travel = Math.hypot(movement.x, movement.z);
-    if (Math.abs(this.speed) * dt > 0.01 && travel < Math.abs(this.speed) * dt * 0.25) this.speed *= 0.5;
+    const motion = this.moveBike(bike, this.speed, this.verticalSpeed, dt, true);
+    this.speed = motion.speed;
+    this.verticalSpeed = motion.verticalSpeed;
+    const travel = motion.travel;
     this.lean = THREE.MathUtils.lerp(this.lean, this.steering * THREE.MathUtils.degToRad(props.maxLean) * Math.min(Math.abs(this.speed) / 10, 1), 1 - Math.exp(-8 * dt));
     bike.animateMotorbike?.(travel * Math.sign(this.speed), this.steering, this.lean);
     this.syncRider(dt);
     const fuel = bike.userData.logicProperties.consumableUse;
     this.show(`${Math.round(Math.abs(this.speed) * 3.6)} km/h · Combustible ${Math.ceil(fuel)} / ${props.maxConsumableUse}${fuel <= 0 ? ' · SIN COMBUSTIBLE' : ''}\nW/S acelerar · A/D girar · Espacio frenar · F bajar`, fuel, props.maxConsumableUse);
     return true;
+  }
+
+  private startCoasting(bike: MotorbikeVisual, speed: number, verticalSpeed: number, local: boolean) {
+    const body: RAPIER.RigidBody = bike.userData.rigidBody;
+    if (!bike.parent || !body?.isValid()) return;
+    body.setBodyType(RAPIER.RigidBodyType.KinematicPositionBased, true);
+    // The render position can be one physics step ahead when F is pressed.
+    body.setTranslation(bike.position, true);
+    body.setNextKinematicTranslation(bike.position);
+    this.coasting.set(bike, { speed, verticalSpeed, local });
+  }
+
+  private moveBike(bike: MotorbikeVisual, speed: number, verticalSpeed: number, dt: number, hasRider = false) {
+    const body: RAPIER.RigidBody = bike.userData.rigidBody;
+    verticalSpeed = Math.max(-40, verticalSpeed - 22 * dt);
+    const desired = new THREE.Vector3(0, 0, -speed * dt).applyQuaternion(bike.quaternion);
+    desired.y = verticalSpeed * dt;
+    this.controller.computeColliderMovement(body.collider(0), desired, RAPIER.QueryFilterFlags.EXCLUDE_SENSORS, undefined,
+      (other: RAPIER.Collider) => !hasRider || other !== this.game.character.collider);
+    const movement = this.controller.computedMovement();
+    const position = body.translation();
+    const next = new THREE.Vector3(position.x + movement.x, position.y + movement.y, position.z + movement.z);
+    body.setNextKinematicTranslation(next);
+    bike.position.copy(next);
+    const grounded = this.controller.computedGrounded();
+    if (grounded) verticalSpeed = 0;
+    const travel = Math.hypot(movement.x, movement.z);
+    if (Math.abs(speed) * dt > 0.01 && travel < Math.abs(speed) * dt * 0.25) speed *= 0.5;
+    return { speed, verticalSpeed, travel, grounded };
+  }
+
+  private updateCoasting(dt: number) {
+    if (dt <= 0) return;
+    for (const [bike, state] of this.coasting) {
+      const body: RAPIER.RigidBody = bike.userData.rigidBody;
+      if (!bike.parent || !body?.isValid() || bike.userData.vehicleDriver) {
+        this.coasting.delete(bike);
+        continue;
+      }
+      // Same rolling resistance as releasing the throttle while mounted; no engine/fuel use.
+      state.speed = Math.sign(state.speed) * Math.max(0, Math.abs(state.speed) - 3 * dt);
+      const motion = this.moveBike(bike, state.speed, state.verticalSpeed, dt);
+      state.speed = motion.speed;
+      state.verticalSpeed = motion.verticalSpeed;
+      bike.animateMotorbike?.(motion.travel * Math.sign(state.speed), 0, 0);
+      if (Math.abs(state.speed) < 0.02 && motion.grounded) {
+        body.setTranslation(bike.position, true);
+        body.setBodyType(RAPIER.RigidBodyType.Fixed, true);
+        body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+        this.coasting.delete(bike);
+        if (state.local && this.game.networkManager?.isConnected) {
+          this.game.networkManager.sendPlayerAction('motorbikePark', this.networkStateFor(bike, 0, 0, 0, 0));
+        }
+      }
+    }
   }
 
   private syncRider(dt: number) {
@@ -239,12 +299,16 @@ export class VehicleSystem {
   getNetworkState() {
     const bike = this.mounted;
     if (!bike) return null;
+    return this.networkStateFor(bike, this.speed, this.verticalSpeed, this.steering, this.lean);
+  }
+
+  private networkStateFor(bike: MotorbikeVisual, speed: number, verticalSpeed: number, steering: number, lean: number) {
     return {
       uuid: bike.userData.uuid,
       position: { x: bike.position.x, y: bike.position.y, z: bike.position.z },
       yaw: getMotorbikeHeading(bike),
       fuel: bike.userData.logicProperties.consumableUse,
-      speed: this.speed, steering: this.steering, lean: this.lean,
+      speed, verticalSpeed, steering, lean,
       riderLean: bike.userData.logicProperties.riderLean,
       seatHeight: bike.userData.logicProperties.seatHeight,
       seatOffsetZ: bike.userData.logicProperties.seatOffsetZ
@@ -253,7 +317,7 @@ export class VehicleSystem {
 
   private validNetworkState(state: any) {
     return state && typeof state.uuid === 'string' &&
-      [state.position?.x, state.position?.y, state.position?.z, state.yaw, state.fuel, state.speed, state.steering, state.lean, state.riderLean, state.seatHeight, state.seatOffsetZ]
+      [state.position?.x, state.position?.y, state.position?.z, state.yaw, state.fuel, state.speed, state.verticalSpeed ?? 0, state.steering, state.lean, state.riderLean, state.seatHeight, state.seatOffsetZ]
         .every(value => typeof value === 'number' && Number.isFinite(value) && Math.abs(value) < 1e6);
   }
 
@@ -264,9 +328,10 @@ export class VehicleSystem {
     this.applyRemoteTransform(bike, state.position, state.yaw);
     bike.userData.logicProperties.consumableUse = Math.max(0, Math.min(state.fuel, bike.userData.logicProperties.maxConsumableUse));
     delete bike.userData.vehicleDriver;
+    this.startCoasting(bike, state.speed, state.verticalSpeed ?? 0, false);
     bike.animateMotorbike?.(0, 0, 0);
     const player = this.game.networkManager?.remotePlayers.get(playerId);
-    if (player) player.state.motorbike = null;
+    if (player?.state.motorbike?.uuid === state.uuid) player.state.motorbike = null;
   }
 
   private applyRemoteTransform(bike: MotorbikeVisual, position: { x: number; y: number; z: number }, yaw: number) {
@@ -275,6 +340,7 @@ export class VehicleSystem {
     const body = bike.userData.rigidBody;
     if (body?.isValid()) {
       body.setTranslation(bike.position, true);
+      if (body.isKinematic()) body.setNextKinematicTranslation(bike.position);
       body.setRotation(bike.quaternion, true);
     }
   }
@@ -295,6 +361,7 @@ export class VehicleSystem {
         this.dismount(true);
       }
       occupied.add(bike);
+      this.coasting.delete(bike);
       bike.userData.vehicleDriver = playerId;
       const yaw = player.currentRotation;
       const hip = player.currentType === 'skin' ? 0.625 : 0.7;
@@ -324,6 +391,15 @@ export class VehicleSystem {
   }
   dispose() {
     this.dismount(true);
+    this.fall.reset(this.game.character);
+    for (const [bike] of this.coasting) {
+      const body = bike.userData.rigidBody;
+      if (!body?.isValid()) continue;
+      body.setTranslation(bike.position, true);
+      body.setBodyType(RAPIER.RigidBodyType.Fixed, true);
+      body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+    }
+    this.coasting.clear();
     this.game.world.removeCharacterController(this.controller);
     this.hud?.remove();
   }

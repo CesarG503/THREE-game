@@ -2,13 +2,30 @@ import { MOTORBIKE_FIELDS, normalizeMotorbikeSettings } from '../../vehicles/Mot
 
 /** Used by both the library draft and the placed-object inspector. */
 export class MotorbikeLogic {
-  render(container: HTMLElement, props: any, update: (key: string, value: number) => void) {
+  render(container: HTMLElement, props: any, update: (key: string, value: number | boolean) => void) {
     if (props?.vehicleKind !== 'motorbike') return;
     const hint = document.createElement('p');
     hint.textContent = 'F: subir / bajar · W/S: acelerar / reversa · A/D: girar · Espacio: frenar. El combustible se gasta al acelerar. Tiempo F en 0 sube al instante.';
     hint.style.cssText = 'font-size:12px;color:#a5d8ff;line-height:1.5';
     container.appendChild(hint);
+    const penaltyLabel = document.createElement('label');
+    penaltyLabel.style.cssText = 'display:flex;align-items:center;gap:8px;margin:12px 0;color:#ccc;font-size:12px';
+    const penalty = document.createElement('input');
+    penalty.type = 'checkbox';
+    penalty.checked = normalizeMotorbikeSettings(props).dismountPenaltyEnabled;
+    penaltyLabel.append(penalty, 'Caída y daño al bajar a alta velocidad');
+    container.appendChild(penaltyLabel);
     const inputs = new Map<string, HTMLInputElement>();
+    const refreshPenalty = () => {
+      for (const key of ['dismountFallSpeed', 'dismountDamagePercent']) {
+        const input = inputs.get(key);
+        if (input) input.disabled = !penalty.checked;
+      }
+    };
+    penalty.onchange = () => {
+      update('dismountPenaltyEnabled', penalty.checked);
+      refreshPenalty();
+    };
     for (const field of MOTORBIKE_FIELDS) {
       const label = document.createElement('label');
       label.style.cssText = 'display:flex;flex-direction:column;gap:4px;margin:8px 0;color:#ccc;font-size:12px';
@@ -36,5 +53,6 @@ export class MotorbikeLogic {
       label.appendChild(input);
       container.appendChild(label);
     }
+    refreshPenalty();
   }
 }

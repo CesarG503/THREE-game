@@ -195,7 +195,7 @@ export function loadMap(this: any, jsonData: any) {
 }
 
 export function useCurrentItem(this: any, isRightClickOrItem: any = false) {
-	if (this.vehicleSystem?.mounted) return;
+	if (this.vehicleSystem?.isDriver) return;
 	const profile = this.playerConfigManager?.getCurrentProfile?.();
 	if (profile?.disableInteraction) return;
 
@@ -546,7 +546,7 @@ export function updateButtonInteraction(this: any, dt: number) {
 		if (obj.userData.mapObjectType === "interaction_button" || obj.userData.mapObjectType === "gravity_sphere" || obj.userData.mapObjectType === "camera_panel" || obj.userData.mapObjectType === "motorbike") {
 			const props = obj.userData.logicProperties;
 			if (!props) return;
-			if (obj.userData.mapObjectType === "motorbike" && (this.vehicleSystem?.mounted || obj.userData.vehicleDriver)) return;
+			if (obj.userData.mapObjectType === "motorbike" && (this.vehicleSystem?.mounted || (obj.userData.vehicleDriver && obj.userData.vehiclePassenger))) return;
 			if (props && props.oneShot && props.triggered) return;
 
 			const dSq = obj.position.distanceToSquared(charPos);

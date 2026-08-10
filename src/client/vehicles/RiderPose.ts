@@ -23,7 +23,11 @@ export class RiderPose {
       }
     });
   }
-  apply(avatar: any, dt: number, speed: number, steer: number, leanDegrees: number) {
+  apply(avatar: any, dt: number, speed: number, steer: number, leanDegrees: number, passenger = false, bikeYaw = avatar.currentRotation || 0) {
+    if (passenger) {
+      this.applyPassenger(avatar, bikeYaw);
+      return;
+    }
     this.time += dt;
     const skin = avatar.polygonModelSkin;
     if (skin?.model) {
@@ -66,6 +70,38 @@ export class RiderPose {
       else if (name.endsWith('leftforearm') || name.endsWith('rightforearm')) this.rotate(node, -0.55);
       else if (name.endsWith('leftarm')) this.rotate(node, -0.9, 0, -0.65);
       else if (name.endsWith('rightarm')) this.rotate(node, -0.9, 0, 0.65);
+    });
+  }
+
+  private applyPassenger(avatar: any, bikeYaw: number) {
+    // Keep the legs astride the bike while the torso, head and weapon can aim freely.
+    const twist = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), bikeYaw - (avatar.currentRotation || 0));
+    const leg = (node: THREE.Object3D | undefined, side: number, skin = false) => {
+      if (!node) return;
+      this.rotate(node, -1.05, 0, side * 0.22);
+      node.quaternion.premultiply(twist);
+      node.position.copy(this.rest.get(node)!.position);
+      if (skin) node.position.x = side * 0.31;
+      node.position.applyQuaternion(twist);
+    };
+    const skin = avatar.polygonModelSkin;
+    if (skin?.model) {
+      this.rotate(skin.pivotGroup, 0);
+      if (skin.pivotGroup) skin.pivotGroup.position.set(0, 0.9, 0);
+      leg(skin.leftLegGroup, -1, true);
+      leg(skin.rightLegGroup, 1, true);
+      this.bend(skin.leftLegGroup, 1.35);
+      this.bend(skin.rightLegGroup, 1.35);
+    }
+    leg(avatar.polygonModel?.polyLeftLeg, -1);
+    leg(avatar.polygonModel?.polyRightLeg, 1);
+    avatar.glbModel?.model?.traverse((node: any) => {
+      if (!node.isBone) return;
+      const name = node.name.toLowerCase();
+      if (name.endsWith('leftupleg') || name.endsWith('rightupleg')) {
+        this.rotate(node, -1.05);
+        node.quaternion.premultiply(twist);
+      } else if (name.endsWith('leftleg') || name.endsWith('rightleg')) this.rotate(node, 1.35);
     });
   }
   reset() {

@@ -28,6 +28,12 @@ export function setupGameInput(this: Game) {
 
 		const key = e.key.toLowerCase();
 
+		if (key === "r" && !e.shiftKey && this.vehicleSystem?.mounted && this.inputManager?.enabled && !this.cameraController?.isUIOpen && !this.cameraController?.isPaused) {
+			e.preventDefault();
+			if (!e.repeat) this.vehicleSystem.switchSeat();
+			return;
+		}
+
 		if ((key === "e" || key === "escape") && this.gameMode === "editor" && this.constructionMenu) {
 			if (key === "escape") {
 				if (this.constructionMenu.isVisible) {

@@ -11,6 +11,8 @@ export const MOTORBIKE_FIELDS = [
   { key: 'fuelConsumption', label: 'Consumo por segundo', value: 1, min: 0, max: 10, step: 0.1 },
   { key: 'seatHeight', label: 'Altura del asiento desde el suelo (m)', value: 1.02, min: 0.1, max: 5, step: 0.05 },
   { key: 'seatOffsetZ', label: 'Posición longitudinal del asiento (m)', value: 0.22, min: -3, max: 3, step: 0.05 },
+  { key: 'passengerSeatHeight', label: 'Altura del asiento trasero desde el suelo (m)', value: 1.12, min: 0.1, max: 5, step: 0.05 },
+  { key: 'passengerSeatOffsetZ', label: 'Posición longitudinal del asiento trasero (m)', value: 0.82, min: -3, max: 3, step: 0.05 },
   { key: 'riderLean', label: 'Inclinación del conductor (°)', value: 12, min: 0, max: 40, step: 1 },
   { key: 'maxLean', label: 'Inclinación máxima al girar (°)', value: 18, min: 0, max: 35, step: 1 },
   { key: 'holdTime', label: 'Tiempo manteniendo F para subir (s)', value: 0, min: 0, max: 10, step: 0.1 },

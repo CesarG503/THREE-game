@@ -1,4 +1,5 @@
 import { RiderPose } from "../vehicles/RiderPose";
+import type { VehicleSeat } from "../vehicles/VehicleSeats";
 import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
 import { GLBModel } from "../character/models/glb/GLBModel";
@@ -339,6 +340,7 @@ export class RemotePlayer {
     }
 
     update(dt: number) {
+        if (this.wasRiding) this.riderPose.reset();
         this.updateGravityTransition(dt);
         this.currentPosition.lerp(this.targetPosition, this.interpolationSpeed * dt);
         const up = this.getGravityUpVector();
@@ -376,33 +378,35 @@ export class RemotePlayer {
         if (ride && [ride.speed, ride.steering, ride.lean, ride.riderLean].every(Number.isFinite)) {
             if (this.collider) this.collider.setSensor(true);
             this.wasRiding = true;
-            this.glbModel.model?.rotateZ(ride.lean);
-            this.polygonModel.model?.rotateZ(-ride.lean);
-            this.polygonModelSkin.model?.rotateZ(-ride.lean);
-            this.riderPose.apply(this, dt, ride.speed, ride.steering, ride.riderLean);
-            return;
+            if (ride.seat !== 'passenger') {
+                this.glbModel.model?.rotateZ(ride.lean);
+                this.polygonModel.model?.rotateZ(-ride.lean);
+                this.polygonModelSkin.model?.rotateZ(-ride.lean);
+                this.riderPose.apply(this, dt, ride.speed, ride.steering, ride.riderLean);
+                return;
+            }
         }
-        if (this.wasRiding) {
+        if (this.wasRiding && !ride) {
             this.riderPose.reset();
             this.wasRiding = false;
             this.applyCollisionProfile();
         }
 
         const isLocallyMoving = (this.currentPosition.distanceTo(this.targetPosition) > 0.05);
-        const hasInput = this.state.isMoving || isLocallyMoving;
+        const hasInput = !ride && (this.state.isMoving || isLocallyMoving);
 
         const effectivelyAttacking = this.state.isAttacking || (Date.now() < this.attackEndTime);
 
         this.glbModel.update(dt, hasInput);
         this.polygonModel.update(dt, hasInput);
-        const isUsingJetpack = this.state.equippedWeapon && (this.state.equippedWeapon === "jetpack" || this.state.equippedWeapon.startsWith("jetpack"));
+        const isUsingJetpack = !ride && this.state.equippedWeapon && (this.state.equippedWeapon === "jetpack" || this.state.equippedWeapon.startsWith("jetpack"));
         const isSuperman = this.state.isSuperman !== undefined ? !!this.state.isSuperman : !!(isUsingJetpack && this.state.isCrouching && !this.state.isGrounded);
         const noPitchTilt = this.state.noPitchTilt !== undefined ? !!this.state.noPitchTilt : !!(isUsingJetpack && 
                                this.currentWeaponInstance && 
                                this.currentWeaponInstance.pointerFollowEnabled && 
                                !this.currentWeaponInstance.shiftFlightEnabled);
-        const visualCrouch = !!(this.state.isCrouching && !isSuperman);
-        const isRunning = !!this.state.isRunning;
+        const visualCrouch = !ride && !!(this.state.isCrouching && !isSuperman);
+        const isRunning = !ride && !!this.state.isRunning;
 
         this.polygonModelSkin.update(
             dt,
@@ -419,7 +423,9 @@ export class RemotePlayer {
             this.currentWeaponInstance.updateAnim(dt, 0);
         }
 
-        const effectivelyUsingJetpack = this.state.isUsingJetpack !== undefined ? !!this.state.isUsingJetpack : isUsingJetpack;
+        if (ride?.seat === 'passenger') this.riderPose.apply(this, dt, ride.speed, 0, 0, true, ride.yaw);
+
+        const effectivelyUsingJetpack = !ride && (this.state.isUsingJetpack !== undefined ? !!this.state.isUsingJetpack : isUsingJetpack);
 
         if (effectivelyUsingJetpack && this.particleSystem && this.polygonModelSkin && this.polygonModelSkin.backItemMesh) {
             const jetpackMesh = this.polygonModelSkin.backItemMesh;
@@ -439,7 +445,27 @@ export class RemotePlayer {
         }
     }
 
+    /** Anchor both avatars to the same rendered bike after network interpolation. */
+    syncVehicleSeat(position: THREE.Vector3, yaw: number, seat: VehicleSeat, lean: number) {
+        const ride = this.state.motorbike;
+        if (!ride) return;
+        this.currentPosition.copy(position);
+        if (seat === 'driver') this.currentRotation = yaw;
+        this.rigidBody?.setTranslation(position, true);
+        this.rigidBody?.setNextKinematicTranslation(position);
+        this.collider?.setSensor(true);
+        this.applyModelTransform(this.glbModel, 0);
+        this.applyModelTransform(this.polygonModel, Math.PI);
+        this.applyModelTransform(this.polygonModelSkin, Math.PI);
+        this.glbModel.model?.rotateZ(lean);
+        this.polygonModel.model?.rotateZ(-lean);
+        this.polygonModelSkin.model?.rotateZ(-lean);
+        this.riderPose.apply(this, 0, ride.speed, ride.steering, ride.riderLean, seat === 'passenger', yaw);
+        if (this.label) this.label.position.copy(position).addScaledVector(this.getGravityUpVector(), 2.2);
+    }
+
     dispose() {
+        this.riderPose.reset();
         const removeMesh = (modelObj: any) => {
             if (modelObj && modelObj.model) {
                 this.scene.remove(modelObj.model);

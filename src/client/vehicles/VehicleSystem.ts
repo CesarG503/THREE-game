@@ -4,6 +4,7 @@ import { consumeFuel } from '../items/Fuel';
 import { normalizeMotorbikeSettings } from './MotorbikeSettings';
 import { RiderPose } from './RiderPose';
 import { VehicleFall } from './VehicleFall';
+import { resolveVehicleSeats, type VehicleSeat } from './VehicleSeats';
 import type { MotorbikeVisual } from './MotorbikeModel';
 
 /** XYZ Euler.y folds at ±90°. Derive the full heading from the actual forward vector. */
@@ -14,6 +15,10 @@ export function getMotorbikeHeading(bike: THREE.Object3D): number {
 
 export class VehicleSystem {
   mounted: MotorbikeVisual | null = null;
+  seat: VehicleSeat | null = null;
+  get isDriver() { return this.mounted !== null && this.seat === 'driver'; }
+  get isPassenger() { return this.mounted !== null && this.seat === 'passenger'; }
+  private get playerId(): string { return this.game.networkManager?.playerId || 'local'; }
   speed = 0;
   private verticalSpeed = 0;
   private steering = 0;
@@ -59,7 +64,7 @@ export class VehicleSystem {
     let nearest: MotorbikeVisual | null = null;
     let distance = 9;
     for (const bike of this.bikes) {
-      if (!bike.visible || bike.userData.invisible || bike.userData.vehicleDriver) continue;
+      if (!bike.visible || bike.userData.invisible || (bike.userData.vehicleDriver && bike.userData.vehiclePassenger)) continue;
       const candidate = position.distanceToSquared(bike.position);
       if (candidate >= distance || !bike.userData.rigidBody?.isValid()) continue;
       // Interacting through a wall should not mount a vehicle.
@@ -91,13 +96,14 @@ export class VehicleSystem {
     const character = this.game.character;
     if (character.getGravityUpVector().y < 0.99 || this.game.gravityQteActive) return false;
     this.mounted = bike;
+    this.seat = bike.userData.vehicleDriver ? 'passenger' : 'driver';
     bike.userData.logicProperties = normalizeMotorbikeSettings(bike.userData.logicProperties);
-    bike.userData.vehicleDriver = this.game.networkManager?.playerId || 'local';
+    bike.userData[this.isDriver ? 'vehicleDriver' : 'vehiclePassenger'] = this.playerId;
     bike.userData.rigidBody.setBodyType(RAPIER.RigidBodyType.KinematicPositionBased, true);
     const motion = this.coasting.get(bike);
-    this.speed = motion?.speed ?? 0;
-    this.verticalSpeed = motion?.verticalSpeed ?? 0;
-    this.coasting.delete(bike);
+    this.speed = motion?.speed ?? bike.userData.vehicleMotion?.speed ?? 0;
+    this.verticalSpeed = motion?.verticalSpeed ?? bike.userData.vehicleMotion?.verticalSpeed ?? 0;
+    if (this.isDriver) this.coasting.delete(bike);
     this.steering = this.lean = 0;
     this.wasSensor = character.collider.isSensor();
     character.collider.setSensor(true);
@@ -108,7 +114,40 @@ export class VehicleSystem {
     // Clear the walking animation before caching the seated pose.
     character.polygonModelSkin?.update(0, false);
     this.syncRider(0);
+    this.sendSeat();
     return true;
+  }
+
+  switchSeat(): boolean {
+    if (!this.mounted || this.paused || this.game.character.isDead) return false;
+    const bike = this.mounted;
+    const target: VehicleSeat = this.isDriver ? 'passenger' : 'driver';
+    if (bike.userData[target === 'driver' ? 'vehicleDriver' : 'vehiclePassenger']) {
+      this.show('El otro asiento está ocupado. F: bajar');
+      return false;
+    }
+    delete bike.userData[this.isDriver ? 'vehicleDriver' : 'vehiclePassenger'];
+    this.pose.reset();
+    this.seat = target;
+    bike.userData[this.isDriver ? 'vehicleDriver' : 'vehiclePassenger'] = this.playerId;
+    if (this.isDriver) {
+      const motion = this.coasting.get(bike);
+      this.speed = motion?.speed ?? this.speed;
+      this.verticalSpeed = motion?.verticalSpeed ?? this.verticalSpeed;
+      this.coasting.delete(bike);
+    } else {
+      this.startCoasting(bike, this.speed, this.verticalSpeed, true);
+    }
+    this.steering = this.lean = 0;
+    this.syncRider(0);
+    this.sendSeat();
+    return true;
+  }
+
+  private sendSeat() {
+    if (this.game.networkManager?.isConnected) {
+      this.game.networkManager.sendPlayerAction('motorbikeSeat', this.getNetworkState());
+    }
   }
 
   private findExit(): THREE.Vector3 | null {
@@ -143,13 +182,16 @@ export class VehicleSystem {
     const props = normalizeMotorbikeSettings(bike.userData.logicProperties);
     const exitSpeed = this.speed;
     const velocity = new THREE.Vector3(0, 0, -exitSpeed).applyQuaternion(bike.quaternion);
-    delete bike.userData.vehicleDriver;
-    this.startCoasting(bike, exitSpeed, this.verticalSpeed, true);
+    const wasDriver = this.isDriver;
+    const field = wasDriver ? 'vehicleDriver' : 'vehiclePassenger';
+    if (bike.userData[field] === this.playerId) delete bike.userData[field];
+    if (!bike.userData.vehicleDriver) this.startCoasting(bike, exitSpeed, this.verticalSpeed, !bike.userData.vehiclePassenger);
     if (finalState && this.game.networkManager?.isConnected) {
       this.game.networkManager.sendPlayerAction('motorbikePark', finalState);
     }
-    bike.animateMotorbike?.(0, 0, 0);
+    if (!bike.userData.vehicleDriver) bike.animateMotorbike?.(0, 0, 0);
     this.mounted = null;
+    this.seat = null;
     character.isMounted = false;
     if (character.collider?.isValid()) character.collider.setSensor(this.wasSensor);
     if (exit && character.rigidBody?.isValid()) {
@@ -188,6 +230,15 @@ export class VehicleSystem {
     }
     const props = normalizeMotorbikeSettings(bike.userData.logicProperties);
     Object.assign(bike.userData.logicProperties, props);
+    if (this.isPassenger) {
+      const motion = this.coasting.get(bike) ?? bike.userData.vehicleMotion;
+      this.speed = motion?.speed ?? 0;
+      this.verticalSpeed = motion?.verticalSpeed ?? 0;
+      this.lean = motion?.lean ?? 0;
+      this.syncRider(dt);
+      this.show(`Pasajero · ${Math.round(Math.abs(this.speed) * 3.6)} km/h\nArmas y construcción disponibles · R cambiar asiento · F bajar\nMayús + R recargar / rotar construcción`, props.consumableUse, props.maxConsumableUse);
+      return true;
+    }
     const keys = this.game.inputManager.keys;
     const throttle = this.paused ? 0 : Number(keys.forward) - Number(keys.backward);
     const brake = this.paused || keys.jump;
@@ -214,10 +265,11 @@ export class VehicleSystem {
     this.verticalSpeed = motion.verticalSpeed;
     const travel = motion.travel;
     this.lean = THREE.MathUtils.lerp(this.lean, this.steering * THREE.MathUtils.degToRad(props.maxLean) * Math.min(Math.abs(this.speed) / 10, 1), 1 - Math.exp(-8 * dt));
+    bike.userData.vehicleMotion = { speed: this.speed, verticalSpeed: this.verticalSpeed, lean: this.lean };
     bike.animateMotorbike?.(travel * Math.sign(this.speed), this.steering, this.lean);
     this.syncRider(dt);
     const fuel = bike.userData.logicProperties.consumableUse;
-    this.show(`${Math.round(Math.abs(this.speed) * 3.6)} km/h · Combustible ${Math.ceil(fuel)} / ${props.maxConsumableUse}${fuel <= 0 ? ' · SIN COMBUSTIBLE' : ''}\nW/S acelerar · A/D girar · Espacio frenar · F bajar`, fuel, props.maxConsumableUse);
+    this.show(`Conductor · ${Math.round(Math.abs(this.speed) * 3.6)} km/h · Combustible ${Math.ceil(fuel)} / ${props.maxConsumableUse}${fuel <= 0 ? ' · SIN COMBUSTIBLE' : ''}\nW/S acelerar · A/D girar · Espacio frenar · R cambiar asiento · F bajar`, fuel, props.maxConsumableUse);
     return true;
   }
 
@@ -263,6 +315,7 @@ export class VehicleSystem {
       const motion = this.moveBike(bike, state.speed, state.verticalSpeed, dt);
       state.speed = motion.speed;
       state.verticalSpeed = motion.verticalSpeed;
+      bike.userData.vehicleMotion = { speed: state.speed, verticalSpeed: state.verticalSpeed, lean: 0 };
       bike.animateMotorbike?.(motion.travel * Math.sign(state.speed), 0, 0);
       if (Math.abs(state.speed) < 0.02 && motion.grounded) {
         body.setTranslation(bike.position, true);
@@ -281,25 +334,37 @@ export class VehicleSystem {
     const character = this.game.character;
     const props = bike.userData.logicProperties;
     const hipHeight = character.currentType === 'skin' ? 0.625 : 0.7;
-    const position = new THREE.Vector3(0, props.seatHeight - bike.userData.originalScale.y / 2 - hipHeight, props.seatOffsetZ)
+    const height = this.isPassenger ? props.passengerSeatHeight : props.seatHeight;
+    const offset = this.isPassenger ? props.passengerSeatOffsetZ : props.seatOffsetZ;
+    const position = new THREE.Vector3(0, height - bike.userData.originalScale.y / 2 - hipHeight, offset)
       .applyQuaternion(bike.quaternion).add(bike.position);
     character.rigidBody.setTranslation(position, true);
     character.rigidBody.setNextKinematicTranslation(position);
     this.lastRiderPosition.copy(position);
-    character.currentRotation = getMotorbikeHeading(bike);
+    if (this.isPassenger) {
+      // Run upper-body/item animations without allowing walking, jumping or flight to detach the rider.
+      this.pose.reset();
+      character.updateAimAlignment?.(dt, true);
+      character.glbModel?.update?.(dt, false);
+      character.polygonModel?.update?.(dt, false);
+      character.polygonModelSkin?.update?.(dt, false, false, !this.paused && this.game.inputManager.keys.attack, true, 0, false, false, false);
+      character.particleSystem?.update?.(dt);
+    } else {
+      character.currentRotation = getMotorbikeHeading(bike);
+    }
     character.grounded = true;
     character.isRunning = false;
     character.updateModelVisuals();
     for (const model of [character.glbModel?.model, character.polygonModel?.model, character.polygonModelSkin?.model]) {
       if (model) model.rotateZ(character.currentType === 'glb' && model === character.glbModel?.model ? this.lean : -this.lean);
     }
-    this.pose.apply(character, dt, this.speed, this.steering, props.riderLean);
+    this.pose.apply(character, dt, this.speed, this.steering, props.riderLean, this.isPassenger, getMotorbikeHeading(bike));
   }
 
   getNetworkState() {
     const bike = this.mounted;
     if (!bike) return null;
-    return this.networkStateFor(bike, this.speed, this.verticalSpeed, this.steering, this.lean);
+    return { ...this.networkStateFor(bike, this.speed, this.verticalSpeed, this.steering, this.lean), seat: this.seat };
   }
 
   private networkStateFor(bike: MotorbikeVisual, speed: number, verticalSpeed: number, steering: number, lean: number) {
@@ -311,27 +376,40 @@ export class VehicleSystem {
       speed, verticalSpeed, steering, lean,
       riderLean: bike.userData.logicProperties.riderLean,
       seatHeight: bike.userData.logicProperties.seatHeight,
-      seatOffsetZ: bike.userData.logicProperties.seatOffsetZ
+      seatOffsetZ: bike.userData.logicProperties.seatOffsetZ,
+      passengerSeatHeight: bike.userData.logicProperties.passengerSeatHeight,
+      passengerSeatOffsetZ: bike.userData.logicProperties.passengerSeatOffsetZ
     };
   }
 
   private validNetworkState(state: any) {
-    return state && typeof state.uuid === 'string' &&
-      [state.position?.x, state.position?.y, state.position?.z, state.yaw, state.fuel, state.speed, state.verticalSpeed ?? 0, state.steering, state.lean, state.riderLean, state.seatHeight, state.seatOffsetZ]
+    return state && typeof state.uuid === 'string' && (state.seat === undefined || state.seat === 'driver' || state.seat === 'passenger') &&
+      [state.position?.x, state.position?.y, state.position?.z, state.yaw, state.fuel, state.speed, state.verticalSpeed ?? 0, state.steering, state.lean, state.riderLean, state.seatHeight, state.seatOffsetZ, state.passengerSeatHeight ?? 1.12, state.passengerSeatOffsetZ ?? 0.82]
         .every(value => typeof value === 'number' && Number.isFinite(value) && Math.abs(value) < 1e6);
   }
 
   receivePark(playerId: string, state: any) {
     if (!this.validNetworkState(state)) return;
     const bike = this.bikes.find(candidate => candidate.userData.uuid === state.uuid);
-    if (!bike || bike === this.mounted || (bike.userData.vehicleDriver && bike.userData.vehicleDriver !== playerId)) return;
-    this.applyRemoteTransform(bike, state.position, state.yaw);
-    bike.userData.logicProperties.consumableUse = Math.max(0, Math.min(state.fuel, bike.userData.logicProperties.maxConsumableUse));
-    delete bike.userData.vehicleDriver;
-    this.startCoasting(bike, state.speed, state.verticalSpeed ?? 0, false);
-    bike.animateMotorbike?.(0, 0, 0);
+    if (!bike) return;
     const player = this.game.networkManager?.remotePlayers.get(playerId);
     if (player?.state.motorbike?.uuid === state.uuid) player.state.motorbike = null;
+    const field = state.seat === 'passenger' ? 'vehiclePassenger' : 'vehicleDriver';
+    if (bike.userData[field] && bike.userData[field] !== playerId) return;
+    if (bike.userData[field] === playerId) delete bike.userData[field];
+    // A departing passenger must never park or rewind a motorcycle that still has a driver.
+    if (bike.userData.vehicleDriver || (bike === this.mounted && this.isDriver)) return;
+    this.applyRemoteTransform(bike, state.position, state.yaw);
+    bike.userData.logicProperties.consumableUse = Math.max(0, Math.min(state.fuel, bike.userData.logicProperties.maxConsumableUse));
+    this.startCoasting(bike, state.speed, state.verticalSpeed ?? 0, bike === this.mounted);
+    bike.animateMotorbike?.(0, 0, 0);
+    if (bike === this.mounted) this.syncRider(0);
+  }
+
+  receiveSeat(playerId: string, state: any) {
+    if (!this.validNetworkState(state)) return;
+    const player = this.game.networkManager?.remotePlayers.get(playerId);
+    if (player) player.state.motorbike = state;
   }
 
   private applyRemoteTransform(bike: MotorbikeVisual, position: { x: number; y: number; z: number }, yaw: number) {
@@ -348,34 +426,59 @@ export class VehicleSystem {
   syncRemote(dt: number) {
     const network = this.game.networkManager;
     if (!network) return;
-    const occupied = new Set<MotorbikeVisual>();
-    // A stable winner also resolves simultaneous mount requests consistently on both clients.
-    const riders = [...network.remotePlayers.entries()].sort(([a], [b]) => String(a).localeCompare(String(b)));
-    for (const [playerId, player] of riders as Array<[string, any]>) {
-      const state = player.state?.motorbike;
-      if (!this.validNetworkState(state)) continue;
-      const bike = this.bikes.find(candidate => candidate.userData.uuid === state.uuid);
-      if (!bike || occupied.has(bike)) continue;
-      if (bike === this.mounted) {
-        if (String(network.playerId).localeCompare(playerId) < 0) continue;
-        this.dismount(true);
-      }
-      occupied.add(bike);
-      this.coasting.delete(bike);
-      bike.userData.vehicleDriver = playerId;
-      const yaw = player.currentRotation;
-      const hip = player.currentType === 'skin' ? 0.625 : 0.7;
-      const seat = new THREE.Vector3(0, state.seatHeight - bike.userData.originalScale.y / 2 - hip, state.seatOffsetZ)
-        .applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
-      const position = player.currentPosition.clone().sub(seat);
-      this.applyRemoteTransform(bike, position, yaw);
-      bike.userData.logicProperties.consumableUse = Math.max(0, Math.min(state.fuel, bike.userData.logicProperties.maxConsumableUse));
-      bike.animateMotorbike?.(state.speed * Math.min(dt, 0.05), state.steering, state.lean);
-    }
     for (const bike of this.bikes) {
-      if (bike !== this.mounted && bike.userData.vehicleDriver && !occupied.has(bike)) {
-        delete bike.userData.vehicleDriver;
-        bike.animateMotorbike?.(0, 0, 0);
+      const remote = [...network.remotePlayers.entries()].filter(([, player]: any) =>
+        this.validNetworkState(player.state?.motorbike) && player.state.motorbike.uuid === bike.userData.uuid) as Array<[string, any]>;
+      const claims = remote.map(([id, player]) => ({ id, seat: (player.state.motorbike.seat ?? 'driver') as VehicleSeat }));
+      if (bike === this.mounted && this.seat) claims.push({ id: this.playerId, seat: this.seat });
+      const seats = resolveVehicleSeats(claims);
+      const previousDriver = bike.userData.vehicleDriver;
+      bike.userData.vehicleDriver = [...seats].find(([, seat]) => seat === 'driver')?.[0];
+      bike.userData.vehiclePassenger = [...seats].find(([, seat]) => seat === 'passenger')?.[0];
+      if (bike === this.mounted && seats.get(this.playerId) !== this.seat) {
+        const assigned = seats.get(this.playerId);
+        if (!assigned) this.dismount(true);
+        else {
+          this.pose.reset();
+          this.seat = assigned;
+          this.sendSeat();
+        }
+      }
+      // Only the driver controls motion and fuel. A lone passenger owns unpowered coasting.
+      const authority = bike.userData.vehicleDriver || bike.userData.vehiclePassenger;
+      const owner = remote.find(([id]) => id === authority)?.[1];
+      if (owner) {
+        const state = owner.state.motorbike;
+        this.coasting.delete(bike);
+        const alpha = 1 - Math.exp(-15 * Math.max(0, Math.min(dt, 0.1)));
+        const position = bike.position.clone().lerp(state.position, alpha);
+        const yaw = getMotorbikeHeading(bike);
+        const diff = Math.atan2(Math.sin(state.yaw - yaw), Math.cos(state.yaw - yaw));
+        // Use vehicle yaw, never passenger aim or an interpolated avatar's old seat offset.
+        this.applyRemoteTransform(bike, position, yaw + diff * alpha);
+        bike.userData.vehicleMotion = { speed: state.speed, verticalSpeed: state.verticalSpeed ?? 0, lean: state.lean };
+        bike.userData.logicProperties.consumableUse = Math.max(0, Math.min(state.fuel, bike.userData.logicProperties.maxConsumableUse));
+        bike.animateMotorbike?.(state.speed * Math.min(dt, 0.05), state.steering, state.lean);
+      } else if (authority === this.playerId && this.isDriver) {
+        this.coasting.delete(bike);
+      } else if (!bike.userData.vehicleDriver && !this.coasting.has(bike) && (previousDriver || authority === this.playerId)) {
+        const motion = bike.userData.vehicleMotion;
+        this.startCoasting(bike, motion?.speed ?? 0, motion?.verticalSpeed ?? 0, authority === this.playerId);
+      }
+      for (const [id, player] of remote) {
+        const seat = seats.get(id);
+        if (!seat) continue;
+        const props = normalizeMotorbikeSettings(bike.userData.logicProperties);
+        const hip = player.currentType === 'skin' ? 0.625 : 0.7;
+        const height = seat === 'passenger' ? props.passengerSeatHeight : props.seatHeight;
+        const offset = seat === 'passenger' ? props.passengerSeatOffsetZ : props.seatOffsetZ;
+        const position = new THREE.Vector3(0, height - bike.userData.originalScale.y / 2 - hip, offset)
+          .applyQuaternion(bike.quaternion).add(bike.position);
+        player.syncVehicleSeat?.(position, getMotorbikeHeading(bike), seat, bike.userData.vehicleMotion?.lean ?? this.lean);
+      }
+      if (bike === this.mounted && this.isPassenger) {
+        this.lean = bike.userData.vehicleMotion?.lean ?? 0;
+        this.syncRider(0);
       }
     }
   }

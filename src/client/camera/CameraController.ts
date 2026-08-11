@@ -50,6 +50,7 @@ export class CameraController {
   smoothedStrafe: number;
   gravityUp: THREE.Vector3;
   gravityQuaternion: THREE.Quaternion;
+  yawConstraint: { centerYaw: number; maxHalfAngle: number } | null = null;
 
   constructor(camera: THREE.Camera, domElement: HTMLElement) {
     this.camera = camera;
@@ -172,6 +173,7 @@ export class CameraController {
           this.fpPitch -= e.movementY * this.rotationSpeed * (this.fpInvertAxisY ? -1 : 1);
           this.fpPitch = Math.max(-this.maxPitch, Math.min(this.maxPitch, this.fpPitch));
           this.manualPitchDelta += this.fpPitch - oldPitch;
+          this.enforceYawConstraint();
         } else {
           const oldPhi = this.phi;
           this.theta -= e.movementX * this.rotationSpeed * (this.tpInvertAxisX ? -1 : 1);
@@ -182,6 +184,7 @@ export class CameraController {
           this.phi = Math.max(minP, Math.min(maxP, this.phi));
 
           this.manualPitchDelta -= this.phi - oldPhi;
+          this.enforceYawConstraint();
         }
       }
     });
@@ -373,6 +376,42 @@ export class CameraController {
     }
   }
 
+  setYawConstraint(centerYaw: number | null, maxHalfAngle: number = (85 * Math.PI) / 180) {
+    if (centerYaw === null || !Number.isFinite(centerYaw)) {
+      this.yawConstraint = null;
+    } else {
+      this.yawConstraint = { centerYaw, maxHalfAngle };
+      this.enforceYawConstraint();
+    }
+  }
+
+  rotateYaw(deltaYaw: number) {
+    if (!Number.isFinite(deltaYaw) || Math.abs(deltaYaw) < 0.00001) return;
+    this.theta += deltaYaw;
+    this.fpYaw += deltaYaw;
+    if (this.yawConstraint) {
+      this.yawConstraint.centerYaw += deltaYaw;
+      this.enforceYawConstraint();
+    }
+  }
+
+  enforceYawConstraint() {
+    if (!this.yawConstraint) return;
+    const { centerYaw, maxHalfAngle } = this.yawConstraint;
+    const currentAim = this.isFirstPerson ? this.fpYaw : this.theta;
+    const targetBodyRot = currentAim + Math.PI;
+    let diff = Math.atan2(Math.sin(targetBodyRot - centerYaw), Math.cos(targetBodyRot - centerYaw));
+    if (Math.abs(diff) > maxHalfAngle) {
+      diff = Math.sign(diff) * maxHalfAngle;
+      const clampedAim = centerYaw + diff - Math.PI;
+      if (this.isFirstPerson) {
+        this.fpYaw = clampedAim;
+      } else {
+        this.theta = clampedAim;
+      }
+    }
+  }
+
   setGravityUpVector(up: THREE.Vector3) {
     if (!up || up.lengthSq() < 0.0001) return;
     this.gravityUp.copy(up).normalize();
@@ -499,6 +538,7 @@ export class CameraController {
     }
 
     this.target.copy(characterPosition);
+    this.enforceYawConstraint();
 
     if (this.mode === 'free-fly') {
       this.updateFreeFly(dt, input);

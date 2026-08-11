@@ -23,9 +23,9 @@ export class RiderPose {
       }
     });
   }
-  apply(avatar: any, dt: number, speed: number, steer: number, leanDegrees: number, passenger = false, bikeYaw = avatar.currentRotation || 0) {
+  apply(avatar: any, dt: number, speed: number, steer: number, leanDegrees: number, passenger = false, bikeYaw = avatar.currentRotation || 0, aimDiff = 0) {
     if (passenger) {
-      this.applyPassenger(avatar, bikeYaw);
+      this.applyPassenger(avatar, bikeYaw, aimDiff);
       return;
     }
     this.time += dt;
@@ -73,35 +73,73 @@ export class RiderPose {
     });
   }
 
-  private applyPassenger(avatar: any, bikeYaw: number) {
-    // Keep the legs astride the bike while the torso, head and weapon can aim freely.
-    const twist = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), bikeYaw - (avatar.currentRotation || 0));
-    const leg = (node: THREE.Object3D | undefined, side: number, skin = false) => {
-      if (!node) return;
-      this.rotate(node, -1.05, 0, side * 0.22);
-      node.quaternion.premultiply(twist);
-      node.position.copy(this.rest.get(node)!.position);
-      if (skin) node.position.x = side * 0.31;
-      node.position.applyQuaternion(twist);
-    };
+  private applyPassenger(avatar: any, bikeYaw: number, aimDiff = 0) {
+    void bikeYaw;
+    const isArmed = Boolean(
+      avatar.isHoldingWeapon ||
+      avatar.currentWeaponInstance ||
+      avatar.polygonModelSkin?.heldItemMesh?.visible ||
+      avatar.isAttacking
+    );
+
     const skin = avatar.polygonModelSkin;
     if (skin?.model) {
       this.rotate(skin.pivotGroup, 0);
       if (skin.pivotGroup) skin.pivotGroup.position.set(0, 0.9, 0);
-      leg(skin.leftLegGroup, -1, true);
-      leg(skin.rightLegGroup, 1, true);
-      this.bend(skin.leftLegGroup, 1.35);
-      this.bend(skin.rightLegGroup, 1.35);
+
+      // Las piernas se mantienen fijas a horcajadas en el asiento trasero
+      this.rotate(skin.leftLegGroup, -1.15, -0.12, -0.22);
+      this.rotate(skin.rightLegGroup, -1.15, 0.12, 0.22);
+      if (skin.leftLegGroup) {
+        skin.leftLegGroup.position.copy(this.rest.get(skin.leftLegGroup)?.position ?? skin.leftLegGroup.position);
+        skin.leftLegGroup.position.x = -0.30;
+      }
+      if (skin.rightLegGroup) {
+        skin.rightLegGroup.position.copy(this.rest.get(skin.rightLegGroup)?.position ?? skin.rightLegGroup.position);
+        skin.rightLegGroup.position.x = 0.30;
+      }
+      this.bend(skin.leftLegGroup, 1.4);
+      this.bend(skin.rightLegGroup, 1.4);
+
+      // El torso superior rota suavemente con el apuntado permitido
+      this.rotate(skin.upperBodyGroup, 0.08, aimDiff, 0);
+      if (skin.upperBodyGroup) {
+        const hip = new THREE.Vector3(0, 0.625, 0);
+        skin.upperBodyGroup.position.copy(hip).sub(hip.clone().applyQuaternion(skin.upperBodyGroup.quaternion));
+      }
+
+      // Si no porta armas, brazos en postura natural de descanso de copiloto
+      if (!isArmed) {
+        this.rotate(skin.leftArmGroup, -0.75, 0.15, -0.15);
+        this.rotate(skin.rightArmGroup, -0.75, -0.15, 0.15);
+        this.bend(skin.leftArmGroup, -0.7);
+        this.bend(skin.rightArmGroup, -0.7);
+      }
     }
-    leg(avatar.polygonModel?.polyLeftLeg, -1);
-    leg(avatar.polygonModel?.polyRightLeg, 1);
+
+    const polygon = avatar.polygonModel;
+    if (polygon) {
+      this.rotate(polygon.polyLeftLeg, -1.15, 0, -0.2);
+      this.rotate(polygon.polyRightLeg, -1.15, 0, 0.2);
+      this.rotate(polygon.polyBody, 0.08, aimDiff, 0);
+      if (!isArmed) {
+        this.rotate(polygon.polyLeftArm, -0.75, 0.15, -0.15);
+        this.rotate(polygon.polyRightArm, -0.75, -0.15, 0.15);
+      }
+    }
+
     avatar.glbModel?.model?.traverse((node: any) => {
       if (!node.isBone) return;
       const name = node.name.toLowerCase();
-      if (name.endsWith('leftupleg') || name.endsWith('rightupleg')) {
-        this.rotate(node, -1.05);
-        node.quaternion.premultiply(twist);
-      } else if (name.endsWith('leftleg') || name.endsWith('rightleg')) this.rotate(node, 1.35);
+      if (name.endsWith('leftupleg')) this.rotate(node, -1.1, 0, -0.22);
+      else if (name.endsWith('rightupleg')) this.rotate(node, -1.1, 0, 0.22);
+      else if (name.endsWith('leftleg') || name.endsWith('rightleg')) this.rotate(node, 1.35);
+      else if (name.endsWith('spine') || name.endsWith('spine1')) this.rotate(node, 0.04, aimDiff * 0.5, 0);
+      else if (!isArmed) {
+        if (name.endsWith('leftarm')) this.rotate(node, -0.7, 0.15, -0.25);
+        else if (name.endsWith('rightarm')) this.rotate(node, -0.7, -0.15, 0.25);
+        else if (name.endsWith('leftforearm') || name.endsWith('rightforearm')) this.rotate(node, -0.55);
+      }
     });
   }
   reset() {

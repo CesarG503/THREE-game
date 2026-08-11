@@ -1,5 +1,6 @@
 import { RiderPose } from "../vehicles/RiderPose";
 import type { VehicleSeat } from "../vehicles/VehicleSeats";
+import { MAX_PASSENGER_YAW } from "../vehicles/MotorbikeSettings";
 import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
 import { GLBModel } from "../character/models/glb/GLBModel";
@@ -378,11 +379,13 @@ export class RemotePlayer {
         if (ride && [ride.speed, ride.steering, ride.lean, ride.riderLean].every(Number.isFinite)) {
             if (this.collider) this.collider.setSensor(true);
             this.wasRiding = true;
-            if (ride.seat !== 'passenger') {
+            if (ride.seat === 'driver') {
                 this.glbModel.model?.rotateZ(ride.lean);
                 this.polygonModel.model?.rotateZ(-ride.lean);
                 this.polygonModelSkin.model?.rotateZ(-ride.lean);
                 this.riderPose.apply(this, dt, ride.speed, ride.steering, ride.riderLean);
+                return;
+            } else if (ride.seat === 'passenger') {
                 return;
             }
         }
@@ -423,8 +426,6 @@ export class RemotePlayer {
             this.currentWeaponInstance.updateAnim(dt, 0);
         }
 
-        if (ride?.seat === 'passenger') this.riderPose.apply(this, dt, ride.speed, 0, 0, true, ride.yaw);
-
         const effectivelyUsingJetpack = !ride && (this.state.isUsingJetpack !== undefined ? !!this.state.isUsingJetpack : isUsingJetpack);
 
         if (effectivelyUsingJetpack && this.particleSystem && this.polygonModelSkin && this.polygonModelSkin.backItemMesh) {
@@ -450,17 +451,31 @@ export class RemotePlayer {
         const ride = this.state.motorbike;
         if (!ride) return;
         this.currentPosition.copy(position);
-        if (seat === 'driver') this.currentRotation = yaw;
+        this.currentRotation = yaw;
         this.rigidBody?.setTranslation(position, true);
         this.rigidBody?.setNextKinematicTranslation(position);
         this.collider?.setSensor(true);
         this.applyModelTransform(this.glbModel, 0);
         this.applyModelTransform(this.polygonModel, Math.PI);
         this.applyModelTransform(this.polygonModelSkin, Math.PI);
-        this.glbModel.model?.rotateZ(lean);
-        this.polygonModel.model?.rotateZ(-lean);
-        this.polygonModelSkin.model?.rotateZ(-lean);
-        this.riderPose.apply(this, 0, ride.speed, ride.steering, ride.riderLean, seat === 'passenger', yaw);
+        const effectiveLean = (seat === 'passenger') ? (-lean * 0.4) : lean;
+        this.glbModel.model?.rotateZ(effectiveLean);
+        this.polygonModel.model?.rotateZ(-effectiveLean);
+        this.polygonModelSkin.model?.rotateZ(-effectiveLean);
+
+        let aimDiff = 0;
+        if (seat === 'passenger') {
+            if (this.state.headYaw !== undefined && Number.isFinite(this.state.headYaw)) {
+                aimDiff = this.state.headYaw;
+            } else if (Number.isFinite(this.targetRotation)) {
+                aimDiff = Math.atan2(Math.sin(this.targetRotation - yaw), Math.cos(this.targetRotation - yaw));
+            }
+            aimDiff = THREE.MathUtils.clamp(aimDiff, -MAX_PASSENGER_YAW, MAX_PASSENGER_YAW);
+            if (this.polygonModelSkin.setHeadRotation) {
+                this.polygonModelSkin.setHeadRotation(this.state.headPitch || 0, aimDiff);
+            }
+        }
+        this.riderPose.apply(this, 0, ride.speed, ride.steering, ride.riderLean, seat === 'passenger', yaw, aimDiff);
         if (this.label) this.label.position.copy(position).addScaledVector(this.getGravityUpVector(), 2.2);
     }
 

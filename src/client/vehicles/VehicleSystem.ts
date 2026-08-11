@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import RAPIER from '@dimforge/rapier3d-compat';
 import { consumeFuel } from '../items/Fuel';
-import { normalizeMotorbikeSettings } from './MotorbikeSettings';
+import { normalizeMotorbikeSettings, MAX_PASSENGER_YAW } from './MotorbikeSettings';
 import { RiderPose } from './RiderPose';
 import { VehicleFall } from './VehicleFall';
 import { resolveVehicleSeats, type VehicleSeat } from './VehicleSeats';
@@ -32,6 +32,7 @@ export class VehicleSystem {
   private fuelBar: HTMLProgressElement | null = null;
   private readout: HTMLDivElement | null = null;
   private lastRiderPosition = new THREE.Vector3();
+  private lastBikeYaw = 0;
 
   constructor(private game: any) {
     this.controller = game.world.createCharacterController(0.025);
@@ -111,7 +112,8 @@ export class VehicleSystem {
     character.verticalVelocity = 0;
     character.momentum.set(0, 0, 0);
     character.isMounted = true;
-    // Clear the walking animation before caching the seated pose.
+    this.lastBikeYaw = getMotorbikeHeading(bike);
+    if (!this.isPassenger) this.game.cameraController?.setYawConstraint?.(null);
     character.polygonModelSkin?.update(0, false);
     this.syncRider(0);
     this.sendSeat();
@@ -131,11 +133,13 @@ export class VehicleSystem {
     this.seat = target;
     bike.userData[this.isDriver ? 'vehicleDriver' : 'vehiclePassenger'] = this.playerId;
     if (this.isDriver) {
+      this.game.cameraController?.setYawConstraint?.(null);
       const motion = this.coasting.get(bike);
       this.speed = motion?.speed ?? this.speed;
       this.verticalSpeed = motion?.verticalSpeed ?? this.verticalSpeed;
       this.coasting.delete(bike);
     } else {
+      this.lastBikeYaw = getMotorbikeHeading(bike);
       this.startCoasting(bike, this.speed, this.verticalSpeed, true);
     }
     this.steering = this.lean = 0;
@@ -209,6 +213,7 @@ export class VehicleSystem {
       if (character.isDead) this.fall.reset(character);
     }
     this.speed = this.lean = 0;
+    this.game.cameraController?.setYawConstraint?.(null);
     if (this.hud) this.hud.style.display = 'none';
     return true;
   }
@@ -235,7 +240,10 @@ export class VehicleSystem {
       this.speed = motion?.speed ?? 0;
       this.verticalSpeed = motion?.verticalSpeed ?? 0;
       this.lean = motion?.lean ?? 0;
-      this.syncRider(dt);
+      const hasRemoteDriver = Boolean(bike.userData.vehicleDriver && bike.userData.vehicleDriver !== this.playerId);
+      if (!hasRemoteDriver) {
+        this.syncRider(dt);
+      }
       this.show(`Pasajero · ${Math.round(Math.abs(this.speed) * 3.6)} km/h\nArmas y construcción disponibles · R cambiar asiento · F bajar\nMayús + R recargar / rotar construcción`, props.consumableUse, props.maxConsumableUse);
       return true;
     }
@@ -312,7 +320,7 @@ export class VehicleSystem {
       }
       // Same rolling resistance as releasing the throttle while mounted; no engine/fuel use.
       state.speed = Math.sign(state.speed) * Math.max(0, Math.abs(state.speed) - 3 * dt);
-      const motion = this.moveBike(bike, state.speed, state.verticalSpeed, dt);
+      const motion = this.moveBike(bike, state.speed, state.verticalSpeed, dt, bike === this.mounted);
       state.speed = motion.speed;
       state.verticalSpeed = motion.verticalSpeed;
       bike.userData.vehicleMotion = { speed: state.speed, verticalSpeed: state.verticalSpeed, lean: 0 };
@@ -341,24 +349,48 @@ export class VehicleSystem {
     character.rigidBody.setTranslation(position, true);
     character.rigidBody.setNextKinematicTranslation(position);
     this.lastRiderPosition.copy(position);
+    const bikeHeading = getMotorbikeHeading(bike);
+    let aimDiff = 0;
     if (this.isPassenger) {
+      const cameraCtrl = this.game.cameraController;
+      if (cameraCtrl) {
+        const deltaBikeYaw = Math.atan2(Math.sin(bikeHeading - this.lastBikeYaw), Math.cos(bikeHeading - this.lastBikeYaw));
+        if (Math.abs(deltaBikeYaw) > 0.00001) {
+          cameraCtrl.rotateYaw?.(deltaBikeYaw);
+        }
+        cameraCtrl.setYawConstraint?.(bikeHeading, MAX_PASSENGER_YAW);
+      }
+
       // Run upper-body/item animations without allowing walking, jumping or flight to detach the rider.
       this.pose.reset();
-      character.updateAimAlignment?.(dt, true);
+
+      const aimYaw = character.getAimYaw ? character.getAimYaw() : (character.currentRotation || 0) - Math.PI;
+      const targetBodyRot = aimYaw + Math.PI;
+      aimDiff = Math.atan2(Math.sin(targetBodyRot - bikeHeading), Math.cos(targetBodyRot - bikeHeading));
+      aimDiff = THREE.MathUtils.clamp(aimDiff, -MAX_PASSENGER_YAW, MAX_PASSENGER_YAW);
+
+      // Character base model (pelvis & legs) faces forward along the motorcycle
+      character.currentRotation = bikeHeading;
+      character.headYaw = aimDiff;
+      character.headPitch = character.getAimPitch ? character.getAimPitch() : 0;
+
       character.glbModel?.update?.(dt, false);
       character.polygonModel?.update?.(dt, false);
       character.polygonModelSkin?.update?.(dt, false, false, !this.paused && this.game.inputManager.keys.attack, true, 0, false, false, false);
       character.particleSystem?.update?.(dt);
     } else {
-      character.currentRotation = getMotorbikeHeading(bike);
+      character.currentRotation = bikeHeading;
+      this.game.cameraController?.setYawConstraint?.(null);
     }
+    this.lastBikeYaw = bikeHeading;
     character.grounded = true;
     character.isRunning = false;
     character.updateModelVisuals();
+    const effectiveLean = this.isPassenger ? (-this.lean * 0.4) : this.lean;
     for (const model of [character.glbModel?.model, character.polygonModel?.model, character.polygonModelSkin?.model]) {
-      if (model) model.rotateZ(character.currentType === 'glb' && model === character.glbModel?.model ? this.lean : -this.lean);
+      if (model) model.rotateZ(character.currentType === 'glb' && model === character.glbModel?.model ? effectiveLean : -effectiveLean);
     }
-    this.pose.apply(character, dt, this.speed, this.steering, props.riderLean, this.isPassenger, getMotorbikeHeading(bike));
+    this.pose.apply(character, dt, this.speed, this.steering, props.riderLean, this.isPassenger, bikeHeading, aimDiff);
   }
 
   getNetworkState() {
@@ -384,7 +416,7 @@ export class VehicleSystem {
 
   private validNetworkState(state: any) {
     return state && typeof state.uuid === 'string' && (state.seat === undefined || state.seat === 'driver' || state.seat === 'passenger') &&
-      [state.position?.x, state.position?.y, state.position?.z, state.yaw, state.fuel, state.speed, state.verticalSpeed ?? 0, state.steering, state.lean, state.riderLean, state.seatHeight, state.seatOffsetZ, state.passengerSeatHeight ?? 1.12, state.passengerSeatOffsetZ ?? 0.82]
+      [state.position?.x, state.position?.y, state.position?.z, state.yaw, state.fuel, state.speed, state.verticalSpeed ?? 0, state.steering, state.lean, state.riderLean, state.seatHeight, state.seatOffsetZ, state.passengerSeatHeight ?? 1.08, state.passengerSeatOffsetZ ?? 0.72]
         .every(value => typeof value === 'number' && Number.isFinite(value) && Math.abs(value) < 1e6);
   }
 
@@ -450,12 +482,15 @@ export class VehicleSystem {
       if (owner) {
         const state = owner.state.motorbike;
         this.coasting.delete(bike);
-        const alpha = 1 - Math.exp(-15 * Math.max(0, Math.min(dt, 0.1)));
-        const position = bike.position.clone().lerp(state.position, alpha);
+        const forwardMove = new THREE.Vector3(0, 0, -state.speed * dt).applyQuaternion(bike.quaternion);
+        forwardMove.y = (state.verticalSpeed ?? 0) * dt;
+        const error = new THREE.Vector3(state.position.x - bike.position.x, state.position.y - bike.position.y, state.position.z - bike.position.z);
+        const correctionRate = 1 - Math.exp(-10 * Math.max(0, Math.min(dt, 0.1)));
+        const position = bike.position.clone().add(forwardMove).addScaledVector(error, correctionRate);
         const yaw = getMotorbikeHeading(bike);
         const diff = Math.atan2(Math.sin(state.yaw - yaw), Math.cos(state.yaw - yaw));
         // Use vehicle yaw, never passenger aim or an interpolated avatar's old seat offset.
-        this.applyRemoteTransform(bike, position, yaw + diff * alpha);
+        this.applyRemoteTransform(bike, position, yaw + diff * (1 - Math.exp(-15 * Math.max(0, Math.min(dt, 0.1)))));
         bike.userData.vehicleMotion = { speed: state.speed, verticalSpeed: state.verticalSpeed ?? 0, lean: state.lean };
         bike.userData.logicProperties.consumableUse = Math.max(0, Math.min(state.fuel, bike.userData.logicProperties.maxConsumableUse));
         bike.animateMotorbike?.(state.speed * Math.min(dt, 0.05), state.steering, state.lean);
@@ -478,7 +513,7 @@ export class VehicleSystem {
       }
       if (bike === this.mounted && this.isPassenger) {
         this.lean = bike.userData.vehicleMotion?.lean ?? 0;
-        this.syncRider(0);
+        this.syncRider(dt);
       }
     }
   }
@@ -504,6 +539,7 @@ export class VehicleSystem {
     }
     this.coasting.clear();
     this.game.world.removeCharacterController(this.controller);
+    this.game.cameraController?.setYawConstraint?.(null);
     this.hud?.remove();
   }
 }

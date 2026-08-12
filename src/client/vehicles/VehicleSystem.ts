@@ -33,6 +33,7 @@ export class VehicleSystem {
   private readout: HTMLDivElement | null = null;
   private lastRiderPosition = new THREE.Vector3();
   private lastBikeYaw = 0;
+  private lastSeatSwitchTime = 0;
 
   constructor(private game: any) {
     this.controller = game.world.createCharacterController(0.025);
@@ -122,14 +123,17 @@ export class VehicleSystem {
 
   switchSeat(): boolean {
     if (!this.mounted || this.paused || this.game.character.isDead) return false;
+    const now = Date.now();
+    if (now - this.lastSeatSwitchTime < 250) return false;
     const bike = this.mounted;
     const target: VehicleSeat = this.isDriver ? 'passenger' : 'driver';
     if (bike.userData[target === 'driver' ? 'vehicleDriver' : 'vehiclePassenger']) {
       this.show('El otro asiento está ocupado. F: bajar');
       return false;
     }
+    this.lastSeatSwitchTime = now;
     delete bike.userData[this.isDriver ? 'vehicleDriver' : 'vehiclePassenger'];
-    this.pose.reset();
+    this.pose.reset(this.game.character);
     this.seat = target;
     bike.userData[this.isDriver ? 'vehicleDriver' : 'vehiclePassenger'] = this.playerId;
     if (this.isDriver) {
@@ -145,6 +149,13 @@ export class VehicleSystem {
     this.steering = this.lean = 0;
     this.syncRider(0);
     this.sendSeat();
+    if (this.game.networkManager?.isConnected) {
+      this.game.networkManager.sendPlayerUpdate?.(
+        this.game.character.getPosition(),
+        this.game.character.getRotation(),
+        { motorbike: this.getNetworkState() }
+      );
+    }
     return true;
   }
 
@@ -204,7 +215,7 @@ export class VehicleSystem {
     }
     character.verticalVelocity = 0;
     character.momentum.set(0, 0, 0);
-    this.pose.reset();
+    this.pose.reset(character);
     character.updateModelVisuals();
     if (!force && props.dismountPenaltyEnabled && Math.abs(exitSpeed) * 3.6 >= props.dismountFallSpeed) {
       this.fall.start(character, velocity);
@@ -361,9 +372,6 @@ export class VehicleSystem {
         cameraCtrl.setYawConstraint?.(bikeHeading, MAX_PASSENGER_YAW);
       }
 
-      // Run upper-body/item animations without allowing walking, jumping or flight to detach the rider.
-      this.pose.reset();
-
       const aimYaw = character.getAimYaw ? character.getAimYaw() : (character.currentRotation || 0) - Math.PI;
       const targetBodyRot = aimYaw + Math.PI;
       aimDiff = Math.atan2(Math.sin(targetBodyRot - bikeHeading), Math.cos(targetBodyRot - bikeHeading));
@@ -376,11 +384,19 @@ export class VehicleSystem {
 
       character.glbModel?.update?.(dt, false);
       character.polygonModel?.update?.(dt, false);
-      character.polygonModelSkin?.update?.(dt, false, false, !this.paused && this.game.inputManager.keys.attack, true, 0, false, false, false);
+      character.polygonModelSkin?.update?.(dt, false, false, false, true, 0, false, false, false);
       character.particleSystem?.update?.(dt);
     } else {
       character.currentRotation = bikeHeading;
+      character.headYaw = 0;
+      character.headPitch = 0;
       this.game.cameraController?.setYawConstraint?.(null);
+      if (character.polygonModelSkin?.setHeadRotation) {
+        character.polygonModelSkin.setHeadRotation(0, 0);
+      }
+      if (character.polygonModelSkin?.heldItemMesh) {
+        character.polygonModelSkin.heldItemMesh.visible = false;
+      }
     }
     this.lastBikeYaw = bikeHeading;
     character.grounded = true;
@@ -390,13 +406,18 @@ export class VehicleSystem {
     for (const model of [character.glbModel?.model, character.polygonModel?.model, character.polygonModelSkin?.model]) {
       if (model) model.rotateZ(character.currentType === 'glb' && model === character.glbModel?.model ? effectiveLean : -effectiveLean);
     }
-    this.pose.apply(character, dt, this.speed, this.steering, props.riderLean, this.isPassenger, bikeHeading, aimDiff);
+    const isAttacking = Boolean(this.isPassenger && !this.paused && this.game.inputManager?.keys?.attack);
+    this.pose.apply(character, dt, this.speed, this.steering, props.riderLean, this.isPassenger, bikeHeading, aimDiff, isAttacking);
   }
 
   getNetworkState() {
     const bike = this.mounted;
     if (!bike) return null;
-    return { ...this.networkStateFor(bike, this.speed, this.verticalSpeed, this.steering, this.lean), seat: this.seat };
+    return {
+      ...this.networkStateFor(bike, this.speed, this.verticalSpeed, this.steering, this.lean),
+      seat: this.seat,
+      seatTimestamp: this.lastSeatSwitchTime || Date.now()
+    };
   }
 
   private networkStateFor(bike: MotorbikeVisual, speed: number, verticalSpeed: number, steering: number, lean: number) {
@@ -441,7 +462,13 @@ export class VehicleSystem {
   receiveSeat(playerId: string, state: any) {
     if (!this.validNetworkState(state)) return;
     const player = this.game.networkManager?.remotePlayers.get(playerId);
-    if (player) player.state.motorbike = state;
+    if (player) {
+      const prevTimestamp = player.state?.motorbike?.seatTimestamp;
+      if (typeof prevTimestamp === 'number' && typeof state.seatTimestamp === 'number' && state.seatTimestamp < prevTimestamp) {
+        return;
+      }
+      player.state.motorbike = state;
+    }
   }
 
   private applyRemoteTransform(bike: MotorbikeVisual, position: { x: number; y: number; z: number }, yaw: number) {
@@ -471,7 +498,7 @@ export class VehicleSystem {
         const assigned = seats.get(this.playerId);
         if (!assigned) this.dismount(true);
         else {
-          this.pose.reset();
+          this.pose.reset(this.game.character);
           this.seat = assigned;
           this.sendSeat();
         }
@@ -509,7 +536,7 @@ export class VehicleSystem {
         const offset = seat === 'passenger' ? props.passengerSeatOffsetZ : props.seatOffsetZ;
         const position = new THREE.Vector3(0, height - bike.userData.originalScale.y / 2 - hip, offset)
           .applyQuaternion(bike.quaternion).add(bike.position);
-        player.syncVehicleSeat?.(position, getMotorbikeHeading(bike), seat, bike.userData.vehicleMotion?.lean ?? this.lean);
+        player.syncVehicleSeat?.(position, getMotorbikeHeading(bike), seat, bike.userData.vehicleMotion?.lean ?? this.lean, dt);
       }
       if (bike === this.mounted && this.isPassenger) {
         this.lean = bike.userData.vehicleMotion?.lean ?? 0;

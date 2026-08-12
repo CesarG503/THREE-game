@@ -341,7 +341,23 @@ export class RemotePlayer {
     }
 
     update(dt: number) {
-        if (this.wasRiding) this.riderPose.reset();
+        const ride = this.state.motorbike;
+        const isRiding = Boolean(ride && [ride.speed, ride.steering, ride.lean, ride.riderLean].every(Number.isFinite));
+
+        if (this.wasRiding && !isRiding) {
+            this.riderPose.reset(this);
+            this.wasRiding = false;
+            this.applyCollisionProfile();
+        }
+
+        if (isRiding) {
+            if (this.collider) this.collider.setSensor(true);
+            this.wasRiding = true;
+            // Early return: while riding, vehicleSystem.syncRemote handles position, rotation, seat anchoring, lean and poses.
+            // Do NOT apply on-foot interpolation, standing transforms or walk/run anims while riding!
+            return;
+        }
+
         this.updateGravityTransition(dt);
         this.currentPosition.lerp(this.targetPosition, this.interpolationSpeed * dt);
         const up = this.getGravityUpVector();
@@ -375,41 +391,21 @@ export class RemotePlayer {
             this.polygonModelSkin.setHeadRotation(this.state.headPitch || 0, this.state.headYaw || 0);
         }
 
-        const ride = this.state.motorbike;
-        if (ride && [ride.speed, ride.steering, ride.lean, ride.riderLean].every(Number.isFinite)) {
-            if (this.collider) this.collider.setSensor(true);
-            this.wasRiding = true;
-            if (ride.seat === 'driver') {
-                this.glbModel.model?.rotateZ(ride.lean);
-                this.polygonModel.model?.rotateZ(-ride.lean);
-                this.polygonModelSkin.model?.rotateZ(-ride.lean);
-                this.riderPose.apply(this, dt, ride.speed, ride.steering, ride.riderLean);
-                return;
-            } else if (ride.seat === 'passenger') {
-                return;
-            }
-        }
-        if (this.wasRiding && !ride) {
-            this.riderPose.reset();
-            this.wasRiding = false;
-            this.applyCollisionProfile();
-        }
-
         const isLocallyMoving = (this.currentPosition.distanceTo(this.targetPosition) > 0.05);
-        const hasInput = !ride && (this.state.isMoving || isLocallyMoving);
+        const hasInput = (this.state.isMoving || isLocallyMoving);
 
         const effectivelyAttacking = this.state.isAttacking || (Date.now() < this.attackEndTime);
 
         this.glbModel.update(dt, hasInput);
         this.polygonModel.update(dt, hasInput);
-        const isUsingJetpack = !ride && this.state.equippedWeapon && (this.state.equippedWeapon === "jetpack" || this.state.equippedWeapon.startsWith("jetpack"));
+        const isUsingJetpack = this.state.equippedWeapon && (this.state.equippedWeapon === "jetpack" || this.state.equippedWeapon.startsWith("jetpack"));
         const isSuperman = this.state.isSuperman !== undefined ? !!this.state.isSuperman : !!(isUsingJetpack && this.state.isCrouching && !this.state.isGrounded);
         const noPitchTilt = this.state.noPitchTilt !== undefined ? !!this.state.noPitchTilt : !!(isUsingJetpack && 
                                this.currentWeaponInstance && 
                                this.currentWeaponInstance.pointerFollowEnabled && 
                                !this.currentWeaponInstance.shiftFlightEnabled);
-        const visualCrouch = !ride && !!(this.state.isCrouching && !isSuperman);
-        const isRunning = !ride && !!this.state.isRunning;
+        const visualCrouch = !!(this.state.isCrouching && !isSuperman);
+        const isRunning = !!this.state.isRunning;
 
         this.polygonModelSkin.update(
             dt,
@@ -426,7 +422,7 @@ export class RemotePlayer {
             this.currentWeaponInstance.updateAnim(dt, 0);
         }
 
-        const effectivelyUsingJetpack = !ride && (this.state.isUsingJetpack !== undefined ? !!this.state.isUsingJetpack : isUsingJetpack);
+        const effectivelyUsingJetpack = (this.state.isUsingJetpack !== undefined ? !!this.state.isUsingJetpack : isUsingJetpack);
 
         if (effectivelyUsingJetpack && this.particleSystem && this.polygonModelSkin && this.polygonModelSkin.backItemMesh) {
             const jetpackMesh = this.polygonModelSkin.backItemMesh;
@@ -447,7 +443,7 @@ export class RemotePlayer {
     }
 
     /** Anchor both avatars to the same rendered bike after network interpolation. */
-    syncVehicleSeat(position: THREE.Vector3, yaw: number, seat: VehicleSeat, lean: number) {
+    syncVehicleSeat(position: THREE.Vector3, yaw: number, seat: VehicleSeat, lean: number, dt = 0.016) {
         const ride = this.state.motorbike;
         if (!ride) return;
         this.currentPosition.copy(position);
@@ -474,13 +470,21 @@ export class RemotePlayer {
             if (this.polygonModelSkin.setHeadRotation) {
                 this.polygonModelSkin.setHeadRotation(this.state.headPitch || 0, aimDiff);
             }
+        } else {
+            if (this.polygonModelSkin.setHeadRotation) {
+                this.polygonModelSkin.setHeadRotation(0, 0);
+            }
+            if (this.polygonModelSkin.heldItemMesh) {
+                this.polygonModelSkin.heldItemMesh.visible = false;
+            }
         }
-        this.riderPose.apply(this, 0, ride.speed, ride.steering, ride.riderLean, seat === 'passenger', yaw, aimDiff);
+        const isAttacking = Boolean(this.state?.isAttacking || (Date.now() < this.attackEndTime));
+        this.riderPose.apply(this, dt, ride.speed, ride.steering, ride.riderLean, seat === 'passenger', yaw, aimDiff, isAttacking);
         if (this.label) this.label.position.copy(position).addScaledVector(this.getGravityUpVector(), 2.2);
     }
 
     dispose() {
-        this.riderPose.reset();
+        this.riderPose.reset(this);
         const removeMesh = (modelObj: any) => {
             if (modelObj && modelObj.model) {
                 this.scene.remove(modelObj.model);

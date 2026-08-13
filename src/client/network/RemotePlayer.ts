@@ -16,6 +16,7 @@ import { getGravityQuaternion, normalizeGravityOrientation, type GravityOrientat
 export class RemotePlayer {
     private riderPose = new RiderPose();
     private wasRiding = false;
+    private ridingSeat: VehicleSeat | null = null;
     scene: any;
     world: any;
     playerId: any;
@@ -212,6 +213,8 @@ export class RemotePlayer {
 
         let oldPlayerCollision = this.state.playerCollision;
 
+        // Preserve equipment/appearance if a peer sends a partial state update.
+        state = { ...this.state, ...state };
         this.state = state;
 
         if (state.gravityOrientation !== undefined) {
@@ -347,6 +350,7 @@ export class RemotePlayer {
         if (this.wasRiding && !isRiding) {
             this.riderPose.reset(this);
             this.wasRiding = false;
+            this.ridingSeat = null;
             this.applyCollisionProfile();
         }
 
@@ -446,6 +450,10 @@ export class RemotePlayer {
     syncVehicleSeat(position: THREE.Vector3, yaw: number, seat: VehicleSeat, lean: number, dt = 0.016) {
         const ride = this.state.motorbike;
         if (!ride) return;
+        if (this.ridingSeat !== seat) {
+            this.riderPose.reset(this);
+            this.ridingSeat = seat;
+        }
         this.currentPosition.copy(position);
         this.currentRotation = yaw;
         this.rigidBody?.setTranslation(position, true);
@@ -478,7 +486,12 @@ export class RemotePlayer {
                 this.polygonModelSkin.heldItemMesh.visible = false;
             }
         }
-        const isAttacking = Boolean(this.state?.isAttacking || (Date.now() < this.attackEndTime));
+        // RiderPose completes short punches itself; the walking attack latch would add extra swings.
+        const isAttacking = Boolean(this.state?.isAttacking);
+        if (seat === 'passenger') {
+            this.riderPose.updatePassengerAnimations(this, dt, this.state.headPitch || 0, aimDiff);
+            this.currentWeaponInstance?.updateAnim?.(dt, 0);
+        }
         this.riderPose.apply(this, dt, ride.speed, ride.steering, ride.riderLean, seat === 'passenger', yaw, aimDiff, isAttacking);
         if (this.label) this.label.position.copy(position).addScaledVector(this.getGravityUpVector(), 2.2);
     }

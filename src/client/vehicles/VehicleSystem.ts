@@ -98,6 +98,7 @@ export class VehicleSystem {
     const character = this.game.character;
     if (character.getGravityUpVector().y < 0.99 || this.game.gravityQteActive) return false;
     this.mounted = bike;
+    this.lastSeatSwitchTime = Date.now();
     this.seat = bike.userData.vehicleDriver ? 'passenger' : 'driver';
     bike.userData.logicProperties = normalizeMotorbikeSettings(bike.userData.logicProperties);
     bike.userData[this.isDriver ? 'vehicleDriver' : 'vehiclePassenger'] = this.playerId;
@@ -149,13 +150,6 @@ export class VehicleSystem {
     this.steering = this.lean = 0;
     this.syncRider(0);
     this.sendSeat();
-    if (this.game.networkManager?.isConnected) {
-      this.game.networkManager.sendPlayerUpdate?.(
-        this.game.character.getPosition(),
-        this.game.character.getRotation(),
-        { motorbike: this.getNetworkState() }
-      );
-    }
     return true;
   }
 
@@ -341,14 +335,14 @@ export class VehicleSystem {
         body.setBodyType(RAPIER.RigidBodyType.Fixed, true);
         body.setLinvel({ x: 0, y: 0, z: 0 }, true);
         this.coasting.delete(bike);
-        if (state.local && this.game.networkManager?.isConnected) {
+        if (state.local && !bike.userData.vehiclePassenger && this.game.networkManager?.isConnected) {
           this.game.networkManager.sendPlayerAction('motorbikePark', this.networkStateFor(bike, 0, 0, 0, 0));
         }
       }
     }
   }
 
-  private syncRider(dt: number) {
+  private syncRider(dt: number, animate = true) {
     const bike = this.mounted!;
     const character = this.game.character;
     const props = bike.userData.logicProperties;
@@ -382,10 +376,10 @@ export class VehicleSystem {
       character.headYaw = aimDiff;
       character.headPitch = character.getAimPitch ? character.getAimPitch() : 0;
 
-      character.glbModel?.update?.(dt, false);
-      character.polygonModel?.update?.(dt, false);
-      character.polygonModelSkin?.update?.(dt, false, false, false, true, 0, false, false, false);
-      character.particleSystem?.update?.(dt);
+      if (animate) {
+        this.pose.updatePassengerAnimations(character, dt, character.headPitch, aimDiff);
+        character.particleSystem?.update?.(dt);
+      }
     } else {
       character.currentRotation = bikeHeading;
       character.headYaw = 0;
@@ -416,7 +410,7 @@ export class VehicleSystem {
     return {
       ...this.networkStateFor(bike, this.speed, this.verticalSpeed, this.steering, this.lean),
       seat: this.seat,
-      seatTimestamp: this.lastSeatSwitchTime || Date.now()
+      seatTimestamp: this.lastSeatSwitchTime
     };
   }
 
@@ -446,6 +440,8 @@ export class VehicleSystem {
     const bike = this.bikes.find(candidate => candidate.userData.uuid === state.uuid);
     if (!bike) return;
     const player = this.game.networkManager?.remotePlayers.get(playerId);
+    // A coasting-complete packet has no seat; it cannot release an active rider.
+    if (state.seat === undefined && player?.state.motorbike?.seat !== undefined) return;
     if (player?.state.motorbike?.uuid === state.uuid) player.state.motorbike = null;
     const field = state.seat === 'passenger' ? 'vehiclePassenger' : 'vehicleDriver';
     if (bike.userData[field] && bike.userData[field] !== playerId) return;
@@ -500,6 +496,7 @@ export class VehicleSystem {
         else {
           this.pose.reset(this.game.character);
           this.seat = assigned;
+          this.lastSeatSwitchTime = Date.now();
           this.sendSeat();
         }
       }
@@ -523,7 +520,7 @@ export class VehicleSystem {
         bike.animateMotorbike?.(state.speed * Math.min(dt, 0.05), state.steering, state.lean);
       } else if (authority === this.playerId && this.isDriver) {
         this.coasting.delete(bike);
-      } else if (!bike.userData.vehicleDriver && !this.coasting.has(bike) && (previousDriver || authority === this.playerId)) {
+      } else if (!bike.userData.vehicleDriver && !this.coasting.has(bike) && (previousDriver || (authority === this.playerId && bike.userData.rigidBody?.isKinematic()))) {
         const motion = bike.userData.vehicleMotion;
         this.startCoasting(bike, motion?.speed ?? 0, motion?.verticalSpeed ?? 0, authority === this.playerId);
       }
@@ -540,7 +537,7 @@ export class VehicleSystem {
       }
       if (bike === this.mounted && this.isPassenger) {
         this.lean = bike.userData.vehicleMotion?.lean ?? 0;
-        this.syncRider(dt);
+        this.syncRider(0, false);
       }
     }
   }

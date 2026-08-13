@@ -13,7 +13,7 @@ export class RiderPose {
     if (node && !this.rest.has(node)) {
       this.rest.set(node, {
         position: node.position.clone(),
-        quaternion: new THREE.Quaternion(), // Canonical rest for polygon model limbs is identity
+        quaternion: node.quaternion.clone(),
         visible: node.visible
       });
     }
@@ -34,12 +34,25 @@ export class RiderPose {
   }
 
   private bend(group: THREE.Group | null | undefined, angle: number) {
-    group?.children.forEach(child => {
+    group?.children.slice(0, 2).forEach(child => {
+      // Only deform the limb and its outer skin layer, never an equipped item's mesh.
       if (child instanceof THREE.Mesh) {
         LimbBender.bend(child, 'joint', angle);
         this.bent.add(child);
       }
     });
+  }
+
+  /** Run the same item/aim animation locally and remotely before layering seated legs. */
+  updatePassengerAnimations(avatar: any, dt: number, pitch: number, aimYaw: number) {
+    avatar.glbModel?.update?.(dt, false);
+    avatar.polygonModel?.update?.(dt, false);
+    const skin = avatar.polygonModelSkin;
+    if (!skin) return;
+    skin.setHeadRotation?.(pitch, aimYaw);
+    // Punching is owned by this pose; a previous standing attack must not override weapon aim.
+    skin.attackWeight = 0;
+    skin.update?.(dt, false, false, false, true, 0, false, false, false);
   }
 
   apply(
@@ -111,6 +124,10 @@ export class RiderPose {
 
   private applyPassenger(avatar: any, dt: number, bikeYaw: number, aimDiff = 0, isAttacking = false) {
     void bikeYaw;
+    const skin = avatar.polygonModelSkin;
+    const hasWeapon = !!(skin?.isHoldingWeapon || avatar.equippedItem?.type === 'weapon' || avatar.currentWeaponInstance?.type === 'weapon');
+    if (hasWeapon) this.punchTime = 0;
+    isAttacking = isAttacking && !hasWeapon;
 
     if (isAttacking || this.punchTime > 0) {
       this.punchTime += dt * 20;
@@ -125,7 +142,6 @@ export class RiderPose {
     const isPunching = this.punchTime > 0 || isAttacking;
     const punchSwing = isPunching ? (1 - Math.cos(this.punchTime)) * 0.5 : 0;
 
-    const skin = avatar.polygonModelSkin;
     if (skin?.model) {
       this.setRotation(skin.pivotGroup, 0);
       if (skin.pivotGroup) skin.pivotGroup.position.set(0, 0.9, 0);
@@ -144,28 +160,24 @@ export class RiderPose {
 
       // El torso superior rota suavemente con el apuntado permitido
       this.setRotation(skin.upperBodyGroup, 0.08, aimDiff, 0);
+      // The torso already owns the yaw; do not turn the head a second time.
+      if (skin.headGroup) skin.headGroup.rotation.y = 0;
       if (skin.upperBodyGroup) {
         const hip = new THREE.Vector3(0, 0.625, 0);
         skin.upperBodyGroup.position.copy(hip).sub(hip.clone().applyQuaternion(skin.upperBodyGroup.quaternion));
       }
 
-      // Brazo izquierdo: SIEMPRE abajo en postura natural de descanso
-      this.setRotation(skin.leftArmGroup, -0.75, 0.15, -0.15);
-      this.bend(skin.leftArmGroup, -0.7);
-
-      // Brazo derecho: por defecto abajo en postura de descanso; al hacer click (isPunching) lanza golpe hacia adelante con una sola mano
-      if (isPunching) {
-        const punchRotX = THREE.MathUtils.lerp(-0.75, -1.8, punchSwing);
-        const punchBend = THREE.MathUtils.lerp(-0.7, -0.15, punchSwing);
-        this.setRotation(skin.rightArmGroup, punchRotX, -0.1, 0.05);
-        this.bend(skin.rightArmGroup, punchBend);
-      } else {
-        this.setRotation(skin.rightArmGroup, -0.75, -0.15, 0.15);
-        this.bend(skin.rightArmGroup, -0.7);
+      // The +Z-facing skin names its physical right arm "leftArmGroup" (see setHeldItem).
+      // Keep the weapon animation's grip, recoil and reload instead of replacing it with a punch.
+      if (!hasWeapon) {
+        this.setRotation(skin.rightArmGroup, 0, 0, 0.06);
+        this.setRotation(skin.leftArmGroup, -1.8 * punchSwing, 0, -0.06);
+        this.bend(skin.rightArmGroup, 0);
+        this.bend(skin.leftArmGroup, 0);
       }
 
       if (skin.heldItemMesh) {
-        skin.heldItemMesh.visible = Boolean(avatar.isHoldingWeapon || avatar.currentWeaponInstance || avatar.equippedItem);
+        skin.heldItemMesh.visible = true;
       }
     }
 
@@ -174,12 +186,8 @@ export class RiderPose {
       this.setRotation(polygon.polyLeftLeg, -1.15, 0, -0.2);
       this.setRotation(polygon.polyRightLeg, -1.15, 0, 0.2);
       this.setRotation(polygon.polyBody, 0.08, aimDiff, 0);
-      this.setRotation(polygon.polyLeftArm, -0.75, 0.15, -0.15);
-      if (isPunching) {
-        this.setRotation(polygon.polyRightArm, THREE.MathUtils.lerp(-0.75, -1.8, punchSwing), -0.1, 0.05);
-      } else {
-        this.setRotation(polygon.polyRightArm, -0.75, -0.15, 0.15);
-      }
+      this.setRotation(polygon.polyRightArm, 0, 0, 0.06);
+      this.setRotation(polygon.polyLeftArm, -1.8 * punchSwing, 0, -0.06);
     }
 
     avatar.glbModel?.model?.traverse((node: any) => {
@@ -189,13 +197,13 @@ export class RiderPose {
       else if (name.endsWith('rightupleg')) this.rotateBone(node, -1.1, 0, 0.22);
       else if (name.endsWith('leftleg') || name.endsWith('rightleg')) this.rotateBone(node, 1.35);
       else if (name.endsWith('spine') || name.endsWith('spine1')) this.rotateBone(node, 0.04, aimDiff * 0.5, 0);
-      else if (name.endsWith('leftarm')) this.rotateBone(node, -0.7, 0.15, -0.25);
-      else if (name.endsWith('leftforearm')) this.rotateBone(node, -0.55);
+      else if (name.endsWith('leftarm')) this.rotateBone(node, 0, 0, -0.08);
+      else if (name.endsWith('leftforearm')) this.rotateBone(node, 0);
       else if (name.endsWith('rightarm')) {
-        const rightRot = isPunching ? THREE.MathUtils.lerp(-0.7, -1.75, punchSwing) : -0.7;
+        const rightRot = -1.75 * punchSwing;
         this.rotateBone(node, rightRot, -0.15, 0.25);
       } else if (name.endsWith('rightforearm')) {
-        const forearmRot = isPunching ? THREE.MathUtils.lerp(-0.55, -0.15, punchSwing) : -0.55;
+        const forearmRot = -0.15 * punchSwing;
         this.rotateBone(node, forearmRot);
       }
     });

@@ -34,6 +34,7 @@ export class VehicleSystem {
   private lastRiderPosition = new THREE.Vector3();
   private lastBikeYaw = 0;
   private lastSeatSwitchTime = 0;
+  private remoteMotionSamples = new WeakMap<MotorbikeVisual, { state: any; age: number }>();
 
   constructor(private game: any) {
     this.controller = game.world.createCharacterController(0.025);
@@ -448,6 +449,7 @@ export class VehicleSystem {
     if (bike.userData[field] === playerId) delete bike.userData[field];
     // A departing passenger must never park or rewind a motorcycle that still has a driver.
     if (bike.userData.vehicleDriver || (bike === this.mounted && this.isDriver)) return;
+    this.remoteMotionSamples.delete(bike);
     this.applyRemoteTransform(bike, state.position, state.yaw);
     bike.userData.logicProperties.consumableUse = Math.max(0, Math.min(state.fuel, bike.userData.logicProperties.maxConsumableUse));
     this.startCoasting(bike, state.speed, state.verticalSpeed ?? 0, bike === this.mounted);
@@ -506,11 +508,21 @@ export class VehicleSystem {
       if (owner) {
         const state = owner.state.motorbike;
         this.coasting.delete(bike);
-        const forwardMove = new THREE.Vector3(0, 0, -state.speed * dt).applyQuaternion(bike.quaternion);
-        forwardMove.y = (state.verticalSpeed ?? 0) * dt;
-        const error = new THREE.Vector3(state.position.x - bike.position.x, state.position.y - bike.position.y, state.position.z - bike.position.z);
-        const correctionRate = 1 - Math.exp(-10 * Math.max(0, Math.min(dt, 0.1)));
-        const position = bike.position.clone().add(forwardMove).addScaledVector(error, correctionRate);
+        const frameDt = Math.max(0, Math.min(dt, 0.1));
+        let sample = this.remoteMotionSamples.get(bike);
+        if (!sample || sample.state !== state) {
+          sample = { state, age: 0 };
+          this.remoteMotionSamples.set(bike, sample);
+        } else {
+          sample.age = Math.min(0.1, sample.age + frameDt);
+        }
+        // Advance the last received target, not the rendered bike plus a correction toward
+        // a frozen packet. The latter repeatedly accelerates/brakes between 20 Hz updates.
+        const predicted = new THREE.Vector3(0, 0, -state.speed * sample.age)
+          .applyAxisAngle(new THREE.Vector3(0, 1, 0), state.yaw)
+          .add(new THREE.Vector3(state.position.x, state.position.y, state.position.z));
+        predicted.y += (state.verticalSpeed ?? 0) * sample.age;
+        const position = bike.position.clone().lerp(predicted, 1 - Math.exp(-15 * frameDt));
         const yaw = getMotorbikeHeading(bike);
         const diff = Math.atan2(Math.sin(state.yaw - yaw), Math.cos(state.yaw - yaw));
         // Use vehicle yaw, never passenger aim or an interpolated avatar's old seat offset.
@@ -519,6 +531,7 @@ export class VehicleSystem {
         bike.userData.logicProperties.consumableUse = Math.max(0, Math.min(state.fuel, bike.userData.logicProperties.maxConsumableUse));
         bike.animateMotorbike?.(state.speed * Math.min(dt, 0.05), state.steering, state.lean);
       } else if (authority === this.playerId && this.isDriver) {
+        this.remoteMotionSamples.delete(bike);
         this.coasting.delete(bike);
       } else if (!bike.userData.vehicleDriver && !this.coasting.has(bike) && (previousDriver || (authority === this.playerId && bike.userData.rigidBody?.isKinematic()))) {
         const motion = bike.userData.vehicleMotion;
@@ -537,7 +550,8 @@ export class VehicleSystem {
       }
       if (bike === this.mounted && this.isPassenger) {
         this.lean = bike.userData.vehicleMotion?.lean ?? 0;
-        this.syncRider(0, false);
+        const hasRemoteDriver = Boolean(bike.userData.vehicleDriver && bike.userData.vehicleDriver !== this.playerId);
+        this.syncRider(hasRemoteDriver ? dt : 0, hasRemoteDriver);
       }
     }
   }

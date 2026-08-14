@@ -444,6 +444,11 @@ export function animate(this: any) {
 		this.inventoryManager.updateFuelBars();
 	}
 
+	// Finish vehicle interpolation and anchor both riders before sampling the camera target.
+	// Otherwise a passenger sees the new bike/driver from the previous frame's seat position.
+	this.networkManager?.update(dt);
+	this.vehicleSystem?.syncRemote(dt);
+
 		// Camera Update
 		if (this.logicCameraSystem?.isViewingLogicCamera) {
 			this.logicCameraSystem.update(dt);
@@ -470,9 +475,6 @@ export function animate(this: any) {
 
 	// Network Update
 	if (this.networkManager) {
-		this.networkManager.update(dt);
-		this.vehicleSystem?.syncRemote(dt);
-
 		if (this.character) {
 			if (!this._netAttackLatch && this.inputManager && this.inputManager.keys.attack) {
 				this._netAttackLatch = true;

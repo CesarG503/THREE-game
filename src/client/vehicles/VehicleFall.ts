@@ -8,8 +8,11 @@ export class VehicleFall {
   private velocity = new THREE.Vector3();
   private lastPosition = new THREE.Vector3();
   private rest = new Map<THREE.Object3D, THREE.Quaternion>();
+  private dust: THREE.Points | null = null;
+  private dustPositions: Float32Array | null = null;
+  private dustSeed = 1;
 
-  start(character: any, velocity: THREE.Vector3) {
+  start(character: any, velocity: THREE.Vector3, scene?: THREE.Scene) {
     this.reset(character);
     this.active = true;
     this.elapsed = 0;
@@ -17,6 +20,7 @@ export class VehicleFall {
     this.velocity.y = 0;
     this.lastPosition.copy(character.getPosition());
     character.isRunning = false;
+    if (scene) this.createDust(scene, this.lastPosition);
   }
 
   update(character: any, controller: RAPIER.KinematicCharacterController, dt: number): boolean {
@@ -40,6 +44,7 @@ export class VehicleFall {
     character.grounded = physics.computedGrounded();
     if (character.grounded) this.velocity.y = 0;
     character.verticalVelocity = this.velocity.y;
+    this.updateDust(next);
     if (this.elapsed >= 1.5 && character.grounded) {
       this.reset(character);
       return true; // Keep the final collision-corrected translation for this physics step.
@@ -93,10 +98,65 @@ export class VehicleFall {
     for (const [node, rotation] of this.rest) node.quaternion.copy(rotation);
   }
 
+  private random() {
+    this.dustSeed = (this.dustSeed * 1664525 + 1013904223) >>> 0;
+    return this.dustSeed / 0xffffffff;
+  }
+
+  private createDust(scene: THREE.Scene, position: THREE.Vector3) {
+    const count = 28;
+    this.dustSeed = 1;
+    this.dustPositions = new Float32Array(count * 3);
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.BufferAttribute(this.dustPositions, 3));
+    geometry.setDrawRange(0, 0);
+    const material = new THREE.PointsMaterial({
+      color: 0xb9a27b,
+      size: 0.09,
+      sizeAttenuation: true,
+      transparent: true,
+      opacity: 0.55,
+      depthWrite: false
+    });
+    this.dust = new THREE.Points(geometry, material);
+    this.dust.name = 'MotorbikeDismountDust';
+    this.dust.frustumCulled = false;
+    scene.add(this.dust);
+    this.updateDust(position);
+  }
+
+  private updateDust(position: THREE.Vector3) {
+    if (!this.dust || !this.dustPositions) return;
+    const count = this.dustPositions.length / 3;
+    const spread = 0.25 + Math.min(1.4, this.elapsed * 1.1);
+    for (let i = 0; i < count; i++) {
+      const angle = this.random() * Math.PI * 2;
+      const radius = (0.12 + this.random() * spread) * (1 - i / count * 0.35);
+      const lift = this.random() * 0.22 * (1 - Math.min(1, this.elapsed / 1.5));
+      this.dustPositions[i * 3] = position.x + Math.cos(angle) * radius;
+      this.dustPositions[i * 3 + 1] = position.y + 0.08 + lift;
+      this.dustPositions[i * 3 + 2] = position.z + Math.sin(angle) * radius;
+    }
+    this.dust.geometry.attributes.position.needsUpdate = true;
+    this.dust.geometry.setDrawRange(0, count);
+  }
+
+  private removeDust() {
+    if (!this.dust) return;
+    this.dust.parent?.remove(this.dust);
+    this.dust.geometry.dispose();
+    const material = this.dust.material;
+    if (Array.isArray(material)) material.forEach(item => item.dispose());
+    else material.dispose();
+    this.dust = null;
+    this.dustPositions = null;
+  }
+
   reset(character: any) {
     if (!this.active) return;
     this.restoreJoints();
     this.rest.clear();
+    this.removeDust();
     this.active = false;
     character.updateModelVisuals();
   }

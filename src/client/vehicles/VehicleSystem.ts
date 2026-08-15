@@ -23,6 +23,9 @@ export class VehicleSystem {
   private verticalSpeed = 0;
   private steering = 0;
   private lean = 0;
+  private grounded = true;
+  private wasJumpDown = false;
+  private jumpCooldown = 0;
   private controller: RAPIER.KinematicCharacterController;
   private pose = new RiderPose();
   private fall = new VehicleFall();
@@ -109,6 +112,9 @@ export class VehicleSystem {
     this.verticalSpeed = motion?.verticalSpeed ?? bike.userData.vehicleMotion?.verticalSpeed ?? 0;
     if (this.isDriver) this.coasting.delete(bike);
     this.steering = this.lean = 0;
+    this.grounded = true;
+    this.wasJumpDown = false;
+    this.jumpCooldown = 0;
     this.wasSensor = character.collider.isSensor();
     character.collider.setSensor(true);
     character.isFlying = character.isClimbing = character.isUsingJetpack = character.isSuperman = false;
@@ -149,6 +155,7 @@ export class VehicleSystem {
       this.startCoasting(bike, this.speed, this.verticalSpeed, true);
     }
     this.steering = this.lean = 0;
+    this.wasJumpDown = Boolean(this.game.inputManager?.keys?.jump);
     this.syncRider(0);
     this.sendSeat();
     return true;
@@ -213,12 +220,15 @@ export class VehicleSystem {
     this.pose.reset(character);
     character.updateModelVisuals();
     if (!force && props.dismountPenaltyEnabled && Math.abs(exitSpeed) * 3.6 >= props.dismountFallSpeed) {
-      this.fall.start(character, velocity);
+      this.fall.start(character, velocity, this.game.sceneManager?.scene);
       const damage = character.maxHealth * props.dismountDamagePercent / 100;
       if (damage > 0) character.takeDamage(damage);
       if (character.isDead) this.fall.reset(character);
     }
-    this.speed = this.lean = 0;
+    this.speed = this.lean = this.verticalSpeed = 0;
+    this.grounded = true;
+    this.wasJumpDown = false;
+    this.jumpCooldown = 0;
     this.game.cameraController?.setYawConstraint?.(null);
     if (this.hud) this.hud.style.display = 'none';
     return true;
@@ -255,15 +265,31 @@ export class VehicleSystem {
     }
     const keys = this.game.inputManager.keys;
     const throttle = this.paused ? 0 : Number(keys.forward) - Number(keys.backward);
-    const brake = this.paused || keys.jump;
+    const brake = this.paused || keys.crouch;
+    const drift = !this.paused && keys.crouch && (keys.left || keys.right);
     const powered = !brake && throttle !== 0 && props.consumableUse > 0;
     const targetSpeed = powered ? (throttle > 0 ? props.maxSpeed : -props.reverseSpeed) : 0;
-    const rate = brake || (throttle !== 0 && Math.sign(this.speed) !== Math.sign(throttle) && Math.abs(this.speed) > 0.1) ? props.braking : powered ? props.acceleration : 3;
+    const brakeRate = props.braking * (drift ? props.driftBrakeMultiplier : 1);
+    const rate = brake || (throttle !== 0 && Math.sign(this.speed) !== Math.sign(throttle) && Math.abs(this.speed) > 0.1) ? brakeRate : powered ? props.acceleration : 3;
     this.speed += Math.sign(targetSpeed - this.speed) * Math.min(Math.abs(targetSpeed - this.speed), rate * dt);
     if (powered) consumeFuel(bike.userData.logicProperties, dt, props.fuelConsumption);
     const steeringTarget = this.paused ? 0 : Number(keys.left) - Number(keys.right);
     this.steering = THREE.MathUtils.lerp(this.steering, steeringTarget, 1 - Math.exp(-10 * dt));
-    const yaw = getMotorbikeHeading(bike) + this.steering * THREE.MathUtils.degToRad(props.turnSpeed) * Math.min(Math.abs(this.speed) / 4, 1) * Math.sign(this.speed) * dt;
+    this.jumpCooldown = Math.max(0, this.jumpCooldown - dt);
+    const jumpDown = Boolean(keys.jump);
+    if (!this.paused && jumpDown && !this.wasJumpDown && this.grounded && this.jumpCooldown <= 0 && props.jumpForce > 0) {
+      this.verticalSpeed = Math.max(this.verticalSpeed, props.jumpForce);
+      this.grounded = false;
+      this.jumpCooldown = props.jumpCooldown;
+    }
+    this.wasJumpDown = jumpDown;
+    const speedAbs = Math.abs(this.speed);
+    const movingTurn = this.steering * THREE.MathUtils.degToRad(props.turnSpeed) *
+      Math.min(speedAbs / (drift ? 2 : 4), 1) * Math.sign(this.speed) * (drift ? props.driftTurnMultiplier : 1);
+    const pivotTurn = brake && speedAbs < 0.35
+      ? this.steering * THREE.MathUtils.degToRad(props.stationaryTurnSpeed) * (1 - THREE.MathUtils.clamp(speedAbs / 0.35, 0, 1))
+      : 0;
+    const yaw = getMotorbikeHeading(bike) + (movingTurn + pivotTurn) * dt;
     const rotation = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
     const collider = body.collider(0);
     // Test the rotated footprint as well as sweeping the translation.
@@ -277,13 +303,14 @@ export class VehicleSystem {
     const motion = this.moveBike(bike, this.speed, this.verticalSpeed, dt, true);
     this.speed = motion.speed;
     this.verticalSpeed = motion.verticalSpeed;
+    this.grounded = motion.grounded;
     const travel = motion.travel;
     this.lean = THREE.MathUtils.lerp(this.lean, this.steering * THREE.MathUtils.degToRad(props.maxLean) * Math.min(Math.abs(this.speed) / 10, 1), 1 - Math.exp(-8 * dt));
     bike.userData.vehicleMotion = { speed: this.speed, verticalSpeed: this.verticalSpeed, lean: this.lean };
     bike.animateMotorbike?.(travel * Math.sign(this.speed), this.steering, this.lean);
     this.syncRider(dt);
     const fuel = bike.userData.logicProperties.consumableUse;
-    this.show(`Conductor · ${Math.round(Math.abs(this.speed) * 3.6)} km/h · Combustible ${Math.ceil(fuel)} / ${props.maxConsumableUse}${fuel <= 0 ? ' · SIN COMBUSTIBLE' : ''}\nW/S acelerar · A/D girar · Espacio frenar · R cambiar asiento · F bajar`, fuel, props.maxConsumableUse);
+    this.show(`Conductor · ${Math.round(Math.abs(this.speed) * 3.6)} km/h · Combustible ${Math.ceil(fuel)} / ${props.maxConsumableUse}${fuel <= 0 ? ' · SIN COMBUSTIBLE' : ''}\nW/S acelerar · A/D girar · Shift frenar/drift · Espacio saltar · R cambiar asiento · F bajar`, fuel, props.maxConsumableUse);
     return true;
   }
 

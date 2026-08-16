@@ -26,6 +26,8 @@ export class VehicleSystem {
   private grounded = true;
   private wasJumpDown = false;
   private jumpCooldown = 0;
+  private vehicleJetpackActive = false;
+  private vehicleJetpackVFX = 'Humo y Fuego';
   private controller: RAPIER.KinematicCharacterController;
   private pose = new RiderPose();
   private fall = new VehicleFall();
@@ -115,6 +117,7 @@ export class VehicleSystem {
     this.grounded = true;
     this.wasJumpDown = false;
     this.jumpCooldown = 0;
+    this.vehicleJetpackActive = false;
     this.wasSensor = character.collider.isSensor();
     character.collider.setSensor(true);
     character.isFlying = character.isClimbing = character.isUsingJetpack = character.isSuperman = false;
@@ -229,6 +232,10 @@ export class VehicleSystem {
     this.grounded = true;
     this.wasJumpDown = false;
     this.jumpCooldown = 0;
+    this.vehicleJetpackActive = false;
+    character.isUsingJetpack = false;
+    character.isSuperman = false;
+    character.noPitchTilt = false;
     this.game.cameraController?.setYawConstraint?.(null);
     if (this.hud) this.hud.style.display = 'none';
     return true;
@@ -266,18 +273,29 @@ export class VehicleSystem {
     const keys = this.game.inputManager.keys;
     const throttle = this.paused ? 0 : Number(keys.forward) - Number(keys.backward);
     const brake = this.paused || keys.crouch;
+    const jetpack = this.getSelectedJetpack();
+    const jetpackActive = !brake && !this.paused && keys.jump && jetpack && jetpack.consumableUse > 0;
+    this.vehicleJetpackActive = Boolean(jetpackActive);
+    this.vehicleJetpackVFX = jetpack?.particleVFX || 'Humo y Fuego';
+    character.isUsingJetpack = this.vehicleJetpackActive;
+    character.isSuperman = false;
+    character.noPitchTilt = false;
     const drift = !this.paused && keys.crouch && (keys.left || keys.right);
-    const powered = !brake && throttle !== 0 && props.consumableUse > 0;
-    const targetSpeed = powered ? (throttle > 0 ? props.maxSpeed : -props.reverseSpeed) : 0;
+    const driveThrottle = jetpackActive ? Math.max(throttle, 1) : throttle;
+    const powered = !brake && driveThrottle !== 0 && (jetpackActive || props.consumableUse > 0);
+    const maxForwardSpeed = props.maxSpeed + (jetpackActive ? props.jetpackMaxSpeedBonus : 0);
+    const targetSpeed = powered ? (driveThrottle > 0 ? maxForwardSpeed : -props.reverseSpeed) : 0;
     const brakeRate = props.braking * (drift ? props.driftBrakeMultiplier : 1);
-    const rate = brake || (throttle !== 0 && Math.sign(this.speed) !== Math.sign(throttle) && Math.abs(this.speed) > 0.1) ? brakeRate : powered ? props.acceleration : 3;
+    const acceleration = props.acceleration + (jetpackActive ? props.jetpackAccelerationBonus : 0);
+    const rate = brake || (driveThrottle !== 0 && Math.sign(this.speed) !== Math.sign(driveThrottle) && Math.abs(this.speed) > 0.1) ? brakeRate : powered ? acceleration : 3;
     this.speed += Math.sign(targetSpeed - this.speed) * Math.min(Math.abs(targetSpeed - this.speed), rate * dt);
-    if (powered) consumeFuel(bike.userData.logicProperties, dt, props.fuelConsumption);
+    if (jetpackActive) this.consumeVehicleJetpack(jetpack, dt);
+    else if (powered) consumeFuel(bike.userData.logicProperties, dt, props.fuelConsumption);
     const steeringTarget = this.paused ? 0 : Number(keys.left) - Number(keys.right);
     this.steering = THREE.MathUtils.lerp(this.steering, steeringTarget, 1 - Math.exp(-10 * dt));
     this.jumpCooldown = Math.max(0, this.jumpCooldown - dt);
     const jumpDown = Boolean(keys.jump);
-    if (!this.paused && jumpDown && !this.wasJumpDown && this.grounded && this.jumpCooldown <= 0 && props.jumpForce > 0) {
+    if (!jetpackActive && !this.paused && jumpDown && !this.wasJumpDown && this.grounded && this.jumpCooldown <= 0 && props.jumpForce > 0) {
       this.verticalSpeed = Math.max(this.verticalSpeed, props.jumpForce);
       this.grounded = false;
       this.jumpCooldown = props.jumpCooldown;
@@ -308,10 +326,54 @@ export class VehicleSystem {
     this.lean = THREE.MathUtils.lerp(this.lean, this.steering * THREE.MathUtils.degToRad(props.maxLean) * Math.min(Math.abs(this.speed) / 10, 1), 1 - Math.exp(-8 * dt));
     bike.userData.vehicleMotion = { speed: this.speed, verticalSpeed: this.verticalSpeed, lean: this.lean };
     bike.animateMotorbike?.(travel * Math.sign(this.speed), this.steering, this.lean);
+    if (this.vehicleJetpackActive) this.spawnBikeJetpackEffect(bike, this.vehicleJetpackVFX);
     this.syncRider(dt);
     const fuel = bike.userData.logicProperties.consumableUse;
-    this.show(`Conductor · ${Math.round(Math.abs(this.speed) * 3.6)} km/h · Combustible ${Math.ceil(fuel)} / ${props.maxConsumableUse}${fuel <= 0 ? ' · SIN COMBUSTIBLE' : ''}\nW/S acelerar · A/D girar · Shift frenar/drift · Espacio saltar · R cambiar asiento · F bajar`, fuel, props.maxConsumableUse);
+    const jetpackFuel = jetpackActive ? ` · Jetpack ${Math.ceil(jetpack.consumableUse)} / ${jetpack.maxConsumableUse}` : '';
+    this.show(`Conductor · ${Math.round(Math.abs(this.speed) * 3.6)} km/h · Combustible ${Math.ceil(fuel)} / ${props.maxConsumableUse}${jetpackFuel}${fuel <= 0 ? ' · SIN COMBUSTIBLE' : ''}\nW/S acelerar · A/D girar · Shift frenar/drift · Espacio saltar/jetpack · R cambiar asiento · F bajar`, fuel, props.maxConsumableUse);
     return true;
+  }
+
+  private getSelectedJetpack() {
+    const item = this.game.inventoryManager?.getCurrentItem?.() ?? this.game.character?.equippedItem;
+    if (!item || item.consumableUse === undefined) return null;
+    return (item.id === 'jetpack' || (typeof item.id === 'string' && item.id.startsWith('jetpack_'))) ? item : null;
+  }
+
+  private consumeVehicleJetpack(jetpack: any, dt: number) {
+    const before = jetpack.consumableUse;
+    if (typeof jetpack.consumeFuel === 'function') jetpack.consumeFuel(dt);
+    else consumeFuel(jetpack, dt);
+    const character = this.game.character;
+    character.emit?.('jetpackUpdate', {
+      fuel: jetpack.consumableUse,
+      maxFuel: jetpack.maxConsumableUse,
+      airTime: 0,
+      maxAirTime: jetpack.airLimit ?? 0
+    });
+    character.emit?.('jumpChanged', {
+      current: jetpack.consumableUse,
+      max: jetpack.maxConsumableUse ?? jetpack.consumableUse,
+      type: 'jetpack'
+    });
+    if (before > 0 && jetpack.consumableUse <= 0) {
+      if (this.game.inventoryManager?.removeCurrentItem) this.game.inventoryManager.removeCurrentItem();
+      else character.setHeldItem?.(null);
+      this.vehicleJetpackActive = false;
+      character.isUsingJetpack = false;
+    }
+  }
+
+  private spawnBikeJetpackEffect(bike: MotorbikeVisual, vfxType = 'Humo y Fuego') {
+    const particleSystem = this.game.character?.particleSystem ?? this.game.networkManager?.particleSystem;
+    if (!particleSystem?.spawnJetpackEffect) return;
+    const dims = bike.userData.originalScale ?? { x: 0.85, y: 1.25, z: 2.4 };
+    const rear = new THREE.Vector3(0, -dims.y * 0.28, dims.z * 0.52);
+    const left = new THREE.Vector3(-dims.x * 0.28, 0, 0).add(rear).applyQuaternion(bike.quaternion).add(bike.position);
+    const right = new THREE.Vector3(dims.x * 0.28, 0, 0).add(rear).applyQuaternion(bike.quaternion).add(bike.position);
+    const normal = new THREE.Vector3(0, 0, 1).applyQuaternion(bike.quaternion).normalize();
+    particleSystem.spawnJetpackEffect(left, normal, vfxType);
+    particleSystem.spawnJetpackEffect(right, normal, vfxType);
   }
 
   private startCoasting(bike: MotorbikeVisual, speed: number, verticalSpeed: number, local: boolean) {
@@ -449,6 +511,8 @@ export class VehicleSystem {
       yaw: getMotorbikeHeading(bike),
       fuel: bike.userData.logicProperties.consumableUse,
       speed, verticalSpeed, steering, lean,
+      jetpackActive: bike === this.mounted && this.vehicleJetpackActive,
+      jetpackVFX: bike === this.mounted && this.vehicleJetpackActive ? this.vehicleJetpackVFX : undefined,
       riderLean: bike.userData.logicProperties.riderLean,
       seatHeight: bike.userData.logicProperties.seatHeight,
       seatOffsetZ: bike.userData.logicProperties.seatOffsetZ,
@@ -459,6 +523,8 @@ export class VehicleSystem {
 
   private validNetworkState(state: any) {
     return state && typeof state.uuid === 'string' && (state.seat === undefined || state.seat === 'driver' || state.seat === 'passenger') &&
+      (state.jetpackActive === undefined || typeof state.jetpackActive === 'boolean') &&
+      (state.jetpackVFX === undefined || typeof state.jetpackVFX === 'string') &&
       [state.position?.x, state.position?.y, state.position?.z, state.yaw, state.fuel, state.speed, state.verticalSpeed ?? 0, state.steering, state.lean, state.riderLean, state.seatHeight, state.seatOffsetZ, state.passengerSeatHeight ?? 1.08, state.passengerSeatOffsetZ ?? 0.72]
         .every(value => typeof value === 'number' && Number.isFinite(value) && Math.abs(value) < 1e6);
   }
@@ -557,6 +623,7 @@ export class VehicleSystem {
         bike.userData.vehicleMotion = { speed: state.speed, verticalSpeed: state.verticalSpeed ?? 0, lean: state.lean };
         bike.userData.logicProperties.consumableUse = Math.max(0, Math.min(state.fuel, bike.userData.logicProperties.maxConsumableUse));
         bike.animateMotorbike?.(state.speed * Math.min(dt, 0.05), state.steering, state.lean);
+        if (state.jetpackActive) this.spawnBikeJetpackEffect(bike, state.jetpackVFX || 'Humo y Fuego');
       } else if (authority === this.playerId && this.isDriver) {
         this.remoteMotionSamples.delete(bike);
         this.coasting.delete(bike);

@@ -11,6 +11,8 @@ export const MOTORBIKE_FIELDS = [
   { key: 'stationaryTurnSpeed', label: 'Giro en sitio detenido (°/s)', value: 130, min: 0, max: 360, step: 5 },
   { key: 'jumpForce', label: 'Fuerza de salto de la moto (m/s)', value: 8, min: 0, max: 30, step: 0.5 },
   { key: 'jumpCooldown', label: 'Tiempo entre saltos (s)', value: 0.35, min: 0, max: 5, step: 0.05 },
+  { key: 'jetpackAccelerationBonus', label: 'Aceleración extra con jetpack (m/s²)', value: 12, min: 0, max: 80, step: 0.5 },
+  { key: 'jetpackMaxSpeedBonus', label: 'Velocidad máxima extra con jetpack (m/s)', value: 10, min: 0, max: 80, step: 1 },
   { key: 'maxConsumableUse', label: 'Capacidad de combustible (s)', value: 60, min: 1, max: 3600, step: 5 },
   { key: 'consumableUse', label: 'Combustible disponible (s)', value: 60, min: 0, max: 3600, step: 5 },
   { key: 'fuelConsumption', label: 'Consumo por segundo', value: 1, min: 0, max: 10, step: 0.1 },

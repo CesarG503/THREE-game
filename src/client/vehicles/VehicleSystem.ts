@@ -126,7 +126,7 @@ export class VehicleSystem {
     character.isMounted = true;
     this.lastBikeYaw = getMotorbikeHeading(bike);
     if (!this.isPassenger) this.game.cameraController?.setYawConstraint?.(null);
-    character.polygonModelSkin?.update(0, false);
+    character.polygonModelSkin?.update?.(0, false);
     this.syncRider(0);
     this.sendSeat();
     return true;
@@ -247,7 +247,11 @@ export class VehicleSystem {
     this.updateCoasting(dt);
     if (!this.mounted) {
       if (this.hud) this.hud.style.display = 'none';
-      return this.fall.update(this.game.character, this.controller, this.paused ? 0 : dt);
+      const falling = this.fall.update(this.game.character, this.controller, this.paused ? 0 : dt);
+      if (falling) {
+        this.game.character?.particleSystem?.update?.(dt);
+      }
+      return falling;
     }
     const bike = this.mounted;
     const character = this.game.character;
@@ -337,7 +341,12 @@ export class VehicleSystem {
   private getSelectedJetpack() {
     const item = this.game.inventoryManager?.getCurrentItem?.() ?? this.game.character?.equippedItem;
     if (!item || item.consumableUse === undefined) return null;
-    return (item.id === 'jetpack' || (typeof item.id === 'string' && item.id.startsWith('jetpack_'))) ? item : null;
+    const isJetpack = item.id === 'jetpack' ||
+      (typeof item.id === 'string' && (item.id.startsWith('jetpack_') || item.id.startsWith('jetpack-') || item.id.includes('jetpack'))) ||
+      item.equipSlot === 'back' ||
+      item.type === 'jetpack' ||
+      Boolean(item.particleVFX && item.thrust !== undefined);
+    return isJetpack ? item : null;
   }
 
   private consumeVehicleJetpack(jetpack: any, dt: number) {
@@ -367,13 +376,30 @@ export class VehicleSystem {
   private spawnBikeJetpackEffect(bike: MotorbikeVisual, vfxType = 'Humo y Fuego') {
     const particleSystem = this.game.character?.particleSystem ?? this.game.networkManager?.particleSystem;
     if (!particleSystem?.spawnJetpackEffect) return;
+    const vfx = (vfxType && vfxType !== 'Ninguno') ? vfxType : 'Humo y Fuego';
     const dims = bike.userData.originalScale ?? { x: 0.85, y: 1.25, z: 2.4 };
     const rear = new THREE.Vector3(0, -dims.y * 0.28, dims.z * 0.52);
     const left = new THREE.Vector3(-dims.x * 0.28, 0, 0).add(rear).applyQuaternion(bike.quaternion).add(bike.position);
     const right = new THREE.Vector3(dims.x * 0.28, 0, 0).add(rear).applyQuaternion(bike.quaternion).add(bike.position);
-    const normal = new THREE.Vector3(0, 0, 1).applyQuaternion(bike.quaternion).normalize();
-    particleSystem.spawnJetpackEffect(left, normal, vfxType);
-    particleSystem.spawnJetpackEffect(right, normal, vfxType);
+    const normal = new THREE.Vector3(0, -0.15, 1).applyQuaternion(bike.quaternion).normalize();
+    particleSystem.spawnJetpackEffect(left, normal, vfx);
+    particleSystem.spawnJetpackEffect(right, normal, vfx);
+
+    // Si el conductor lleva un jetpack en la espalda (backItemMesh), emitir también desde las toberas del jetpack
+    const driverAvatar = (bike === this.mounted && !this.isPassenger)
+      ? this.game.character
+      : (bike.userData.vehicleDriver ? this.game.networkManager?.remotePlayers?.get(bike.userData.vehicleDriver) : null);
+    const jetpackMesh = driverAvatar?.polygonModelSkin?.backItemMesh;
+    if (jetpackMesh) {
+      const leftNozzle = new THREE.Vector3();
+      const rightNozzle = new THREE.Vector3();
+      jetpackMesh.updateMatrixWorld(true);
+      jetpackMesh.localToWorld(leftNozzle.copy(new THREE.Vector3(-0.15, 0.1, 0.5)));
+      jetpackMesh.localToWorld(rightNozzle.copy(new THREE.Vector3(0.15, 0.1, 0.5)));
+      const backNormal = new THREE.Vector3(0, -0.25, 1).applyQuaternion(bike.quaternion).normalize();
+      particleSystem.spawnJetpackEffect(leftNozzle, backNormal, vfx);
+      particleSystem.spawnJetpackEffect(rightNozzle, backNormal, vfx);
+    }
   }
 
   private startCoasting(bike: MotorbikeVisual, speed: number, verticalSpeed: number, local: boolean) {
@@ -468,7 +494,6 @@ export class VehicleSystem {
 
       if (animate) {
         this.pose.updatePassengerAnimations(character, dt, character.headPitch, aimDiff);
-        character.particleSystem?.update?.(dt);
       }
     } else {
       character.currentRotation = bikeHeading;
@@ -492,6 +517,9 @@ export class VehicleSystem {
     }
     const isAttacking = Boolean(this.isPassenger && !this.paused && this.game.inputManager?.keys?.attack);
     this.pose.apply(character, dt, this.speed, this.steering, props.riderLean, this.isPassenger, bikeHeading, aimDiff, isAttacking);
+    if (animate) {
+      character.particleSystem?.update?.(dt);
+    }
   }
 
   getNetworkState() {

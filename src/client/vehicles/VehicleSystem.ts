@@ -378,28 +378,10 @@ export class VehicleSystem {
     if (!particleSystem?.spawnJetpackEffect) return;
     const vfx = (vfxType && vfxType !== 'Ninguno') ? vfxType : 'Humo y Fuego';
     const dims = bike.userData.originalScale ?? { x: 0.85, y: 1.25, z: 2.4 };
-    const rear = new THREE.Vector3(0, -dims.y * 0.28, dims.z * 0.52);
-    const left = new THREE.Vector3(-dims.x * 0.28, 0, 0).add(rear).applyQuaternion(bike.quaternion).add(bike.position);
-    const right = new THREE.Vector3(dims.x * 0.28, 0, 0).add(rear).applyQuaternion(bike.quaternion).add(bike.position);
-    const normal = new THREE.Vector3(0, -0.15, 1).applyQuaternion(bike.quaternion).normalize();
-    particleSystem.spawnJetpackEffect(left, normal, vfx);
-    particleSystem.spawnJetpackEffect(right, normal, vfx);
-
-    // Si el conductor lleva un jetpack en la espalda (backItemMesh), emitir también desde las toberas del jetpack
-    const driverAvatar = (bike === this.mounted && !this.isPassenger)
-      ? this.game.character
-      : (bike.userData.vehicleDriver ? this.game.networkManager?.remotePlayers?.get(bike.userData.vehicleDriver) : null);
-    const jetpackMesh = driverAvatar?.polygonModelSkin?.backItemMesh;
-    if (jetpackMesh) {
-      const leftNozzle = new THREE.Vector3();
-      const rightNozzle = new THREE.Vector3();
-      jetpackMesh.updateMatrixWorld(true);
-      jetpackMesh.localToWorld(leftNozzle.copy(new THREE.Vector3(-0.15, 0.1, 0.5)));
-      jetpackMesh.localToWorld(rightNozzle.copy(new THREE.Vector3(0.15, 0.1, 0.5)));
-      const backNormal = new THREE.Vector3(0, -0.25, 1).applyQuaternion(bike.quaternion).normalize();
-      particleSystem.spawnJetpackEffect(leftNozzle, backNormal, vfx);
-      particleSystem.spawnJetpackEffect(rightNozzle, backNormal, vfx);
-    }
+    const rear = new THREE.Vector3(0, dims.y * 0.15, dims.z * 0.52);
+    const rearWorld = rear.applyQuaternion(bike.quaternion).add(bike.position);
+    const normal = new THREE.Vector3(0, -0.10, 1).applyQuaternion(bike.quaternion).normalize();
+    particleSystem.spawnJetpackEffect(rearWorld, normal, vfx);
   }
 
   private startCoasting(bike: MotorbikeVisual, speed: number, verticalSpeed: number, local: boolean) {

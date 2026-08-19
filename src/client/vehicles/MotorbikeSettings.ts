@@ -8,6 +8,7 @@ export const MOTORBIKE_FIELDS = [
   { key: 'turnSpeed', label: 'Velocidad de giro (°/s)', value: 95, min: 10, max: 180, step: 5 },
   { key: 'driftTurnMultiplier', label: 'Multiplicador de giro con drift', value: 1.8, min: 1, max: 4, step: 0.1 },
   { key: 'driftBrakeMultiplier', label: 'Intensidad de frenado con drift', value: 1.15, min: 0.1, max: 4, step: 0.05 },
+  { key: 'driftMarkDuration', label: 'Duración marca de derrape (s)', value: 4, min: 0.5, max: 30, step: 0.5 },
   { key: 'stationaryTurnSpeed', label: 'Giro en sitio detenido (°/s)', value: 130, min: 0, max: 360, step: 5 },
   { key: 'jumpForce', label: 'Fuerza de salto de la moto (m/s)', value: 8, min: 0, max: 30, step: 0.5 },
   { key: 'jumpCooldown', label: 'Tiempo entre saltos (s)', value: 0.35, min: 0, max: 5, step: 0.05 },

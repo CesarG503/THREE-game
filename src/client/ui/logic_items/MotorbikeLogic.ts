@@ -5,7 +5,7 @@ export class MotorbikeLogic {
   render(container: HTMLElement, props: any, update: (key: string, value: number | boolean) => void) {
     if (props?.vehicleKind !== 'motorbike') return;
     const hint = document.createElement('p');
-    hint.textContent = 'Dos asientos. F: subir / bajar · R: cambiar al asiento libre · W/S: acelerar / reversa · A/D: girar · Shift: frenar y hacer drift · Espacio: saltar. Si el conductor tiene un jetpack seleccionado, mantener Espacio activa el impulso del jetpack y consume ese combustible en lugar de gasolina. Si está detenida, Shift + A/D gira sobre su propio eje. El pasajero puede usar armas y construir; Mayús + R recarga o rota la construcción. El combustible se gasta al acelerar. Tiempo F en 0 sube al instante.';
+    hint.textContent = 'Dos asientos. F: subir / bajar · R: cambiar al asiento libre · W/S: acelerar / reversa · A/D: girar · Shift: frenar y hacer drift (deja marcas de neumático en el suelo) · Espacio: saltar. Si el conductor tiene un jetpack seleccionado, mantener Espacio activa el impulso del jetpack y consume ese combustible en lugar de gasolina. Si está detenida, Shift + A/D gira sobre su propio eje. El pasajero puede usar armas y construir; Mayús + R recarga o rota la construcción. El combustible se gasta al acelerar. Tiempo F en 0 sube al instante.';
     hint.style.cssText = 'font-size:12px;color:#a5d8ff;line-height:1.5';
     container.appendChild(hint);
     const penaltyLabel = document.createElement('label');

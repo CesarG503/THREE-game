@@ -6,6 +6,7 @@ import { RiderPose } from './RiderPose';
 import { VehicleFall } from './VehicleFall';
 import { resolveVehicleSeats, type VehicleSeat } from './VehicleSeats';
 import type { MotorbikeVisual } from './MotorbikeModel';
+import { TireTrackManager } from './TireTrackManager';
 
 /** XYZ Euler.y folds at ±90°. Derive the full heading from the actual forward vector. */
 export function getMotorbikeHeading(bike: THREE.Object3D): number {
@@ -40,12 +41,16 @@ export class VehicleSystem {
   private lastBikeYaw = 0;
   private lastSeatSwitchTime = 0;
   private remoteMotionSamples = new WeakMap<MotorbikeVisual, { state: any; age: number }>();
+  tireTracks: TireTrackManager;
+  isSkidding = false;
 
   constructor(private game: any) {
     this.controller = game.world.createCharacterController(0.025);
     this.controller.enableSnapToGround(0.3);
     this.controller.setMaxSlopeClimbAngle(Math.PI / 4);
     this.controller.setMinSlopeSlideAngle(Math.PI / 3);
+    const scene = game.sceneManager?.scene ?? game.scene ?? new THREE.Scene();
+    this.tireTracks = new TireTrackManager(scene);
     if (typeof document !== 'undefined') {
       this.hud = document.createElement('div');
       this.hud.id = 'motorbike-hud';
@@ -156,6 +161,8 @@ export class VehicleSystem {
     } else {
       this.lastBikeYaw = getMotorbikeHeading(bike);
       this.startCoasting(bike, this.speed, this.verticalSpeed, true);
+      this.tireTracks.endTrack(bike.userData.uuid || 'local_bike');
+      this.isSkidding = false;
     }
     this.steering = this.lean = 0;
     this.wasJumpDown = Boolean(this.game.inputManager?.keys?.jump);
@@ -210,6 +217,8 @@ export class VehicleSystem {
       this.game.networkManager.sendPlayerAction('motorbikePark', finalState);
     }
     if (!bike.userData.vehicleDriver) bike.animateMotorbike?.(0, 0, 0);
+    this.tireTracks.endTrack(bike.userData.uuid || 'local_bike');
+    this.isSkidding = false;
     this.mounted = null;
     this.seat = null;
     character.isMounted = false;
@@ -244,6 +253,7 @@ export class VehicleSystem {
   /** Returns true while the vehicle owns movement and avatar animation. */
   update(delta: number): boolean {
     const dt = Number.isFinite(delta) ? Math.min(0.05, Math.max(0, delta)) : 0;
+    this.tireTracks.update(dt);
     this.updateCoasting(dt);
     if (!this.mounted) {
       if (this.hud) this.hud.style.display = 'none';
@@ -331,6 +341,17 @@ export class VehicleSystem {
     bike.userData.vehicleMotion = { speed: this.speed, verticalSpeed: this.verticalSpeed, lean: this.lean };
     bike.animateMotorbike?.(travel * Math.sign(this.speed), this.steering, this.lean);
     if (this.vehicleJetpackActive) this.spawnBikeJetpackEffect(bike, this.vehicleJetpackVFX);
+    const currentSpeedAbs = Math.abs(this.speed);
+    const isSkidding = !this.paused && this.grounded && (
+      (keys.crouch && currentSpeedAbs > 1.0) ||
+      (drift && currentSpeedAbs > 0.6)
+    );
+    this.isSkidding = isSkidding;
+    if (isSkidding) {
+      this.spawnTireTrack(bike, props.driftMarkDuration ?? 4);
+    } else {
+      this.tireTracks.endTrack(bike.userData.uuid || 'local_bike');
+    }
     this.syncRider(dt);
     const fuel = bike.userData.logicProperties.consumableUse;
     const jetpackFuel = jetpackActive ? ` · Jetpack ${Math.ceil(jetpack.consumableUse)} / ${jetpack.maxConsumableUse}` : '';
@@ -382,6 +403,44 @@ export class VehicleSystem {
     const rearWorld = rear.applyQuaternion(bike.quaternion).add(bike.position);
     const normal = new THREE.Vector3(0, -0.10, 1).applyQuaternion(bike.quaternion).normalize();
     particleSystem.spawnJetpackEffect(rearWorld, normal, vfx);
+  }
+
+  private spawnTireTrack(bike: MotorbikeVisual, duration = 4) {
+    const dims = bike.userData.originalScale ?? { x: 0.85, y: 1.25, z: 2.4 };
+    const rearWheelLocal = new THREE.Vector3(0, -dims.y * 0.25, dims.z * 0.42);
+    const rearWheelWorld = rearWheelLocal.applyQuaternion(bike.quaternion).add(bike.position);
+
+    let groundPos: THREE.Vector3;
+    let groundNormal = new THREE.Vector3(0, 1, 0);
+    const rayOrigin = rearWheelWorld.clone();
+    rayOrigin.y += 0.25;
+
+    const hit = this.game.world?.castRay?.(
+      new RAPIER.Ray(rayOrigin, { x: 0, y: -1, z: 0 }),
+      dims.y * 0.9,
+      true,
+      RAPIER.QueryFilterFlags.EXCLUDE_SENSORS,
+      undefined,
+      this.game.character?.collider,
+      bike.userData.rigidBody
+    );
+
+    if (hit) {
+      groundPos = new THREE.Vector3(rayOrigin.x, rayOrigin.y - hit.timeOfImpact, rayOrigin.z);
+    } else {
+      groundPos = new THREE.Vector3(rearWheelWorld.x, bike.position.y - dims.y * 0.5, rearWheelWorld.z);
+    }
+
+    const forwardDir = new THREE.Vector3(0, 0, -Math.sign(this.speed || 1)).applyQuaternion(bike.quaternion).normalize();
+    const tireWidth = Math.max(0.12, Math.min(0.24, dims.x * 0.18));
+    this.tireTracks.addTirePoint(
+      bike.userData.uuid || 'local_bike',
+      groundPos,
+      groundNormal,
+      forwardDir,
+      tireWidth,
+      duration
+    );
   }
 
   private startCoasting(bike: MotorbikeVisual, speed: number, verticalSpeed: number, local: boolean) {
@@ -523,6 +582,8 @@ export class VehicleSystem {
       speed, verticalSpeed, steering, lean,
       jetpackActive: bike === this.mounted && this.vehicleJetpackActive,
       jetpackVFX: bike === this.mounted && this.vehicleJetpackActive ? this.vehicleJetpackVFX : undefined,
+      isDrifting: Boolean(bike === this.mounted && this.isSkidding),
+      driftMarkDuration: bike.userData.logicProperties?.driftMarkDuration ?? 4,
       riderLean: bike.userData.logicProperties.riderLean,
       seatHeight: bike.userData.logicProperties.seatHeight,
       seatOffsetZ: bike.userData.logicProperties.seatOffsetZ,
@@ -535,6 +596,8 @@ export class VehicleSystem {
     return state && typeof state.uuid === 'string' && (state.seat === undefined || state.seat === 'driver' || state.seat === 'passenger') &&
       (state.jetpackActive === undefined || typeof state.jetpackActive === 'boolean') &&
       (state.jetpackVFX === undefined || typeof state.jetpackVFX === 'string') &&
+      (state.isDrifting === undefined || typeof state.isDrifting === 'boolean') &&
+      (state.driftMarkDuration === undefined || (typeof state.driftMarkDuration === 'number' && Number.isFinite(state.driftMarkDuration) && Math.abs(state.driftMarkDuration) < 1e6)) &&
       [state.position?.x, state.position?.y, state.position?.z, state.yaw, state.fuel, state.speed, state.verticalSpeed ?? 0, state.steering, state.lean, state.riderLean, state.seatHeight, state.seatOffsetZ, state.passengerSeatHeight ?? 1.08, state.passengerSeatOffsetZ ?? 0.72]
         .every(value => typeof value === 'number' && Number.isFinite(value) && Math.abs(value) < 1e6);
   }
@@ -634,6 +697,11 @@ export class VehicleSystem {
         bike.userData.logicProperties.consumableUse = Math.max(0, Math.min(state.fuel, bike.userData.logicProperties.maxConsumableUse));
         bike.animateMotorbike?.(state.speed * Math.min(dt, 0.05), state.steering, state.lean);
         if (state.jetpackActive) this.spawnBikeJetpackEffect(bike, state.jetpackVFX || 'Humo y Fuego');
+        if (state.isDrifting) {
+          this.spawnTireTrack(bike, state.driftMarkDuration ?? bike.userData.logicProperties?.driftMarkDuration ?? 4);
+        } else {
+          this.tireTracks.endTrack(bike.userData.uuid || 'remote_bike');
+        }
       } else if (authority === this.playerId && this.isDriver) {
         this.remoteMotionSamples.delete(bike);
         this.coasting.delete(bike);
@@ -671,6 +739,7 @@ export class VehicleSystem {
   }
   dispose() {
     this.dismount(true);
+    this.tireTracks.dispose();
     this.fall.reset(this.game.character);
     for (const [bike] of this.coasting) {
       const body = bike.userData.rigidBody;

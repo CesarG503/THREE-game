@@ -96,8 +96,8 @@ export class TireTrackManager {
     }
 
     const dist = prev.center.distanceTo(center);
-    // Evitar generar geometría redundante si no ha habido suficiente desplazamiento (mínimo 12 cm)
-    if (dist < 0.12) return;
+    // Evitar generar geometría redundante si no ha habido suficiente desplazamiento (mínimo 8 cm)
+    if (dist < 0.08) return;
 
     // Si hubo un salto brusco de distancia (teletransporte, respawn), reiniciar el trazo
     if (dist > 3.0) {
@@ -105,13 +105,22 @@ export class TireTrackManager {
       return;
     }
 
+    // Calcular vector lateral perpendicular a la dirección real de desplazamiento
+    const moveDir = center.clone().sub(prev.center).normalize();
+    let curLateral = new THREE.Vector3().crossVectors(moveDir, groundNormal).normalize().multiplyScalar(width * 0.5);
+    if (curLateral.lengthSq() < 0.0001) {
+      curLateral = lateral;
+    }
+    const curLeft = center.clone().sub(curLateral);
+    const curRight = center.clone().add(curLateral);
+
     // Construir quad con 2 triángulos que conectan el punto anterior con el actual
     const geometry = new THREE.BufferGeometry();
     const positions = new Float32Array([
       prev.left.x, prev.left.y, prev.left.z,
       prev.right.x, prev.right.y, prev.right.z,
-      right.x, right.y, right.z,
-      left.x, left.y, left.z,
+      curRight.x, curRight.y, curRight.z,
+      curLeft.x, curLeft.y, curLeft.z,
     ]);
 
     const normals = new Float32Array([
@@ -160,7 +169,7 @@ export class TireTrackManager {
     };
 
     this.activeSegments.push(segment);
-    this.lastPoints.set(trackId, { left, right, center });
+    this.lastPoints.set(trackId, { left: curLeft, right: curRight, center });
 
     // Mantener límite de segmentos para rendimiento óptimo
     if (this.activeSegments.length > this.maxSegments) {

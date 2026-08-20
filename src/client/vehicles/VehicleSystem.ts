@@ -161,7 +161,7 @@ export class VehicleSystem {
     } else {
       this.lastBikeYaw = getMotorbikeHeading(bike);
       this.startCoasting(bike, this.speed, this.verticalSpeed, true);
-      this.tireTracks.endTrack(bike.userData.uuid || 'local_bike');
+      this.endBikeTracks(bike);
       this.isSkidding = false;
     }
     this.steering = this.lean = 0;
@@ -217,7 +217,7 @@ export class VehicleSystem {
       this.game.networkManager.sendPlayerAction('motorbikePark', finalState);
     }
     if (!bike.userData.vehicleDriver) bike.animateMotorbike?.(0, 0, 0);
-    this.tireTracks.endTrack(bike.userData.uuid || 'local_bike');
+    this.endBikeTracks(bike);
     this.isSkidding = false;
     this.mounted = null;
     this.seat = null;
@@ -342,15 +342,17 @@ export class VehicleSystem {
     bike.animateMotorbike?.(travel * Math.sign(this.speed), this.steering, this.lean);
     if (this.vehicleJetpackActive) this.spawnBikeJetpackEffect(bike, this.vehicleJetpackVFX);
     const currentSpeedAbs = Math.abs(this.speed);
+    const isPivoting = Boolean(brake && (keys.left || keys.right) && Math.abs(pivotTurn) > 0.05);
     const isSkidding = !this.paused && this.grounded && (
       (keys.crouch && currentSpeedAbs > 1.0) ||
-      (drift && currentSpeedAbs > 0.6)
+      (drift && currentSpeedAbs > 0.6) ||
+      isPivoting
     );
     this.isSkidding = isSkidding;
     if (isSkidding) {
-      this.spawnTireTrack(bike, props.driftMarkDuration ?? 4);
+      this.spawnTireTrack(bike, props.driftMarkDuration ?? 4, isPivoting);
     } else {
-      this.tireTracks.endTrack(bike.userData.uuid || 'local_bike');
+      this.endBikeTracks(bike);
     }
     this.syncRider(dt);
     const fuel = bike.userData.logicProperties.consumableUse;
@@ -405,14 +407,27 @@ export class VehicleSystem {
     particleSystem.spawnJetpackEffect(rearWorld, normal, vfx);
   }
 
-  private spawnTireTrack(bike: MotorbikeVisual, duration = 4) {
-    const dims = bike.userData.originalScale ?? { x: 0.85, y: 1.25, z: 2.4 };
-    const rearWheelLocal = new THREE.Vector3(0, -dims.y * 0.25, dims.z * 0.42);
-    const rearWheelWorld = rearWheelLocal.applyQuaternion(bike.quaternion).add(bike.position);
+  private endBikeTracks(bike: MotorbikeVisual) {
+    const baseId = bike.userData.uuid || 'local_bike';
+    this.tireTracks.endTrack(baseId);
+    this.tireTracks.endTrack(baseId + '_rear');
+    this.tireTracks.endTrack(baseId + '_front');
+  }
+
+  private spawnWheelTrack(
+    bike: MotorbikeVisual,
+    trackId: string,
+    wheelLocal: THREE.Vector3,
+    dims: { x: number; y: number; z: number },
+    tireWidth: number,
+    duration: number,
+    isPivoting: boolean
+  ) {
+    const wheelWorld = wheelLocal.clone().applyQuaternion(bike.quaternion).add(bike.position);
 
     let groundPos: THREE.Vector3;
     let groundNormal = new THREE.Vector3(0, 1, 0);
-    const rayOrigin = rearWheelWorld.clone();
+    const rayOrigin = wheelWorld.clone();
     rayOrigin.y += 0.25;
 
     const hit = this.game.world?.castRay?.(
@@ -428,19 +443,42 @@ export class VehicleSystem {
     if (hit) {
       groundPos = new THREE.Vector3(rayOrigin.x, rayOrigin.y - hit.timeOfImpact, rayOrigin.z);
     } else {
-      groundPos = new THREE.Vector3(rearWheelWorld.x, bike.position.y - dims.y * 0.5, rearWheelWorld.z);
+      groundPos = new THREE.Vector3(wheelWorld.x, bike.position.y - dims.y * 0.5, wheelWorld.z);
     }
 
-    const forwardDir = new THREE.Vector3(0, 0, -Math.sign(this.speed || 1)).applyQuaternion(bike.quaternion).normalize();
-    const tireWidth = Math.max(0.12, Math.min(0.24, dims.x * 0.18));
+    let forwardDir: THREE.Vector3;
+    if (isPivoting) {
+      const signZ = Math.sign(wheelLocal.z);
+      const signTurn = Math.sign(this.steering || 1);
+      forwardDir = new THREE.Vector3(signZ * signTurn, 0, 0).applyQuaternion(bike.quaternion).normalize();
+    } else {
+      forwardDir = new THREE.Vector3(0, 0, -Math.sign(this.speed || 1)).applyQuaternion(bike.quaternion).normalize();
+    }
+
     this.tireTracks.addTirePoint(
-      bike.userData.uuid || 'local_bike',
+      trackId,
       groundPos,
       groundNormal,
       forwardDir,
       tireWidth,
       duration
     );
+  }
+
+  private spawnTireTrack(bike: MotorbikeVisual, duration = 4, isPivoting = false) {
+    const dims = bike.userData.originalScale ?? { x: 0.85, y: 1.25, z: 2.4 };
+    const tireWidth = Math.max(0.12, Math.min(0.24, dims.x * 0.18));
+    const baseId = bike.userData.uuid || 'local_bike';
+
+    // Rueda trasera (siempre marca en derrape, frenada o giro sobre el eje)
+    this.spawnWheelTrack(bike, baseId + '_rear', new THREE.Vector3(0, -dims.y * 0.25, dims.z * 0.42), dims, tireWidth, duration, isPivoting);
+
+    // Rueda delantera (marca cuando da vueltas sobre su propio eje en el sitio)
+    if (isPivoting) {
+      this.spawnWheelTrack(bike, baseId + '_front', new THREE.Vector3(0, -dims.y * 0.25, -dims.z * 0.42), dims, tireWidth, duration, true);
+    } else {
+      this.tireTracks.endTrack(baseId + '_front');
+    }
   }
 
   private startCoasting(bike: MotorbikeVisual, speed: number, verticalSpeed: number, local: boolean) {
@@ -698,9 +736,10 @@ export class VehicleSystem {
         bike.animateMotorbike?.(state.speed * Math.min(dt, 0.05), state.steering, state.lean);
         if (state.jetpackActive) this.spawnBikeJetpackEffect(bike, state.jetpackVFX || 'Humo y Fuego');
         if (state.isDrifting) {
-          this.spawnTireTrack(bike, state.driftMarkDuration ?? bike.userData.logicProperties?.driftMarkDuration ?? 4);
+          const remotePivoting = Boolean(Math.abs(state.speed) < 0.35 && Math.abs(state.steering) > 0.05);
+          this.spawnTireTrack(bike, state.driftMarkDuration ?? bike.userData.logicProperties?.driftMarkDuration ?? 4, remotePivoting);
         } else {
-          this.tireTracks.endTrack(bike.userData.uuid || 'remote_bike');
+          this.endBikeTracks(bike);
         }
       } else if (authority === this.playerId && this.isDriver) {
         this.remoteMotionSamples.delete(bike);

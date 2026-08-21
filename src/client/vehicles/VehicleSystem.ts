@@ -470,15 +470,8 @@ export class VehicleSystem {
     const tireWidth = Math.max(0.12, Math.min(0.24, dims.x * 0.18));
     const baseId = bike.userData.uuid || 'local_bike';
 
-    // Rueda trasera (siempre marca en derrape, frenada o giro sobre el eje)
+    // Únicamente la rueda trasera marca la pista en el suelo
     this.spawnWheelTrack(bike, baseId + '_rear', new THREE.Vector3(0, -dims.y * 0.25, dims.z * 0.42), dims, tireWidth, duration, isPivoting);
-
-    // Rueda delantera (marca cuando da vueltas sobre su propio eje en el sitio)
-    if (isPivoting) {
-      this.spawnWheelTrack(bike, baseId + '_front', new THREE.Vector3(0, -dims.y * 0.25, -dims.z * 0.42), dims, tireWidth, duration, true);
-    } else {
-      this.tireTracks.endTrack(baseId + '_front');
-    }
   }
 
   private startCoasting(bike: MotorbikeVisual, speed: number, verticalSpeed: number, local: boolean) {

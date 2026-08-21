@@ -250,4 +250,9 @@ export class TireTrackManager {
   get segmentCount(): number {
     return this.activeSegments.length;
   }
+
+  /** Indica si existe un trazo activo para el identificador dado. */
+  hasActiveTrack(trackId: string): boolean {
+    return this.lastPoints.has(trackId);
+  }
 }

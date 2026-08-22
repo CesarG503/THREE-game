@@ -561,9 +561,9 @@ export function updateButtonInteraction(this: any, dt: number) {
 		promptEl.style.display = "flex";
 
 		const btnPos = nearest.position.clone();
-		btnPos.y += nearest.userData.mapObjectType === "motorbike"
-			? Math.max(0.7, (nearest.userData.originalScale?.y || 1.25) * 0.65)
-			: 0.5;
+		if (nearest.userData.mapObjectType === "motorbike") {
+			btnPos.add(new THREE.Vector3(0, Math.max(0.7, (nearest.userData.originalScale?.y || 1.25) * 0.65), 0).applyQuaternion(nearest.quaternion));
+		} else btnPos.y += 0.5;
 		btnPos.project(this.sceneManager.camera);
 
 		const x = (btnPos.x * 0.5 + 0.5) * window.innerWidth;

@@ -1,3 +1,4 @@
+import { normalizeGravityOrientation, type GravityOrientation } from '../utils/GravityOrientation';
 export const MOTORBIKE_SIZE = { x: 0.85, y: 1.25, z: 2.4 };
 
 export const MOTORBIKE_FIELDS = [
@@ -31,11 +32,12 @@ export const MOTORBIKE_FIELDS = [
 /** Ángulo máximo de giro relativo del torso y cámara del pasajero (85°). */
 export const MAX_PASSENGER_YAW = (85 * Math.PI) / 180;
 
-export type MotorbikeSettings = Record<(typeof MOTORBIKE_FIELDS)[number]['key'], number> & { vehicleKind: 'motorbike'; dismountPenaltyEnabled: boolean };
+export type MotorbikeSettings = Record<(typeof MOTORBIKE_FIELDS)[number]['key'], number> & { vehicleKind: 'motorbike'; dismountPenaltyEnabled: boolean; gravityOrientation: GravityOrientation | 'inherit' };
 
 export function normalizeMotorbikeSettings(props: any = {}): MotorbikeSettings {
   props = props ?? {};
   const result: any = { ...props, vehicleKind: 'motorbike' };
+  result.gravityOrientation = props.gravityOrientation === undefined || props.gravityOrientation === 'inherit' ? 'inherit' : normalizeGravityOrientation(props.gravityOrientation);
   result.dismountPenaltyEnabled = props.dismountPenaltyEnabled === true;
   for (const field of MOTORBIKE_FIELDS) {
     const value = Number(props[field.key] ?? field.value);

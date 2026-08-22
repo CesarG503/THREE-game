@@ -99,7 +99,7 @@ export class RiderPose {
         this.remember(skin.heldItemMesh);
         skin.heldItemMesh.visible = false;
       }
-      skin.model.position.y += Math.sin(this.time * 18) * Math.min(Math.abs(speed) / 22, 1) * 0.008;
+      skin.model.position.addScaledVector(avatar.getGravityUpVector?.() ?? new THREE.Vector3(0, 1, 0), Math.sin(this.time * 18) * Math.min(Math.abs(speed) / 22, 1) * 0.008);
     }
 
     const polygon = avatar.polygonModel;

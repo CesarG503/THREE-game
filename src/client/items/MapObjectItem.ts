@@ -1,3 +1,4 @@
+import { orientationFromRotation } from '../vehicles/VehicleGravity';
 import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
 import { createMotorbikeModel } from "../vehicles/MotorbikeModel";
@@ -1582,7 +1583,7 @@ export class MapObjectItem extends Item {
     object3D.position.copy(position);
     const surfaceAlignedTypes = ["interaction_button", "target", "gravity_pad", "impulse_jump", "impulse_lateral", "farming_zone", "logic_camera", "camera_panel", "camera_prop", "cone", "spiked_floor"];
     const isSurfaceAligned = surfaceAlignedTypes.includes(this.type);
-    if (!isSurfaceAligned && this.type !== "spawn_point" && this.type !== "tube" && !isCenterPosition) {
+    if (!isSurfaceAligned && this.type !== "motorbike" && this.type !== "spawn_point" && this.type !== "tube" && !isCenterPosition) {
       object3D.position.y += this.scale.y / 2;
     }
 
@@ -1615,6 +1616,7 @@ export class MapObjectItem extends Item {
 
     if (this.logicProperties) {
       object3D.userData.logicProperties = { ...this.logicProperties };
+      if (this.type === 'motorbike') object3D.userData.logicProperties.gravityOrientation = orientationFromRotation(object3D.quaternion);
     }
 
     if (typeof object3D.updateLogicCameraVisuals === "function") {

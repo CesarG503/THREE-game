@@ -5,6 +5,7 @@ import RAPIER from '@dimforge/rapier3d-compat';
 export class VehicleFall {
   active = false;
   private elapsed = 0;
+  private up = new THREE.Vector3(0, 1, 0);
   private velocity = new THREE.Vector3();
   private lastPosition = new THREE.Vector3();
   private rest = new Map<THREE.Object3D, THREE.Quaternion>();
@@ -17,7 +18,8 @@ export class VehicleFall {
     this.active = true;
     this.elapsed = 0;
     this.velocity.copy(velocity).multiplyScalar(0.6);
-    this.velocity.y = 0;
+    this.up.copy(character.getGravityUpVector());
+    this.velocity.projectOnPlane(this.up);
     this.lastPosition.copy(character.getPosition());
     character.isRunning = false;
     if (scene) this.createDust(scene, this.lastPosition);
@@ -26,15 +28,17 @@ export class VehicleFall {
   update(character: any, controller: RAPIER.KinematicCharacterController, dt: number): boolean {
     if (!this.active) return false;
     if (character.isDead || !character.rigidBody?.isValid() || !character.collider?.isValid() ||
-        character.getGravityUpVector().y < 0.99 || character.getPosition().distanceTo(this.lastPosition) > 4) {
+        character.getPosition().distanceTo(this.lastPosition) > 4) {
       this.reset(character);
       return false;
     }
     this.elapsed += dt;
-    this.velocity.x *= Math.exp(-4 * dt);
-    this.velocity.z *= Math.exp(-4 * dt);
-    this.velocity.y = Math.max(-40, this.velocity.y - 22 * dt);
+    this.up.copy(character.getGravityUpVector());
+    const vertical = this.velocity.dot(this.up);
+    this.velocity.projectOnPlane(this.up).multiplyScalar(Math.exp(-4 * dt));
+    this.velocity.addScaledVector(this.up, Math.max(-40, vertical - 22 * dt));
     const physics = character.characterController || controller;
+    physics.setUp(this.up);
     physics.computeColliderMovement(character.collider, this.velocity.clone().multiplyScalar(dt),
       RAPIER.QueryFilterFlags.EXCLUDE_SENSORS, character.collider.collisionGroups());
     const movement = physics.computedMovement();
@@ -42,8 +46,8 @@ export class VehicleFall {
     character.rigidBody.setNextKinematicTranslation(next);
     this.lastPosition.copy(next);
     character.grounded = physics.computedGrounded();
-    if (character.grounded) this.velocity.y = 0;
-    character.verticalVelocity = this.velocity.y;
+    if (character.grounded) this.velocity.projectOnPlane(this.up);
+    character.verticalVelocity = this.velocity.dot(this.up);
     this.updateDust(next);
     if (this.elapsed >= 1.5 && character.grounded) {
       this.reset(character);
@@ -71,7 +75,7 @@ export class VehicleFall {
       const hip = new THREE.Vector3(0, 0.7, 0);
       model.rotateZ(down * Math.PI * 0.48);
       model.position.add(hip.clone().applyQuaternion(base)).sub(hip.applyQuaternion(model.quaternion));
-      model.position.y -= down * 0.38;
+      model.position.addScaledVector(this.up, -down * 0.38);
     }
     const skin = character.polygonModelSkin;
     this.rotate(skin?.upperBodyGroup, -0.2 * down);
@@ -133,9 +137,9 @@ export class VehicleFall {
       const angle = this.random() * Math.PI * 2;
       const radius = (0.12 + this.random() * spread) * (1 - i / count * 0.35);
       const lift = this.random() * 0.22 * (1 - Math.min(1, this.elapsed / 1.5));
-      this.dustPositions[i * 3] = position.x + Math.cos(angle) * radius;
-      this.dustPositions[i * 3 + 1] = position.y + 0.08 + lift;
-      this.dustPositions[i * 3 + 2] = position.z + Math.sin(angle) * radius;
+      const offset = new THREE.Vector3(Math.cos(angle) * radius, 0.08 + lift, Math.sin(angle) * radius)
+        .applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), this.up)).add(position);
+      offset.toArray(this.dustPositions, i * 3);
     }
     this.dust.geometry.attributes.position.needsUpdate = true;
     this.dust.geometry.setDrawRange(0, count);

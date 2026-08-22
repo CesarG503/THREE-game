@@ -126,6 +126,8 @@ function updateMapImpulsePads(game: any) {
 }
 
 function updateMapGravityPads(game: any) {
+	// The motorcycle detects pads using its own collider and rotates both occupants.
+	if (game.vehicleSystem?.mounted) return;
 	if (!game.character || !game.sceneManager?.scene) return;
 
 	const charPos = game.character.getPosition();
@@ -816,19 +818,19 @@ export function animate(this: any) {
 			} else if (!logicSystem.toolbar.activeTool && this.placementManager && this.inventoryManager) {
 				const currentItem = this.inventoryManager.getCurrentItem();
 				const charPos = this.character ? this.character.getPosition() : null;
-				this.placementManager.update(currentItem, this.placementRotationIndex || 0, charPos);
+				this.placementManager.update(currentItem, this.placementRotationIndex || 0, charPos, this.character.getGravityQuaternion?.());
 			} else {
 				if (this.placementManager) this.placementManager.placementGhost.visible = false;
 			}
 		} else if (!this.constructionMenu.isVisible && this.placementManager && this.inventoryManager) {
 			const currentItem = this.inventoryManager.getCurrentItem();
 			const charPos = this.character ? this.character.getPosition() : null;
-			this.placementManager.update(currentItem, this.placementRotationIndex || 0, charPos);
+			this.placementManager.update(currentItem, this.placementRotationIndex || 0, charPos, this.character.getGravityQuaternion?.());
 		}
 	} else if (this.placementManager && this.inventoryManager) {
 		const currentItem = this.inventoryManager.getCurrentItem();
 		const charPos = this.character ? this.character.getPosition() : null;
-		this.placementManager.update(currentItem, this.placementRotationIndex || 0, charPos);
+		this.placementManager.update(currentItem, this.placementRotationIndex || 0, charPos, this.character.getGravityQuaternion?.());
 	}
 
 	this.updateDebugRender();

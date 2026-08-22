@@ -1,13 +1,27 @@
+import { GRAVITY_ORIENTATION_OPTIONS } from '../../utils/GravityOrientation';
 import { MOTORBIKE_FIELDS, normalizeMotorbikeSettings } from '../../vehicles/MotorbikeSettings';
 
 /** Used by both the library draft and the placed-object inspector. */
 export class MotorbikeLogic {
-  render(container: HTMLElement, props: any, update: (key: string, value: number | boolean) => void) {
+  render(container: HTMLElement, props: any, update: (key: string, value: number | boolean | string) => void) {
     if (props?.vehicleKind !== 'motorbike') return;
     const hint = document.createElement('p');
     hint.textContent = 'Dos asientos. F: subir / bajar · R: cambiar al asiento libre · W/S: acelerar / reversa · A/D: girar · Shift: frenar y hacer drift (deja marcas de neumático en el suelo) · Espacio: saltar. Si el conductor tiene un jetpack seleccionado, mantener Espacio activa el impulso del jetpack y consume ese combustible en lugar de gasolina. Si está detenida, Shift + A/D gira sobre su propio eje. El pasajero puede usar armas y construir; Mayús + R recarga o rota la construcción. El combustible se gasta al acelerar. Tiempo F en 0 sube al instante.';
     hint.style.cssText = 'font-size:12px;color:#a5d8ff;line-height:1.5';
     container.appendChild(hint);
+    const gravityLabel = document.createElement('label');
+    gravityLabel.textContent = 'Eje de gravedad (los pads lo cambian al conducir): ';
+    const gravity = document.createElement('select');
+    for (const entry of [{ value: 'inherit', label: 'Gravedad del jugador al colocar' }, ...GRAVITY_ORIENTATION_OPTIONS]) {
+      const option = document.createElement('option');
+      option.value = entry.value;
+      option.textContent = entry.label;
+      gravity.appendChild(option);
+    }
+    gravity.value = normalizeMotorbikeSettings(props).gravityOrientation;
+    gravity.onchange = () => update('gravityOrientation', gravity.value);
+    gravityLabel.appendChild(gravity);
+    container.appendChild(gravityLabel);
     const penaltyLabel = document.createElement('label');
     penaltyLabel.style.cssText = 'display:flex;align-items:center;gap:8px;margin:12px 0;color:#ccc;font-size:12px';
     const penalty = document.createElement('input');

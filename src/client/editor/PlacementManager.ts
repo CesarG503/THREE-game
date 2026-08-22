@@ -1,3 +1,4 @@
+import { getGravityQuaternion } from '../utils/GravityOrientation';
 import { createMotorbikeModel } from "../vehicles/MotorbikeModel";
 import * as THREE from "three";
 import { RampUtils } from "../utils/RampUtils";
@@ -1014,7 +1015,7 @@ export class PlacementManager {
      * @param {THREE.Vector3} [playerPosition] - Posición del jugador para altura dinámica
      * @returns {THREE.Vector3|null} - Punto de impacto válido o null
      */
-    update(item, rotationIndex, playerPosition) {
+    update(item, rotationIndex, playerPosition, playerGravity = new THREE.Quaternion()) {
         if (this.ghostMotorbike) this.ghostMotorbike.visible = false;
         this.currentItem = item;
         this.rotationIndex = rotationIndex;
@@ -1547,6 +1548,22 @@ export class PlacementManager {
                 }
             }
 
+            if (item.type === 'motorbike') {
+                const configured = item.logicProperties?.gravityOrientation;
+                const frame = configured && configured !== 'inherit' ? getGravityQuaternion(configured) : playerGravity;
+                const yaw = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), -rotationIndex * Math.PI / 2);
+                this.lastValidQuaternion = frame.clone().multiply(yaw);
+                const up = new THREE.Vector3(0, 1, 0).applyQuaternion(frame);
+                targetPos.copy(hit.point);
+                if (this.snapToGrid || this.aerialGridActive) {
+                    const snapped = targetPos.clone().divideScalar(gridSize).round().multiplyScalar(gridSize);
+                    targetPos.add(snapped.sub(targetPos).projectOnPlane(up));
+                }
+                const normal = hit.face ? hit.face.normal.clone().transformDirection(hit.object.matrixWorld).normalize() : up;
+                const extent = ['x', 'y', 'z'].reduce((sum, axis, i) => sum + Math.abs(new THREE.Vector3().setComponent(i, 1).applyQuaternion(this.lastValidQuaternion!).dot(normal)) * item.scale[axis] / 2, 0);
+                targetPos.addScaledVector(normal, extent + 0.03);
+            }
+
             this.placementGhost.position.copy(targetPos);
 
             // Adjust visual geometry matches RealSize
@@ -1834,7 +1851,7 @@ export class PlacementManager {
             // Return Base Position (Bottom Center) for Spawner
             const basePos = targetPos.clone();
             const isSurfaceAligned = surfaceAlignedTypes.includes(item.type);
-            if (!isSurfaceAligned) {
+            if (!isSurfaceAligned && item.type !== "motorbike") {
                 basePos.y -= realSize.y / 2;
             }
 

@@ -6,12 +6,13 @@ import { RiderPose } from './RiderPose';
 import { VehicleFall } from './VehicleFall';
 import { resolveVehicleSeats, type VehicleSeat } from './VehicleSeats';
 import type { MotorbikeVisual } from './MotorbikeModel';
+import { advanceVehicleGravity, beginVehicleGravity, vehicleGravity, vehicleHeading, vehicleUp, receiveVehicleGravity, syncVehicleGravity } from './VehicleGravity';
+import { getGravityQuaternion } from '../utils/GravityOrientation';
 import { TireTrackManager } from './TireTrackManager';
 
-/** XYZ Euler.y folds at ±90°. Derive the full heading from the actual forward vector. */
+/** Heading around the current gravity axis, without Euler angle folding. */
 export function getMotorbikeHeading(bike: THREE.Object3D): number {
-  const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(bike.quaternion);
-  return Math.atan2(-forward.x, -forward.z);
+  return vehicleHeading(bike);
 }
 
 export class VehicleSystem {
@@ -29,6 +30,7 @@ export class VehicleSystem {
   private jumpCooldown = 0;
   private vehicleJetpackActive = false;
   private vehicleJetpackVFX = 'Humo y Fuego';
+  private padContacts = new WeakMap<MotorbikeVisual, Map<THREE.Object3D, { inside: boolean; cooldown: number }>>();
   private controller: RAPIER.KinematicCharacterController;
   private pose = new RiderPose();
   private fall = new VehicleFall();
@@ -81,7 +83,7 @@ export class VehicleSystem {
       const candidate = position.distanceToSquared(bike.position);
       if (candidate >= distance || !bike.userData.rigidBody?.isValid()) continue;
       // Interacting through a wall should not mount a vehicle.
-      const origin = position.clone().add(new THREE.Vector3(0, 0.8, 0));
+      const origin = position.clone().add(character.getGravityUpVector().multiplyScalar(0.8));
       const direction = bike.position.clone().sub(origin);
       const hit = this.game.world.castRay(new RAPIER.Ray(origin, direction.normalize()), origin.distanceTo(bike.position), true,
         RAPIER.QueryFilterFlags.EXCLUDE_SENSORS, undefined, character.collider, bike.userData.rigidBody);
@@ -107,7 +109,7 @@ export class VehicleSystem {
     const bike = this.nearest();
     if (!bike) return false;
     const character = this.game.character;
-    if (character.getGravityUpVector().y < 0.99 || this.game.gravityQteActive) return false;
+    if (character.getGravityUpVector().dot(vehicleUp(bike)) < 0.99 || this.game.gravityQteActive) return false;
     this.mounted = bike;
     this.lastSeatSwitchTime = Date.now();
     this.seat = bike.userData.vehicleDriver ? 'passenger' : 'driver';
@@ -183,13 +185,14 @@ export class VehicleSystem {
     const dims = bike.userData.originalScale;
     for (const offset of [new THREE.Vector3(dims.x / 2 + 0.85, 0, 0), new THREE.Vector3(-dims.x / 2 - 0.85, 0, 0), new THREE.Vector3(0, 0, dims.z / 2 + 0.85), new THREE.Vector3(0, 0, -dims.z / 2 - 0.85)]) {
       const position = offset.applyQuaternion(bike.quaternion).add(bike.position);
-      const origin = position.clone().add(new THREE.Vector3(0, 2, 0));
-      const floor = this.game.world.castRay(new RAPIER.Ray(origin, { x: 0, y: -1, z: 0 }), 5, true,
+      const up = vehicleUp(bike);
+      const origin = position.clone().addScaledVector(up, 2);
+      const floor = this.game.world.castRay(new RAPIER.Ray(origin, up.clone().negate()), 5, true,
         RAPIER.QueryFilterFlags.EXCLUDE_SENSORS, undefined, character.collider, bike.userData.rigidBody);
       if (!floor) continue;
-      position.y = origin.y - floor.timeOfImpact + Math.max(0, character.capsuleHalfHeight + character.capsuleRadius - character.capsuleCenterOffset) + 0.05;
-      const center = position.clone().add(new THREE.Vector3(0, character.capsuleCenterOffset, 0));
-      const blocked = this.game.world.intersectionWithShape(center, { x: 0, y: 0, z: 0, w: 1 }, character.collider.shape,
+      position.copy(origin).addScaledVector(up, -floor.timeOfImpact + Math.max(0, character.capsuleHalfHeight + character.capsuleRadius - character.capsuleCenterOffset) + 0.05);
+      const center = position.clone().addScaledVector(up, character.capsuleCenterOffset);
+      const blocked = this.game.world.intersectionWithShape(center, vehicleGravity(bike).frame, character.collider.shape,
         RAPIER.QueryFilterFlags.EXCLUDE_SENSORS, undefined, character.collider);
       if (!blocked) return position;
     }
@@ -254,6 +257,14 @@ export class VehicleSystem {
   update(delta: number): boolean {
     const dt = Number.isFinite(delta) ? Math.min(0.05, Math.max(0, delta)) : 0;
     this.tireTracks.update(dt);
+    // Inspector edits also apply to parked motorcycles, which then fall toward their new surface.
+    for (const bike of this.bikes) {
+      const requested = bike.userData.logicProperties?.gravityOrientation;
+      if (bike !== this.mounted && !bike.userData.vehicleDriver && !bike.userData.vehiclePassenger && !this.coasting.has(bike) &&
+          requested && requested !== 'inherit' && requested !== vehicleGravity(bike).orientation) {
+        this.startCoasting(bike, 0, 0, true);
+      }
+    }
     this.updateCoasting(dt);
     if (!this.mounted) {
       if (this.hud) this.hud.style.display = 'none';
@@ -266,7 +277,7 @@ export class VehicleSystem {
     const bike = this.mounted;
     const character = this.game.character;
     const body: RAPIER.RigidBody = bike.userData.rigidBody;
-    if (!bike.parent || !body?.isValid() || character.isDead || character.getPosition().distanceTo(this.lastRiderPosition) > 4 || character.getGravityUpVector().y < 0.99) {
+    if (!bike.parent || !body?.isValid() || character.isDead || character.getPosition().distanceTo(this.lastRiderPosition) > 4) {
       this.dismount(true);
       return false;
     }
@@ -284,6 +295,7 @@ export class VehicleSystem {
       this.show(`Pasajero · ${Math.round(Math.abs(this.speed) * 3.6)} km/h\nArmas y construcción disponibles · R cambiar asiento · F bajar\nMayús + R recargar / rotar construcción`, props.consumableUse, props.maxConsumableUse);
       return true;
     }
+    this.updateBikeGravity(bike, dt);
     const keys = this.game.inputManager.keys;
     const throttle = this.paused ? 0 : Number(keys.forward) - Number(keys.backward);
     const brake = this.paused || keys.crouch;
@@ -322,7 +334,7 @@ export class VehicleSystem {
       ? this.steering * THREE.MathUtils.degToRad(props.stationaryTurnSpeed) * (1 - THREE.MathUtils.clamp(speedAbs / 0.35, 0, 1))
       : 0;
     const yaw = getMotorbikeHeading(bike) + (movingTurn + pivotTurn) * dt;
-    const rotation = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
+    const rotation = vehicleGravity(bike).frame.clone().multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), yaw));
     const collider = body.collider(0);
     // Test the rotated footprint as well as sweeping the translation.
     const blockedRotation = this.game.world.intersectionWithShape(body.translation(), rotation, collider.shape,
@@ -359,6 +371,47 @@ export class VehicleSystem {
     const jetpackFuel = jetpackActive ? ` · Jetpack ${Math.ceil(jetpack.consumableUse)} / ${jetpack.maxConsumableUse}` : '';
     this.show(`Conductor · ${Math.round(Math.abs(this.speed) * 3.6)} km/h · Combustible ${Math.ceil(fuel)} / ${props.maxConsumableUse}${jetpackFuel}${fuel <= 0 ? ' · SIN COMBUSTIBLE' : ''}\nW/S acelerar · A/D girar · Shift frenar/drift · Espacio saltar/jetpack · R cambiar asiento · F bajar`, fuel, props.maxConsumableUse);
     return true;
+  }
+
+  private networkGravityFrame(state: any) {
+    return state.gravityQuaternion ? new THREE.Quaternion().fromArray(state.gravityQuaternion).normalize() : getGravityQuaternion(state.gravityOrientation);
+  }
+
+  private updateBikeGravity(bike: MotorbikeVisual, dt: number) {
+    let contacts = this.padContacts.get(bike);
+    if (!contacts) { contacts = new Map(); this.padContacts.set(bike, contacts); }
+    const body = bike.userData.rigidBody;
+    const collider = body.collider(0);
+    this.game.sceneManager.scene.traverse((pad: THREE.Object3D) => {
+      if (pad.userData.mapObjectType !== 'gravity_pad') return;
+      const props = pad.userData.logicProperties || {};
+      const dims = pad.userData.originalScale || { x: 3, y: 0.2, z: 3 };
+      const position = pad.getWorldPosition(new THREE.Vector3());
+      const rotation = pad.getWorldQuaternion(new THREE.Quaternion());
+      const normal = new THREE.Vector3(0, 1, 0).applyQuaternion(rotation);
+      const shape = new RAPIER.Cuboid(dims.x / 2, dims.y / 2 + 0.12, dims.z / 2);
+      const inside = collider.shape.intersectsShape(bike.position, bike.quaternion, shape, position, rotation);
+      const contact = contacts!.get(pad) || { inside: false, cooldown: 0 };
+      contact.cooldown = Math.max(0, contact.cooldown - dt);
+      if (inside && !contact.inside && contact.cooldown === 0) {
+        if (bike.position.clone().sub(position).dot(normal) < 0) normal.negate();
+        beginVehicleGravity(bike, props.gravityOrientation ?? 'up', Number(props.transitionDuration ?? 0.8), normal, position.addScaledVector(normal, dims.y / 2));
+        contact.cooldown = Math.max(0, Number(props.cooldown ?? 0.35));
+      }
+      contact.inside = inside;
+      contacts!.set(pad, contact);
+    });
+    const requested = bike.userData.logicProperties.gravityOrientation;
+    if (requested && requested !== 'inherit' && requested !== vehicleGravity(bike).orientation) {
+      const up = vehicleUp(bike);
+      beginVehicleGravity(bike, requested, 0.8, up, bike.position.clone().addScaledVector(up, -bike.userData.originalScale.y / 2));
+    }
+    if (vehicleGravity(bike).start) {
+      advanceVehicleGravity(bike, dt);
+      body.setRotation(bike.quaternion, true);
+      body.setTranslation(bike.position, true);
+      body.setNextKinematicTranslation(bike.position);
+    }
   }
 
   private getSelectedJetpack() {
@@ -426,12 +479,12 @@ export class VehicleSystem {
     const wheelWorld = wheelLocal.clone().applyQuaternion(bike.quaternion).add(bike.position);
 
     let groundPos: THREE.Vector3;
-    let groundNormal = new THREE.Vector3(0, 1, 0);
+    const groundNormal = vehicleUp(bike);
     const rayOrigin = wheelWorld.clone();
-    rayOrigin.y += 0.25;
+    rayOrigin.addScaledVector(groundNormal, 0.25);
 
     const hit = this.game.world?.castRay?.(
-      new RAPIER.Ray(rayOrigin, { x: 0, y: -1, z: 0 }),
+      new RAPIER.Ray(rayOrigin, groundNormal.clone().negate()),
       dims.y * 0.9,
       true,
       RAPIER.QueryFilterFlags.EXCLUDE_SENSORS,
@@ -441,9 +494,9 @@ export class VehicleSystem {
     );
 
     if (hit) {
-      groundPos = new THREE.Vector3(rayOrigin.x, rayOrigin.y - hit.timeOfImpact, rayOrigin.z);
+      groundPos = rayOrigin.clone().addScaledVector(groundNormal, -hit.timeOfImpact);
     } else {
-      groundPos = new THREE.Vector3(wheelWorld.x, bike.position.y - dims.y * 0.5, wheelWorld.z);
+      groundPos = wheelWorld.clone().addScaledVector(groundNormal, -dims.y * 0.25);
     }
 
     let forwardDir: THREE.Vector3;
@@ -481,6 +534,12 @@ export class VehicleSystem {
     // The render position can be one physics step ahead when F is pressed.
     body.setTranslation(bike.position, true);
     body.setNextKinematicTranslation(bike.position);
+    const gravity = vehicleGravity(bike);
+    if (!gravity.start && gravity.frame.angleTo(getGravityQuaternion(gravity.orientation)) > 0.0001) {
+      gravity.start = gravity.frame.clone();
+      gravity.duration = Math.max(0.1, gravity.duration - gravity.elapsed);
+      gravity.elapsed = 0;
+    }
     this.coasting.set(bike, { speed, verticalSpeed, local });
   }
 
@@ -488,7 +547,9 @@ export class VehicleSystem {
     const body: RAPIER.RigidBody = bike.userData.rigidBody;
     verticalSpeed = Math.max(-40, verticalSpeed - 22 * dt);
     const desired = new THREE.Vector3(0, 0, -speed * dt).applyQuaternion(bike.quaternion);
-    desired.y = verticalSpeed * dt;
+    const up = vehicleUp(bike);
+    desired.addScaledVector(up, verticalSpeed * dt);
+    this.controller.setUp(up);
     this.controller.computeColliderMovement(body.collider(0), desired, RAPIER.QueryFilterFlags.EXCLUDE_SENSORS, undefined,
       (other: RAPIER.Collider) => !hasRider || other !== this.game.character.collider);
     const movement = this.controller.computedMovement();
@@ -498,7 +559,7 @@ export class VehicleSystem {
     bike.position.copy(next);
     const grounded = this.controller.computedGrounded();
     if (grounded) verticalSpeed = 0;
-    const travel = Math.hypot(movement.x, movement.z);
+    const travel = new THREE.Vector3(movement.x, movement.y, movement.z).projectOnPlane(up).length();
     if (Math.abs(speed) * dt > 0.01 && travel < Math.abs(speed) * dt * 0.25) speed *= 0.5;
     return { speed, verticalSpeed, travel, grounded };
   }
@@ -511,6 +572,7 @@ export class VehicleSystem {
         this.coasting.delete(bike);
         continue;
       }
+      this.updateBikeGravity(bike, dt);
       // Same rolling resistance as releasing the throttle while mounted; no engine/fuel use.
       state.speed = Math.sign(state.speed) * Math.max(0, Math.abs(state.speed) - 3 * dt);
       const motion = this.moveBike(bike, state.speed, state.verticalSpeed, dt, bike === this.mounted);
@@ -518,7 +580,7 @@ export class VehicleSystem {
       state.verticalSpeed = motion.verticalSpeed;
       bike.userData.vehicleMotion = { speed: state.speed, verticalSpeed: state.verticalSpeed, lean: 0 };
       bike.animateMotorbike?.(motion.travel * Math.sign(state.speed), 0, 0);
-      if (Math.abs(state.speed) < 0.02 && motion.grounded) {
+      if (Math.abs(state.speed) < 0.02 && motion.grounded && !vehicleGravity(bike).start) {
         body.setTranslation(bike.position, true);
         body.setBodyType(RAPIER.RigidBodyType.Fixed, true);
         body.setLinvel({ x: 0, y: 0, z: 0 }, true);
@@ -534,6 +596,8 @@ export class VehicleSystem {
     const bike = this.mounted!;
     const character = this.game.character;
     const props = bike.userData.logicProperties;
+    syncVehicleGravity(character, bike);
+    this.game.cameraController?.setGravityQuaternion?.(vehicleGravity(bike).frame);
     const hipHeight = character.currentType === 'skin' ? 0.625 : 0.7;
     const height = this.isPassenger ? props.passengerSeatHeight : props.seatHeight;
     const offset = this.isPassenger ? props.passengerSeatOffsetZ : props.seatOffsetZ;
@@ -609,6 +673,9 @@ export class VehicleSystem {
       uuid: bike.userData.uuid,
       position: { x: bike.position.x, y: bike.position.y, z: bike.position.z },
       yaw: getMotorbikeHeading(bike),
+      gravityOrientation: vehicleGravity(bike).orientation,
+      gravityQuaternion: vehicleGravity(bike).frame.toArray(),
+      gravityTransitionRemaining: Math.max(0, vehicleGravity(bike).duration - vehicleGravity(bike).elapsed),
       fuel: bike.userData.logicProperties.consumableUse,
       speed, verticalSpeed, steering, lean,
       jetpackActive: bike === this.mounted && this.vehicleJetpackActive,
@@ -625,6 +692,9 @@ export class VehicleSystem {
 
   private validNetworkState(state: any) {
     return state && typeof state.uuid === 'string' && (state.seat === undefined || state.seat === 'driver' || state.seat === 'passenger') &&
+      (state.gravityTransitionRemaining === undefined || (typeof state.gravityTransitionRemaining === 'number' && Number.isFinite(state.gravityTransitionRemaining) && state.gravityTransitionRemaining >= 0 && state.gravityTransitionRemaining < 1e6)) &&
+      (state.gravityOrientation === undefined || ['down', 'up', 'left', 'right', 'front', 'back'].includes(state.gravityOrientation)) &&
+      (state.gravityQuaternion === undefined || (Array.isArray(state.gravityQuaternion) && state.gravityQuaternion.length === 4 && state.gravityQuaternion.every((v: any) => typeof v === 'number' && Number.isFinite(v)) && Math.abs(Math.hypot(...state.gravityQuaternion) - 1) < 0.01)) &&
       (state.jetpackActive === undefined || typeof state.jetpackActive === 'boolean') &&
       (state.jetpackVFX === undefined || typeof state.jetpackVFX === 'string') &&
       (state.isDrifting === undefined || typeof state.isDrifting === 'boolean') &&
@@ -647,6 +717,7 @@ export class VehicleSystem {
     // A departing passenger must never park or rewind a motorcycle that still has a driver.
     if (bike.userData.vehicleDriver || (bike === this.mounted && this.isDriver)) return;
     this.remoteMotionSamples.delete(bike);
+    receiveVehicleGravity(bike, state.gravityOrientation, this.networkGravityFrame(state), state.gravityTransitionRemaining ?? 0);
     this.applyRemoteTransform(bike, state.position, state.yaw);
     bike.userData.logicProperties.consumableUse = Math.max(0, Math.min(state.fuel, bike.userData.logicProperties.maxConsumableUse));
     this.startCoasting(bike, state.speed, state.verticalSpeed ?? 0, bike === this.mounted);
@@ -668,7 +739,7 @@ export class VehicleSystem {
 
   private applyRemoteTransform(bike: MotorbikeVisual, position: { x: number; y: number; z: number }, yaw: number) {
     bike.position.copy(position as THREE.Vector3);
-    bike.rotation.set(0, yaw, 0);
+    bike.quaternion.copy(vehicleGravity(bike).frame).multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), yaw));
     const body = bike.userData.rigidBody;
     if (body?.isValid()) {
       body.setTranslation(bike.position, true);
@@ -716,12 +787,14 @@ export class VehicleSystem {
         // Advance the last received target, not the rendered bike plus a correction toward
         // a frozen packet. The latter repeatedly accelerates/brakes between 20 Hz updates.
         const predicted = new THREE.Vector3(0, 0, -state.speed * sample.age)
-          .applyAxisAngle(new THREE.Vector3(0, 1, 0), state.yaw)
+          .applyAxisAngle(new THREE.Vector3(0, 1, 0), state.yaw).applyQuaternion(this.networkGravityFrame(state))
           .add(new THREE.Vector3(state.position.x, state.position.y, state.position.z));
-        predicted.y += (state.verticalSpeed ?? 0) * sample.age;
+        predicted.addScaledVector(new THREE.Vector3(0, 1, 0).applyQuaternion(this.networkGravityFrame(state)), (state.verticalSpeed ?? 0) * sample.age);
         const position = bike.position.clone().lerp(predicted, 1 - Math.exp(-15 * frameDt));
         const yaw = getMotorbikeHeading(bike);
         const diff = Math.atan2(Math.sin(state.yaw - yaw), Math.cos(state.yaw - yaw));
+        const frame = vehicleGravity(bike).frame.clone().slerp(this.networkGravityFrame(state), 1 - Math.exp(-15 * frameDt));
+        receiveVehicleGravity(bike, state.gravityOrientation, frame, state.gravityTransitionRemaining ?? 0);
         // Use vehicle yaw, never passenger aim or an interpolated avatar's old seat offset.
         this.applyRemoteTransform(bike, position, yaw + diff * (1 - Math.exp(-15 * Math.max(0, Math.min(dt, 0.1)))));
         bike.userData.vehicleMotion = { speed: state.speed, verticalSpeed: state.verticalSpeed ?? 0, lean: state.lean };
@@ -750,6 +823,7 @@ export class VehicleSystem {
         const offset = seat === 'passenger' ? props.passengerSeatOffsetZ : props.seatOffsetZ;
         const position = new THREE.Vector3(0, height - bike.userData.originalScale.y / 2 - hip, offset)
           .applyQuaternion(bike.quaternion).add(bike.position);
+        syncVehicleGravity(player, bike);
         player.syncVehicleSeat?.(position, getMotorbikeHeading(bike), seat, bike.userData.vehicleMotion?.lean ?? this.lean, dt);
       }
       if (bike === this.mounted && this.isPassenger) {

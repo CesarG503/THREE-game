@@ -342,6 +342,10 @@ export class Game {
 		};
 
 		this.networkManager.onPlayerAction = (playerId: any, actionType: any, data: any) => {
+			if (actionType === "motorbikeDurability") {
+				this.vehicleSystem?.receiveDurability(playerId, data);
+				return;
+			}
 			if (actionType === "motorbikeSeat") {
 				this.vehicleSystem?.receiveSeat(playerId, data);
 				return;

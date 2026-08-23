@@ -2,6 +2,8 @@ import { normalizeGravityOrientation, type GravityOrientation } from '../utils/G
 export const MOTORBIKE_SIZE = { x: 0.85, y: 1.25, z: 2.4 };
 
 export const MOTORBIKE_FIELDS = [
+  { key: 'maxDurability', label: 'Durabilidad máxima', value: 100, min: 1, max: 100000, step: 1 },
+  { key: 'durability', label: 'Durabilidad disponible', value: 100, min: 0, max: 100000, step: 1 },
   { key: 'maxSpeed', label: 'Velocidad máxima (m/s)', value: 22, min: 1, max: 60, step: 1 },
   { key: 'reverseSpeed', label: 'Velocidad en reversa (m/s)', value: 5, min: 0, max: 15, step: 0.5 },
   { key: 'acceleration', label: 'Aceleración (m/s²)', value: 9, min: 0.1, max: 40, step: 0.5 },
@@ -32,17 +34,19 @@ export const MOTORBIKE_FIELDS = [
 /** Ángulo máximo de giro relativo del torso y cámara del pasajero (85°). */
 export const MAX_PASSENGER_YAW = (85 * Math.PI) / 180;
 
-export type MotorbikeSettings = Record<(typeof MOTORBIKE_FIELDS)[number]['key'], number> & { vehicleKind: 'motorbike'; dismountPenaltyEnabled: boolean; gravityOrientation: GravityOrientation | 'inherit' };
+export type MotorbikeSettings = Record<(typeof MOTORBIKE_FIELDS)[number]['key'], number> & { vehicleKind: 'motorbike'; dismountPenaltyEnabled: boolean; durabilityEnabled: boolean; gravityOrientation: GravityOrientation | 'inherit' };
 
 export function normalizeMotorbikeSettings(props: any = {}): MotorbikeSettings {
   props = props ?? {};
   const result: any = { ...props, vehicleKind: 'motorbike' };
   result.gravityOrientation = props.gravityOrientation === undefined || props.gravityOrientation === 'inherit' ? 'inherit' : normalizeGravityOrientation(props.gravityOrientation);
+  result.durabilityEnabled = props.durabilityEnabled === true;
   result.dismountPenaltyEnabled = props.dismountPenaltyEnabled === true;
   for (const field of MOTORBIKE_FIELDS) {
     const value = Number(props[field.key] ?? field.value);
     result[field.key] = Number.isFinite(value) ? Math.min(field.max, Math.max(field.min, value)) : field.value;
   }
+  result.durability = props.durability === undefined ? result.maxDurability : Math.min(result.durability, result.maxDurability);
   result.consumableUse = Math.min(result.consumableUse, result.maxConsumableUse);
   result.reverseSpeed = Math.min(result.reverseSpeed, result.maxSpeed);
   return result;

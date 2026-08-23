@@ -1,3 +1,4 @@
+import { VehicleDurability, isMotorbikeBroken } from './VehicleDurability';
 import * as THREE from 'three';
 import RAPIER from '@dimforge/rapier3d-compat';
 import { consumeFuel } from '../items/Fuel';
@@ -31,6 +32,7 @@ export class VehicleSystem {
   private vehicleJetpackActive = false;
   private vehicleJetpackVFX = 'Humo y Fuego';
   private padContacts = new WeakMap<MotorbikeVisual, Map<THREE.Object3D, { inside: boolean; cooldown: number }>>();
+  private durability: VehicleDurability;
   private controller: RAPIER.KinematicCharacterController;
   private pose = new RiderPose();
   private fall = new VehicleFall();
@@ -47,6 +49,7 @@ export class VehicleSystem {
   isSkidding = false;
 
   constructor(private game: any) {
+    this.durability = new VehicleDurability(game);
     this.controller = game.world.createCharacterController(0.025);
     this.controller.enableSnapToGround(0.3);
     this.controller.setMaxSlopeClimbAngle(Math.PI / 4);
@@ -110,6 +113,10 @@ export class VehicleSystem {
     if (!bike) return false;
     const character = this.game.character;
     if (character.getGravityUpVector().dot(vehicleUp(bike)) < 0.99 || this.game.gravityQteActive) return false;
+    if (isMotorbikeBroken(bike.userData.logicProperties)) {
+      this.show('Motocicleta averiada · Durabilidad 0');
+      return false;
+    }
     this.mounted = bike;
     this.lastSeatSwitchTime = Date.now();
     this.seat = bike.userData.vehicleDriver ? 'passenger' : 'driver';
@@ -257,6 +264,7 @@ export class VehicleSystem {
   update(delta: number): boolean {
     const dt = Number.isFinite(delta) ? Math.min(0.05, Math.max(0, delta)) : 0;
     this.tireTracks.update(dt);
+    this.durability.update(this.bikes, dt);
     // Inspector edits also apply to parked motorcycles, which then fall toward their new surface.
     for (const bike of this.bikes) {
       const requested = bike.userData.logicProperties?.gravityOrientation;
@@ -300,7 +308,8 @@ export class VehicleSystem {
     const throttle = this.paused ? 0 : Number(keys.forward) - Number(keys.backward);
     const brake = this.paused || keys.crouch;
     const jetpack = this.getSelectedJetpack();
-    const jetpackActive = !brake && !this.paused && keys.jump && jetpack && jetpack.consumableUse > 0;
+    const broken = isMotorbikeBroken(props);
+    const jetpackActive = !broken && !brake && !this.paused && keys.jump && jetpack && jetpack.consumableUse > 0;
     this.vehicleJetpackActive = Boolean(jetpackActive);
     this.vehicleJetpackVFX = jetpack?.particleVFX || 'Humo y Fuego';
     character.isUsingJetpack = this.vehicleJetpackActive;
@@ -308,7 +317,7 @@ export class VehicleSystem {
     character.noPitchTilt = false;
     const drift = !this.paused && keys.crouch && (keys.left || keys.right);
     const driveThrottle = jetpackActive ? Math.max(throttle, 1) : throttle;
-    const powered = !brake && driveThrottle !== 0 && (jetpackActive || props.consumableUse > 0);
+    const powered = !broken && !brake && driveThrottle !== 0 && (jetpackActive || props.consumableUse > 0);
     const maxForwardSpeed = props.maxSpeed + (jetpackActive ? props.jetpackMaxSpeedBonus : 0);
     const targetSpeed = powered ? (driveThrottle > 0 ? maxForwardSpeed : -props.reverseSpeed) : 0;
     const brakeRate = props.braking * (drift ? props.driftBrakeMultiplier : 1);
@@ -321,7 +330,7 @@ export class VehicleSystem {
     this.steering = THREE.MathUtils.lerp(this.steering, steeringTarget, 1 - Math.exp(-10 * dt));
     this.jumpCooldown = Math.max(0, this.jumpCooldown - dt);
     const jumpDown = Boolean(keys.jump);
-    if (!jetpackActive && !this.paused && jumpDown && !this.wasJumpDown && this.grounded && this.jumpCooldown <= 0 && props.jumpForce > 0) {
+    if (!broken && !jetpackActive && !this.paused && jumpDown && !this.wasJumpDown && this.grounded && this.jumpCooldown <= 0 && props.jumpForce > 0) {
       this.verticalSpeed = Math.max(this.verticalSpeed, props.jumpForce);
       this.grounded = false;
       this.jumpCooldown = props.jumpCooldown;
@@ -330,7 +339,7 @@ export class VehicleSystem {
     const speedAbs = Math.abs(this.speed);
     const movingTurn = this.steering * THREE.MathUtils.degToRad(props.turnSpeed) *
       Math.min(speedAbs / (drift ? 2 : 4), 1) * Math.sign(this.speed) * (drift ? props.driftTurnMultiplier : 1);
-    const pivotTurn = brake && speedAbs < 0.35
+    const pivotTurn = !broken && brake && speedAbs < 0.35
       ? this.steering * THREE.MathUtils.degToRad(props.stationaryTurnSpeed) * (1 - THREE.MathUtils.clamp(speedAbs / 0.35, 0, 1))
       : 0;
     const yaw = getMotorbikeHeading(bike) + (movingTurn + pivotTurn) * dt;
@@ -671,6 +680,7 @@ export class VehicleSystem {
   private networkStateFor(bike: MotorbikeVisual, speed: number, verticalSpeed: number, steering: number, lean: number) {
     return {
       uuid: bike.userData.uuid,
+      ...this.durability.state(bike),
       position: { x: bike.position.x, y: bike.position.y, z: bike.position.z },
       yaw: getMotorbikeHeading(bike),
       gravityOrientation: vehicleGravity(bike).orientation,
@@ -716,6 +726,7 @@ export class VehicleSystem {
     if (bike.userData[field] === playerId) delete bike.userData[field];
     // A departing passenger must never park or rewind a motorcycle that still has a driver.
     if (bike.userData.vehicleDriver || (bike === this.mounted && this.isDriver)) return;
+    this.durability.receive(bike, state);
     this.remoteMotionSamples.delete(bike);
     receiveVehicleGravity(bike, state.gravityOrientation, this.networkGravityFrame(state), state.gravityTransitionRemaining ?? 0);
     this.applyRemoteTransform(bike, state.position, state.yaw);
@@ -723,6 +734,10 @@ export class VehicleSystem {
     this.startCoasting(bike, state.speed, state.verticalSpeed ?? 0, bike === this.mounted);
     bike.animateMotorbike?.(0, 0, 0);
     if (bike === this.mounted) this.syncRider(0);
+  }
+
+  receiveDurability(playerId: string, state: any) {
+    this.durability.receiveAction(playerId, state, this.bikes);
   }
 
   receiveSeat(playerId: string, state: any) {
@@ -775,6 +790,7 @@ export class VehicleSystem {
       const owner = remote.find(([id]) => id === authority)?.[1];
       if (owner) {
         const state = owner.state.motorbike;
+        this.durability.receive(bike, state);
         this.coasting.delete(bike);
         const frameDt = Math.max(0, Math.min(dt, 0.1));
         let sample = this.remoteMotionSamples.get(bike);
@@ -838,7 +854,10 @@ export class VehicleSystem {
     if (!this.hud || !this.readout || !this.fuelBar) return;
     this.hud.style.display = 'block';
     this.readout.style.whiteSpace = 'pre-line';
-    this.readout.textContent = message;
+    const props = this.mounted?.userData.logicProperties;
+    const durability = props?.durabilityEnabled ? `
+Durabilidad ${Math.ceil(props.durability)} / ${props.maxDurability}${isMotorbikeBroken(props) ? ' · AVERIADA' : ''}` : '';
+    this.readout.textContent = message + durability;
     this.fuelBar.style.display = fuel === undefined ? 'none' : 'block';
     this.fuelBar.max = maxFuel;
     this.fuelBar.value = fuel ?? 0;

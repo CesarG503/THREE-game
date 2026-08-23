@@ -1,3 +1,4 @@
+import { getControllerDamage } from '../utils/DamageController';
 import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
 import { animate } from "animejs";
@@ -792,23 +793,7 @@ export function updateCollisionLogic(this: any, dt: number) {
 					const accumulatedDamage = Number(props.accumulatedDamage ?? 0);
 
 					if (!enableStop || accumulatedDamage < damageStopLimit) {
-						// Determine damage
-						let finalDamage = 0;
-						if (props.instantKill) {
-							finalDamage = this.character.maxHealth;
-						} else {
-							const baseDamage = Number(props.damage ?? 10);
-							const percentDamage = Number(props.percentDamage ?? 0);
-							const percentVal = (percentDamage / 100) * this.character.maxHealth;
-							finalDamage = baseDamage + percentVal;
-
-							const maxDamage = Number(props.maxDamage ?? 100);
-							if (finalDamage > maxDamage) {
-								finalDamage = maxDamage;
-							}
-						}
-
-						finalDamage = Math.round(finalDamage);
+						const finalDamage = getControllerDamage(props, this.character.maxHealth);
 
 						if (finalDamage > 0) {
 							// Apply damage to player

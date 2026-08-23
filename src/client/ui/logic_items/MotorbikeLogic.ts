@@ -29,12 +29,29 @@ export class MotorbikeLogic {
     penalty.checked = normalizeMotorbikeSettings(props).dismountPenaltyEnabled;
     penaltyLabel.append(penalty, 'Caída y daño al bajar a alta velocidad');
     container.appendChild(penaltyLabel);
+    const durabilityLabel = document.createElement('label');
+    durabilityLabel.style.cssText = penaltyLabel.style.cssText;
+    const durability = document.createElement('input');
+    durability.type = 'checkbox';
+    durability.checked = normalizeMotorbikeSettings(props).durabilityEnabled;
+    durabilityLabel.append(durability, 'Activar durabilidad (en 0 la moto queda averiada)');
+    container.appendChild(durabilityLabel);
     const inputs = new Map<string, HTMLInputElement>();
     const refreshPenalty = () => {
       for (const key of ['dismountFallSpeed', 'dismountDamagePercent']) {
         const input = inputs.get(key);
         if (input) input.disabled = !penalty.checked;
       }
+    };
+    const refreshDurability = () => {
+      for (const key of ['maxDurability', 'durability']) {
+        const input = inputs.get(key);
+        if (input) input.disabled = !durability.checked;
+      }
+    };
+    durability.onchange = () => {
+      update('durabilityEnabled', durability.checked);
+      refreshDurability();
     };
     penalty.onchange = () => {
       update('dismountPenaltyEnabled', penalty.checked);
@@ -68,5 +85,6 @@ export class MotorbikeLogic {
       container.appendChild(label);
     }
     refreshPenalty();
+    refreshDurability();
   }
 }

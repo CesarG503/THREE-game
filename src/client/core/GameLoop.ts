@@ -269,6 +269,7 @@ export function animate(this: any) {
 
 	// Handle Projectile Collisions
 	this.eventQueue.drainCollisionEvents((handle1: any, handle2: any, started: any) => {
+		if (started) this.vehicleSystem?.handleProjectileCollision?.(handle1, handle2, this.projectiles);
 		if (started && this.projectiles) {
 			for (let i = 0; i < this.projectiles.length; i++) {
 				const proj = this.projectiles[i];

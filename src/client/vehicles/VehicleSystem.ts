@@ -1,3 +1,4 @@
+import { VehicleDamageEffects } from './VehicleDamageEffects';
 import { VehicleDurability, isMotorbikeBroken } from './VehicleDurability';
 import * as THREE from 'three';
 import RAPIER from '@dimforge/rapier3d-compat';
@@ -32,6 +33,8 @@ export class VehicleSystem {
   private vehicleJetpackActive = false;
   private vehicleJetpackVFX = 'Humo y Fuego';
   private padContacts = new WeakMap<MotorbikeVisual, Map<THREE.Object3D, { inside: boolean; cooldown: number }>>();
+  private damageEffects: VehicleDamageEffects;
+  private projectileHits = new WeakMap<object, Set<MotorbikeVisual>>();
   private durability: VehicleDurability;
   private controller: RAPIER.KinematicCharacterController;
   private pose = new RiderPose();
@@ -49,7 +52,8 @@ export class VehicleSystem {
   isSkidding = false;
 
   constructor(private game: any) {
-    this.durability = new VehicleDurability(game);
+    this.damageEffects = new VehicleDamageEffects(game.sceneManager?.scene ?? game.scene ?? new THREE.Scene());
+    this.durability = new VehicleDurability(game, bike => this.damageEffects.hit(bike));
     this.controller = game.world.createCharacterController(0.025);
     this.controller.enableSnapToGround(0.3);
     this.controller.setMaxSlopeClimbAngle(Math.PI / 4);
@@ -265,6 +269,7 @@ export class VehicleSystem {
     const dt = Number.isFinite(delta) ? Math.min(0.05, Math.max(0, delta)) : 0;
     this.tireTracks.update(dt);
     this.durability.update(this.bikes, dt);
+    this.damageEffects.update(this.bikes, dt);
     // Inspector edits also apply to parked motorcycles, which then fall toward their new surface.
     for (const bike of this.bikes) {
       const requested = bike.userData.logicProperties?.gravityOrientation;
@@ -736,6 +741,25 @@ export class VehicleSystem {
     if (bike === this.mounted) this.syncRider(0);
   }
 
+  handleProjectileCollision(handle1: number, handle2: number, projectiles: any[] = []) {
+    for (const projectile of projectiles) {
+      if (projectile.isDead || (projectile.colliderHandle !== handle1 && projectile.colliderHandle !== handle2)) continue;
+      const otherHandle = projectile.colliderHandle === handle1 ? handle2 : handle1;
+      if (otherHandle === projectile.ownerColliderHandle) continue;
+      const bike = this.bikes.find(candidate => {
+        const body = candidate.userData.rigidBody;
+        if (!body?.isValid()) return false;
+        for (let i = 0; i < body.numColliders(); i++) if (body.collider(i).handle === otherHandle) return true;
+        return false;
+      });
+      if (!bike) continue;
+      let hits = this.projectileHits.get(projectile);
+      if (!hits) { hits = new Set(); this.projectileHits.set(projectile, hits); }
+      if (hits.has(bike)) continue;
+      if (this.durability.damage(bike, projectile.damage)) hits.add(bike);
+    }
+  }
+
   receiveDurability(playerId: string, state: any) {
     this.durability.receiveAction(playerId, state, this.bikes);
   }
@@ -865,6 +889,7 @@ Durabilidad ${Math.ceil(props.durability)} / ${props.maxDurability}${isMotorbike
   dispose() {
     this.dismount(true);
     this.tireTracks.dispose();
+    this.damageEffects.dispose();
     this.fall.reset(this.game.character);
     for (const [bike] of this.coasting) {
       const body = bike.userData.rigidBody;

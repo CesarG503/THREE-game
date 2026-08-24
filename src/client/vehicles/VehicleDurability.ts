@@ -13,7 +13,7 @@ export class VehicleDurability {
   private elapsed = 0;
   private lastHits = new WeakMap<MotorbikeVisual, WeakMap<THREE.Object3D, number>>();
   private revisions = new WeakMap<MotorbikeVisual, number>();
-  constructor(private game: any) {}
+  constructor(private game: any, private onDamage?: (bike: MotorbikeVisual) => void) {}
 
   private authority(bike: MotorbikeVisual): string {
     const network = this.game.networkManager;
@@ -43,6 +43,7 @@ export class VehicleDurability {
         !Number.isSafeInteger(state.durabilityRevision) || state.durabilityRevision < 0 ||
         state.durabilityRevision <= (this.revisions.get(bike) ?? -1)) return;
     const props = normalizeMotorbikeSettings(bike.userData.logicProperties);
+    if (props.durabilityEnabled && state.durability < props.durability) this.onDamage?.(bike);
     bike.userData.logicProperties.durability = Math.min(props.maxDurability, state.durability);
     this.revisions.set(bike, state.durabilityRevision);
   }
@@ -50,6 +51,21 @@ export class VehicleDurability {
   receiveAction(playerId: string, state: any, bikes: MotorbikeVisual[]) {
     const bike = bikes.find(b => b.userData.uuid === state?.uuid);
     if (bike && playerId === this.authority(bike)) this.receive(bike, state);
+  }
+
+  damage(bike: MotorbikeVisual, amount: number): boolean {
+    if (!Number.isFinite(amount) || amount <= 0 || !bike.userData.logicProperties?.durabilityEnabled ||
+        this.authority(bike) !== (this.game.networkManager?.playerId || 'local')) return false;
+    const props = normalizeMotorbikeSettings(bike.userData.logicProperties);
+    if (isMotorbikeBroken(props)) return false;
+    Object.assign(bike.userData.logicProperties, props, { durability: Math.max(0, props.durability - amount) });
+    this.revisions.set(bike, (this.revisions.get(bike) ?? 0) + 1);
+    this.onDamage?.(bike);
+    this.game.floatingTextManager?.spawnText(`-${amount}`, bike.position.clone().addScaledVector(vehicleUp(bike), 1), '#FF9933', 2);
+    if (this.game.networkManager?.isConnected) {
+      this.game.networkManager.sendPlayerAction('motorbikeDurability', { uuid: bike.userData.uuid, ...this.state(bike) });
+    }
+    return true;
   }
 
   private touches(bike: MotorbikeVisual, source: THREE.Object3D) {
@@ -91,13 +107,8 @@ export class VehicleDurability {
         const damage = getControllerDamage(damageProps, props.maxDurability);
         if (damage <= 0) continue;
         hits.set(source, this.elapsed);
-        bike.userData.logicProperties.durability = Math.max(0, bike.userData.logicProperties.durability - damage);
+        this.damage(bike, damage);
         damageProps.accumulatedDamage = accumulated + damage;
-        this.revisions.set(bike, (this.revisions.get(bike) ?? 0) + 1);
-        this.game.floatingTextManager?.spawnText(`-${damage}`, bike.position.clone().addScaledVector(vehicleUp(bike), 1), '#FF9933', 2);
-        if (this.game.networkManager?.isConnected) {
-          this.game.networkManager.sendPlayerAction('motorbikeDurability', { uuid: bike.userData.uuid, ...this.state(bike) });
-        }
         if (isMotorbikeBroken(bike.userData.logicProperties)) break;
       }
     }

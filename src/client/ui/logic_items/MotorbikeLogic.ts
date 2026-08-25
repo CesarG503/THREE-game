@@ -36,6 +36,18 @@ export class MotorbikeLogic {
     durability.checked = normalizeMotorbikeSettings(props).durabilityEnabled;
     durabilityLabel.append(durability, 'Activar durabilidad (en 0 la moto queda averiada)');
     container.appendChild(durabilityLabel);
+    const durabilitySettings = document.createElement('div');
+    container.appendChild(durabilitySettings);
+    const explosionLabel = document.createElement('label');
+    explosionLabel.style.cssText = penaltyLabel.style.cssText;
+    const explosion = document.createElement('input');
+    explosion.type = 'checkbox';
+    explosion.checked = normalizeMotorbikeSettings(props).explosionDamageEnabled;
+    explosionLabel.append(explosion, 'Daño por explosión al llegar a 0 de durabilidad');
+    container.appendChild(explosionLabel);
+    const explosionSettings = document.createElement('div');
+    explosionSettings.style.cssText = 'padding-left:12px;border-left:2px solid #f97316';
+    container.appendChild(explosionSettings);
     const inputs = new Map<string, HTMLInputElement>();
     const refreshPenalty = () => {
       for (const key of ['dismountFallSpeed', 'dismountDamagePercent']) {
@@ -44,10 +56,19 @@ export class MotorbikeLogic {
       }
     };
     const refreshDurability = () => {
+      explosion.disabled = !durability.checked;
+      for (const key of ['explosionDamage', 'explosionRadius']) {
+        const input = inputs.get(key);
+        if (input) input.disabled = !durability.checked || !explosion.checked;
+      }
       for (const key of ['maxDurability', 'durability']) {
         const input = inputs.get(key);
         if (input) input.disabled = !durability.checked;
       }
+    };
+    explosion.onchange = () => {
+      update('explosionDamageEnabled', explosion.checked);
+      refreshDurability();
     };
     durability.onchange = () => {
       update('durabilityEnabled', durability.checked);
@@ -82,7 +103,9 @@ export class MotorbikeLogic {
       };
       inputs.set(field.key, input);
       label.appendChild(input);
-      container.appendChild(label);
+      const parent = ['explosionDamage', 'explosionRadius'].includes(field.key) ? explosionSettings
+        : ['maxDurability', 'durability'].includes(field.key) ? durabilitySettings : container;
+      parent.appendChild(label);
     }
     refreshPenalty();
     refreshDurability();

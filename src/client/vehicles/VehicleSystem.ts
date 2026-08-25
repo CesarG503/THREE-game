@@ -760,6 +760,10 @@ export class VehicleSystem {
     }
   }
 
+  receiveExplosion(playerId: string, state: any) {
+    this.durability.receiveExplosion(playerId, state, this.bikes);
+  }
+
   receiveDurability(playerId: string, state: any) {
     this.durability.receiveAction(playerId, state, this.bikes);
   }

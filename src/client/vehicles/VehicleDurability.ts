@@ -11,6 +11,7 @@ export function isMotorbikeBroken(props: any) {
 /** Each vehicle has independent damage intervals; only its network owner applies damage. */
 export class VehicleDurability {
   private elapsed = 0;
+  private explosions = new WeakMap<MotorbikeVisual, number>();
   private lastHits = new WeakMap<MotorbikeVisual, WeakMap<THREE.Object3D, number>>();
   private revisions = new WeakMap<MotorbikeVisual, number>();
   constructor(private game: any, private onDamage?: (bike: MotorbikeVisual) => void) {}
@@ -65,7 +66,44 @@ export class VehicleDurability {
     if (this.game.networkManager?.isConnected) {
       this.game.networkManager.sendPlayerAction('motorbikeDurability', { uuid: bike.userData.uuid, ...this.state(bike) });
     }
+    if (isMotorbikeBroken(bike.userData.logicProperties) && props.explosionDamageEnabled) {
+      const explosion = {
+        uuid: bike.userData.uuid,
+        revision: this.revisions.get(bike)!,
+        position: { x: bike.position.x, y: bike.position.y, z: bike.position.z },
+        damage: props.explosionDamage,
+        radius: props.explosionRadius,
+      };
+      // Publish before applying local damage: the blast can kill and unseat the driver.
+      if (this.game.networkManager?.isConnected) this.game.networkManager.sendPlayerAction('motorbikeExplosion', explosion);
+      this.applyExplosion(bike, explosion);
+    }
     return true;
+  }
+
+  receiveExplosion(playerId: string, state: any, bikes: MotorbikeVisual[]) {
+    const bike = bikes.find(candidate => candidate.userData.uuid === state?.uuid);
+    if (!bike || playerId !== this.authority(bike) || !bike.userData.logicProperties?.durabilityEnabled ||
+        !bike.userData.logicProperties.explosionDamageEnabled) return;
+    if (!Number.isSafeInteger(state.revision) || state.revision <= 0 ||
+        state.revision < (this.revisions.get(bike) ?? 0) ||
+        typeof state.damage !== 'number' || !Number.isFinite(state.damage) || state.damage < 0 || state.damage > 100000 ||
+        typeof state.radius !== 'number' || !Number.isFinite(state.radius) || state.radius < 0 || state.radius > 100 ||
+        ![state.position?.x, state.position?.y, state.position?.z].every(value => typeof value === 'number' && Number.isFinite(value) && Math.abs(value) < 1e6)) return;
+    this.applyExplosion(bike, state);
+  }
+
+  private applyExplosion(bike: MotorbikeVisual, state: { revision: number; position: { x: number; y: number; z: number }; damage: number; radius: number }) {
+    if (state.revision <= (this.explosions.get(bike) ?? 0)) return;
+    this.explosions.set(bike, state.revision);
+    const origin = new THREE.Vector3(state.position.x, state.position.y, state.position.z);
+    const character = this.game.character;
+    character?.particleSystem?.spawnExplosionEffect?.(origin);
+    // Every client owns its own player's health; remote avatars must not take damage twice.
+    if (!character || character.isDead || state.damage <= 0 || state.radius <= 0) return;
+    if (character.getPosition().distanceToSquared(origin) <= state.radius * state.radius) {
+      character.takeDamage(state.damage);
+    }
   }
 
   private touches(bike: MotorbikeVisual, source: THREE.Object3D) {

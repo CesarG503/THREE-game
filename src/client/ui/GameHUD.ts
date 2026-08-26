@@ -1,3 +1,4 @@
+import { VehicleHUDWidget, ensureVehicleHUDDefaults, isVehicleHUDId, vehicleShowKey, type VehicleHUDData, type VehicleHUDId } from './modules/VehicleHUD';
 import { animate } from 'animejs'
 import type { HUDConfig, UIPosition, UIPositionObject } from '../types'
 import {
@@ -65,6 +66,8 @@ function ensureStaminaHUDDefaults(hudSettings: any) {
 }
 
 export class GameHUD {
+    private vehicleWidgets = new Map<VehicleHUDId, VehicleHUDWidget>();
+    private lastVehicle: VehicleHUDData | null = null;
     container: HTMLElement;
     timerElement: HTMLElement | null;
     healthElement: HTMLElement | null;
@@ -123,6 +126,9 @@ export class GameHUD {
         if (this.isDestroyed) return
         this.settings = settings || {};
         ensureStaminaHUDDefaults(this.settings);
+        ensureVehicleHUDDefaults(this.settings);
+        for (const widget of this.vehicleWidgets.values()) widget.destroy();
+        this.vehicleWidgets.clear();
         const sharedInventory = document.getElementById('inventory-container')
 
         // Hide HUD check based on player role profile
@@ -171,7 +177,13 @@ export class GameHUD {
 
         for (let i = layerOrder.length - 1; i >= 0; i--) {
             const id = layerOrder[i];
-            if (id === 'health' && this.settings.showHealth) this.createHealth(this.settings);
+            if (isVehicleHUDId(id) && (this.settings as any)[vehicleShowKey(id)]) {
+                const widget = new VehicleHUDWidget(id, this.settings, this.container);
+                this.applyPosition(widget.element, (this.settings as any)[id + 'Pos']);
+                this.container.appendChild(widget.element);
+                this.vehicleWidgets.set(id, widget);
+            }
+            else if (id === 'health' && this.settings.showHealth) this.createHealth(this.settings);
             else if (id === 'jump' && this.settings.showJump) this.createJump(this.settings);
             else if (id === 'stamina' && this.settings.showStamina) this.createStamina(this.settings);
             else if (id === 'inventory' && this.settings.showInventory) this.createInventory(this.settings);
@@ -187,7 +199,17 @@ export class GameHUD {
         if (this.lastJump) this.updateJump(this.lastJump.current, this.lastJump.max)
         if (this.lastStamina) this.updateStamina(this.lastStamina.current, this.lastStamina.max)
         this.applyLayerOrder()
+        this.updateVehicle(this.lastVehicle)
         this.scheduleLayoutStabilization()
+    }
+
+    updateVehicle(data: VehicleHUDData | null) {
+        this.lastVehicle = data;
+        const visible = data !== null && !this.game?.playerConfigManager?.getCurrentProfile?.()?.hideHUD;
+        for (const widget of this.vehicleWidgets.values()) {
+            widget.show(visible);
+            if (visible) widget.update(data!);
+        }
     }
 
     scheduleLayoutStabilization() {
@@ -673,6 +695,7 @@ export class GameHUD {
     }
 
     getHudElement(id: string) {
+        if (isVehicleHUDId(id)) return this.vehicleWidgets.get(id)?.element ?? null;
         if (id === 'health') return this.healthElement;
         if (id === 'jump') return this.jumpElement;
         if (id === 'stamina') return this.staminaElement;
@@ -682,7 +705,7 @@ export class GameHUD {
     }
 
     getRenderedHudIds() {
-        const ids: string[] = [];
+        const ids: string[] = [...this.vehicleWidgets.keys()];
         if (this.healthElement) ids.push('health');
         if (this.jumpElement) ids.push('jump');
         if (this.staminaElement) ids.push('stamina');
@@ -786,6 +809,7 @@ export class GameHUD {
             ['inventory', this.inventoryElement]
         ]);
 
+        for (const [id, widget] of this.vehicleWidgets) elementById.set(id, widget.element);
         Array.from(this.container.querySelectorAll<HTMLElement>('[id^="fz-counter-"]')).forEach(el => {
             elementById.set(`fz_${el.id.substring('fz-counter-'.length)}`, el);
         });
@@ -854,6 +878,8 @@ export class GameHUD {
     destroy() {
         if (this.isDestroyed) return
         this.isDestroyed = true
+        for (const widget of this.vehicleWidgets.values()) widget.destroy();
+        this.vehicleWidgets.clear();
 
         if (this.resizeTimer !== null) {
             window.clearTimeout(this.resizeTimer)

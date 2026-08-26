@@ -164,6 +164,7 @@ export class VehicleSystem {
     delete bike.userData[this.isDriver ? 'vehicleDriver' : 'vehiclePassenger'];
     this.pose.reset(this.game.character);
     this.seat = target;
+    if (this.isPassenger) this.game.hud?.updateVehicle?.(null);
     bike.userData[this.isDriver ? 'vehicleDriver' : 'vehiclePassenger'] = this.playerId;
     if (this.isDriver) {
       this.game.cameraController?.setYawConstraint?.(null);
@@ -234,6 +235,7 @@ export class VehicleSystem {
     this.endBikeTracks(bike);
     this.isSkidding = false;
     this.mounted = null;
+    this.game.hud?.updateVehicle?.(null);
     this.seat = null;
     character.isMounted = false;
     if (character.collider?.isValid()) character.collider.setSensor(this.wasSensor);
@@ -280,6 +282,7 @@ export class VehicleSystem {
     }
     this.updateCoasting(dt);
     if (!this.mounted) {
+      this.game.hud?.updateVehicle?.(null);
       if (this.hud) this.hud.style.display = 'none';
       const falling = this.fall.update(this.game.character, this.controller, this.paused ? 0 : dt);
       if (falling) {
@@ -879,6 +882,21 @@ export class VehicleSystem {
   }
 
   private show(message: string, fuel?: number, maxFuel = 1) {
+    if (this.game.hud?.updateVehicle) {
+      const props = this.mounted?.userData.logicProperties;
+      this.game.hud.updateVehicle(this.isDriver && props && !this.game.character.isDead ? {
+        speed: Math.abs(this.speed) * 3.6,
+        maxSpeed: (props.maxSpeed + props.jetpackMaxSpeedBonus) * 3.6,
+        fuel: props.consumableUse, maxFuel: props.maxConsumableUse,
+        durability: props.durability, maxDurability: props.maxDurability,
+        durabilityEnabled: props.durabilityEnabled, jetpack: this.vehicleJetpackActive,
+      } : null);
+      // Keep transient interaction errors visible; only replace the old driving readout.
+      if (fuel !== undefined) {
+        if (this.hud) this.hud.style.display = 'none';
+        return;
+      }
+    }
     if (!this.hud || !this.readout || !this.fuelBar) return;
     this.hud.style.display = 'block';
     this.readout.style.whiteSpace = 'pre-line';

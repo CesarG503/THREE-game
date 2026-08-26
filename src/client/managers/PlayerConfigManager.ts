@@ -1,3 +1,4 @@
+import { ensureVehicleHUDDefaults } from '../ui/modules/VehicleHUD';
 import { DEFAULT_POLYGON_SKIN_URL, getSelectedSkin } from "../platform/skinPreferences";
 import { getStoredAuth } from "../platform/auth";
 import { normalizeGravityOrientation } from "../utils/GravityOrientation";
@@ -10,6 +11,7 @@ const DEFAULT_VISUAL_RULE = {
 
 export function ensureStaminaHUDDefaults(hudSettings: any) {
     if (!hudSettings) return;
+    ensureVehicleHUDDefaults(hudSettings);
 
     if (hudSettings.showStamina === undefined) {
         hudSettings.showStamina = true;

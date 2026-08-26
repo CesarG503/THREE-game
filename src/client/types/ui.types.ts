@@ -28,6 +28,22 @@ export type UIPresetPosition =
 export type UIPosition = UIPresetPosition | UIPositionObject;
 
 export interface HUDConfig {
+    showVehicleSpeed?: boolean;
+    vehicleSpeedPos?: UIPosition;
+    vehicleSpeedWidth?: number;
+    vehicleSpeedHeight?: number;
+    vehicleSpeedShowText?: boolean;
+    showVehicleFuel?: boolean;
+    vehicleFuelPos?: UIPosition;
+    vehicleFuelWidth?: number;
+    vehicleFuelHeight?: number;
+    vehicleFuelShowText?: boolean;
+    showVehicleDurability?: boolean;
+    vehicleDurabilityPos?: UIPosition;
+    vehicleDurabilityWidth?: number;
+    vehicleDurabilityHeight?: number;
+    vehicleDurabilityShowText?: boolean;
+
     showHealth?: boolean;
     healthStyle?: 'bar' | 'hearts' | 'simple';
     healthPos?: UIPosition;

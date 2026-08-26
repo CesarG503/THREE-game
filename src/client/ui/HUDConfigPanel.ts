@@ -1,5 +1,6 @@
 // @ts-nocheck
 
+import { VehicleHUDWidget, VEHICLE_HUD_ITEMS, VEHICLE_HUD_PREVIEW, ensureVehicleHUDDefaults, isVehicleHUDId, vehicleShowKey } from './modules/VehicleHUD';
 import { animate, stagger } from 'animejs'
 import { HUDLayoutSystem } from './modules/HUDLayoutSystem'
 import { getActiveFarmingGroups } from './GameHUD'
@@ -93,6 +94,7 @@ export class HUDConfigPanel {
         this.profile = profile;
         this.tempSettings = JSON.parse(JSON.stringify(profile.hudSettings || {}));
         ensureStaminaHUDDefaults(this.tempSettings);
+        ensureVehicleHUDDefaults(this.tempSettings);
         this.selectedId = 'health'; // Default selection
         this.selectedPropertyTab = 'style';
         this.previewBackdropEnabled = false;
@@ -337,7 +339,7 @@ export class HUDConfigPanel {
         // Ensure layerOrder is initialized if missing
         if (!this.tempSettings.layerOrder) this.tempSettings.layerOrder = order;
 
-        const labels = { 'health': 'Salud', 'jump': 'Salto', 'stamina': 'Estamina', 'inventory': 'Inventario' };
+        const labels = { ...Object.fromEntries(VEHICLE_HUD_ITEMS.map(item => [item.id, item.label])), 'health': 'Salud', 'jump': 'Salto', 'stamina': 'Estamina', 'inventory': 'Inventario' };
         const items = order.map(id => {
             if (id.startsWith("fz_")) {
                 const gId = id.substring(3);
@@ -424,7 +426,7 @@ export class HUDConfigPanel {
             // Vis Checkbox (Stop propagation so we don't select row when checking)
             const check = document.createElement('input');
             check.type = "checkbox";
-            const vKey = item.id.startsWith("fz_") ? "show_" + item.id : (item.id === 'health' ? 'showHealth' : (item.id === 'jump' ? 'showJump' : (item.id === 'stamina' ? 'showStamina' : 'showInventory')));
+            const vKey = isVehicleHUDId(item.id) ? vehicleShowKey(item.id) : item.id.startsWith("fz_") ? "show_" + item.id : (item.id === 'health' ? 'showHealth' : (item.id === 'jump' ? 'showJump' : (item.id === 'stamina' ? 'showStamina' : 'showInventory')));
             if (this.tempSettings[vKey] === undefined) {
                 this.tempSettings[vKey] = true;
             }
@@ -495,10 +497,59 @@ export class HUDConfigPanel {
             return;
         }
 
+        if (isVehicleHUDId(type)) {
+            this.renderVehicleProperties(body, type);
+            return;
+        }
         const title = type === 'health' ? "Salud (Vida)" : (type === 'jump' ? "Salto (Carga)" : (type === 'stamina' ? "Estamina (Correr)" : "Inventario"));
 
         // Re-use logic from createSection but adapt to just render one
         this.createSection(body, title, type);
+    }
+
+    renderVehicleProperties(parent, id) {
+        const item = VEHICLE_HUD_ITEMS.find(item => item.id === id);
+        const title = document.createElement('h3');
+        title.textContent = item.label;
+        title.style.cssText = 'color:#baf5ff;font-size:15px';
+        parent.appendChild(title);
+        const description = document.createElement('p');
+        description.textContent = 'Visible solo al conducir una moto. Arrastra y redimensiona esta pieza; el diseño se guarda para este rol. La vista previa usa valores de ejemplo.';
+        description.style.cssText = 'color:#aaa;font-size:12px;line-height:1.5';
+        parent.appendChild(description);
+        for (const [key, label] of [[vehicleShowKey(id), 'Mostrar al conducir'], [id + 'ShowText', 'Mostrar valor numérico']]) {
+            const row = document.createElement('label');
+            row.style.cssText = 'display:flex;gap:8px;margin:12px 0;color:#ddd;font-size:12px';
+            const input = document.createElement('input');
+            input.type = 'checkbox'; input.checked = this.tempSettings[key];
+            input.onchange = () => { this.tempSettings[key] = input.checked; this.updatePreview(); this.renderSidebar(); };
+            row.append(input, label); parent.appendChild(row);
+        }
+        for (const [suffix, label] of [['Width', 'Ancho (px)'], ['Height', 'Alto (px)']]) {
+            const row = document.createElement('label');
+            row.style.cssText = 'display:flex;flex-direction:column;gap:6px;margin:12px 0;color:#ccc;font-size:12px';
+            row.textContent = label;
+            const input = document.createElement('input');
+            input.type = 'number'; input.min = '32'; input.max = '1000';
+            input.value = this.tempSettings[id + suffix];
+            input.style.cssText = 'padding:7px;background:#222;color:white;border:1px solid #555;border-radius:4px';
+            input.onchange = () => {
+                if (Number.isFinite(input.valueAsNumber)) this.tempSettings[id + suffix] = Math.max(32, Math.min(1000, input.valueAsNumber));
+                input.value = this.tempSettings[id + suffix]; this.updatePreview();
+            };
+            this.uiInputs[id + suffix] = input;
+            row.appendChild(input); parent.appendChild(row);
+        }
+    }
+
+    renderPreviewVehicle(id) {
+        const widget = new VehicleHUDWidget(id, this.tempSettings, this.previewContainer);
+        widget.element.removeAttribute('id');
+        widget.update(VEHICLE_HUD_PREVIEW, false);
+        widget.show(true, false);
+        this.contentWrapper.appendChild(widget.element);
+        this.makeResizable(widget.element, id);
+        this.layoutSystem.registerElement(widget.element, id, this.tempSettings[id + 'Pos'], pos => { this.tempSettings[id + 'Pos'] = pos; });
     }
 
     renderPropertyTabs(parent) {
@@ -1431,7 +1482,8 @@ export class HUDConfigPanel {
         // List: [Top, Middle, Bottom] -> Append: Bottom, Middle, Top
         for (let i = layerOrder.length - 1; i >= 0; i--) {
             const id = layerOrder[i];
-            if (id === 'health' && this.tempSettings.showHealth) this.renderPreviewHealth();
+            if (isVehicleHUDId(id) && this.tempSettings[vehicleShowKey(id)]) this.renderPreviewVehicle(id);
+            else if (id === 'health' && this.tempSettings.showHealth) this.renderPreviewHealth();
             else if (id === 'jump' && this.tempSettings.showJump) this.renderPreviewJump();
             else if (id === 'stamina' && this.tempSettings.showStamina) this.renderPreviewStamina();
             else if (id === 'inventory' && this.tempSettings.showInventory) this.renderPreviewInventory();
@@ -2190,7 +2242,7 @@ export class HUDConfigPanel {
                         const visualH = fitLength(newH, this.previewContainer, 'y', 1);
                         inner.style.width = visualW + 'px';
                         inner.style.height = visualH + 'px';
-                        inner.style.borderRadius = (Math.min(visualW, visualH) / 2) + 'px';
+                        if (!isVehicleHUDId(prefix)) inner.style.borderRadius = (Math.min(visualW, visualH) / 2) + 'px';
                     }
 
                     this.keepPreviewElementInsideViewport(prefix);
@@ -2242,8 +2294,8 @@ export class HUDConfigPanel {
             animate(this.container, {
                 opacity: [1, 0],
                 duration: 200,
-                easing: 'easeInQuad',
-                complete: () => {
+                ease: 'inQuad',
+                onComplete: () => {
                     if (this.container) {
                         document.body.removeChild(this.container);
                         this.container = null;

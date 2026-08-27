@@ -1,3 +1,4 @@
+import { curvatureCollider, supportsCurvature } from "../utils/CurvatureUtils";
 import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
 import { StairsUtils } from "../utils/StairsUtils";
@@ -36,7 +37,10 @@ export function regenerateObjectPhysics(this: Game, objectMesh: THREE.Object3D) 
 	objectMesh.userData.rigidBody = rigidBody;
 
 	let colDesc: any;
-	if (objectMesh.userData.mapObjectType === "ramp") {
+	if (supportsCurvature(objectMesh.userData.mapObjectType) && dims.curvature?.enabled && (objectMesh as THREE.Mesh).geometry) {
+		colDesc = curvatureCollider((objectMesh as THREE.Mesh).geometry, RAPIER);
+		this.world.createCollider(colDesc, rigidBody);
+	} else if (objectMesh.userData.mapObjectType === "ramp") {
 		colDesc = RampUtils.createColliderDesc(dims, RAPIER);
 		this.world.createCollider(colDesc, rigidBody);
 	} else if (objectMesh.userData.mapObjectType === "stairs") {

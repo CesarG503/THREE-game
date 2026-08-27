@@ -272,7 +272,7 @@ export function applyMapObjectTexture(object3D: any, texture: THREE.Texture, fal
     if (mesh.userData && mesh.userData.isSpike) return;
     const dimensions = getMeshDimensions(mesh, fallbackDimensions);
 
-    if (normalized.fitMode === "auto" && mesh.geometry?.type === "BoxGeometry") {
+    if (normalized.fitMode === "auto" && mesh.geometry?.type === "BoxGeometry" && !mesh.geometry.userData.curved) {
       remapBoxUVs(mesh.geometry, dimensions, normalized);
     }
 

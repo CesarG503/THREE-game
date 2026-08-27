@@ -1,3 +1,4 @@
+import { createCurvedGeometry, curvatureCollider, resolveCurvature, type CurvatureSettings } from "../utils/CurvatureUtils";
 import { orientationFromRotation } from '../vehicles/VehicleGravity';
 import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
@@ -12,6 +13,7 @@ import { normalizeGravityOrientation } from "../utils/GravityOrientation";
 import { MapAssetManager } from "../map/MapAssetManager";
 
 type MapObjectScale = {
+  curvature?: CurvatureSettings;
   x: number;
   y: number;
   z: number;
@@ -1578,6 +1580,15 @@ export class MapObjectItem extends Item {
 
       const col = RAPIER.ColliderDesc.cuboid(this.scale.x / 2, this.scale.y / 2, this.scale.z / 2);
       collidersDesc.push(col);
+    }
+
+    const curvedGeometry = createCurvedGeometry(this.type, this.scale, this.textureSettings);
+    if (curvedGeometry && object3D.isMesh) {
+      object3D.geometry.dispose();
+      object3D.geometry = curvedGeometry;
+      this.scale = { ...this.scale, curvature: resolveCurvature(this.type, this.scale) };
+      collidersDesc.length = 0;
+      collidersDesc.push(curvatureCollider(curvedGeometry, RAPIER));
     }
 
     object3D.position.copy(position);

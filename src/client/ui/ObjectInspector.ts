@@ -6,6 +6,7 @@ import { RampUtils } from "../utils/RampUtils"
 import { LogicItemsManager } from "./logic_items/LogicItemsManager"
 import { listAssets, uploadAsset } from "../platform/api"
 import { applyMapObjectTexture, normalizeTextureSettings } from "../utils/TextureMapping"
+import { createCurvedGeometry, normalizeCurvature, resolveCurvature, supportsCurvature, maxCurveAngle } from "../utils/CurvatureUtils"
 import { TransformGizmo } from "../editor/TransformGizmo"
 
 export class ObjectInspector {
@@ -201,6 +202,70 @@ export class ObjectInspector {
             nudgeContainer.appendChild(createRotNudgeGroup('Y', '#44FF44'))
             nudgeContainer.appendChild(createRotNudgeGroup('Z', '#4444FF'))
             section.appendChild(nudgeContainer)
+        })
+
+        this.curvatureSection = this.createSection("Curvatura", (section) => {
+            const label = document.createElement('label')
+            label.style.cssText = 'display:flex;align-items:center;gap:8px;font-size:13px'
+            this.curvatureToggle = document.createElement('input')
+            this.curvatureToggle.type = 'checkbox'
+            this.curvatureToggle.onchange = () => this.updateCurvature({ enabled: this.curvatureToggle.checked })
+            label.append(this.curvatureToggle, document.createTextNode('Activar curvatura'))
+            section.appendChild(label)
+            this.curvatureFields = document.createElement('div')
+            this.curvatureFields.style.cssText = 'display:grid;gap:8px;margin-top:10px'
+            const hint = document.createElement('div')
+            hint.style.cssText = 'font-size:11px;color:#9acfff;line-height:1.5'
+            hint.textContent = 'R: entrar / salir del gizmo central. Arrastra X, Y o Z en ambos sentidos. La sección azul marca la mitad del objeto.'
+            this.curvatureFields.appendChild(hint)
+            const makeSelect = (title, entries, change) => {
+                const row = document.createElement('label')
+                row.style.cssText = 'display:flex;justify-content:space-between;align-items:center;font-size:12px'
+                row.appendChild(document.createTextNode(title))
+                const select = document.createElement('select')
+                select.style.cssText = 'background:#222;color:white;border:1px solid #555;border-radius:4px;padding:5px'
+                entries.forEach(([value, text]) => select.add(new Option(text, value)))
+                select.onchange = () => change(select.value)
+                row.appendChild(select)
+                this.curvatureFields.appendChild(row)
+                return select
+            }
+            this.curvatureAxis = makeSelect('Recorrido', [['x', 'Ancho · X'], ['y', 'Alto · Y'], ['z', 'Profundidad · Z']], axis => {
+                const curve = normalizeCurvature(this.selectedObject.userData.originalScale.curvature)
+                this.updateCurvature({ axis, direction: axis === curve.direction ? (axis === 'z' ? 'x' : 'z') : curve.direction })
+            })
+            this.curvatureDirection = makeSelect('Doblar hacia', [['x', 'Izq. / der. · X'], ['y', 'Arriba / abajo · Y'], ['z', 'Dentro / fuera · Z']], direction => this.updateCurvature({ direction }))
+            this.curvatureAngle = this.createNumberInput('Ángulo (°)', angle => this.updateCurvature({ angle }), -360, 1, '#66ccff')
+            this.curvatureAngle.input.max = '360'
+            this.curvatureFields.appendChild(this.curvatureAngle.container)
+            this.curvatureStatus = document.createElement('div')
+            this.curvatureStatus.style.cssText = 'font-size:11px;color:#aaa;line-height:1.5'
+            this.curvatureFields.appendChild(this.curvatureStatus)
+            const actions = document.createElement('div')
+            actions.style.cssText = 'display:flex;gap:5px;flex-wrap:wrap'
+            const button = (text, action) => {
+                const b = document.createElement('button')
+                b.textContent = text
+                b.style.cssText = 'background:#16334c;color:#d4eaff;border:1px solid #345d7b;border-radius:4px;padding:6px;cursor:pointer'
+                b.onclick = action
+                actions.appendChild(b)
+                return b
+            }
+            this.curvatureEditButton = button('Editar (R)', () => this.cycleTransformMode())
+            this.curvatureCircleButton = button('Círculo 360°', () => this.updateCurvature({ angle: 360 }))
+            button('Enderezar', () => this.updateCurvature({ angle: 0 }))
+            this.curvatureFields.appendChild(actions)
+            const modes = document.createElement('div')
+            modes.style.cssText = 'display:flex;gap:5px;margin-top:8px'
+            ;[['translate', 'Mover'], ['scale', 'Escalar'], ['rotate', 'Rotar']].forEach(([mode, title]) => {
+                const b = document.createElement('button')
+                b.textContent = title
+                b.style.cssText = 'flex:1;background:#222;color:#ddd;border:1px solid #555;padding:5px;border-radius:4px;cursor:pointer'
+                b.onclick = () => { this.transformGizmo.setMode(mode); this.transformGizmo.update(); this.syncCurvatureInputs() }
+                modes.appendChild(b)
+            })
+            this.curvatureFields.appendChild(modes)
+            section.appendChild(this.curvatureFields)
         })
 
         // 2. Dimensions/Scale Controls
@@ -918,6 +983,12 @@ export class ObjectInspector {
             // Stop propagation of events to prevent game interaction when over the UI
             ;['mousedown', 'mouseup', 'click', 'wheel', 'keydown', 'keyup'].forEach(eventType => {
                 this.container.addEventListener(eventType, (e) => {
+                    const typing = e.target instanceof HTMLInputElement && e.target.type !== 'checkbox' ||
+                        e.target instanceof HTMLSelectElement || e.target instanceof HTMLTextAreaElement || e.target.isContentEditable
+                    if (eventType === 'keydown' && e.key.toLowerCase() === 'r' && !typing && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey) {
+                        e.preventDefault()
+                        this.cycleTransformMode()
+                    }
                     e.stopPropagation()
                 })
             })
@@ -1076,6 +1147,7 @@ export class ObjectInspector {
 
     show(object) {
         if (!object) return
+        if (this.transformGizmo?.target && this.selectedObject !== object) this.transformGizmo.detach()
         this.selectedObject = object
         this.isVisible = true
         this.container.style.display = 'flex'
@@ -1225,6 +1297,7 @@ export class ObjectInspector {
         if (this.game.cameraController) this.game.cameraController.setUIOpen(true)
 
         this.updateGizmoAttachment()
+        this.syncCurvatureInputs()
 
         if (object.userData.mapObjectType === "logic_camera") {
             this.game?.logicCameraSystem?.showCameraPreview?.(object)
@@ -1464,6 +1537,44 @@ export class ObjectInspector {
             if (this.rowBendAngleX) this.rowBendAngleX.style.display = "none";
             if (this.rowBendAngleY) this.rowBendAngleY.style.display = "none";
         }
+    }
+
+    syncCurvatureInputs() {
+        const object = this.selectedObject
+        const supported = object && supportsCurvature(object.userData.mapObjectType)
+        this.curvatureSection.style.display = supported ? 'block' : 'none'
+        if (!supported) return
+        const dims = object.userData.originalScale
+        const curve = resolveCurvature(object.userData.mapObjectType, dims)
+        this.curvatureToggle.checked = curve.enabled
+        this.curvatureFields.style.display = curve.enabled ? 'grid' : 'none'
+        this.curvatureAxis.value = curve.axis
+        this.curvatureDirection.value = curve.direction
+        Array.from(this.curvatureDirection.options).forEach(option => { option.disabled = option.value === curve.axis })
+        const limit = maxCurveAngle(object.userData.mapObjectType, dims, curve)
+        this.curvatureAngle.input.min = String(-limit)
+        this.curvatureAngle.input.max = String(limit)
+        this.curvatureAngle.input.value = curve.angle.toFixed(1)
+        this.curvatureCircleButton.disabled = limit < 360
+        this.curvatureCircleButton.style.opacity = limit < 360 ? '0.4' : '1'
+        this.curvatureCircleButton.title = limit < 360 ? 'Aumenta el recorrido o reduce el grosor para cerrar el círculo.' : 'Unir los extremos del objeto'
+        const editing = this.transformGizmo.curvatureActive
+        this.curvatureEditButton.textContent = editing ? 'Salir (R)' : 'Editar (R)'
+        this.curvatureStatus.textContent = `${editing ? 'Editando curvatura' : 'Forma conservada'} · ${curve.angle.toFixed(1)}°` +
+            (limit < 360 ? ` · Límite ${limit.toFixed(1)}° por el grosor del objeto.` : ' · ±360° cierra el círculo.')
+    }
+
+    updateCurvature(patch, commit = true) {
+        const object = this.selectedObject
+        if (!object || !supportsCurvature(object.userData.mapObjectType)) return
+        const dims = object.userData.originalScale
+        dims.curvature = resolveCurvature(object.userData.mapObjectType, {
+            ...dims, curvature: { ...normalizeCurvature(dims.curvature), ...patch }
+        })
+        if (!dims.curvature.enabled && this.transformGizmo.curvatureActive) this.transformGizmo.setMode('translate')
+        this.updateDimensions('x', dims.x, false)
+        this.syncCurvatureInputs()
+        if (commit) this.refreshPhysicsAndVisuals()
     }
 
     cycleTransformMode() {
@@ -1854,14 +1965,21 @@ export class ObjectInspector {
             newGeo = new THREE.BoxGeometry(dims.x, dims.y, dims.z)
         }
 
+        const curvedGeometry = createCurvedGeometry(this.selectedObject.userData.mapObjectType, dims, this.selectedObject.userData.textureSettings)
+        if (curvedGeometry) {
+            newGeo?.dispose()
+            newGeo = curvedGeometry
+            dims.curvature = resolveCurvature(this.selectedObject.userData.mapObjectType, dims)
+        }
         if (newGeo) {
             this.selectedObject.geometry.dispose()
             this.selectedObject.geometry = newGeo
         }
 
-        if (this.selectedObject.userData.texturePath) {
+        if (this.selectedObject.userData.texturePath && !curvedGeometry) {
             this.reapplySelectedTexture()
         }
+        this.syncCurvatureInputs()
         this.transformGizmo.update()
         this.syncTransformInputs()
         if (shouldRefresh) this.refreshPhysicsAndVisuals()
@@ -2089,6 +2207,9 @@ export class ObjectInspector {
             [key]: value
         })
         this.syncTextureSettingsInputs(this.selectedObject.userData.textureSettings)
+        if (supportsCurvature(this.selectedObject.userData.mapObjectType) && this.selectedObject.userData.originalScale?.curvature?.enabled) {
+            this.updateDimensions('x', this.selectedObject.userData.originalScale.x, false)
+        }
         if (this.selectedObject.userData.texturePath) {
             this.reapplySelectedTexture()
         }

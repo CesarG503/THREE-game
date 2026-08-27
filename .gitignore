@@ -9,4 +9,5 @@ dist
 .codex
 graphify-out
 .graphifyignore
+tests/*
 tests/

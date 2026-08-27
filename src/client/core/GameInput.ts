@@ -52,6 +52,7 @@ export function setupGameInput(this: Game) {
 
 		if (key === "r" && this.objectInspector?.isVisible && this.objectInspector?.selectedObject) {
 			e.preventDefault();
+			if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
 			const mode = this.objectInspector.cycleTransformMode();
 			console.log("Transform Gizmo Mode:", mode);
 			return;

@@ -6,7 +6,7 @@ import { RampUtils } from "../utils/RampUtils"
 import { LogicItemsManager } from "./logic_items/LogicItemsManager"
 import { listAssets, uploadAsset } from "../platform/api"
 import { applyMapObjectTexture, normalizeTextureSettings } from "../utils/TextureMapping"
-import { createCurvedGeometry, normalizeCurvature, resolveCurvature, supportsCurvature, maxCurveAngle } from "../utils/CurvatureUtils"
+import { createCurvedGeometry, normalizeCurvature, patchCurvature, resolveCurvature, supportsCurvature, maxCurveAngle } from "../utils/CurvatureUtils"
 import { TransformGizmo } from "../editor/TransformGizmo"
 
 export class ObjectInspector {
@@ -216,7 +216,7 @@ export class ObjectInspector {
             this.curvatureFields.style.cssText = 'display:grid;gap:8px;margin-top:10px'
             const hint = document.createElement('div')
             hint.style.cssText = 'font-size:11px;color:#9acfff;line-height:1.5'
-            hint.textContent = 'R: entrar / salir del gizmo central. Arrastra X, Y o Z en ambos sentidos. La sección azul marca la mitad del objeto.'
+            hint.textContent = 'R: Mover → Escalar → Rotar → Curvatura. El arco ámbar identifica la curva activa. Arrastra su flecha en ambos sentidos; conserva los ejes elegidos. Las curvas se combinan en el orden de la lista.'
             this.curvatureFields.appendChild(hint)
             const makeSelect = (title, entries, change) => {
                 const row = document.createElement('label')
@@ -230,6 +230,36 @@ export class ObjectInspector {
                 this.curvatureFields.appendChild(row)
                 return select
             }
+            this.curvatureLayerSelect = makeSelect('Curva activa', [], value => this.updateCurvature({ activeLayer: Number(value) }))
+            const layerActions = document.createElement('div')
+            layerActions.style.cssText = 'display:flex;gap:5px;flex-wrap:wrap'
+            const layerButton = (text, action) => {
+                const b = document.createElement('button')
+                b.textContent = text
+                b.style.cssText = 'background:#352a18;color:#ffcd76;border:1px solid #85612e;border-radius:4px;padding:6px;cursor:pointer'
+                b.onclick = action
+                layerActions.appendChild(b)
+                return b
+            }
+            layerButton('+ Añadir curva', () => {
+                const curve = normalizeCurvature(this.selectedObject.userData.originalScale.curvature)
+                this.updateCurvature({ layers: [...curve.layers, { axis: curve.axis, direction: curve.direction, angle: 0 }], activeLayer: curve.layers.length })
+            })
+            this.curvatureRemoveButton = layerButton('Eliminar curva', () => {
+                const curve = normalizeCurvature(this.selectedObject.userData.originalScale.curvature)
+                if (curve.layers.length < 2) return
+                this.updateCurvature({ layers: curve.layers.filter((_, index) => index !== curve.activeLayer), activeLayer: Math.max(0, curve.activeLayer - 1) })
+            })
+            const moveLayer = delta => {
+                const curve = normalizeCurvature(this.selectedObject.userData.originalScale.curvature)
+                const next = curve.activeLayer + delta
+                if (next < 0 || next >= curve.layers.length) return
+                ;[curve.layers[next], curve.layers[curve.activeLayer]] = [curve.layers[curve.activeLayer], curve.layers[next]]
+                this.updateCurvature({ layers: curve.layers, activeLayer: next })
+            }
+            this.curvatureUpButton = layerButton('Subir', () => moveLayer(-1))
+            this.curvatureDownButton = layerButton('Bajar', () => moveLayer(1))
+            this.curvatureFields.appendChild(layerActions)
             this.curvatureAxis = makeSelect('Recorrido', [['x', 'Ancho · X'], ['y', 'Alto · Y'], ['z', 'Profundidad · Z']], axis => {
                 const curve = normalizeCurvature(this.selectedObject.userData.originalScale.curvature)
                 this.updateCurvature({ axis, direction: axis === curve.direction ? (axis === 'z' ? 'x' : 'z') : curve.direction })
@@ -237,6 +267,7 @@ export class ObjectInspector {
             this.curvatureDirection = makeSelect('Doblar hacia', [['x', 'Izq. / der. · X'], ['y', 'Arriba / abajo · Y'], ['z', 'Dentro / fuera · Z']], direction => this.updateCurvature({ direction }))
             this.curvatureAngle = this.createNumberInput('Ángulo (°)', angle => this.updateCurvature({ angle }), -360, 1, '#66ccff')
             this.curvatureAngle.input.max = '360'
+            this.curvatureAngle.input.setAttribute('aria-label', 'Ángulo de curvatura')
             this.curvatureFields.appendChild(this.curvatureAngle.container)
             this.curvatureStatus = document.createElement('div')
             this.curvatureStatus.style.cssText = 'font-size:11px;color:#aaa;line-height:1.5'
@@ -251,9 +282,9 @@ export class ObjectInspector {
                 actions.appendChild(b)
                 return b
             }
-            this.curvatureEditButton = button('Editar (R)', () => this.cycleTransformMode())
+            this.curvatureEditButton = button('∿ Curvatura', () => this.transformGizmo.setMode('curvature'))
             this.curvatureCircleButton = button('Círculo 360°', () => this.updateCurvature({ angle: 360 }))
-            button('Enderezar', () => this.updateCurvature({ angle: 0 }))
+            button('Enderezar curva', () => this.updateCurvature({ angle: 0 }))
             this.curvatureFields.appendChild(actions)
             const modes = document.createElement('div')
             modes.style.cssText = 'display:flex;gap:5px;margin-top:8px'
@@ -1548,6 +1579,16 @@ export class ObjectInspector {
         const curve = resolveCurvature(object.userData.mapObjectType, dims)
         this.curvatureToggle.checked = curve.enabled
         this.curvatureFields.style.display = curve.enabled ? 'grid' : 'none'
+        const options = curve.layers.map((layer, index) => [`${index}`, `${index + 1}. ${layer.axis.toUpperCase()} → ${layer.direction.toUpperCase()} · ${layer.angle.toFixed(1)}°`])
+        const signature = JSON.stringify(options)
+        if (this.curvatureLayerSelect.dataset.options !== signature) {
+            this.curvatureLayerSelect.replaceChildren(...options.map(([value, label]) => new Option(label, value)))
+            this.curvatureLayerSelect.dataset.options = signature
+        }
+        this.curvatureLayerSelect.value = String(curve.activeLayer)
+        this.curvatureRemoveButton.disabled = curve.layers.length <= 1
+        this.curvatureUpButton.disabled = curve.activeLayer === 0
+        this.curvatureDownButton.disabled = curve.activeLayer === curve.layers.length - 1
         this.curvatureAxis.value = curve.axis
         this.curvatureDirection.value = curve.direction
         Array.from(this.curvatureDirection.options).forEach(option => { option.disabled = option.value === curve.axis })
@@ -1559,9 +1600,10 @@ export class ObjectInspector {
         this.curvatureCircleButton.style.opacity = limit < 360 ? '0.4' : '1'
         this.curvatureCircleButton.title = limit < 360 ? 'Aumenta el recorrido o reduce el grosor para cerrar el círculo.' : 'Unir los extremos del objeto'
         const editing = this.transformGizmo.curvatureActive
-        this.curvatureEditButton.textContent = editing ? 'Salir (R)' : 'Editar (R)'
-        this.curvatureStatus.textContent = `${editing ? 'Editando curvatura' : 'Forma conservada'} · ${curve.angle.toFixed(1)}°` +
-            (limit < 360 ? ` · Límite ${limit.toFixed(1)}° por el grosor del objeto.` : ' · ±360° cierra el círculo.')
+        this.curvatureEditButton.textContent = editing ? '∿ Curvatura activa' : '∿ Curvatura'
+        this.curvatureEditButton.style.borderColor = editing ? '#ffbd45' : '#345d7b'
+        this.curvatureStatus.textContent = `Curva ${curve.activeLayer + 1} de ${curve.layers.length} · ${curve.angle.toFixed(1)}° · ${editing ? 'Editando' : 'Conservada'}` +
+            (limit < 360 ? ` · Límite ${limit.toFixed(1)}° por el grosor del objeto.` : (curve.layers.length === 1 ? ' · ±360° cierra el círculo.' : ' · Se combina con las demás curvas.'))
     }
 
     updateCurvature(patch, commit = true) {
@@ -1569,7 +1611,7 @@ export class ObjectInspector {
         if (!object || !supportsCurvature(object.userData.mapObjectType)) return
         const dims = object.userData.originalScale
         dims.curvature = resolveCurvature(object.userData.mapObjectType, {
-            ...dims, curvature: { ...normalizeCurvature(dims.curvature), ...patch }
+            ...dims, curvature: patchCurvature(dims.curvature, patch)
         })
         if (!dims.curvature.enabled && this.transformGizmo.curvatureActive) this.transformGizmo.setMode('translate')
         this.updateDimensions('x', dims.x, false)

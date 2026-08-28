@@ -1,12 +1,12 @@
 import * as THREE from "three";
 import { TransformControls } from "three/examples/jsm/controls/TransformControls.js";
 
-import { bendPoint, curveDimensions, normalizeCurvature, supportsCurvature, type CurveAxis } from "../utils/CurvatureUtils";
+import { bendStackPoint, curveDimensions, normalizeCurvature, supportsCurvature, type CurveAxis } from "../utils/CurvatureUtils";
 
-type TransformMode = "translate" | "scale" | "rotate";
+type TransformMode = "translate" | "scale" | "rotate" | "curvature";
 type Axis = "x" | "y" | "z";
 
-const TRANSFORM_MODES: TransformMode[] = ["translate", "scale", "rotate"];
+const TRANSFORM_MODES: TransformMode[] = ["translate", "scale", "rotate", "curvature"];
 const GIZMO_LAYER = 31;
 const MIN_DIMENSION = 0.1;
 
@@ -39,6 +39,8 @@ export class TransformGizmo {
 	tmpSize: THREE.Vector3;
 	curvatureActive = false;
 	section: THREE.LineLoop;
+	curveArc: THREE.Line;
+	modeBadge: HTMLDivElement | null = null;
 
 
 	constructor(game: any, inspector: any) {
@@ -63,6 +65,16 @@ export class TransformGizmo {
 		this.section.visible = false;
 		this.applyGizmoLayer(this.section);
 		game.sceneManager.scene.add(this.section);
+
+		this.curveArc = new THREE.Line(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: 0xffbd45, depthTest: false }));
+		this.curveArc.visible = false;
+		this.applyGizmoLayer(this.curveArc);
+		game.sceneManager.scene.add(this.curveArc);
+		if (typeof document !== "undefined" && document.createElement) {
+			this.modeBadge = document.createElement("div");
+			this.modeBadge.style.cssText = "position:fixed;bottom:24px;left:50%;transform:translateX(-50%);padding:9px 16px;border:1px solid #63748a;border-radius:8px;background:#142131ed;color:white;font:600 13px sans-serif;z-index:1900;pointer-events:none;display:none";
+			document.body.appendChild(this.modeBadge);
+		}
 
 		this.controls = new TransformControls(game.sceneManager.camera, game.sceneManager.renderer.domElement);
 		this.controls.setMode("translate");
@@ -97,6 +109,8 @@ export class TransformGizmo {
 		if (this.dragState && this.target) this.handleMouseUp();
 		this.curvatureActive = false;
 		this.section.visible = false;
+		this.curveArc.visible = false;
+		if (this.modeBadge) this.modeBadge.style.display = "none";
 		this.target = null;
 		this.dragState = null;
 		this.controls.detach();
@@ -107,14 +121,8 @@ export class TransformGizmo {
 
 	cycleMode() {
 		if (!this.target || this.dragState) return this.getMode();
-		if (supportsCurvature(this.target.userData.mapObjectType) && this.target.userData.originalScale?.curvature?.enabled) {
-			this.curvatureActive = !this.curvatureActive;
-			this.controls.setMode(this.curvatureActive ? "translate" : TRANSFORM_MODES[this.modeIndex]);
-			this.syncProxyFromTarget(true);
-			this.inspector.syncCurvatureInputs?.();
-			return this.getMode();
-		}
-		this.modeIndex = (this.modeIndex + 1) % TRANSFORM_MODES.length;
+		const count = this.canCurve() ? TRANSFORM_MODES.length : TRANSFORM_MODES.length - 1;
+		this.modeIndex = (this.modeIndex + 1) % count;
 		const mode = TRANSFORM_MODES[this.modeIndex];
 		this.setMode(mode);
 		this.syncProxyFromTarget(true);
@@ -122,7 +130,7 @@ export class TransformGizmo {
 	}
 
 	getMode() {
-		return this.curvatureActive ? "curvature" : TRANSFORM_MODES[this.modeIndex];
+		return TRANSFORM_MODES[this.modeIndex];
 	}
 
 	update() {
@@ -141,6 +149,10 @@ export class TransformGizmo {
 		this.game.sceneManager.scene.remove(this.proxy);
 		this.section.removeFromParent();
 		this.section.geometry.dispose();
+		this.curveArc.removeFromParent();
+		this.curveArc.geometry.dispose();
+		(this.curveArc.material as THREE.Material).dispose();
+		this.modeBadge?.remove();
 		(this.section.material as THREE.Material).dispose();
 		this.helper.traverse((child: any) => {
 			child.geometry?.dispose?.();
@@ -152,17 +164,33 @@ export class TransformGizmo {
 		});
 	}
 
+	private canCurve() {
+		return this.target && supportsCurvature(this.target.userData.mapObjectType) && this.target.userData.originalScale?.curvature?.enabled;
+	}
+
 	setMode(mode: TransformMode) {
-		if (this.dragState) return;
-		this.curvatureActive = false;
-		this.section.visible = false;
+		if (this.dragState || (mode === "curvature" && !this.canCurve())) return;
+		this.curvatureActive = mode === "curvature";
 		this.modeIndex = TRANSFORM_MODES.indexOf(mode);
-		this.controls.setMode(mode);
+		this.controls.setMode(mode === "curvature" ? "translate" : mode);
 		this.controls.setSpace("local");
-		this.controls.showX = true;
-		this.controls.showY = true;
-		this.controls.showZ = true;
-		this.updateSize();
+		this.controls.setColors(...(this.curvatureActive ? [0xffbd45, 0xffbd45, 0xffbd45, 0xffffff] : [0xff4d4d, 0x4dff6d, 0x4d8dff, 0xffd84d]) as [number, number, number, number]);
+		this.syncProxyFromTarget(true);
+		this.inspector.syncCurvatureInputs?.();
+	}
+
+	private updateModeVisuals() {
+		const curve = normalizeCurvature(this.target?.userData.originalScale?.curvature);
+		this.controls.showX = !this.curvatureActive || curve.direction === "x";
+		this.controls.showY = !this.curvatureActive || curve.direction === "y";
+		this.controls.showZ = !this.curvatureActive || curve.direction === "z";
+		if (this.modeBadge) {
+			const labels = { translate: "Mover", scale: "Escalar", rotate: "Rotar", curvature: "∿ Curvatura" };
+			this.modeBadge.style.display = this.target ? "block" : "none";
+			this.modeBadge.style.color = this.curvatureActive ? "#ffbd45" : "#e0ecff";
+			this.modeBadge.style.borderColor = this.curvatureActive ? "#ffbd45" : "#63748a";
+			this.modeBadge.textContent = labels[this.getMode()] + (this.curvatureActive ? ` · Curva ${curve.activeLayer + 1} · ${curve.axis.toUpperCase()} → ${curve.direction.toUpperCase()}` : "") + " · R: siguiente";
+		}
 	}
 
 	private handleMouseDown = () => {
@@ -216,15 +244,10 @@ export class TransformGizmo {
 		if (mode === "curvature") {
 			const localDelta = this.proxy.position.clone().sub(this.dragState.proxyPositionStart)
 				.applyQuaternion(this.dragState.proxyQuaternionStart.clone().invert());
-			const axes: CurveAxis[] = ["x", "y", "z"];
-			const chosen = this.controls.axis?.toLowerCase();
-			const direction: CurveAxis = axes.includes(chosen as CurveAxis) ? chosen as CurveAxis
-				: axes.reduce((a, b) => Math.abs(localDelta[a]) > Math.abs(localDelta[b]) ? a : b);
 			const start = this.dragState.curvatureStart;
-			const axis: CurveAxis = direction !== start.axis ? start.axis : direction === "x" ? "y" : "x";
 			const dims = curveDimensions(this.target.userData.mapObjectType, this.target.userData.originalScale);
-			const angleStart = direction === start.direction && axis === start.axis ? start.angle : 0;
-			this.inspector.updateCurvature?.({ axis, direction, angle: angleStart + localDelta[direction] / Math.max(0.5, dims[axis] / 2) * 360 }, false);
+			this.inspector.updateCurvature?.({ activeLayer: start.activeLayer, angle: start.angle + localDelta[start.direction] / Math.max(0.5, dims[start.axis] / 2) * 360 }, false);
+
 		} else if (mode === "translate") {
 			const delta = this.proxy.position.clone().sub(this.dragState.proxyPositionStart);
 			const nextWorld = this.dragState.targetWorldPositionStart.clone().add(delta);
@@ -271,6 +294,7 @@ export class TransformGizmo {
 
 		this.proxy.position.copy(this.curvatureActive ? this.target.getWorldPosition(new THREE.Vector3()) : this.getHandlePosition());
 		this.updateSection();
+		this.updateModeVisuals();
 		this.proxy.quaternion.copy(this.target.getWorldQuaternion(new THREE.Quaternion()));
 		this.proxy.scale.set(1, 1, 1);
 		this.proxy.visible = true;
@@ -280,6 +304,7 @@ export class TransformGizmo {
 
 	private updateSection() {
 		this.section.visible = this.curvatureActive && !!this.target;
+		this.curveArc.visible = this.section.visible;
 		if (!this.section.visible || !this.target) return;
 		const dims = curveDimensions(this.target.userData.mapObjectType, this.target.userData.originalScale);
 		const curve = normalizeCurvature(this.target.userData.originalScale.curvature);
@@ -288,10 +313,20 @@ export class TransformGizmo {
 			const point = new THREE.Vector3();
 			point[axes[0]] = u * dims[axes[0]] / 2;
 			point[axes[1]] = v * dims[axes[1]] / 2;
-			return this.target!.localToWorld(bendPoint(point, dims[curve.axis], curve));
+			return this.target!.localToWorld(bendStackPoint(point, dims, curve));
 		});
 		this.section.geometry.setFromPoints(points);
 		this.section.geometry.computeBoundingSphere();
+		const radius = Math.max(0.35, Math.min(1.5, dims[curve.axis] * 0.15));
+		const arc = Array.from({ length: 49 }, (_, i) => {
+			const angle = -Math.PI * 0.8 + i / 48 * Math.PI * 1.6;
+			const point = new THREE.Vector3();
+			point[curve.axis] = Math.sin(angle) * radius;
+			point[curve.direction] = (1 - Math.cos(angle)) * radius;
+			return this.target!.localToWorld(point);
+		});
+		this.curveArc.geometry.setFromPoints(arc);
+		this.curveArc.geometry.computeBoundingSphere();
 	}
 
 	private getHandlePosition() {

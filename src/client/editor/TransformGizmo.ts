@@ -40,7 +40,6 @@ export class TransformGizmo {
 	curvatureActive = false;
 	section: THREE.LineLoop;
 	curveArc: THREE.Line;
-	modeBadge: HTMLDivElement | null = null;
 
 
 	constructor(game: any, inspector: any) {
@@ -70,11 +69,7 @@ export class TransformGizmo {
 		this.curveArc.visible = false;
 		this.applyGizmoLayer(this.curveArc);
 		game.sceneManager.scene.add(this.curveArc);
-		if (typeof document !== "undefined" && document.createElement) {
-			this.modeBadge = document.createElement("div");
-			this.modeBadge.style.cssText = "position:fixed;bottom:24px;left:50%;transform:translateX(-50%);padding:9px 16px;border:1px solid #63748a;border-radius:8px;background:#142131ed;color:white;font:600 13px sans-serif;z-index:1900;pointer-events:none;display:none";
-			document.body.appendChild(this.modeBadge);
-		}
+
 
 		this.controls = new TransformControls(game.sceneManager.camera, game.sceneManager.renderer.domElement);
 		this.controls.setMode("translate");
@@ -110,7 +105,6 @@ export class TransformGizmo {
 		this.curvatureActive = false;
 		this.section.visible = false;
 		this.curveArc.visible = false;
-		if (this.modeBadge) this.modeBadge.style.display = "none";
 		this.target = null;
 		this.dragState = null;
 		this.controls.detach();
@@ -152,7 +146,6 @@ export class TransformGizmo {
 		this.curveArc.removeFromParent();
 		this.curveArc.geometry.dispose();
 		(this.curveArc.material as THREE.Material).dispose();
-		this.modeBadge?.remove();
 		(this.section.material as THREE.Material).dispose();
 		this.helper.traverse((child: any) => {
 			child.geometry?.dispose?.();
@@ -184,13 +177,7 @@ export class TransformGizmo {
 		this.controls.showX = !this.curvatureActive || curve.direction === "x";
 		this.controls.showY = !this.curvatureActive || curve.direction === "y";
 		this.controls.showZ = !this.curvatureActive || curve.direction === "z";
-		if (this.modeBadge) {
-			const labels = { translate: "Mover", scale: "Escalar", rotate: "Rotar", curvature: "∿ Curvatura" };
-			this.modeBadge.style.display = this.target ? "block" : "none";
-			this.modeBadge.style.color = this.curvatureActive ? "#ffbd45" : "#e0ecff";
-			this.modeBadge.style.borderColor = this.curvatureActive ? "#ffbd45" : "#63748a";
-			this.modeBadge.textContent = labels[this.getMode()] + (this.curvatureActive ? ` · Curva ${curve.activeLayer + 1} · ${curve.axis.toUpperCase()} → ${curve.direction.toUpperCase()}` : "") + " · R: siguiente";
-		}
+
 	}
 
 	private handleMouseDown = () => {

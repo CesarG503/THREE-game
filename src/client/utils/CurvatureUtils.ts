@@ -6,6 +6,8 @@ export interface CurveLayer {
   axis: CurveAxis;
   direction: CurveAxis;
   angle: number;
+  /** Position along the path: 0 = first end, 0.5 = center, 1 = last end. */
+  origin: number;
 }
 export interface CurvatureSettings extends CurveLayer {
   enabled: boolean;
@@ -19,7 +21,7 @@ function normalizeLayer(value: any): CurveLayer {
   const axis: CurveAxis = CURVE_AXES.includes(value?.axis) ? value.axis : "x";
   const direction: CurveAxis = CURVE_AXES.includes(value?.direction) && value.direction !== axis
     ? value.direction : axis === "z" ? "x" : "z";
-  return { axis, direction, angle: Number.isFinite(Number(value?.angle)) ? THREE.MathUtils.clamp(Number(value.angle), -360, 360) : 0 };
+  return { axis, direction, origin: Number.isFinite(value?.origin) ? THREE.MathUtils.clamp(value.origin, 0, 1) : 0.5, angle: Number.isFinite(Number(value?.angle)) ? THREE.MathUtils.clamp(Number(value.angle), -360, 360) : 0 };
 }
 
 // Root axis/direction/angle mirror the selected layer for legacy consumers.
@@ -34,7 +36,7 @@ export function patchCurvature(value: any, patch: Partial<CurvatureSettings>): C
   const current = normalizeCurvature(value);
   const next = normalizeCurvature({ ...current, ...patch });
   const layer = { ...next.layers[next.activeLayer] };
-  for (const key of ["axis", "direction", "angle"] as const) {
+  for (const key of ["axis", "direction", "angle", "origin"] as const) {
     if (patch[key] !== undefined) (layer as any)[key] = patch[key];
   }
   next.layers[next.activeLayer] = normalizeLayer(layer);
@@ -65,19 +67,20 @@ export function resolveCurvature(type: string, dims: any): CurvatureSettings {
   return normalizeCurvature(settings);
 }
 
-/** Arc length is preserved on the centerline. Both halves bend about their shared midpoint. */
+/** Arc length is preserved on the centerline. The selected section remains fixed while both sides bend around it. */
 export function bendPoint(point: THREE.Vector3, length: number, settings: CurveLayer & { enabled: boolean }) {
   if (!settings.enabled || Math.abs(settings.angle) < 0.00001) return point;
   const k = THREE.MathUtils.degToRad(settings.angle) / length;
-  const t = point[settings.axis] * k;
+  const anchor = ((settings.origin ?? 0.5) - 0.5) * length;
+  const t = (point[settings.axis] - anchor) * k;
   const transverse = point[settings.direction];
-  point[settings.axis] = Math.sin(t) / k - transverse * Math.sin(t);
+  point[settings.axis] = anchor + Math.sin(t) / k - transverse * Math.sin(t);
   point[settings.direction] = (2 * Math.sin(t / 2) ** 2) / k + transverse * Math.cos(t);
   return point;
 }
 
-export function bendStackPoint(point: THREE.Vector3, size: Record<CurveAxis, number>, settings: CurvatureSettings) {
-  if (settings.enabled) for (const layer of settings.layers) bendPoint(point, size[layer.axis], { ...layer, enabled: true });
+export function bendStackPoint(point: THREE.Vector3, size: Record<CurveAxis, number>, settings: CurvatureSettings, fromLayer = 0) {
+  if (settings.enabled) for (const layer of settings.layers.slice(fromLayer)) bendPoint(point, size[layer.axis], { ...layer, enabled: true });
   return point;
 }
 
@@ -113,7 +116,8 @@ export function createCurvedGeometry(type: string, dims: any, textureSettings?: 
     for (const layer of settings.layers) {
       if (Math.abs(layer.angle) < 0.00001) continue;
       const k = THREE.MathUtils.degToRad(layer.angle) / size[layer.axis];
-      const t = point[layer.axis] * k;
+      const anchor = ((layer.origin ?? 0.5) - 0.5) * size[layer.axis];
+      const t = (point[layer.axis] - anchor) * k;
       const depth = point[layer.direction];
       bendPoint(point, size[layer.axis], { ...layer, enabled: true });
       const a = normal[layer.axis];

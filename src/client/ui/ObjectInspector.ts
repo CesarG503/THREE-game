@@ -216,7 +216,7 @@ export class ObjectInspector {
             this.curvatureFields.style.cssText = 'display:grid;gap:8px;margin-top:10px'
             const hint = document.createElement('div')
             hint.style.cssText = 'font-size:11px;color:#9acfff;line-height:1.5'
-            hint.textContent = 'R: Mover → Escalar → Rotar → Curvatura. El arco ámbar identifica la curva activa. Arrastra su flecha en ambos sentidos; conserva los ejes elegidos. Las curvas se combinan en el orden de la lista.'
+            hint.textContent = 'R: Mover → Escalar → Rotar → Curvatura. El arco ámbar identifica la curva activa. Arrastra su flecha en ambos sentidos; conserva los ejes elegidos. Para cambiar dónde se dobla, usa Mover punto de doblez y arrastra la flecha celeste. Las curvas se combinan en el orden de la lista.'
             this.curvatureFields.appendChild(hint)
             const makeSelect = (title, entries, change) => {
                 const row = document.createElement('label')
@@ -243,7 +243,7 @@ export class ObjectInspector {
             }
             layerButton('+ Añadir curva', () => {
                 const curve = normalizeCurvature(this.selectedObject.userData.originalScale.curvature)
-                this.updateCurvature({ layers: [...curve.layers, { axis: curve.axis, direction: curve.direction, angle: 0 }], activeLayer: curve.layers.length })
+                this.updateCurvature({ layers: [...curve.layers, { axis: curve.axis, direction: curve.direction, angle: 0, origin: curve.origin }], activeLayer: curve.layers.length })
             })
             this.curvatureRemoveButton = layerButton('Eliminar curva', () => {
                 const curve = normalizeCurvature(this.selectedObject.userData.originalScale.curvature)
@@ -265,6 +265,10 @@ export class ObjectInspector {
                 this.updateCurvature({ axis, direction: axis === curve.direction ? (axis === 'z' ? 'x' : 'z') : curve.direction })
             })
             this.curvatureDirection = makeSelect('Doblar hacia', [['x', 'Izq. / der. · X'], ['y', 'Arriba / abajo · Y'], ['z', 'Dentro / fuera · Z']], direction => this.updateCurvature({ direction }))
+            this.curvatureOrigin = this.createNumberInput('Punto de doblez (%) · 0 inicio / 50 centro / 100 fin', value => this.updateCurvature({ origin: value / 100 }), 0, 1, '#48ddff')
+            this.curvatureOrigin.input.max = '100'
+            this.curvatureOrigin.input.setAttribute('aria-label', 'Punto de doblez (%)')
+            this.curvatureFields.appendChild(this.curvatureOrigin.container)
             this.curvatureAngle = this.createNumberInput('Ángulo (°)', angle => this.updateCurvature({ angle }), -360, 1, '#66ccff')
             this.curvatureAngle.input.max = '360'
             this.curvatureAngle.input.setAttribute('aria-label', 'Ángulo de curvatura')
@@ -282,7 +286,9 @@ export class ObjectInspector {
                 actions.appendChild(b)
                 return b
             }
-            this.curvatureEditButton = button('∿ Curvatura', () => this.transformGizmo.setMode('curvature'))
+            this.curvatureEditButton = button('Ajustar ángulo', () => this.transformGizmo.setCurvatureOriginEditing(false))
+            this.curvatureOriginButton = button('Mover punto de doblez', () => this.transformGizmo.setCurvatureOriginEditing(true))
+            button('Centrar punto', () => this.updateCurvature({ origin: 0.5 }))
             this.curvatureCircleButton = button('Círculo 360°', () => this.updateCurvature({ angle: 360 }))
             button('Enderezar curva', () => this.updateCurvature({ angle: 0 }))
             this.curvatureFields.appendChild(actions)
@@ -1579,7 +1585,7 @@ export class ObjectInspector {
         const curve = resolveCurvature(object.userData.mapObjectType, dims)
         this.curvatureToggle.checked = curve.enabled
         this.curvatureFields.style.display = curve.enabled ? 'grid' : 'none'
-        const options = curve.layers.map((layer, index) => [`${index}`, `${index + 1}. ${layer.axis.toUpperCase()} → ${layer.direction.toUpperCase()} · ${layer.angle.toFixed(1)}°`])
+        const options = curve.layers.map((layer, index) => [`${index}`, `${index + 1}. ${layer.axis.toUpperCase()} → ${layer.direction.toUpperCase()} · ${layer.angle.toFixed(1)}° · ${(layer.origin * 100).toFixed(1)}%`])
         const signature = JSON.stringify(options)
         if (this.curvatureLayerSelect.dataset.options !== signature) {
             this.curvatureLayerSelect.replaceChildren(...options.map(([value, label]) => new Option(label, value)))
@@ -1596,13 +1602,17 @@ export class ObjectInspector {
         this.curvatureAngle.input.min = String(-limit)
         this.curvatureAngle.input.max = String(limit)
         this.curvatureAngle.input.value = curve.angle.toFixed(1)
+        this.curvatureOrigin.input.value = (curve.origin * 100).toFixed(1)
         this.curvatureCircleButton.disabled = limit < 360
         this.curvatureCircleButton.style.opacity = limit < 360 ? '0.4' : '1'
         this.curvatureCircleButton.title = limit < 360 ? 'Aumenta el recorrido o reduce el grosor para cerrar el círculo.' : 'Unir los extremos del objeto'
         const editing = this.transformGizmo.curvatureActive
-        this.curvatureEditButton.textContent = editing ? '∿ Curvatura activa' : '∿ Curvatura'
-        this.curvatureEditButton.style.borderColor = editing ? '#ffbd45' : '#345d7b'
-        this.curvatureStatus.textContent = `Curva ${curve.activeLayer + 1} de ${curve.layers.length} · ${curve.angle.toFixed(1)}° · ${editing ? 'Editando' : 'Conservada'}` +
+        const movingOrigin = editing && this.transformGizmo.curvatureOriginEditing
+        this.curvatureEditButton.textContent = editing && !movingOrigin ? 'Ángulo activo' : 'Ajustar ángulo'
+        this.curvatureEditButton.style.borderColor = editing && !movingOrigin ? '#ffbd45' : '#345d7b'
+        this.curvatureOriginButton.textContent = movingOrigin ? 'Moviendo punto de doblez' : 'Mover punto de doblez'
+        this.curvatureOriginButton.style.borderColor = movingOrigin ? '#48ddff' : '#345d7b'
+        this.curvatureStatus.textContent = `Curva ${curve.activeLayer + 1} de ${curve.layers.length} · ${curve.angle.toFixed(1)}° · Punto ${(curve.origin * 100).toFixed(1)}% · ${movingOrigin ? 'Moviendo punto' : editing ? 'Editando ángulo' : 'Conservada'}` +
             (limit < 360 ? ` · Límite ${limit.toFixed(1)}° por el grosor del objeto.` : (curve.layers.length === 1 ? ' · ±360° cierra el círculo.' : ' · Se combina con las demás curvas.'))
     }
 

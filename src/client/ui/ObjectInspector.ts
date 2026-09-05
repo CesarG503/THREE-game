@@ -6,7 +6,7 @@ import { RampUtils } from "../utils/RampUtils"
 import { LogicItemsManager } from "./logic_items/LogicItemsManager"
 import { listAssets, uploadAsset } from "../platform/api"
 import { applyMapObjectTexture, normalizeTextureSettings } from "../utils/TextureMapping"
-import { createCurvedGeometry, normalizeCurvature, patchCurvature, resolveCurvature, supportsCurvature, maxCurveAngle } from "../utils/CurvatureUtils"
+import { createCurvedGeometry, normalizeCurvature, patchCurvature, resolveCurvature, supportsCurvature, curveAngleRange } from "../utils/CurvatureUtils"
 import { TransformGizmo } from "../editor/TransformGizmo"
 
 export class ObjectInspector {
@@ -216,7 +216,7 @@ export class ObjectInspector {
             this.curvatureFields.style.cssText = 'display:grid;gap:8px;margin-top:10px'
             const hint = document.createElement('div')
             hint.style.cssText = 'font-size:11px;color:#9acfff;line-height:1.5'
-            hint.textContent = 'R: Mover → Escalar → Rotar → Curvatura. El arco ámbar identifica la curva activa. Arrastra su flecha en ambos sentidos; conserva los ejes elegidos. Para cambiar dónde se dobla, usa Mover punto de doblez y arrastra la flecha celeste. Las curvas se combinan en el orden de la lista.'
+            hint.textContent = 'R: Mover → Escalar → Rotar → Curvatura. El arco ámbar identifica la curva activa. Arrastra su flecha en ambos sentidos; conserva los ejes elegidos. Para cambiar dónde se dobla, usa Mover punto de doblez: arrastra el punto celeste o haz clic y arrastra sobre la pared. Las curvas se combinan en el orden de la lista.'
             this.curvatureFields.appendChild(hint)
             const makeSelect = (title, entries, change) => {
                 const row = document.createElement('label')
@@ -1598,14 +1598,15 @@ export class ObjectInspector {
         this.curvatureAxis.value = curve.axis
         this.curvatureDirection.value = curve.direction
         Array.from(this.curvatureDirection.options).forEach(option => { option.disabled = option.value === curve.axis })
-        const limit = maxCurveAngle(object.userData.mapObjectType, dims, curve)
-        this.curvatureAngle.input.min = String(-limit)
-        this.curvatureAngle.input.max = String(limit)
+        const range = curveAngleRange(object.userData.mapObjectType, dims)
+        const limited = range.min > -360 || range.max < 360
+        this.curvatureAngle.input.min = String(range.min)
+        this.curvatureAngle.input.max = String(range.max)
         this.curvatureAngle.input.value = curve.angle.toFixed(1)
         this.curvatureOrigin.input.value = (curve.origin * 100).toFixed(1)
-        this.curvatureCircleButton.disabled = limit < 360
-        this.curvatureCircleButton.style.opacity = limit < 360 ? '0.4' : '1'
-        this.curvatureCircleButton.title = limit < 360 ? 'Aumenta el recorrido o reduce el grosor para cerrar el círculo.' : 'Unir los extremos del objeto'
+        this.curvatureCircleButton.disabled = range.max < 360
+        this.curvatureCircleButton.style.opacity = range.max < 360 ? '0.4' : '1'
+        this.curvatureCircleButton.title = range.max < 360 ? 'Aumenta el recorrido o reduce el grosor o las curvas previas para cerrar el círculo.' : 'Unir los extremos del objeto'
         const editing = this.transformGizmo.curvatureActive
         const movingOrigin = editing && this.transformGizmo.curvatureOriginEditing
         this.curvatureEditButton.textContent = editing && !movingOrigin ? 'Ángulo activo' : 'Ajustar ángulo'
@@ -1613,7 +1614,7 @@ export class ObjectInspector {
         this.curvatureOriginButton.textContent = movingOrigin ? 'Moviendo punto de doblez' : 'Mover punto de doblez'
         this.curvatureOriginButton.style.borderColor = movingOrigin ? '#48ddff' : '#345d7b'
         this.curvatureStatus.textContent = `Curva ${curve.activeLayer + 1} de ${curve.layers.length} · ${curve.angle.toFixed(1)}° · Punto ${(curve.origin * 100).toFixed(1)}% · ${movingOrigin ? 'Moviendo punto' : editing ? 'Editando ángulo' : 'Conservada'}` +
-            (limit < 360 ? ` · Límite ${limit.toFixed(1)}° por el grosor del objeto.` : (curve.layers.length === 1 ? ' · ±360° cierra el círculo.' : ' · Se combina con las demás curvas.'))
+            (limited ? ` · Límites ${range.min.toFixed(1)}° a ${range.max.toFixed(1)}° por el grosor y las curvas previas.` : (curve.layers.length === 1 ? ' · ±360° cierra el círculo.' : ' · Se combina con las demás curvas.'))
     }
 
     updateCurvature(patch, commit = true) {

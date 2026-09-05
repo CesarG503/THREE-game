@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { TransformControls } from "three/examples/jsm/controls/TransformControls.js";
 
-import { bendStackPoint, curveDimensions, normalizeCurvature, supportsCurvature, type CurveAxis } from "../utils/CurvatureUtils";
+import { createCurveDeformer, curveDimensions, normalizeCurvature, supportsCurvature, type CurveAxis } from "../utils/CurvatureUtils";
 
 type TransformMode = "translate" | "scale" | "rotate" | "curvature";
 type Axis = "x" | "y" | "z";
@@ -41,6 +41,10 @@ export class TransformGizmo {
 	curvatureOriginEditing = false;
 	section: THREE.LineLoop;
 	curveArc: THREE.Line;
+	originMarkers = new THREE.Group();
+	originPath = new THREE.Line(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: 0x48ddff, depthTest: false, transparent: true, opacity: 0.45 }));
+	private originPointer: number | null = null;
+	private originDragSurface: THREE.Mesh | null = null;
 
 
 	constructor(game: any, inspector: any) {
@@ -85,6 +89,15 @@ export class TransformGizmo {
 		this.controls.getRaycaster().layers.set(GIZMO_LAYER);
 		game.sceneManager.scene.add(this.helper);
 
+		game.sceneManager.scene.add(this.originMarkers, this.originPath);
+		this.originMarkers.visible = this.originPath.visible = false;
+		this.applyGizmoLayer(this.originPath);
+		const canvas = game.sceneManager.renderer.domElement;
+		canvas.addEventListener("pointerdown", this.handleOriginPointerDown, true);
+		canvas.addEventListener("pointermove", this.handleOriginPointerMove, true);
+		canvas.addEventListener("pointerup", this.handleOriginPointerUp, true);
+		canvas.addEventListener("pointercancel", this.handleOriginPointerUp, true);
+		canvas.addEventListener("lostpointercapture", this.handleOriginPointerUp, true);
 		this.controls.addEventListener("mouseDown", this.handleMouseDown);
 		this.controls.addEventListener("mouseUp", this.handleMouseUp);
 		this.controls.addEventListener("objectChange", this.handleObjectChange);
@@ -103,11 +116,13 @@ export class TransformGizmo {
 	}
 
 	detach() {
+		this.finishOriginDrag();
 		if (this.dragState && this.target) this.handleMouseUp();
 		this.curvatureActive = false;
 		this.curvatureOriginEditing = false;
 		this.section.visible = false;
 		this.curveArc.visible = false;
+		this.originMarkers.visible = this.originPath.visible = false;
 		this.target = null;
 		this.dragState = null;
 		this.controls.detach();
@@ -141,6 +156,17 @@ export class TransformGizmo {
 		this.controls.removeEventListener("mouseDown", this.handleMouseDown);
 		this.controls.removeEventListener("mouseUp", this.handleMouseUp);
 		this.controls.removeEventListener("objectChange", this.handleObjectChange);
+		const canvas = this.game.sceneManager.renderer.domElement;
+		canvas.removeEventListener("pointerdown", this.handleOriginPointerDown, true);
+		canvas.removeEventListener("pointermove", this.handleOriginPointerMove, true);
+		canvas.removeEventListener("pointerup", this.handleOriginPointerUp, true);
+		canvas.removeEventListener("pointercancel", this.handleOriginPointerUp, true);
+		canvas.removeEventListener("lostpointercapture", this.handleOriginPointerUp, true);
+		this.originMarkers.removeFromParent();
+		for (const child of this.originMarkers.children as THREE.Mesh[]) { child.geometry.dispose(); (child.material as THREE.Material).dispose(); }
+		this.originPath.removeFromParent();
+		this.originPath.geometry.dispose();
+		(this.originPath.material as THREE.Material).dispose();
 		this.controls.disconnect();
 		this.game.sceneManager.scene.remove(this.helper);
 		this.game.sceneManager.scene.remove(this.proxy);
@@ -188,6 +214,107 @@ export class TransformGizmo {
 		this.controls.showY = !this.curvatureActive || axis === "y";
 		this.controls.showZ = !this.curvatureActive || axis === "z";
 
+	}
+
+	private pointerRay(event: PointerEvent) {
+		const rect = this.game.sceneManager.renderer.domElement.getBoundingClientRect();
+		const ray = new THREE.Raycaster();
+		ray.setFromCamera(new THREE.Vector2((event.clientX - rect.left) / rect.width * 2 - 1, -(event.clientY - rect.top) / rect.height * 2 + 1), this.game.sceneManager.camera);
+		return ray;
+	}
+
+	private handleOriginPointerDown = (event: PointerEvent) => {
+		if (event.button !== 0 || !this.curvatureActive || !this.curvatureOriginEditing || !this.target || this.dragState) return;
+		const mesh = this.target as THREE.Mesh;
+		if (!mesh.geometry?.getAttribute("curveSourcePosition")) return;
+		const ray = this.pointerRay(event);
+		this.originMarkers.updateMatrixWorld(true);
+		ray.layers.set(GIZMO_LAYER);
+		const marker = ray.intersectObjects(this.originMarkers.children)[0];
+		ray.layers.set(0);
+		mesh.updateWorldMatrix(true, false);
+		const hit = ray.intersectObject(mesh, false)[0];
+		if (!marker && !hit && !this.controls.axis) return;
+		event.preventDefault(); event.stopImmediatePropagation();
+		if (marker) {
+			this.inspector.updateCurvature?.({ activeLayer: marker.object.userData.curveLayer }, false);
+			this.syncProxyFromTarget(true);
+		}
+		// Pick against the shape at drag start so rebuilding the bend cannot make
+		// the pointer chase its own deformation or jump to another section.
+		this.originDragSurface = new THREE.Mesh(mesh.geometry.clone(), new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }));
+		this.originDragSurface.matrixAutoUpdate = false;
+		this.originDragSurface.matrix.copy(mesh.matrixWorld);
+		this.originDragSurface.matrixWorld.copy(mesh.matrixWorld);
+		this.handleMouseDown();
+		this.originPointer = event.pointerId;
+		this.controls.enabled = false;
+		this.controls.dispatchEvent({ type: "dragging-changed", value: true });
+		this.game.sceneManager.renderer.domElement.setPointerCapture(event.pointerId);
+		if (!marker && hit) this.moveOriginToPointer(event);
+	};
+
+	private moveOriginToPointer(event: PointerEvent) {
+		if (!this.originDragSurface || !this.target || !this.dragState) return;
+		const ray = this.pointerRay(event);
+		const hit = ray.intersectObject(this.originDragSurface, false)[0];
+		const curve = this.dragState.curvatureStart;
+		const dims = curveDimensions(this.target.userData.mapObjectType, this.target.userData.originalScale);
+		let origin: number;
+		if (hit?.face) {
+			const geometry = this.originDragSurface.geometry;
+			const positions = geometry.getAttribute("position"), source = geometry.getAttribute("curveSourcePosition");
+			const indices = [hit.face.a, hit.face.b, hit.face.c];
+			const vertices = indices.map(i => new THREE.Vector3().fromBufferAttribute(positions, i));
+			const local = this.originDragSurface.worldToLocal(hit.point.clone());
+			const weights = THREE.Triangle.getBarycoord(local, vertices[0], vertices[1], vertices[2], new THREE.Vector3());
+			if (!weights) return;
+			const material = new THREE.Vector3();
+			indices.forEach((i, j) => material.addScaledVector(new THREE.Vector3().fromBufferAttribute(source, i), weights.getComponent(j)));
+			origin = material[curve.axis] / dims[curve.axis] + 0.5;
+		} else {
+			// Outside the surface, follow the closest point of the visible path.
+			const deformer = createCurveDeformer(dims, curve);
+			let best = Infinity;
+			origin = curve.origin;
+			const rect = this.game.sceneManager.renderer.domElement.getBoundingClientRect();
+			for (let i = 0; i <= 192; i++) {
+				const p = new THREE.Vector3(); p[curve.axis] = (i / 192 - 0.5) * dims[curve.axis];
+				this.target.localToWorld(deformer.transform(p)).project(this.game.sceneManager.camera);
+				const distance = ((p.x + 1) * rect.width / 2 + rect.left - event.clientX) ** 2 + ((1 - p.y) * rect.height / 2 + rect.top - event.clientY) ** 2;
+				// At closed/overlapping paths, prefer the current material section.
+				const score = distance + Math.abs(i / 192 - this.target.userData.originalScale.curvature.origin) * 0.01;
+				if (score < best) { best = score; origin = i / 192; }
+			}
+		}
+		this.inspector.updateCurvature?.({ activeLayer: curve.activeLayer, origin: THREE.MathUtils.clamp(origin, 0, 1) }, false);
+		this.syncProxyFromTarget(true);
+	}
+
+	private handleOriginPointerMove = (event: PointerEvent) => {
+		if (event.pointerId !== this.originPointer) return;
+		event.preventDefault(); event.stopImmediatePropagation();
+		this.moveOriginToPointer(event);
+	};
+
+	private handleOriginPointerUp = (event: PointerEvent) => {
+		if (event.pointerId !== this.originPointer) return;
+		event.preventDefault(); event.stopImmediatePropagation();
+		this.finishOriginDrag();
+	};
+
+	private finishOriginDrag() {
+		if (this.originPointer === null) return;
+		const pointer = this.originPointer;
+		this.originPointer = null;
+		const canvas = this.game.sceneManager.renderer.domElement;
+		if (canvas.hasPointerCapture(pointer)) canvas.releasePointerCapture(pointer);
+		this.originDragSurface?.geometry.dispose();
+		(this.originDragSurface?.material as THREE.Material)?.dispose();
+		this.originDragSurface = null;
+		this.controls.enabled = true;
+		this.controls.dispatchEvent({ type: "dragging-changed", value: false });
+		this.handleMouseUp();
 	}
 
 	private handleMouseDown = () => {
@@ -251,7 +378,7 @@ export class TransformGizmo {
 			} else {
 				this.inspector.updateCurvature?.({ activeLayer: start.activeLayer, angle: start.angle + localDelta[start.direction] / (Math.max(0.5, dims[start.axis] / 2) * this.dragState.curveHandleScale) * 360 }, false);
 			}
-			this.updateSection();
+			this.syncProxyFromTarget(true);
 
 		} else if (mode === "translate") {
 			const delta = this.proxy.position.clone().sub(this.dragState.proxyPositionStart);
@@ -308,8 +435,7 @@ export class TransformGizmo {
 		this.updateSize();
 	}
 
-	// The selected layer's anchor is invariant under its own bend. Later layers
-	// transport it and its drag axis into the final, deformed object.
+	// Geometry, markers and drag axes all use the same complete deformation.
 	private getCurveHandleFrame() {
 		const target = this.target!;
 		const dims = curveDimensions(target.userData.mapObjectType, target.userData.originalScale);
@@ -320,7 +446,8 @@ export class TransformGizmo {
 		const unit = new THREE.Vector3();
 		unit[axis] = 1;
 		const epsilon = 0.0001;
-		const transform = (point: THREE.Vector3) => target.localToWorld(bendStackPoint(point, dims, curve, curve.activeLayer + 1));
+		const deformer = createCurveDeformer(dims, curve);
+		const transform = (point: THREE.Vector3) => target.localToWorld(deformer.transform(point));
 		const position = transform(anchor.clone());
 		const tangent = transform(anchor.clone().addScaledVector(unit, epsilon))
 			.sub(transform(anchor.clone().addScaledVector(unit, -epsilon))).multiplyScalar(1 / (2 * epsilon));
@@ -332,18 +459,48 @@ export class TransformGizmo {
 
 	private updateSection() {
 		this.section.visible = this.curvatureActive && !!this.target;
-		this.curveArc.visible = this.section.visible;
+		this.curveArc.visible = this.originMarkers.visible = this.section.visible;
+		this.originPath.visible = this.section.visible && this.curvatureOriginEditing;
 		if (!this.section.visible || !this.target) return;
 		const dims = curveDimensions(this.target.userData.mapObjectType, this.target.userData.originalScale);
 		const curve = normalizeCurvature(this.target.userData.originalScale.curvature);
+		const deformer = createCurveDeformer(dims, curve);
+		const transform = (point: THREE.Vector3) => this.target!.localToWorld(deformer.transform(point));
 		const axes = (["x", "y", "z"] as CurveAxis[]).filter(axis => axis !== curve.axis);
-		const points = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([u, v]) => {
+		// Subdivide the section too: later bends can curve its edges.
+		const corners = [[-1, -1], [1, -1], [1, 1], [-1, 1]];
+		const points: THREE.Vector3[] = [];
+		for (let edge = 0; edge < 4; edge++) for (let step = 0; step < 16; step++) {
+			const [u, v] = corners[edge], [u2, v2] = corners[(edge + 1) % 4];
 			const point = new THREE.Vector3();
 			point[curve.axis] = (curve.origin - 0.5) * dims[curve.axis];
-			point[axes[0]] = u * dims[axes[0]] / 2;
-			point[axes[1]] = v * dims[axes[1]] / 2;
-			return this.target!.localToWorld(bendStackPoint(point, dims, curve, curve.activeLayer + 1));
+			point[axes[0]] = THREE.MathUtils.lerp(u, u2, step / 16) * dims[axes[0]] / 2;
+			point[axes[1]] = THREE.MathUtils.lerp(v, v2, step / 16) * dims[axes[1]] / 2;
+			points.push(transform(point));
+		}
+		while (this.originMarkers.children.length > curve.layers.length) {
+			const marker = this.originMarkers.children.at(-1) as THREE.Mesh;
+			marker.removeFromParent(); marker.geometry.dispose(); (marker.material as THREE.Material).dispose();
+		}
+		curve.layers.forEach((layer, index) => {
+			let marker = this.originMarkers.children[index] as THREE.Mesh;
+			if (!marker) {
+				marker = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 8), new THREE.MeshBasicMaterial({ depthTest: false }));
+				marker.userData.curveLayer = index;
+				this.applyGizmoLayer(marker); this.originMarkers.add(marker);
+			}
+			const anchor = new THREE.Vector3(); anchor[layer.axis] = (layer.origin - 0.5) * dims[layer.axis];
+			marker.position.copy(transform(anchor));
+			const camera = this.game.sceneManager.camera;
+			const radius = camera.isOrthographicCamera ? (camera.top - camera.bottom) / camera.zoom * 0.006 : marker.position.distanceTo(camera.getWorldPosition(new THREE.Vector3())) * 0.006;
+			marker.scale.setScalar(Math.max(0.03, radius));
+			(marker.material as THREE.MeshBasicMaterial).color.setHex(index === curve.activeLayer ? 0x48ddff : 0x7196aa);
 		});
+		const path = Array.from({ length: 97 }, (_, i) => {
+			const point = new THREE.Vector3(); point[curve.axis] = (i / 96 - 0.5) * dims[curve.axis];
+			return transform(point);
+		});
+		this.originPath.geometry.setFromPoints(path); this.originPath.geometry.computeBoundingSphere();
 		this.section.geometry.setFromPoints(points);
 		this.section.geometry.computeBoundingSphere();
 		const radius = Math.max(0.35, Math.min(1.5, dims[curve.axis] * 0.15));
@@ -352,7 +509,7 @@ export class TransformGizmo {
 			const point = new THREE.Vector3();
 			point[curve.axis] = (curve.origin - 0.5) * dims[curve.axis] + Math.sin(angle) * radius;
 			point[curve.direction] = (1 - Math.cos(angle)) * radius;
-			return this.target!.localToWorld(bendStackPoint(point, dims, curve, curve.activeLayer + 1));
+			return transform(point);
 		});
 		this.curveArc.geometry.setFromPoints(arc);
 		this.curveArc.geometry.computeBoundingSphere();

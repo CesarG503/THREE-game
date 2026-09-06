@@ -1,0 +1,195 @@
+import * as THREE from 'three';
+import RAPIER from '@dimforge/rapier3d-compat';
+import { vehicleUp, vehicleGravity } from './VehicleGravity';
+
+const Y = new THREE.Vector3(0, 1, 0);
+const FORWARD = new THREE.Vector3(0, 0, -1);
+
+/** Rounded footprint: the sharp bottom corners of a box catch stair risers and mesh seams. */
+export function motorbikeCollider(size: { x: number; y: number; z: number }) {
+  const radius = Math.min(size.x, size.y, size.z) * 0.24;
+  return RAPIER.ColliderDesc.roundCuboid(size.x / 2 - radius, size.y / 2 - radius, size.z / 2 - radius, radius);
+}
+
+interface Motion {
+  velocity: THREE.Vector3;
+  angular: THREE.Vector3;
+  grounded: boolean;
+  jumpTime: number;
+  body: RAPIER.RigidBody;
+  gravityFrame: THREE.Quaternion;
+}
+export interface BikeControls { yawRate?: number; pitch?: number; yaw?: number; roll?: number; jump?: number; boost?: number; }
+
+/** Swept, wheel-supported vehicle motion. Airborne translation is independent of
+ * the bike's attitude, so rotating a trick cannot redirect its flight velocity. */
+export class MotorbikePhysics {
+  private states = new WeakMap<THREE.Object3D, Motion>();
+  private departingRiders = new WeakMap<THREE.Object3D, { collider: RAPIER.Collider; remaining: number }>();
+  private initialVelocities = new WeakMap<THREE.Object3D, THREE.Vector3>();
+  private controller: RAPIER.KinematicCharacterController;
+  constructor(private world: RAPIER.World) {
+    this.controller = world.createCharacterController(0.025);
+    this.controller.disableSnapToGround();
+    this.controller.setMaxSlopeClimbAngle(Math.PI / 2 - 0.01);
+    this.controller.setMinSlopeSlideAngle(Math.PI / 2);
+  }
+
+  releaseRider(bike: THREE.Object3D, collider: RAPIER.Collider) { this.departingRiders.set(bike, { collider, remaining: 0.4 }); }
+  velocity(bike: THREE.Object3D) { return this.states.get(bike)?.velocity.clone(); }
+  reset(bike: THREE.Object3D, velocity?: number[]) { this.states.delete(bike); if (velocity) this.initialVelocities.set(bike, new THREE.Vector3().fromArray(velocity)); }
+  dispose() { this.world.removeCharacterController(this.controller); }
+
+  step(bike: THREE.Object3D, speed: number, verticalSpeed: number, dt: number, excluded?: RAPIER.Collider, controls: BikeControls = {}) {
+    const body = bike.userData.rigidBody as RAPIER.RigidBody;
+    const dims = bike.userData.originalScale;
+    const gravityUp = vehicleUp(bike);
+    let state = this.states.get(bike);
+    if (!state || state.body !== body) {
+      // Upgrade existing/saved motorcycles as well as newly placed ones.
+      body.collider(0).setShape(motorbikeCollider(dims).shape);
+      state = { velocity: this.initialVelocities.get(bike)?.clone() ?? FORWARD.clone().applyQuaternion(bike.quaternion).multiplyScalar(speed).addScaledVector(gravityUp, verticalSpeed), angular: new THREE.Vector3(), grounded: false, jumpTime: 0, body, gravityFrame: vehicleGravity(bike).frame.clone() };
+      this.initialVelocities.delete(bike);
+      this.states.set(bike, state);
+    }
+    const gravity = vehicleGravity(bike);
+    if (state.gravityFrame.angleTo(gravity.frame) > 1e-6) {
+      state.velocity.applyQuaternion(gravity.frame.clone().multiply(state.gravityFrame.clone().invert()));
+      state.gravityFrame.copy(gravity.frame);
+    }
+    if (dt <= 0) return { speed, verticalSpeed, travel: 0, grounded: state.grounded };
+    const departing = this.departingRiders.get(bike);
+    if (departing) { departing.remaining -= dt; if (departing.remaining <= 0) this.departingRiders.delete(bike); }
+    const filter = (other: RAPIER.Collider) => other !== excluded && (!departing || departing.remaining <= 0 || other !== departing.collider);
+    const steps = Math.max(1, Math.ceil(dt * 120));
+    const h = dt / steps;
+    let travel = 0;
+    let driveSpeed = speed;
+    if (controls.jump && controls.jump > 0) {
+      state.velocity.addScaledVector(gravityUp, Math.max(0, controls.jump - state.velocity.dot(gravityUp)));
+      state.jumpTime = 0.18;
+      state.grounded = false;
+    }
+    for (let step = 0; step < steps; step++) {
+      state.jumpTime = Math.max(0, state.jumpTime - h);
+      const up = Y.clone().applyQuaternion(bike.quaternion);
+      const forward = FORWARD.clone().applyQuaternion(bike.quaternion);
+      const normal = new THREE.Vector3();
+      const contacts: THREE.Vector3[] = [];
+      // A small tire footprint averages neighboring triangles and bridges stair
+      // edges. Only surfaces within suspension travel may support the wheels.
+      for (const wheel of [-1, 1]) {
+        let closest: { point: THREE.Vector3; normal: THREE.Vector3; distance: number } | null = null;
+        for (const offset of [-0.12, 0, 0.12]) {
+          const origin = new THREE.Vector3(0, 0.12, wheel * dims.z * 0.43 + offset * dims.y).applyQuaternion(bike.quaternion).add(bike.position);
+          const hit = this.world.castRayAndGetNormal(new RAPIER.Ray(origin, up.clone().negate()), dims.y / 2 + 0.38, true,
+            RAPIER.QueryFilterFlags.EXCLUDE_SENSORS, undefined, excluded, body, filter);
+          if (!hit) continue;
+          const n = new THREE.Vector3().copy(hit.normal as THREE.Vector3);
+          if (n.dot(up) < 0.35) continue;
+          const point = origin.clone().addScaledVector(up, -hit.timeOfImpact);
+          if (!closest || hit.timeOfImpact < closest.distance) closest = { point, normal: n, distance: hit.timeOfImpact };
+        }
+        if (closest) { contacts.push(closest.point); normal.add(closest.normal); }
+      }
+      if (contacts.length) normal.normalize();
+      if (contacts.length === 2) {
+        const along = contacts[0].clone().sub(contacts[1]).normalize();
+        const axle = new THREE.Vector3().crossVectors(forward, up).normalize();
+        const wheelNormal = new THREE.Vector3().crossVectors(axle, along).normalize();
+        if (wheelNormal.dot(normal) > 0.7) normal.lerp(wheelNormal, 0.7).normalize();
+      }
+      if (normal.dot(gravityUp) > 0.9995) normal.copy(gravityUp);
+      // No ground magnetism: a separating wheel at a crest must launch. Normal
+      // impulses can push away from a surface, never pull the bike onto it.
+      const separating = contacts.length && state.velocity.dot(normal) > Math.max(1.2, state.velocity.length() * 0.12);
+      const supported = !gravity.start && contacts.length > 0 && state.jumpTime === 0 && !separating && up.dot(gravityUp) > -0.2;
+      if (supported) {
+        let tangent = forward.clone().projectOnPlane(normal).normalize();
+        if (tangent.lengthSq() < 0.5) tangent.copy(forward);
+        const right = new THREE.Vector3().crossVectors(tangent, normal).normalize();
+        const rotation = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(right, normal, tangent.clone().negate()));
+        bike.quaternion.rotateTowards(rotation, h * 7);
+        if (controls.yawRate) bike.quaternion.premultiply(new THREE.Quaternion().setFromAxisAngle(normal, controls.yawRate * h));
+        tangent.copy(FORWARD).applyQuaternion(bike.quaternion).projectOnPlane(normal).normalize();
+        // Gravity costs speed uphill and adds speed downhill, including near-vertical transitions.
+        driveSpeed -= 22 * gravityUp.dot(tangent) * h;
+        if (!state.grounded) driveSpeed = state.velocity.dot(tangent);
+        state.velocity.copy(tangent).multiplyScalar(driveSpeed);
+        state.angular.multiplyScalar(Math.exp(-10 * h));
+        this.controller.enableAutostep(Math.min(0.32, dims.y * 0.25), Math.min(0.2, dims.z * 0.08), false);
+      } else {
+        this.controller.disableAutostep();
+        state.velocity.addScaledVector(gravityUp, -22 * h);
+        if (controls.boost) state.velocity.addScaledVector(forward, controls.boost * h);
+        const target = gravity.start ? new THREE.Vector3() : new THREE.Vector3(controls.pitch || 0, controls.yaw || 0, controls.roll || 0).multiplyScalar(3.2);
+        state.angular.lerp(target, 1 - Math.exp(-5 * h));
+        const angle = state.angular.length() * h;
+        if (angle > 0 && !gravity.start) {
+          const rotation = bike.quaternion.clone().multiply(new THREE.Quaternion().setFromAxisAngle(state.angular.clone().normalize(), angle)).normalize();
+          // Limit the angular sweep too; a trick cannot rotate through a wall.
+          const blocked = this.world.intersectionWithShape(bike.position, rotation, body.collider(0).shape,
+            RAPIER.QueryFilterFlags.EXCLUDE_SENSORS, undefined, undefined, body, filter);
+          if (!blocked) bike.quaternion.copy(rotation);
+          else state.angular.set(0, 0, 0);
+        }
+      }
+      state.grounded = Boolean(supported);
+      body.setRotation(bike.quaternion, true);
+      body.setTranslation(bike.position, true);
+      this.world.propagateModifiedBodyPositionsToColliders();
+      const desired = state.velocity.clone().multiplyScalar(h);
+      // A small compressive contact keeps the sweep aware of the ground, without
+      // replacing the launch velocity with a permanently zero vertical speed.
+      if (supported) desired.addScaledVector(normal, -0.025);
+      this.controller.setUp(supported ? normal : gravityUp);
+      this.controller.computeColliderMovement(body.collider(0), desired, RAPIER.QueryFilterFlags.EXCLUDE_SENSORS, undefined, filter);
+      const move = new THREE.Vector3().copy(this.controller.computedMovement() as THREE.Vector3);
+      if (departing && gravity.orientation==='right' && step===0) console.log('COAST',bike.position.toArray(),state.velocity.toArray(),normal.toArray(),move.toArray(), this.controller.numComputedCollisions(), departing.remaining);
+      let stepped = false;
+      const horizontal = desired.clone().projectOnPlane(gravityUp);
+      if (supported && horizontal.length() > 0.0001 && move.dot(horizontal.clone().normalize()) < horizontal.length() * 0.6 && normal.dot(gravityUp) > 0.6) {
+        // Explicit swept wheel-height step: test ceiling, forward clearance and
+        // landing before accepting it. Tall walls and gaps cannot become steps.
+        const shape = body.collider(0).shape;
+        const rise = Math.min(0.34, dims.y * 0.28);
+        const cast = (position: THREE.Vector3, delta: THREE.Vector3) => this.world.castShape(position, bike.quaternion, delta, shape, 0.005, 1, false,
+          RAPIER.QueryFilterFlags.EXCLUDE_SENSORS, undefined, undefined, body, filter);
+        const lift = gravityUp.clone().multiplyScalar(rise);
+        if (!cast(bike.position, lift)) {
+          const raised = bike.position.clone().add(lift);
+          const advance = horizontal.clone().normalize().multiplyScalar(Math.max(0.12, horizontal.length()));
+          if (!cast(raised, advance)) {
+            const landing = raised.clone().add(advance);
+            const down = gravityUp.clone().multiplyScalar(-(rise + 0.04));
+            const floor = cast(landing, down);
+            if (floor && new THREE.Vector3().copy(floor.normal1 as THREE.Vector3).dot(gravityUp) > 0.6) {
+              landing.addScaledVector(down, floor.time_of_impact);
+              const height = landing.clone().sub(bike.position).dot(gravityUp);
+              if (height > 0.01 && height <= rise + 0.005) {
+                move.copy(landing).sub(bike.position);
+                stepped = true;
+              }
+            }
+          }
+        }
+      }
+      for (let i = 0; i < this.controller.numComputedCollisions(); i++) {
+        const collision = this.controller.computedCollision(i);
+        if (!collision) continue;
+        const n = new THREE.Vector3().copy(collision.normal1 as THREE.Vector3);
+        const into = state.velocity.dot(n);
+        const passedStep = supported && move.clone().projectOnPlane(gravityUp).length() >= desired.clone().projectOnPlane(gravityUp).length() * 0.8;
+        if (!stepped && into < 0 && !(supported && n.dot(up) > 0.35) && !(passedStep && n.dot(gravityUp) < 0.5)) state.velocity.addScaledVector(n, -into);
+      }
+      bike.position.add(move);
+      travel += move.length();
+      if (supported) driveSpeed = Math.sign(driveSpeed) * state.velocity.length();
+    }
+    body.setTranslation(bike.position, true);
+    body.setNextKinematicTranslation(bike.position);
+    body.setNextKinematicRotation(bike.quaternion);
+    const reportedSpeed = state.grounded ? driveSpeed : Math.sign(speed || 1) * state.velocity.clone().projectOnPlane(gravityUp).length();
+    return { speed: Math.abs(reportedSpeed) < 0.005 ? 0 : reportedSpeed, verticalSpeed: state.velocity.dot(gravityUp), travel, grounded: state.grounded };
+  }
+}

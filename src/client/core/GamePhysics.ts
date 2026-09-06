@@ -1,3 +1,4 @@
+import { motorbikeCollider } from "../vehicles/MotorbikePhysics";
 import { curvatureCollider, supportsCurvature } from "../utils/CurvatureUtils";
 import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
@@ -40,6 +41,8 @@ export function regenerateObjectPhysics(this: Game, objectMesh: THREE.Object3D) 
 	if (supportsCurvature(objectMesh.userData.mapObjectType) && dims.curvature?.enabled && (objectMesh as THREE.Mesh).geometry) {
 		colDesc = curvatureCollider((objectMesh as THREE.Mesh).geometry, RAPIER);
 		this.world.createCollider(colDesc, rigidBody);
+	} else if (objectMesh.userData.mapObjectType === "motorbike") {
+		this.world.createCollider(motorbikeCollider(dims), rigidBody);
 	} else if (objectMesh.userData.mapObjectType === "ramp") {
 		colDesc = RampUtils.createColliderDesc(dims, RAPIER);
 		this.world.createCollider(colDesc, rigidBody);

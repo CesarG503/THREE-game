@@ -217,5 +217,5 @@ export function curvatureCollider(geometry: THREE.BufferGeometry, rapier: any) {
     vertices.set([positions.getX(i), positions.getY(i), positions.getZ(i)], i * 3);
   }
   const indices = geometry.index ? new Uint32Array(geometry.index.array) : Uint32Array.from({ length: positions.count }, (_, i) => i);
-  return rapier.ColliderDesc.trimesh(vertices, indices);
+  return rapier.ColliderDesc.trimesh(vertices, indices, rapier.TriMeshFlags.FIX_INTERNAL_EDGES);
 }

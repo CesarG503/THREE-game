@@ -1,3 +1,4 @@
+import { motorbikeCollider } from "../vehicles/MotorbikePhysics";
 import { createCurvedGeometry, curvatureCollider, resolveCurvature, type CurvatureSettings } from "../utils/CurvatureUtils";
 import { orientationFromRotation } from '../vehicles/VehicleGravity';
 import * as THREE from "three";
@@ -639,7 +640,7 @@ export class MapObjectItem extends Item {
     if (this.type === "motorbike") {
       this.logicProperties = normalizeMotorbikeSettings(this.logicProperties);
       object3D = createMotorbikeModel(this.scale);
-      collidersDesc.push(RAPIER.ColliderDesc.cuboid(this.scale.x / 2, this.scale.y / 2, this.scale.z / 2));
+      collidersDesc.push(motorbikeCollider(this.scale));
     } else if (this.type === "stairs") {
       const steps = StairsUtils.calculateSteps(this.scale);
 

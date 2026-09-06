@@ -447,7 +447,7 @@ export class RemotePlayer {
     }
 
     /** Anchor both avatars to the same rendered bike after network interpolation. */
-    syncVehicleSeat(position: THREE.Vector3, yaw: number, seat: VehicleSeat, lean: number, dt = 0.016) {
+    syncVehicleSeat(position: THREE.Vector3, yaw: number, seat: VehicleSeat, lean: number, dt = 0.016, vehicleRotation?: THREE.Quaternion) {
         const ride = this.state.motorbike;
         if (!ride) return;
         if (this.ridingSeat !== seat) {
@@ -462,6 +462,11 @@ export class RemotePlayer {
         this.applyModelTransform(this.glbModel, 0);
         this.applyModelTransform(this.polygonModel, Math.PI);
         this.applyModelTransform(this.polygonModelSkin, Math.PI);
+        if (vehicleRotation) {
+            const upright = this.currentGravityQuaternion.clone().multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), yaw));
+            const tilt = vehicleRotation.clone().multiply(upright.invert());
+            for (const model of [this.glbModel.model, this.polygonModel.model, this.polygonModelSkin.model]) model?.quaternion.premultiply(tilt);
+        }
         const effectiveLean = (seat === 'passenger') ? (-lean * 0.4) : lean;
         this.glbModel.model?.rotateZ(effectiveLean);
         this.polygonModel.model?.rotateZ(-effectiveLean);

@@ -36,12 +36,13 @@ export const MOTORBIKE_FIELDS = [
 /** Ángulo máximo de giro relativo del torso y cámara del pasajero (85°). */
 export const MAX_PASSENGER_YAW = (85 * Math.PI) / 180;
 
-export type MotorbikeSettings = Record<(typeof MOTORBIKE_FIELDS)[number]['key'], number> & { vehicleKind: 'motorbike'; dismountPenaltyEnabled: boolean; durabilityEnabled: boolean; explosionDamageEnabled: boolean; gravityOrientation: GravityOrientation | 'inherit' };
+export type MotorbikeSettings = Record<(typeof MOTORBIKE_FIELDS)[number]['key'], number> & { vehicleKind: 'motorbike'; autoStabilize: boolean; dismountPenaltyEnabled: boolean; durabilityEnabled: boolean; explosionDamageEnabled: boolean; gravityOrientation: GravityOrientation | 'inherit' };
 
 export function normalizeMotorbikeSettings(props: any = {}): MotorbikeSettings {
   props = props ?? {};
   const result: any = { ...props, vehicleKind: 'motorbike' };
   result.gravityOrientation = props.gravityOrientation === undefined || props.gravityOrientation === 'inherit' ? 'inherit' : normalizeGravityOrientation(props.gravityOrientation);
+  result.autoStabilize = props.autoStabilize !== false;
   result.explosionDamageEnabled = props.explosionDamageEnabled === true;
   result.durabilityEnabled = props.durabilityEnabled === true;
   result.dismountPenaltyEnabled = props.dismountPenaltyEnabled === true;

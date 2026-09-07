@@ -18,6 +18,7 @@ interface Motion {
   jumpTime: number;
   body: RAPIER.RigidBody;
   gravityFrame: THREE.Quaternion;
+  recovering: boolean;
 }
 export interface BikeControls { yawRate?: number; pitch?: number; yaw?: number; roll?: number; jump?: number; boost?: number; }
 
@@ -40,6 +41,66 @@ export class MotorbikePhysics {
   reset(bike: THREE.Object3D, velocity?: number[]) { this.states.delete(bike); if (velocity) this.initialVelocities.set(bike, new THREE.Vector3().fromArray(velocity)); }
   dispose() { this.world.removeCharacterController(this.controller); }
 
+  /** Recover around the contact footprint, checking clearance before moving.
+   * Gravity stays independent of attitude; righting never creates drive speed. */
+  private stabilize(bike: THREE.Object3D, maxAngle: number, filter: (collider: RAPIER.Collider) => boolean) {
+    const body = bike.userData.rigidBody as RAPIER.RigidBody;
+    const up = vehicleUp(bike), dims = bike.userData.originalScale;
+    let forward = FORWARD.clone().applyQuaternion(bike.quaternion).projectOnPlane(up);
+    if (forward.lengthSq() < 0.01) forward = new THREE.Vector3(1, 0, 0).applyQuaternion(bike.quaternion).cross(up);
+    forward.normalize();
+    const right = forward.clone().cross(up).normalize();
+    const target = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(right, up, forward.negate()));
+    const rotation = bike.quaternion.clone().rotateTowards(target, maxAngle);
+    const extent = (q: THREE.Quaternion) => ['x', 'y', 'z'].reduce((sum, axis, index) => sum + Math.abs(new THREE.Vector3().setComponent(index, 1).applyQuaternion(q).dot(up)) * dims[axis] / 2, 0);
+    const ground = this.world.castRay(new RAPIER.Ray(bike.position, up.clone().negate()), extent(bike.quaternion) + 0.15, true,
+      RAPIER.QueryFilterFlags.EXCLUDE_SENSORS, undefined, undefined, body, filter);
+    const position = bike.position.clone();
+    if (ground) position.addScaledVector(up, Math.max(0, extent(rotation) + 0.035 - ground.timeOfImpact));
+    // Make room away from nearby surfaces instead of retrying the same blocked
+    // rotation forever. The subsequent sweep still forbids crossing a wall.
+    for (let iteration = 0; iteration < 4; iteration++) {
+      let adjusted = false;
+      this.world.intersectionsWithShape(position, rotation, body.collider(0).shape, other => {
+        const contact = other.contactShape(body.collider(0).shape, position, rotation, 0);
+        if (contact && contact.distance <= 0) {
+          position.addScaledVector(new THREE.Vector3().copy(contact.normal1 as THREE.Vector3), Math.min(0.2, -contact.distance + 0.01));
+          adjusted = true;
+        }
+        return true;
+      }, RAPIER.QueryFilterFlags.EXCLUDE_SENSORS, undefined, undefined, body, filter);
+      if (!adjusted) break;
+    }
+    const lift = position.clone().sub(bike.position);
+    const blockedLift = lift.lengthSq() > 1e-8 && this.world.castShape(bike.position, bike.quaternion, lift, body.collider(0).shape, 0.001, 1, false,
+      RAPIER.QueryFilterFlags.EXCLUDE_SENSORS, undefined, undefined, body, filter);
+    const blockedPose = this.world.intersectionWithShape(position, rotation, body.collider(0).shape,
+      RAPIER.QueryFilterFlags.EXCLUDE_SENSORS, undefined, undefined, body, filter);
+    if (blockedLift || blockedPose) return false;
+    bike.position.copy(position); bike.quaternion.copy(rotation);
+    body.setTranslation(position, true); body.setRotation(rotation, true);
+    body.setNextKinematicTranslation(position); body.setNextKinematicRotation(rotation);
+    return true;
+  }
+
+  rightBike(bike: THREE.Object3D, excluded?: RAPIER.Collider) {
+    const before = bike.position.clone(), rotation = bike.quaternion.clone();
+    const filter = (other: RAPIER.Collider) => other !== excluded;
+    // Validate the whole rotation, not just a clear final pose.
+    for (let i = 0; i < 36; i++) {
+      if (!this.stabilize(bike, Math.PI / 18, filter)) {
+        bike.position.copy(before); bike.quaternion.copy(rotation);
+        const body = bike.userData.rigidBody as RAPIER.RigidBody;
+        body.setTranslation(before, true); body.setRotation(rotation, true);
+        body.setNextKinematicTranslation(before); body.setNextKinematicRotation(rotation);
+        return false;
+      }
+    }
+    bike.userData.vehicleToppled = false;
+    this.reset(bike, [0, 0, 0]);
+    return true;
+  }
+
   step(bike: THREE.Object3D, speed: number, verticalSpeed: number, dt: number, excluded?: RAPIER.Collider, controls: BikeControls = {}) {
     const body = bike.userData.rigidBody as RAPIER.RigidBody;
     const dims = bike.userData.originalScale;
@@ -48,7 +109,7 @@ export class MotorbikePhysics {
     if (!state || state.body !== body) {
       // Upgrade existing/saved motorcycles as well as newly placed ones.
       body.collider(0).setShape(motorbikeCollider(dims).shape);
-      state = { velocity: this.initialVelocities.get(bike)?.clone() ?? FORWARD.clone().applyQuaternion(bike.quaternion).multiplyScalar(speed).addScaledVector(gravityUp, verticalSpeed), angular: new THREE.Vector3(), grounded: false, jumpTime: 0, body, gravityFrame: vehicleGravity(bike).frame.clone() };
+      state = { velocity: this.initialVelocities.get(bike)?.clone() ?? FORWARD.clone().applyQuaternion(bike.quaternion).multiplyScalar(speed).addScaledVector(gravityUp, verticalSpeed), angular: new THREE.Vector3(), grounded: false, jumpTime: 0, body, recovering: false, gravityFrame: vehicleGravity(bike).frame.clone() };
       this.initialVelocities.delete(bike);
       this.states.set(bike, state);
     }
@@ -60,6 +121,8 @@ export class MotorbikePhysics {
     if (dt <= 0) return { speed, verticalSpeed, travel: 0, grounded: state.grounded };
     const departing = this.departingRiders.get(bike);
     if (departing) { departing.remaining -= dt; if (departing.remaining <= 0) this.departingRiders.delete(bike); }
+    const automatic = bike.userData.logicProperties?.autoStabilize !== false;
+    if (!automatic) state.recovering = false;
     const filter = (other: RAPIER.Collider) => other !== excluded && (!departing || departing.remaining <= 0 || other !== departing.collider);
     const steps = Math.max(1, Math.ceil(dt * 120));
     const h = dt / steps;
@@ -71,6 +134,16 @@ export class MotorbikePhysics {
       state.grounded = false;
     }
     for (let step = 0; step < steps; step++) {
+      const trickInput = Math.abs(controls.pitch || 0) + Math.abs(controls.yaw || 0) + Math.abs(controls.roll || 0) > 0.1;
+      if (automatic && !gravity.start && (state.recovering || bike.userData.vehicleToppled || (!trickInput && state.velocity.length() > 1 && Y.clone().applyQuaternion(bike.quaternion).dot(gravityUp) < 0.25))) {
+        state.recovering = true;
+        this.stabilize(bike, h * 4, filter);
+        state.angular.set(0, 0, 0);
+        if (Y.clone().applyQuaternion(bike.quaternion).dot(gravityUp) > 0.94) {
+          state.recovering = false;
+          bike.userData.vehicleToppled = false;
+        }
+      }
       state.jumpTime = Math.max(0, state.jumpTime - h);
       const up = Y.clone().applyQuaternion(bike.quaternion);
       const forward = FORWARD.clone().applyQuaternion(bike.quaternion);
@@ -103,7 +176,12 @@ export class MotorbikePhysics {
       // No ground magnetism: a separating wheel at a crest must launch. Normal
       // impulses can push away from a surface, never pull the bike onto it.
       const separating = contacts.length && state.velocity.dot(normal) > Math.max(1.2, state.velocity.length() * 0.12);
-      const supported = !gravity.start && contacts.length > 0 && state.jumpTime === 0 && !separating && up.dot(gravityUp) > -0.2;
+      const slope = normal.dot(gravityUp);
+      // Steep riding needs momentum. Once it is lost, gravity owns translation;
+      // wheel proximity alone cannot keep a stopped bike glued to a wall.
+      const minimumSpeed = 5 * THREE.MathUtils.smoothstep(1 - slope, 0.35, 1);
+      const hasTraction = slope > 0.65 || state.velocity.clone().projectOnPlane(normal).length() >= minimumSpeed;
+      const supported = hasTraction && !bike.userData.vehicleToppled && !state.recovering && !gravity.start && contacts.length > 0 && state.jumpTime === 0 && !separating && up.dot(gravityUp) > -0.2;
       if (supported) {
         let tangent = forward.clone().projectOnPlane(normal).normalize();
         if (tangent.lengthSq() < 0.5) tangent.copy(forward);
@@ -122,7 +200,7 @@ export class MotorbikePhysics {
         this.controller.disableAutostep();
         state.velocity.addScaledVector(gravityUp, -22 * h);
         if (controls.boost) state.velocity.addScaledVector(forward, controls.boost * h);
-        const target = gravity.start ? new THREE.Vector3() : new THREE.Vector3(controls.pitch || 0, controls.yaw || 0, controls.roll || 0).multiplyScalar(3.2);
+        const target = gravity.start || state.recovering || bike.userData.vehicleToppled ? new THREE.Vector3() : new THREE.Vector3(controls.pitch || 0, controls.yaw || 0, controls.roll || 0).multiplyScalar(3.2);
         state.angular.lerp(target, 1 - Math.exp(-5 * h));
         const angle = state.angular.length() * h;
         if (angle > 0 && !gravity.start) {
@@ -141,11 +219,10 @@ export class MotorbikePhysics {
       const desired = state.velocity.clone().multiplyScalar(h);
       // A small compressive contact keeps the sweep aware of the ground, without
       // replacing the launch velocity with a permanently zero vertical speed.
-      if (supported) desired.addScaledVector(normal, -0.025);
+      if (supported) desired.addScaledVector(normal, -22 * h * h);
       this.controller.setUp(supported ? normal : gravityUp);
       this.controller.computeColliderMovement(body.collider(0), desired, RAPIER.QueryFilterFlags.EXCLUDE_SENSORS, undefined, filter);
       const move = new THREE.Vector3().copy(this.controller.computedMovement() as THREE.Vector3);
-      if (departing && gravity.orientation==='right' && step===0) console.log('COAST',bike.position.toArray(),state.velocity.toArray(),normal.toArray(),move.toArray(), this.controller.numComputedCollisions(), departing.remaining);
       let stepped = false;
       const horizontal = desired.clone().projectOnPlane(gravityUp);
       if (supported && horizontal.length() > 0.0001 && move.dot(horizontal.clone().normalize()) < horizontal.length() * 0.6 && normal.dot(gravityUp) > 0.6) {
@@ -174,13 +251,24 @@ export class MotorbikePhysics {
           }
         }
       }
+      let bodyOnFloor = false;
       for (let i = 0; i < this.controller.numComputedCollisions(); i++) {
         const collision = this.controller.computedCollision(i);
         if (!collision) continue;
         const n = new THREE.Vector3().copy(collision.normal1 as THREE.Vector3);
+        if (n.dot(gravityUp) > 0.55) bodyOnFloor = true;
         const into = state.velocity.dot(n);
         const passedStep = supported && move.clone().projectOnPlane(gravityUp).length() >= desired.clone().projectOnPlane(gravityUp).length() * 0.8;
         if (!stepped && into < 0 && !(supported && n.dot(up) > 0.35) && !(passedStep && n.dot(gravityUp) < 0.5)) state.velocity.addScaledVector(n, -into);
+      }
+      if (bodyOnFloor && !gravity.start && Y.clone().applyQuaternion(bike.quaternion).dot(gravityUp) < 0.45) {
+        if (automatic) state.recovering = true;
+        else bike.userData.vehicleToppled = true;
+      }
+      if (bodyOnFloor && !supported) {
+        const length = state.velocity.length();
+        state.velocity.multiplyScalar(Math.max(0, length - 3 * h) / Math.max(length, 0.00001));
+        if (bike.userData.vehicleToppled && !automatic && length < 0.1) state.grounded = true;
       }
       bike.position.add(move);
       travel += move.length();
@@ -190,6 +278,6 @@ export class MotorbikePhysics {
     body.setNextKinematicTranslation(bike.position);
     body.setNextKinematicRotation(bike.quaternion);
     const reportedSpeed = state.grounded ? driveSpeed : Math.sign(speed || 1) * state.velocity.clone().projectOnPlane(gravityUp).length();
-    return { speed: Math.abs(reportedSpeed) < 0.005 ? 0 : reportedSpeed, verticalSpeed: state.velocity.dot(gravityUp), travel, grounded: state.grounded };
+    return { speed: Math.abs(reportedSpeed) < 0.005 ? 0 : reportedSpeed, verticalSpeed: state.velocity.dot(gravityUp), travel, grounded: state.grounded, toppled: bike.userData.vehicleToppled === true };
   }
 }

@@ -120,6 +120,19 @@ export class VehicleSystem {
     if (!bike) return false;
     const character = this.game.character;
     if (character.getGravityUpVector().dot(vehicleUp(bike)) < 0.99 || this.game.gravityQteActive) return false;
+    if (bike.userData.vehicleToppled) {
+      if (bike.userData.vehicleDriver || bike.userData.vehiclePassenger) return false;
+      if (!this.physics.rightBike(bike, character.collider)) {
+        this.show('No hay espacio para enderezar la moto.');
+        return false;
+      }
+      this.startCoasting(bike, 0, 0, true);
+      bike.userData.vehicleMotion = { speed: 0, verticalSpeed: 0, lean: 0 };
+      this.game.broadcastObjectUpdate?.(bike);
+      if (this.game.networkManager?.isConnected) this.game.networkManager.sendPlayerAction('motorbikePark', this.networkStateFor(bike, 0, 0, 0, 0));
+      this.show('Moto de pie · Pulsa F otra vez para subir');
+      return true;
+    }
     if (isMotorbikeBroken(bike.userData.logicProperties)) {
       this.show('Motocicleta averiada · Durabilidad 0');
       return false;
@@ -214,11 +227,11 @@ export class VehicleSystem {
     return null;
   }
 
-  dismount(force = false): boolean {
+  dismount(force = false, crashed = false): boolean {
     if (!this.mounted) return false;
     const bike = this.mounted;
     const character = this.game.character;
-    const exit = force ? null : this.findExit();
+    const exit = force && !crashed ? null : this.findExit();
     if (!force && !exit) {
       this.show('No hay espacio libre para bajar. Mueve la moto e intenta de nuevo.');
       return false;
@@ -278,6 +291,7 @@ export class VehicleSystem {
     this.damageEffects.update(this.bikes, dt);
     // Inspector edits also apply to parked motorcycles, which then fall toward their new surface.
     for (const bike of this.bikes) {
+      if (bike.userData.vehicleToppled && bike.userData.logicProperties?.autoStabilize !== false && !this.coasting.has(bike) && !bike.userData.vehicleDriver) this.startCoasting(bike, 0, 0, true);
       const requested = bike.userData.logicProperties?.gravityOrientation;
       if (bike !== this.mounted && !bike.userData.vehicleDriver && !bike.userData.vehiclePassenger && !this.coasting.has(bike) &&
           requested && requested !== 'inherit' && requested !== vehicleGravity(bike).orientation) {
@@ -288,6 +302,8 @@ export class VehicleSystem {
     if (!this.mounted) {
       this.game.hud?.updateVehicle?.(null);
       if (this.hud) this.hud.style.display = 'none';
+      const nearby = this.nearest();
+      if (nearby?.userData.vehicleToppled) this.show('Moto volcada · F: poner de pie');
       const falling = this.fall.update(this.game.character, this.controller, this.paused ? 0 : dt);
       if (falling) {
         this.game.character?.particleSystem?.update?.(dt);
@@ -303,6 +319,10 @@ export class VehicleSystem {
     }
     const props = normalizeMotorbikeSettings(bike.userData.logicProperties);
     Object.assign(bike.userData.logicProperties, props);
+    if (bike.userData.vehicleToppled && !props.autoStabilize) {
+      this.dismount(true, true);
+      return false;
+    }
     if (this.isPassenger) {
       const motion = this.coasting.get(bike) ?? bike.userData.vehicleMotion;
       this.speed = motion?.speed ?? 0;
@@ -367,6 +387,10 @@ export class VehicleSystem {
     this.speed = motion.speed;
     this.verticalSpeed = motion.verticalSpeed;
     this.grounded = motion.grounded;
+    if (motion.toppled && !props.autoStabilize) {
+      this.dismount(true, true);
+      return false;
+    }
     const travel = motion.travel;
     this.lean = THREE.MathUtils.lerp(this.lean, this.steering * THREE.MathUtils.degToRad(props.maxLean) * Math.min(Math.abs(this.speed) / 10, 1), 1 - Math.exp(-8 * dt));
     bike.userData.vehicleMotion = { speed: this.speed, verticalSpeed: this.verticalSpeed, lean: this.lean };
@@ -680,6 +704,8 @@ export class VehicleSystem {
       position: { x: bike.position.x, y: bike.position.y, z: bike.position.z },
       yaw: getMotorbikeHeading(bike),
       rotation: bike.quaternion.toArray(),
+      toppled: bike.userData.vehicleToppled === true,
+      autoStabilize: bike.userData.logicProperties.autoStabilize !== false,
       velocity: this.physics.velocity(bike)?.toArray(),
       gravityOrientation: vehicleGravity(bike).orientation,
       gravityQuaternion: vehicleGravity(bike).frame.toArray(),
@@ -703,6 +729,8 @@ export class VehicleSystem {
       (state.gravityTransitionRemaining === undefined || (typeof state.gravityTransitionRemaining === 'number' && Number.isFinite(state.gravityTransitionRemaining) && state.gravityTransitionRemaining >= 0 && state.gravityTransitionRemaining < 1e6)) &&
       (state.gravityOrientation === undefined || ['down', 'up', 'left', 'right', 'front', 'back'].includes(state.gravityOrientation)) &&
       (state.gravityQuaternion === undefined || (Array.isArray(state.gravityQuaternion) && state.gravityQuaternion.length === 4 && state.gravityQuaternion.every((v: any) => typeof v === 'number' && Number.isFinite(v)) && Math.abs(Math.hypot(...state.gravityQuaternion) - 1) < 0.01)) &&
+      (state.toppled === undefined || typeof state.toppled === 'boolean') &&
+      (state.autoStabilize === undefined || typeof state.autoStabilize === 'boolean') &&
       (state.rotation === undefined || (Array.isArray(state.rotation) && state.rotation.length === 4 && state.rotation.every((v: any) => typeof v === 'number' && Number.isFinite(v)) && Math.abs(Math.hypot(...state.rotation) - 1) < 0.01)) &&
       (state.velocity === undefined || (Array.isArray(state.velocity) && state.velocity.length === 3 && state.velocity.every((v: any) => typeof v === 'number' && Number.isFinite(v) && Math.abs(v) < 1000))) &&
       (state.jetpackActive === undefined || typeof state.jetpackActive === 'boolean') &&
@@ -731,6 +759,8 @@ export class VehicleSystem {
     receiveVehicleGravity(bike, state.gravityOrientation, this.networkGravityFrame(state), state.gravityTransitionRemaining ?? 0);
     this.applyRemoteTransform(bike, state.position, state.yaw, state.rotation ? new THREE.Quaternion().fromArray(state.rotation) : undefined);
     this.physics.reset(bike, state.velocity);
+    bike.userData.vehicleToppled = state.toppled === true;
+    if (state.autoStabilize !== undefined) bike.userData.logicProperties.autoStabilize = state.autoStabilize;
     bike.userData.logicProperties.consumableUse = Math.max(0, Math.min(state.fuel, bike.userData.logicProperties.maxConsumableUse));
     this.startCoasting(bike, state.speed, state.verticalSpeed ?? 0, bike === this.mounted);
     bike.animateMotorbike?.(0, 0, 0);
@@ -838,6 +868,8 @@ export class VehicleSystem {
         receiveVehicleGravity(bike, state.gravityOrientation, frame, state.gravityTransitionRemaining ?? 0);
         // Use vehicle yaw, never passenger aim or an interpolated avatar's old seat offset.
         this.applyRemoteTransform(bike, position, yaw + diff * (1 - Math.exp(-15 * frameDt)), state.rotation ? bike.quaternion.clone().slerp(new THREE.Quaternion().fromArray(state.rotation), 1 - Math.exp(-15 * frameDt)) : undefined);
+        bike.userData.vehicleToppled = state.toppled === true;
+        if (state.autoStabilize !== undefined) bike.userData.logicProperties.autoStabilize = state.autoStabilize;
         bike.userData.vehicleMotion = { speed: state.speed, verticalSpeed: state.verticalSpeed ?? 0, lean: state.lean };
         bike.userData.logicProperties.consumableUse = Math.max(0, Math.min(state.fuel, bike.userData.logicProperties.maxConsumableUse));
         bike.animateMotorbike?.(state.speed * Math.min(dt, 0.05), state.steering, state.lean);

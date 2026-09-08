@@ -40,8 +40,12 @@ export class MotorbikeLogic {
     const penalty = document.createElement('input');
     penalty.type = 'checkbox';
     penalty.checked = normalizeMotorbikeSettings(props).dismountPenaltyEnabled;
-    penaltyLabel.append(penalty, 'Caída y daño al bajar a alta velocidad');
+    penaltyLabel.append(penalty, 'Daño por caída y al bajar a alta velocidad');
     container.appendChild(penaltyLabel);
+    const crashHint = document.createElement('p');
+    crashHint.style.cssText = hint.style.cssText;
+    crashHint.textContent = 'Con daño por caída activado y sin estabilizador, un vuelco hace caer y daña al jugador aunque vaya despacio. Si también activas la durabilidad, cada caída de la moto resta la cantidad configurada. Los aterrizajes normales sobre las ruedas no se penalizan.';
+    container.appendChild(crashHint);
     const durabilityLabel = document.createElement('label');
     durabilityLabel.style.cssText = penaltyLabel.style.cssText;
     const durability = document.createElement('input');
@@ -51,6 +55,18 @@ export class MotorbikeLogic {
     container.appendChild(durabilityLabel);
     const durabilitySettings = document.createElement('div');
     container.appendChild(durabilitySettings);
+    const crashSettings = document.createElement('div');
+    container.appendChild(crashSettings);
+    const crashModeLabel = document.createElement('label');
+    crashModeLabel.textContent = 'Daño al vehículo por caída: ';
+    const crashMode = document.createElement('select');
+    for (const [value, text] of [['percent', 'Porcentaje de durabilidad máxima'], ['fixed', 'Cantidad fija']]) {
+      const option = document.createElement('option');
+      option.value = value; option.textContent = text; crashMode.appendChild(option);
+    }
+    crashMode.value = normalizeMotorbikeSettings(props).crashDamageMode;
+    crashModeLabel.appendChild(crashMode);
+    crashSettings.appendChild(crashModeLabel);
     const explosionLabel = document.createElement('label');
     explosionLabel.style.cssText = penaltyLabel.style.cssText;
     const explosion = document.createElement('input');
@@ -62,13 +78,26 @@ export class MotorbikeLogic {
     explosionSettings.style.cssText = 'padding-left:12px;border-left:2px solid #f97316';
     container.appendChild(explosionSettings);
     const inputs = new Map<string, HTMLInputElement>();
+    const refreshCrash = () => {
+      crashMode.disabled = !penalty.checked || !durability.checked;
+      for (const [key, mode] of [['crashDamagePercent', 'percent'], ['crashDamageFixed', 'fixed']]) {
+        const input = inputs.get(key);
+        if (input) {
+          input.disabled = crashMode.disabled || crashMode.value !== mode;
+          input.parentElement!.style.display = crashMode.value === mode ? 'flex' : 'none';
+        }
+      }
+    };
+    crashMode.onchange = () => { update('crashDamageMode', crashMode.value); refreshCrash(); };
     const refreshPenalty = () => {
+      refreshCrash();
       for (const key of ['dismountFallSpeed', 'dismountDamagePercent']) {
         const input = inputs.get(key);
         if (input) input.disabled = !penalty.checked;
       }
     };
     const refreshDurability = () => {
+      refreshCrash();
       explosion.disabled = !durability.checked;
       for (const key of ['explosionDamage', 'explosionRadius']) {
         const input = inputs.get(key);
@@ -117,6 +146,7 @@ export class MotorbikeLogic {
       inputs.set(field.key, input);
       label.appendChild(input);
       const parent = ['explosionDamage', 'explosionRadius'].includes(field.key) ? explosionSettings
+        : ['crashDamagePercent', 'crashDamageFixed'].includes(field.key) ? crashSettings
         : ['maxDurability', 'durability'].includes(field.key) ? durabilitySettings : container;
       parent.appendChild(label);
     }

@@ -19,6 +19,11 @@ interface Motion {
   body: RAPIER.RigidBody;
   gravityFrame: THREE.Quaternion;
   recovering: boolean;
+  crashLatched: boolean;
+  stableTime: number;
+  restingNormal: THREE.Vector3;
+  restingSide: number;
+  restingTarget?: THREE.Quaternion;
 }
 export interface BikeControls { yawRate?: number; pitch?: number; yaw?: number; roll?: number; jump?: number; boost?: number; }
 
@@ -43,16 +48,17 @@ export class MotorbikePhysics {
 
   /** Recover around the contact footprint, checking clearance before moving.
    * Gravity stays independent of attitude; righting never creates drive speed. */
-  private stabilize(bike: THREE.Object3D, maxAngle: number, filter: (collider: RAPIER.Collider) => boolean) {
+  private stabilize(bike: THREE.Object3D, maxAngle: number, filter: (collider: RAPIER.Collider) => boolean, restingTarget?: THREE.Quaternion) {
     const body = bike.userData.rigidBody as RAPIER.RigidBody;
     const up = vehicleUp(bike), dims = bike.userData.originalScale;
     let forward = FORWARD.clone().applyQuaternion(bike.quaternion).projectOnPlane(up);
     if (forward.lengthSq() < 0.01) forward = new THREE.Vector3(1, 0, 0).applyQuaternion(bike.quaternion).cross(up);
     forward.normalize();
     const right = forward.clone().cross(up).normalize();
-    const target = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(right, up, forward.negate()));
+    const target = restingTarget ?? new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(right, up, forward.negate()));
     const rotation = bike.quaternion.clone().rotateTowards(target, maxAngle);
-    const extent = (q: THREE.Quaternion) => ['x', 'y', 'z'].reduce((sum, axis, index) => sum + Math.abs(new THREE.Vector3().setComponent(index, 1).applyQuaternion(q).dot(up)) * dims[axis] / 2, 0);
+    const radius = Math.min(dims.x, dims.y, dims.z) * 0.24;
+    const extent = (q: THREE.Quaternion) => radius + ['x', 'y', 'z'].reduce((sum, axis, index) => sum + Math.abs(new THREE.Vector3().setComponent(index, 1).applyQuaternion(q).dot(up)) * (dims[axis] / 2 - radius), 0);
     const ground = this.world.castRay(new RAPIER.Ray(bike.position, up.clone().negate()), extent(bike.quaternion) + 0.15, true,
       RAPIER.QueryFilterFlags.EXCLUDE_SENSORS, undefined, undefined, body, filter);
     const position = bike.position.clone();
@@ -109,7 +115,7 @@ export class MotorbikePhysics {
     if (!state || state.body !== body) {
       // Upgrade existing/saved motorcycles as well as newly placed ones.
       body.collider(0).setShape(motorbikeCollider(dims).shape);
-      state = { velocity: this.initialVelocities.get(bike)?.clone() ?? FORWARD.clone().applyQuaternion(bike.quaternion).multiplyScalar(speed).addScaledVector(gravityUp, verticalSpeed), angular: new THREE.Vector3(), grounded: false, jumpTime: 0, body, recovering: false, gravityFrame: vehicleGravity(bike).frame.clone() };
+      state = { velocity: this.initialVelocities.get(bike)?.clone() ?? FORWARD.clone().applyQuaternion(bike.quaternion).multiplyScalar(speed).addScaledVector(gravityUp, verticalSpeed), angular: new THREE.Vector3(), grounded: false, jumpTime: 0, body, recovering: false, gravityFrame: vehicleGravity(bike).frame.clone(), crashLatched: bike.userData.vehicleToppled === true, stableTime: 0, restingNormal: gravityUp.clone(), restingSide: 0 };
       this.initialVelocities.delete(bike);
       this.states.set(bike, state);
     }
@@ -117,8 +123,10 @@ export class MotorbikePhysics {
     if (state.gravityFrame.angleTo(gravity.frame) > 1e-6) {
       state.velocity.applyQuaternion(gravity.frame.clone().multiply(state.gravityFrame.clone().invert()));
       state.gravityFrame.copy(gravity.frame);
+      state.restingNormal.copy(gravityUp);
+      state.restingTarget = undefined;
     }
-    if (dt <= 0) return { speed, verticalSpeed, travel: 0, grounded: state.grounded };
+    if (dt <= 0) return { speed, verticalSpeed, travel: 0, grounded: state.grounded, crashed: false, toppled: bike.userData.vehicleToppled === true };
     const departing = this.departingRiders.get(bike);
     if (departing) { departing.remaining -= dt; if (departing.remaining <= 0) this.departingRiders.delete(bike); }
     const automatic = bike.userData.logicProperties?.autoStabilize !== false;
@@ -128,12 +136,31 @@ export class MotorbikePhysics {
     const h = dt / steps;
     let travel = 0;
     let driveSpeed = speed;
+    let crashed = false;
     if (controls.jump && controls.jump > 0) {
       state.velocity.addScaledVector(gravityUp, Math.max(0, controls.jump - state.velocity.dot(gravityUp)));
       state.jumpTime = 0.18;
       state.grounded = false;
     }
     for (let step = 0; step < steps; step++) {
+      let settled = false;
+      if (bike.userData.vehicleToppled && !automatic && !gravity.start) {
+        // A fallen bike rests on its side, never balanced on its roof or nose.
+        // Keep collision-aware clearance, then let gravity lower it to contact.
+        if (!state.restingTarget) {
+          const restingUp = state.restingNormal;
+          let heading = FORWARD.clone().applyQuaternion(bike.quaternion).projectOnPlane(restingUp);
+          if (heading.lengthSq() < 0.01) heading = new THREE.Vector3(1, 0, 0).applyQuaternion(bike.quaternion).cross(restingUp);
+          heading.normalize();
+          state.restingSide = new THREE.Vector3(1, 0, 0).applyQuaternion(bike.quaternion).dot(restingUp) < 0 ? -1 : 1;
+          state.restingTarget = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(heading.clone().cross(restingUp), restingUp, heading.negate()))
+            .multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), state.restingSide * Math.PI / 2));
+        }
+        const target = state.restingTarget;
+        if (bike.quaternion.angleTo(target) > 0.005) this.stabilize(bike, h * 3, filter, target);
+        settled = bike.quaternion.angleTo(target) < 0.01;
+        state.angular.set(0, 0, 0);
+      }
       const trickInput = Math.abs(controls.pitch || 0) + Math.abs(controls.yaw || 0) + Math.abs(controls.roll || 0) > 0.1;
       if (automatic && !gravity.start && (state.recovering || bike.userData.vehicleToppled || (!trickInput && state.velocity.length() > 1 && Y.clone().applyQuaternion(bike.quaternion).dot(gravityUp) < 0.25))) {
         state.recovering = true;
@@ -187,12 +214,25 @@ export class MotorbikePhysics {
         if (tangent.lengthSq() < 0.5) tangent.copy(forward);
         const right = new THREE.Vector3().crossVectors(tangent, normal).normalize();
         const rotation = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(right, normal, tangent.clone().negate()));
-        bike.quaternion.rotateTowards(rotation, h * 7);
+        const aligned = bike.quaternion.clone().rotateTowards(rotation, h * 7);
+        if (contacts.length === 1) {
+          // Rotate around the supporting wheel, not the chassis center. The
+          // latter pushed the low end into the floor at every small landing.
+          const delta = aligned.clone().multiply(bike.quaternion.clone().invert());
+          const position = bike.position.clone().sub(contacts[0]).applyQuaternion(delta).add(contacts[0]);
+          const lift = position.clone().sub(bike.position);
+          const blocked = this.world.castShape(bike.position, bike.quaternion, lift, body.collider(0).shape, 0.001, 1, false,
+            RAPIER.QueryFilterFlags.EXCLUDE_SENSORS, undefined, undefined, body, filter);
+          if (!blocked && !this.world.intersectionWithShape(position, aligned, body.collider(0).shape,
+            RAPIER.QueryFilterFlags.EXCLUDE_SENSORS, undefined, undefined, body, filter)) {
+            bike.position.copy(position); bike.quaternion.copy(aligned);
+          }
+        } else bike.quaternion.copy(aligned);
         if (controls.yawRate) bike.quaternion.premultiply(new THREE.Quaternion().setFromAxisAngle(normal, controls.yawRate * h));
         tangent.copy(FORWARD).applyQuaternion(bike.quaternion).projectOnPlane(normal).normalize();
         // Gravity costs speed uphill and adds speed downhill, including near-vertical transitions.
-        driveSpeed -= 22 * gravityUp.dot(tangent) * h;
         if (!state.grounded) driveSpeed = state.velocity.dot(tangent);
+        driveSpeed -= 22 * gravityUp.dot(tangent) * h;
         state.velocity.copy(tangent).multiplyScalar(driveSpeed);
         state.angular.multiplyScalar(Math.exp(-10 * h));
         this.controller.enableAutostep(Math.min(0.32, dims.y * 0.25), Math.min(0.2, dims.z * 0.08), false);
@@ -213,6 +253,8 @@ export class MotorbikePhysics {
         }
       }
       state.grounded = Boolean(supported);
+      state.stableTime = supported && contacts.length === 2 ? state.stableTime + h : 0;
+      if (state.stableTime > 0.3) { state.crashLatched = false; state.restingTarget = undefined; }
       body.setRotation(bike.quaternion, true);
       body.setTranslation(bike.position, true);
       this.world.propagateModifiedBodyPositionsToColliders();
@@ -256,19 +298,35 @@ export class MotorbikePhysics {
         const collision = this.controller.computedCollision(i);
         if (!collision) continue;
         const n = new THREE.Vector3().copy(collision.normal1 as THREE.Vector3);
-        if (n.dot(gravityUp) > 0.55) bodyOnFloor = true;
+        if (n.dot(gravityUp) > 0.55) { bodyOnFloor = true; state.restingNormal.copy(n); }
         const into = state.velocity.dot(n);
         const passedStep = supported && move.clone().projectOnPlane(gravityUp).length() >= desired.clone().projectOnPlane(gravityUp).length() * 0.8;
         if (!stepped && into < 0 && !(supported && n.dot(up) > 0.35) && !(passedStep && n.dot(gravityUp) < 0.5)) state.velocity.addScaledVector(n, -into);
       }
       if (bodyOnFloor && !gravity.start && Y.clone().applyQuaternion(bike.quaternion).dot(gravityUp) < 0.45) {
+        if (!state.crashLatched) { crashed = true; state.crashLatched = true; }
         if (automatic) state.recovering = true;
         else bike.userData.vehicleToppled = true;
       }
-      if (bodyOnFloor && !supported) {
+      // During the brief clearance lift used to roll onto its side, the body
+      // still skids against the ground. Do not alternate friction on/off.
+      let skidding = bodyOnFloor;
+      if (!skidding && bike.userData.vehicleToppled) {
+        const radius = Math.min(dims.x, dims.y, dims.z) * 0.24;
+        const extent = radius + ['x', 'y', 'z'].reduce((sum, axis, index) => sum + Math.abs(new THREE.Vector3().setComponent(index, 1).applyQuaternion(bike.quaternion).dot(gravityUp)) * (dims[axis] / 2 - radius), 0);
+        skidding = Boolean(this.world.castRay(new RAPIER.Ray(bike.position, gravityUp.clone().negate()), extent + 0.1, true,
+          RAPIER.QueryFilterFlags.EXCLUDE_SENSORS, undefined, undefined, body, filter));
+      }
+      if (skidding && !supported) {
         const length = state.velocity.length();
-        state.velocity.multiplyScalar(Math.max(0, length - 3 * h) / Math.max(length, 0.00001));
-        if (bike.userData.vehicleToppled && !automatic && length < 0.1) state.grounded = true;
+        const friction = bike.userData.vehicleToppled ? 10 + length * 1.5 : 3;
+        const vertical = state.velocity.dot(gravityUp);
+        const slide = state.velocity.clone().projectOnPlane(gravityUp);
+        slide.multiplyScalar(Math.max(0, slide.length() - friction * h) / Math.max(slide.length(), 0.00001));
+        state.velocity.copy(slide).addScaledVector(gravityUp, vertical);
+        if (bodyOnFloor && bike.userData.vehicleToppled && !automatic && settled && state.velocity.length() < 0.1) {
+          state.velocity.set(0, 0, 0); driveSpeed = 0; state.grounded = true;
+        }
       }
       bike.position.add(move);
       travel += move.length();
@@ -278,6 +336,6 @@ export class MotorbikePhysics {
     body.setNextKinematicTranslation(bike.position);
     body.setNextKinematicRotation(bike.quaternion);
     const reportedSpeed = state.grounded ? driveSpeed : Math.sign(speed || 1) * state.velocity.clone().projectOnPlane(gravityUp).length();
-    return { speed: Math.abs(reportedSpeed) < 0.005 ? 0 : reportedSpeed, verticalSpeed: state.velocity.dot(gravityUp), travel, grounded: state.grounded, toppled: bike.userData.vehicleToppled === true };
+    return { speed: Math.abs(reportedSpeed) < 0.005 ? 0 : reportedSpeed, verticalSpeed: state.velocity.dot(gravityUp), travel, grounded: state.grounded, toppled: bike.userData.vehicleToppled === true, crashed };
   }
 }

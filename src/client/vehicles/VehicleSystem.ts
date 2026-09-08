@@ -107,7 +107,7 @@ export class VehicleSystem {
   nearestMountHoldTime(): number | null {
     const bike = this.nearest();
     if (!bike) return null;
-    bike.userData.logicProperties = normalizeMotorbikeSettings(bike.userData.logicProperties);
+    bike.userData.logicProperties = Object.assign(bike.userData.logicProperties ?? {}, normalizeMotorbikeSettings(bike.userData.logicProperties));
     return bike.userData.logicProperties.holdTime;
   }
 
@@ -140,7 +140,7 @@ export class VehicleSystem {
     this.mounted = bike;
     this.lastSeatSwitchTime = Date.now();
     this.seat = bike.userData.vehicleDriver ? 'passenger' : 'driver';
-    bike.userData.logicProperties = normalizeMotorbikeSettings(bike.userData.logicProperties);
+    bike.userData.logicProperties = Object.assign(bike.userData.logicProperties ?? {}, normalizeMotorbikeSettings(bike.userData.logicProperties));
     bike.userData[this.isDriver ? 'vehicleDriver' : 'vehiclePassenger'] = this.playerId;
     bike.userData.rigidBody.setBodyType(RAPIER.RigidBodyType.KinematicPositionBased, true);
     const motion = this.coasting.get(bike);
@@ -239,7 +239,7 @@ export class VehicleSystem {
     const finalState = this.getNetworkState();
     const props = normalizeMotorbikeSettings(bike.userData.logicProperties);
     const exitSpeed = this.speed;
-    const velocity = new THREE.Vector3(0, 0, -exitSpeed).applyQuaternion(bike.quaternion);
+    const velocity = this.physics.velocity(bike) ?? new THREE.Vector3(0, 0, -exitSpeed).applyQuaternion(bike.quaternion);
     const wasDriver = this.isDriver;
     this.physics.releaseRider(bike, character.collider);
     const field = wasDriver ? 'vehicleDriver' : 'vehiclePassenger';
@@ -264,7 +264,7 @@ export class VehicleSystem {
     character.momentum.set(0, 0, 0);
     this.pose.reset(character);
     character.updateModelVisuals();
-    if (!force && props.dismountPenaltyEnabled && Math.abs(exitSpeed) * 3.6 >= props.dismountFallSpeed) {
+    if (props.dismountPenaltyEnabled && !character.isDead && (crashed || (!force && Math.abs(exitSpeed) * 3.6 >= props.dismountFallSpeed))) {
       this.fall.start(character, velocity, this.game.sceneManager?.scene);
       const damage = character.maxHealth * props.dismountDamagePercent / 100;
       if (damage > 0) character.takeDamage(damage);
@@ -384,6 +384,8 @@ export class VehicleSystem {
       roll: this.paused || broken || !keys.crouch ? 0 : -steeringTarget,
       boost: jetpackActive ? props.jetpackAccelerationBonus : 0,
     });
+    // Crash damage can trigger an explosion that kills and dismounts the rider.
+    if (this.mounted !== bike || this.game.character.isDead) return false;
     this.speed = motion.speed;
     this.verticalSpeed = motion.verticalSpeed;
     this.grounded = motion.grounded;
@@ -587,7 +589,14 @@ export class VehicleSystem {
   }
 
   private moveBike(bike: MotorbikeVisual, speed: number, verticalSpeed: number, dt: number, hasRider = false, controls: BikeControls = {}) {
-    return this.physics.step(bike, speed, verticalSpeed, dt, hasRider ? this.game.character.collider : undefined, controls);
+    const motion = this.physics.step(bike, speed, verticalSpeed, dt, hasRider ? this.game.character.collider : undefined, controls);
+    if (motion.crashed) {
+      const props = normalizeMotorbikeSettings(bike.userData.logicProperties);
+      if (props.dismountPenaltyEnabled && props.durabilityEnabled) {
+        this.durability.damage(bike, props.crashDamageMode === 'fixed' ? props.crashDamageFixed : props.maxDurability * props.crashDamagePercent / 100);
+      }
+    }
+    return motion;
   }
 
   private updateCoasting(dt: number) {

@@ -138,7 +138,9 @@ export class MotorbikePhysics {
     let driveSpeed = speed;
     let crashed = false;
     if (controls.jump && controls.jump > 0) {
-      state.velocity.addScaledVector(gravityUp, Math.max(0, controls.jump - state.velocity.dot(gravityUp)));
+      const surfaceUp = Y.clone().applyQuaternion(bike.quaternion);
+      const jumpUp = state.grounded && surfaceUp.dot(gravityUp) < 0 ? surfaceUp : gravityUp;
+      state.velocity.addScaledVector(jumpUp, Math.max(0, controls.jump - state.velocity.dot(jumpUp)));
       state.jumpTime = 0.18;
       state.grounded = false;
     }
@@ -162,15 +164,6 @@ export class MotorbikePhysics {
         state.angular.set(0, 0, 0);
       }
       const trickInput = Math.abs(controls.pitch || 0) + Math.abs(controls.yaw || 0) + Math.abs(controls.roll || 0) > 0.1;
-      if (automatic && !gravity.start && (state.recovering || bike.userData.vehicleToppled || (!trickInput && state.velocity.length() > 1 && Y.clone().applyQuaternion(bike.quaternion).dot(gravityUp) < 0.25))) {
-        state.recovering = true;
-        this.stabilize(bike, h * 4, filter);
-        state.angular.set(0, 0, 0);
-        if (Y.clone().applyQuaternion(bike.quaternion).dot(gravityUp) > 0.94) {
-          state.recovering = false;
-          bike.userData.vehicleToppled = false;
-        }
-      }
       state.jumpTime = Math.max(0, state.jumpTime - h);
       const up = Y.clone().applyQuaternion(bike.quaternion);
       const forward = FORWARD.clone().applyQuaternion(bike.quaternion);
@@ -190,7 +183,22 @@ export class MotorbikePhysics {
           const point = origin.clone().addScaledVector(up, -hit.timeOfImpact);
           if (!closest || hit.timeOfImpact < closest.distance) closest = { point, normal: n, distance: hit.timeOfImpact };
         }
-        if (closest) { contacts.push(closest.point); normal.add(closest.normal); }
+        if (closest) {
+          // Read both sides of the tire. A single triangle normal on the seam
+          // of a torus adds a tiny sideways steer that accumulates every lap.
+          const sides: THREE.Vector3[] = [];
+          for (const side of [-1, 1]) {
+            const origin = new THREE.Vector3(side * dims.x * 0.22, 0.12, wheel * dims.z * 0.43).applyQuaternion(bike.quaternion).add(bike.position);
+            const hit = this.world.castRayAndGetNormal(new RAPIER.Ray(origin, up.clone().negate()), dims.y / 2 + 0.38, true,
+              RAPIER.QueryFilterFlags.EXCLUDE_SENSORS, undefined, excluded, body, filter);
+            if (hit && Math.abs(hit.timeOfImpact - closest.distance) < 0.15) {
+              const sideNormal = new THREE.Vector3().copy(hit.normal as THREE.Vector3);
+              if (sideNormal.dot(closest.normal) > 0.85) sides.push(sideNormal);
+            }
+          }
+          if (sides.length === 2) closest.normal.copy(sides[0]).add(sides[1]).normalize();
+          contacts.push(closest.point); normal.add(closest.normal);
+        }
       }
       if (contacts.length) normal.normalize();
       if (contacts.length === 2) {
@@ -208,7 +216,7 @@ export class MotorbikePhysics {
       // wheel proximity alone cannot keep a stopped bike glued to a wall.
       const minimumSpeed = 5 * THREE.MathUtils.smoothstep(1 - slope, 0.35, 1);
       const hasTraction = slope > 0.65 || state.velocity.clone().projectOnPlane(normal).length() >= minimumSpeed;
-      const supported = hasTraction && !bike.userData.vehicleToppled && !state.recovering && !gravity.start && contacts.length > 0 && state.jumpTime === 0 && !separating && up.dot(gravityUp) > -0.2;
+      const supported = hasTraction && !bike.userData.vehicleToppled && !state.recovering && !gravity.start && contacts.length > 0 && state.jumpTime === 0 && !separating;
       if (supported) {
         let tangent = forward.clone().projectOnPlane(normal).normalize();
         if (tangent.lengthSq() < 0.5) tangent.copy(forward);
@@ -237,6 +245,17 @@ export class MotorbikePhysics {
         state.angular.multiplyScalar(Math.exp(-10 * h));
         this.controller.enableAutostep(Math.min(0.32, dims.y * 0.25), Math.min(0.2, dims.z * 0.08), false);
       } else {
+        // Wheel contact is evaluated first: an inverted rider inside a loop is
+        // driving, not crashing. Recovery only acts after losing that support.
+        if (automatic && !gravity.start && (state.recovering || bike.userData.vehicleToppled || (!trickInput && state.velocity.length() > 1 && up.dot(gravityUp) < 0.25))) {
+          state.recovering = true;
+          this.stabilize(bike, h * 4, filter);
+          state.angular.set(0, 0, 0);
+          if (Y.clone().applyQuaternion(bike.quaternion).dot(gravityUp) > 0.94) {
+            state.recovering = false;
+            bike.userData.vehicleToppled = false;
+          }
+        }
         this.controller.disableAutostep();
         state.velocity.addScaledVector(gravityUp, -22 * h);
         if (controls.boost) state.velocity.addScaledVector(forward, controls.boost * h);
@@ -303,7 +322,7 @@ export class MotorbikePhysics {
         const passedStep = supported && move.clone().projectOnPlane(gravityUp).length() >= desired.clone().projectOnPlane(gravityUp).length() * 0.8;
         if (!stepped && into < 0 && !(supported && n.dot(up) > 0.35) && !(passedStep && n.dot(gravityUp) < 0.5)) state.velocity.addScaledVector(n, -into);
       }
-      if (bodyOnFloor && !gravity.start && Y.clone().applyQuaternion(bike.quaternion).dot(gravityUp) < 0.45) {
+      if (bodyOnFloor && !supported && !gravity.start && Y.clone().applyQuaternion(bike.quaternion).dot(gravityUp) < 0.45) {
         if (!state.crashLatched) { crashed = true; state.crashLatched = true; }
         if (automatic) state.recovering = true;
         else bike.userData.vehicleToppled = true;

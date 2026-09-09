@@ -51,6 +51,9 @@ export class CameraController {
   gravityUp: THREE.Vector3;
   gravityQuaternion: THREE.Quaternion;
   yawConstraint: { centerYaw: number; maxHalfAngle: number } | null = null;
+  private vehicleSurfaceRotation: THREE.Quaternion | null = null;
+  private vehicleViewTilt = new THREE.Quaternion();
+  private vehicleTiltAxis = new THREE.Vector3(0, 0, 1);
 
   constructor(camera: THREE.Camera, domElement: HTMLElement) {
     this.camera = camera;
@@ -436,10 +439,39 @@ export class CameraController {
     this.camera.up.copy(up);
   }
 
+  /** Visual follow only. Riding a ceiling must not change world gravity, mouse
+   * settings, or the existing camera behavior on floors and side walls. */
+  setVehicleSurfaceRotation(rotation: THREE.Quaternion | null) {
+    this.vehicleSurfaceRotation = rotation?.clone() ?? null;
+  }
+
+  private updateVehicleView(dt: number) {
+    const desired = new THREE.Quaternion();
+    if (this.vehicleSurfaceRotation) {
+      const riderUp = new THREE.Vector3(0, 1, 0).applyQuaternion(this.vehicleSurfaceRotation);
+      const alignment = THREE.MathUtils.clamp(this.gravityUp.dot(riderUp), -1, 1);
+      const weight = THREE.MathUtils.smoothstep(-alignment, 0.05, 0.65);
+      if (weight > 0) {
+        const axis = this.gravityUp.clone().cross(riderUp);
+        // Retain the approach direction at exactly 180°, where the cross
+        // product vanishes; this avoids an arbitrary flip at the ceiling.
+        if (axis.lengthSq() > 0.0001) this.vehicleTiltAxis.copy(axis.normalize());
+        else if (Math.abs(this.vehicleTiltAxis.dot(this.gravityUp)) > 0.99) {
+          this.vehicleTiltAxis.set(0, 0, -1).applyQuaternion(this.vehicleSurfaceRotation).normalize();
+        }
+        desired.setFromAxisAngle(this.vehicleTiltAxis, Math.acos(alignment) * weight);
+      }
+    }
+    this.vehicleViewTilt.slerp(desired, 1 - Math.exp(-10 * Math.max(0, Math.min(dt, 0.1))));
+    if (this.vehicleViewTilt.angleTo(new THREE.Quaternion()) < 0.00001) this.vehicleViewTilt.identity();
+    this.camera.up.copy(this.gravityUp).applyQuaternion(this.vehicleViewTilt);
+  }
+
   getGravityBasis(yaw: number) {
-    const up = this.gravityUp.clone().normalize();
-    const baseForward = new THREE.Vector3(0, 0, 1).applyQuaternion(this.gravityQuaternion).normalize();
-    const baseRight = new THREE.Vector3(-1, 0, 0).applyQuaternion(this.gravityQuaternion).normalize();
+    const viewFrame = this.gravityQuaternion.clone().premultiply(this.vehicleViewTilt);
+    const up = new THREE.Vector3(0, 1, 0).applyQuaternion(viewFrame).normalize();
+    const baseForward = new THREE.Vector3(0, 0, 1).applyQuaternion(viewFrame).normalize();
+    const baseRight = new THREE.Vector3(-1, 0, 0).applyQuaternion(viewFrame).normalize();
 
     const forward = baseForward.clone().multiplyScalar(Math.cos(yaw)).addScaledVector(baseRight, -Math.sin(yaw)).normalize();
     const right = baseRight.clone().multiplyScalar(Math.cos(yaw)).addScaledVector(baseForward, Math.sin(yaw)).normalize();
@@ -536,6 +568,8 @@ export class CameraController {
     } else {
       this.camera.up.copy(this.gravityUp);
     }
+
+    if (this.mode !== 'free-fly') this.updateVehicleView(dt);
 
     this.target.copy(characterPosition);
     this.enforceYawConstraint();

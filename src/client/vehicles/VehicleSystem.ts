@@ -255,6 +255,7 @@ export class VehicleSystem {
     this.game.hud?.updateVehicle?.(null);
     this.seat = null;
     character.isMounted = false;
+    this.game.cameraController?.setVehicleSurfaceRotation?.(null);
     if (character.collider?.isValid()) character.collider.setSensor(this.wasSensor);
     if (exit && character.rigidBody?.isValid()) {
       character.rigidBody.setTranslation(exit, true);
@@ -633,6 +634,7 @@ export class VehicleSystem {
     const props = bike.userData.logicProperties;
     syncVehicleGravity(character, bike);
     this.game.cameraController?.setGravityQuaternion?.(vehicleGravity(bike).frame);
+    this.game.cameraController?.setVehicleSurfaceRotation?.(bike.quaternion);
     const hipHeight = character.currentType === 'skin' ? 0.625 : 0.7;
     const height = this.isPassenger ? props.passengerSeatHeight : props.seatHeight;
     const offset = this.isPassenger ? props.passengerSeatOffsetZ : props.seatOffsetZ;

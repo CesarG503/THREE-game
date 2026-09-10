@@ -19,13 +19,16 @@ interface Motion {
   body: RAPIER.RigidBody;
   gravityFrame: THREE.Quaternion;
   recovering: boolean;
+  groundRecovery?: boolean;
+  surfaceSupported?: boolean;
+  recoveryTarget?: THREE.Quaternion;
   crashLatched: boolean;
   stableTime: number;
   restingNormal: THREE.Vector3;
   restingSide: number;
   restingTarget?: THREE.Quaternion;
 }
-export interface BikeControls { yawRate?: number; pitch?: number; yaw?: number; roll?: number; jump?: number; boost?: number; }
+export interface BikeControls { yawRate?: number; pitch?: number; yaw?: number; roll?: number; jump?: number; boost?: number; stabilize?: boolean; }
 
 /** Swept, wheel-supported vehicle motion. Airborne translation is independent of
  * the bike's attitude, so rotating a trick cannot redirect its flight velocity. */
@@ -43,6 +46,7 @@ export class MotorbikePhysics {
 
   releaseRider(bike: THREE.Object3D, collider: RAPIER.Collider) { this.departingRiders.set(bike, { collider, remaining: 0.4 }); }
   velocity(bike: THREE.Object3D) { return this.states.get(bike)?.velocity.clone(); }
+  surfaceSupported(bike: THREE.Object3D) { return this.states.get(bike)?.surfaceSupported === true; }
   reset(bike: THREE.Object3D, velocity?: number[]) { this.states.delete(bike); if (velocity) this.initialVelocities.set(bike, new THREE.Vector3().fromArray(velocity)); }
   dispose() { this.world.removeCharacterController(this.controller); }
 
@@ -125,12 +129,17 @@ export class MotorbikePhysics {
       state.gravityFrame.copy(gravity.frame);
       state.restingNormal.copy(gravityUp);
       state.restingTarget = undefined;
+      state.recoveryTarget = undefined;
     }
     if (dt <= 0) return { speed, verticalSpeed, travel: 0, grounded: state.grounded, crashed: false, toppled: bike.userData.vehicleToppled === true };
     const departing = this.departingRiders.get(bike);
     if (departing) { departing.remaining -= dt; if (departing.remaining <= 0) this.departingRiders.delete(bike); }
     const automatic = bike.userData.logicProperties?.autoStabilize !== false;
-    if (!automatic) state.recovering = false;
+    if (!automatic || (!controls.stabilize && !state.groundRecovery && !bike.userData.vehicleToppled)) {
+      state.recovering = false;
+      state.recoveryTarget = undefined;
+      if (!automatic) state.groundRecovery = false;
+    }
     const filter = (other: RAPIER.Collider) => other !== excluded && (!departing || departing.remaining <= 0 || other !== departing.collider);
     const steps = Math.max(1, Math.ceil(dt * 120));
     const h = dt / steps;
@@ -163,7 +172,6 @@ export class MotorbikePhysics {
         settled = bike.quaternion.angleTo(target) < 0.01;
         state.angular.set(0, 0, 0);
       }
-      const trickInput = Math.abs(controls.pitch || 0) + Math.abs(controls.yaw || 0) + Math.abs(controls.roll || 0) > 0.1;
       state.jumpTime = Math.max(0, state.jumpTime - h);
       const up = Y.clone().applyQuaternion(bike.quaternion);
       const forward = FORWARD.clone().applyQuaternion(bike.quaternion);
@@ -216,8 +224,12 @@ export class MotorbikePhysics {
       // wheel proximity alone cannot keep a stopped bike glued to a wall.
       const minimumSpeed = 5 * THREE.MathUtils.smoothstep(1 - slope, 0.35, 1);
       const hasTraction = slope > 0.65 || state.velocity.clone().projectOnPlane(normal).length() >= minimumSpeed;
-      const supported = hasTraction && !bike.userData.vehicleToppled && !state.recovering && !gravity.start && contacts.length > 0 && state.jumpTime === 0 && !separating;
+      const recoveryReady = state.recoveryTarget && bike.quaternion.angleTo(state.recoveryTarget) < 0.035;
+      const supported = hasTraction && !bike.userData.vehicleToppled && (!state.recovering || recoveryReady) && !gravity.start && contacts.length > 0 && state.jumpTime === 0 && !separating;
       if (supported) {
+        state.recovering = false;
+        state.groundRecovery = false;
+        state.recoveryTarget = undefined;
         let tangent = forward.clone().projectOnPlane(normal).normalize();
         if (tangent.lengthSq() < 0.5) tangent.copy(forward);
         const right = new THREE.Vector3().crossVectors(tangent, normal).normalize();
@@ -247,12 +259,24 @@ export class MotorbikePhysics {
       } else {
         // Wheel contact is evaluated first: an inverted rider inside a loop is
         // driving, not crashing. Recovery only acts after losing that support.
-        if (automatic && !gravity.start && (state.recovering || bike.userData.vehicleToppled || (!trickInput && state.velocity.length() > 1 && up.dot(gravityUp) < 0.25))) {
+        // Air recovery is held, never latched by attitude or loss of contact.
+        // Releasing Shift restores trick input even partway through righting.
+        if (automatic && !gravity.start && (controls.stabilize || state.groundRecovery || bike.userData.vehicleToppled)) {
           state.recovering = true;
-          this.stabilize(bike, h * 4, filter);
+          if (!state.recoveryTarget) {
+            // Choose the landing heading once, from momentum rather than the
+            // rotating chassis. Holding the throttle must not cancel recovery.
+            let heading = state.velocity.clone().projectOnPlane(gravityUp).multiplyScalar(Math.sign(speed || 1));
+            if (heading.lengthSq() < 0.25) heading = forward.clone().projectOnPlane(gravityUp);
+            if (heading.lengthSq() < 0.01) heading = new THREE.Vector3(1, 0, 0).applyQuaternion(bike.quaternion).cross(gravityUp);
+            heading.normalize();
+            state.recoveryTarget = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(heading.clone().cross(gravityUp), gravityUp, heading.negate()));
+          }
+          this.stabilize(bike, h * 6, filter, state.recoveryTarget);
           state.angular.set(0, 0, 0);
-          if (Y.clone().applyQuaternion(bike.quaternion).dot(gravityUp) > 0.94) {
-            state.recovering = false;
+          if (bike.quaternion.angleTo(state.recoveryTarget) < 0.035) {
+            // Keep the prepared pose while assistance is held. Releasing it
+            // clears recovery at the next step and immediately restores tricks.
             bike.userData.vehicleToppled = false;
           }
         }
@@ -272,6 +296,7 @@ export class MotorbikePhysics {
         }
       }
       state.grounded = Boolean(supported);
+      state.surfaceSupported = Boolean(supported);
       state.stableTime = supported && contacts.length === 2 ? state.stableTime + h : 0;
       if (state.stableTime > 0.3) { state.crashLatched = false; state.restingTarget = undefined; }
       body.setRotation(bike.quaternion, true);
@@ -324,7 +349,7 @@ export class MotorbikePhysics {
       }
       if (bodyOnFloor && !supported && !gravity.start && Y.clone().applyQuaternion(bike.quaternion).dot(gravityUp) < 0.45) {
         if (!state.crashLatched) { crashed = true; state.crashLatched = true; }
-        if (automatic) state.recovering = true;
+        if (automatic) { state.recovering = true; state.groundRecovery = true; }
         else bike.userData.vehicleToppled = true;
       }
       // During the brief clearance lift used to roll onto its side, the body

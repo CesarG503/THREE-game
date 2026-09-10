@@ -54,6 +54,8 @@ export class CameraController {
   private vehicleSurfaceRotation: THREE.Quaternion | null = null;
   private vehicleViewTilt = new THREE.Quaternion();
   private vehicleTiltAxis = new THREE.Vector3(0, 0, 1);
+  private vehicleTiltSpeed = 0;
+  private vehicleTiltSign = 1;
 
   constructor(camera: THREE.Camera, domElement: HTMLElement) {
     this.camera = camera;
@@ -441,11 +443,12 @@ export class CameraController {
 
   /** Visual follow only. Riding a ceiling must not change world gravity, mouse
    * settings, or the existing camera behavior on floors and side walls. */
-  setVehicleSurfaceRotation(rotation: THREE.Quaternion | null) {
-    this.vehicleSurfaceRotation = rotation?.clone() ?? null;
+  setVehicleSurfaceRotation(rotation: THREE.Quaternion | null, surfaceSupported = false) {
+    this.vehicleSurfaceRotation = surfaceSupported && rotation ? rotation.clone() : null;
   }
 
   private updateVehicleView(dt: number) {
+    const step = Number.isFinite(dt) ? Math.max(0, Math.min(dt, 0.1)) : 0;
     const desired = new THREE.Quaternion();
     if (this.vehicleSurfaceRotation) {
       const riderUp = new THREE.Vector3(0, 1, 0).applyQuaternion(this.vehicleSurfaceRotation);
@@ -455,14 +458,24 @@ export class CameraController {
         const axis = this.gravityUp.clone().cross(riderUp);
         // Retain the approach direction at exactly 180°, where the cross
         // product vanishes; this avoids an arbitrary flip at the ceiling.
-        if (axis.lengthSq() > 0.0001) this.vehicleTiltAxis.copy(axis.normalize());
-        else if (Math.abs(this.vehicleTiltAxis.dot(this.gravityUp)) > 0.99) {
+        if (axis.lengthSq() > 0.0001) {
+          axis.normalize();
+          this.vehicleTiltSign = axis.dot(this.vehicleTiltAxis) < 0 ? -1 : 1;
+          // Near inversion the up-vector cross product is ill-conditioned:
+          // tiny normal changes must not spin the camera's whole reference.
+          if (alignment > -0.98) this.vehicleTiltAxis.lerp(axis.multiplyScalar(this.vehicleTiltSign), 1 - Math.exp(-8 * step)).normalize();
+        } else if (Math.abs(this.vehicleTiltAxis.dot(this.gravityUp)) > 0.99) {
           this.vehicleTiltAxis.set(0, 0, -1).applyQuaternion(this.vehicleSurfaceRotation).normalize();
         }
-        desired.setFromAxisAngle(this.vehicleTiltAxis, Math.acos(alignment) * weight);
+        desired.setFromAxisAngle(this.vehicleTiltAxis, this.vehicleTiltSign * Math.acos(alignment) * weight);
       }
     }
-    this.vehicleViewTilt.slerp(desired, 1 - Math.exp(-10 * Math.max(0, Math.min(dt, 0.1))));
+    // Ease angular speed as well as orientation. This bounds both a sudden
+    // contact change and the return to the horizon after leaving a ceiling.
+    const angle = this.vehicleViewTilt.angleTo(desired);
+    const targetSpeed = Math.min(4, angle * 7);
+    this.vehicleTiltSpeed += THREE.MathUtils.clamp(targetSpeed - this.vehicleTiltSpeed, -16 * step, 16 * step);
+    this.vehicleViewTilt.rotateTowards(desired, Math.min(angle, this.vehicleTiltSpeed * step));
     if (this.vehicleViewTilt.angleTo(new THREE.Quaternion()) < 0.00001) this.vehicleViewTilt.identity();
     this.camera.up.copy(this.gravityUp).applyQuaternion(this.vehicleViewTilt);
   }

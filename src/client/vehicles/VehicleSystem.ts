@@ -383,6 +383,7 @@ export class VehicleSystem {
       pitch: this.paused || broken ? 0 : -throttle,
       yaw: this.paused || broken || keys.crouch ? 0 : steeringTarget,
       roll: this.paused || broken || !keys.crouch ? 0 : -steeringTarget,
+      stabilize: !this.paused && !broken && Boolean(keys.crouch),
       boost: jetpackActive ? props.jetpackAccelerationBonus : 0,
     });
     // Crash damage can trigger an explosion that kills and dismounts the rider.
@@ -415,7 +416,7 @@ export class VehicleSystem {
     this.syncRider(dt);
     const fuel = bike.userData.logicProperties.consumableUse;
     const jetpackFuel = jetpackActive ? ` · Jetpack ${Math.ceil(jetpack.consumableUse)} / ${jetpack.maxConsumableUse}` : '';
-    this.show(`Conductor · ${Math.round(Math.abs(this.speed) * 3.6)} km/h · Combustible ${Math.ceil(fuel)} / ${props.maxConsumableUse}${jetpackFuel}${fuel <= 0 ? ' · SIN COMBUSTIBLE' : ''}\nW/S acelerar · A/D girar · Shift frenar/drift · Espacio saltar/jetpack · En el aire: W/S inclinar, A/D girar, Shift+A/D rodar · R cambiar asiento · F bajar`, fuel, props.maxConsumableUse);
+    this.show(`Conductor · ${Math.round(Math.abs(this.speed) * 3.6)} km/h · Combustible ${Math.ceil(fuel)} / ${props.maxConsumableUse}${jetpackFuel}${fuel <= 0 ? ' · SIN COMBUSTIBLE' : ''}\nW/S acelerar · A/D girar · Shift frenar/drift · Espacio saltar/jetpack · En el aire: W/S inclinar, A/D girar, ${props.autoStabilize ? 'mantener Shift para estabilizar' : 'Shift+A/D rodar'} · R cambiar asiento · F bajar`, fuel, props.maxConsumableUse);
     return true;
   }
 
@@ -591,6 +592,7 @@ export class VehicleSystem {
 
   private moveBike(bike: MotorbikeVisual, speed: number, verticalSpeed: number, dt: number, hasRider = false, controls: BikeControls = {}) {
     const motion = this.physics.step(bike, speed, verticalSpeed, dt, hasRider ? this.game.character.collider : undefined, controls);
+    bike.userData.vehicleSurfaceSupported = this.physics.surfaceSupported(bike);
     if (motion.crashed) {
       const props = normalizeMotorbikeSettings(bike.userData.logicProperties);
       if (props.dismountPenaltyEnabled && props.durabilityEnabled) {
@@ -634,7 +636,7 @@ export class VehicleSystem {
     const props = bike.userData.logicProperties;
     syncVehicleGravity(character, bike);
     this.game.cameraController?.setGravityQuaternion?.(vehicleGravity(bike).frame);
-    this.game.cameraController?.setVehicleSurfaceRotation?.(bike.quaternion);
+    this.game.cameraController?.setVehicleSurfaceRotation?.(bike.quaternion, bike.userData.vehicleSurfaceSupported === true);
     const hipHeight = character.currentType === 'skin' ? 0.625 : 0.7;
     const height = this.isPassenger ? props.passengerSeatHeight : props.seatHeight;
     const offset = this.isPassenger ? props.passengerSeatOffsetZ : props.seatOffsetZ;
@@ -716,6 +718,7 @@ export class VehicleSystem {
       yaw: getMotorbikeHeading(bike),
       rotation: bike.quaternion.toArray(),
       toppled: bike.userData.vehicleToppled === true,
+      surfaceSupported: bike.userData.vehicleSurfaceSupported === true,
       autoStabilize: bike.userData.logicProperties.autoStabilize !== false,
       velocity: this.physics.velocity(bike)?.toArray(),
       gravityOrientation: vehicleGravity(bike).orientation,
@@ -741,6 +744,7 @@ export class VehicleSystem {
       (state.gravityOrientation === undefined || ['down', 'up', 'left', 'right', 'front', 'back'].includes(state.gravityOrientation)) &&
       (state.gravityQuaternion === undefined || (Array.isArray(state.gravityQuaternion) && state.gravityQuaternion.length === 4 && state.gravityQuaternion.every((v: any) => typeof v === 'number' && Number.isFinite(v)) && Math.abs(Math.hypot(...state.gravityQuaternion) - 1) < 0.01)) &&
       (state.toppled === undefined || typeof state.toppled === 'boolean') &&
+      (state.surfaceSupported === undefined || typeof state.surfaceSupported === 'boolean') &&
       (state.autoStabilize === undefined || typeof state.autoStabilize === 'boolean') &&
       (state.rotation === undefined || (Array.isArray(state.rotation) && state.rotation.length === 4 && state.rotation.every((v: any) => typeof v === 'number' && Number.isFinite(v)) && Math.abs(Math.hypot(...state.rotation) - 1) < 0.01)) &&
       (state.velocity === undefined || (Array.isArray(state.velocity) && state.velocity.length === 3 && state.velocity.every((v: any) => typeof v === 'number' && Number.isFinite(v) && Math.abs(v) < 1000))) &&
@@ -771,6 +775,7 @@ export class VehicleSystem {
     this.applyRemoteTransform(bike, state.position, state.yaw, state.rotation ? new THREE.Quaternion().fromArray(state.rotation) : undefined);
     this.physics.reset(bike, state.velocity);
     bike.userData.vehicleToppled = state.toppled === true;
+    bike.userData.vehicleSurfaceSupported = state.surfaceSupported === true;
     if (state.autoStabilize !== undefined) bike.userData.logicProperties.autoStabilize = state.autoStabilize;
     bike.userData.logicProperties.consumableUse = Math.max(0, Math.min(state.fuel, bike.userData.logicProperties.maxConsumableUse));
     this.startCoasting(bike, state.speed, state.verticalSpeed ?? 0, bike === this.mounted);
@@ -880,6 +885,7 @@ export class VehicleSystem {
         // Use vehicle yaw, never passenger aim or an interpolated avatar's old seat offset.
         this.applyRemoteTransform(bike, position, yaw + diff * (1 - Math.exp(-15 * frameDt)), state.rotation ? bike.quaternion.clone().slerp(new THREE.Quaternion().fromArray(state.rotation), 1 - Math.exp(-15 * frameDt)) : undefined);
         bike.userData.vehicleToppled = state.toppled === true;
+        bike.userData.vehicleSurfaceSupported = state.surfaceSupported === true;
         if (state.autoStabilize !== undefined) bike.userData.logicProperties.autoStabilize = state.autoStabilize;
         bike.userData.vehicleMotion = { speed: state.speed, verticalSpeed: state.verticalSpeed ?? 0, lean: state.lean };
         bike.userData.logicProperties.consumableUse = Math.max(0, Math.min(state.fuel, bike.userData.logicProperties.maxConsumableUse));

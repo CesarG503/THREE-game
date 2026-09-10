@@ -19,7 +19,7 @@ export class MotorbikeLogic {
     stabilizeLabel.append(stabilize, 'Estabilización automática');
     container.appendChild(stabilizeLabel);
     const recoveryHint = document.createElement('p');
-    recoveryHint.textContent = 'Activada: recupera el equilibrio después de una mala caída. Desactivada: si vuelcas, bajas de la moto; F la pone de pie y otra F permite subir. Las paredes pronunciadas requieren velocidad: al perderla, la moto cae por gravedad.';
+    recoveryHint.textContent = 'Activada: en el aire, mantén Shift para enderezar la moto y preparar el aterrizaje; suéltalo para hacer giros libremente. En el suelo recupera el equilibrio después de una mala caída. Desactivada: si vuelcas, bajas de la moto; F la pone de pie y otra F permite subir. Las paredes pronunciadas requieren velocidad: al perderla, la moto cae por gravedad.';
     recoveryHint.style.cssText = hint.style.cssText;
     container.appendChild(recoveryHint);
     const gravityLabel = document.createElement('label');

@@ -20,6 +20,7 @@ interface Motion {
   gravityFrame: THREE.Quaternion;
   recovering: boolean;
   groundRecovery?: boolean;
+  invertedDeparture?: boolean;
   surfaceSupported?: boolean;
   recoveryTarget?: THREE.Quaternion;
   crashLatched: boolean;
@@ -130,16 +131,13 @@ export class MotorbikePhysics {
       state.restingNormal.copy(gravityUp);
       state.restingTarget = undefined;
       state.recoveryTarget = undefined;
+      state.invertedDeparture = false;
     }
     if (dt <= 0) return { speed, verticalSpeed, travel: 0, grounded: state.grounded, crashed: false, toppled: bike.userData.vehicleToppled === true };
     const departing = this.departingRiders.get(bike);
     if (departing) { departing.remaining -= dt; if (departing.remaining <= 0) this.departingRiders.delete(bike); }
     const automatic = bike.userData.logicProperties?.autoStabilize !== false;
-    if (!automatic || (!controls.stabilize && !state.groundRecovery && !bike.userData.vehicleToppled)) {
-      state.recovering = false;
-      state.recoveryTarget = undefined;
-      if (!automatic) state.groundRecovery = false;
-    }
+    if (!automatic) state.groundRecovery = false;
     const filter = (other: RAPIER.Collider) => other !== excluded && (!departing || departing.remaining <= 0 || other !== departing.collider);
     const steps = Math.max(1, Math.ceil(dt * 120));
     const h = dt / steps;
@@ -224,9 +222,19 @@ export class MotorbikePhysics {
       // wheel proximity alone cannot keep a stopped bike glued to a wall.
       const minimumSpeed = 5 * THREE.MathUtils.smoothstep(1 - slope, 0.35, 1);
       const hasTraction = slope > 0.65 || state.velocity.clone().projectOnPlane(normal).length() >= minimumSpeed;
+      const wheelSupport = hasTraction && !bike.userData.vehicleToppled && !gravity.start && contacts.length > 0 && state.jumpTime === 0 && !separating;
+      // Eligibility comes from leaving wheel support upside down, never from
+      // merely rotating upside down during a ramp jump. Keep it for this fall.
+      if (state.surfaceSupported && !wheelSupport && !gravity.start) state.invertedDeparture = up.dot(gravityUp) < -0.05;
+      const landingAssist = controls.stabilize && bike.userData.logicProperties?.landingAssistEnabled !== false &&
+        (bike.userData.logicProperties?.landingAssistMode !== 'inverted-detach' || state.invertedDeparture) &&
+        !bike.userData.vehicleToppled && !state.groundRecovery;
+      const groundAssist = automatic && (state.groundRecovery || bike.userData.vehicleToppled);
+      if (!landingAssist && !groundAssist) { state.recovering = false; state.recoveryTarget = undefined; }
       const recoveryReady = state.recoveryTarget && bike.quaternion.angleTo(state.recoveryTarget) < 0.035;
-      const supported = hasTraction && !bike.userData.vehicleToppled && (!state.recovering || recoveryReady) && !gravity.start && contacts.length > 0 && state.jumpTime === 0 && !separating;
+      const supported = wheelSupport && (!state.recovering || recoveryReady);
       if (supported) {
+        state.invertedDeparture = false;
         state.recovering = false;
         state.groundRecovery = false;
         state.recoveryTarget = undefined;
@@ -261,7 +269,7 @@ export class MotorbikePhysics {
         // driving, not crashing. Recovery only acts after losing that support.
         // Air recovery is held, never latched by attitude or loss of contact.
         // Releasing Shift restores trick input even partway through righting.
-        if (automatic && !gravity.start && (controls.stabilize || state.groundRecovery || bike.userData.vehicleToppled)) {
+        if (!gravity.start && (landingAssist || groundAssist)) {
           state.recovering = true;
           if (!state.recoveryTarget) {
             // Choose the landing heading once, from momentum rather than the
@@ -352,6 +360,7 @@ export class MotorbikePhysics {
         if (automatic) { state.recovering = true; state.groundRecovery = true; }
         else bike.userData.vehicleToppled = true;
       }
+      if (bodyOnFloor) state.invertedDeparture = false;
       // During the brief clearance lift used to roll onto its side, the body
       // still skids against the ground. Do not alternate friction on/off.
       let skidding = bodyOnFloor;

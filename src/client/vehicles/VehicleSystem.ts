@@ -416,7 +416,7 @@ export class VehicleSystem {
     this.syncRider(dt);
     const fuel = bike.userData.logicProperties.consumableUse;
     const jetpackFuel = jetpackActive ? ` · Jetpack ${Math.ceil(jetpack.consumableUse)} / ${jetpack.maxConsumableUse}` : '';
-    this.show(`Conductor · ${Math.round(Math.abs(this.speed) * 3.6)} km/h · Combustible ${Math.ceil(fuel)} / ${props.maxConsumableUse}${jetpackFuel}${fuel <= 0 ? ' · SIN COMBUSTIBLE' : ''}\nW/S acelerar · A/D girar · Shift frenar/drift · Espacio saltar/jetpack · En el aire: W/S inclinar, A/D girar, ${props.autoStabilize ? 'mantener Shift para estabilizar' : 'Shift+A/D rodar'} · R cambiar asiento · F bajar`, fuel, props.maxConsumableUse);
+    this.show(`Conductor · ${Math.round(Math.abs(this.speed) * 3.6)} km/h · Combustible ${Math.ceil(fuel)} / ${props.maxConsumableUse}${jetpackFuel}${fuel <= 0 ? ' · SIN COMBUSTIBLE' : ''}\nW/S acelerar · A/D girar · Shift frenar/drift · Espacio saltar/jetpack · En el aire: W/S inclinar, A/D girar, ${props.landingAssistEnabled ? (props.landingAssistMode === 'inverted-detach' ? 'Shift para aterrizar tras soltarte de cabeza' : 'mantener Shift para aterrizar') : 'Shift+A/D rodar'} · R cambiar asiento · F bajar`, fuel, props.maxConsumableUse);
     return true;
   }
 
@@ -720,6 +720,8 @@ export class VehicleSystem {
       toppled: bike.userData.vehicleToppled === true,
       surfaceSupported: bike.userData.vehicleSurfaceSupported === true,
       autoStabilize: bike.userData.logicProperties.autoStabilize !== false,
+      landingAssistEnabled: bike.userData.logicProperties.landingAssistEnabled !== false,
+      landingAssistMode: bike.userData.logicProperties.landingAssistMode === 'inverted-detach' ? 'inverted-detach' : 'any-airborne',
       velocity: this.physics.velocity(bike)?.toArray(),
       gravityOrientation: vehicleGravity(bike).orientation,
       gravityQuaternion: vehicleGravity(bike).frame.toArray(),
@@ -746,6 +748,8 @@ export class VehicleSystem {
       (state.toppled === undefined || typeof state.toppled === 'boolean') &&
       (state.surfaceSupported === undefined || typeof state.surfaceSupported === 'boolean') &&
       (state.autoStabilize === undefined || typeof state.autoStabilize === 'boolean') &&
+      (state.landingAssistEnabled === undefined || typeof state.landingAssistEnabled === 'boolean') &&
+      (state.landingAssistMode === undefined || ['any-airborne', 'inverted-detach'].includes(state.landingAssistMode)) &&
       (state.rotation === undefined || (Array.isArray(state.rotation) && state.rotation.length === 4 && state.rotation.every((v: any) => typeof v === 'number' && Number.isFinite(v)) && Math.abs(Math.hypot(...state.rotation) - 1) < 0.01)) &&
       (state.velocity === undefined || (Array.isArray(state.velocity) && state.velocity.length === 3 && state.velocity.every((v: any) => typeof v === 'number' && Number.isFinite(v) && Math.abs(v) < 1000))) &&
       (state.jetpackActive === undefined || typeof state.jetpackActive === 'boolean') &&
@@ -777,6 +781,8 @@ export class VehicleSystem {
     bike.userData.vehicleToppled = state.toppled === true;
     bike.userData.vehicleSurfaceSupported = state.surfaceSupported === true;
     if (state.autoStabilize !== undefined) bike.userData.logicProperties.autoStabilize = state.autoStabilize;
+    if (state.landingAssistEnabled !== undefined) bike.userData.logicProperties.landingAssistEnabled = state.landingAssistEnabled;
+    if (state.landingAssistMode !== undefined) bike.userData.logicProperties.landingAssistMode = state.landingAssistMode;
     bike.userData.logicProperties.consumableUse = Math.max(0, Math.min(state.fuel, bike.userData.logicProperties.maxConsumableUse));
     this.startCoasting(bike, state.speed, state.verticalSpeed ?? 0, bike === this.mounted);
     bike.animateMotorbike?.(0, 0, 0);
@@ -887,6 +893,8 @@ export class VehicleSystem {
         bike.userData.vehicleToppled = state.toppled === true;
         bike.userData.vehicleSurfaceSupported = state.surfaceSupported === true;
         if (state.autoStabilize !== undefined) bike.userData.logicProperties.autoStabilize = state.autoStabilize;
+        if (state.landingAssistEnabled !== undefined) bike.userData.logicProperties.landingAssistEnabled = state.landingAssistEnabled;
+        if (state.landingAssistMode !== undefined) bike.userData.logicProperties.landingAssistMode = state.landingAssistMode;
         bike.userData.vehicleMotion = { speed: state.speed, verticalSpeed: state.verticalSpeed ?? 0, lean: state.lean };
         bike.userData.logicProperties.consumableUse = Math.max(0, Math.min(state.fuel, bike.userData.logicProperties.maxConsumableUse));
         bike.animateMotorbike?.(state.speed * Math.min(dt, 0.05), state.steering, state.lean);

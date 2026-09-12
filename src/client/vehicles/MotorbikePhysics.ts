@@ -21,6 +21,7 @@ interface Motion {
   recovering: boolean;
   groundRecovery?: boolean;
   invertedDeparture?: boolean;
+  invertedSupport?: boolean;
   surfaceSupported?: boolean;
   recoveryTarget?: THREE.Quaternion;
   crashLatched: boolean;
@@ -132,6 +133,7 @@ export class MotorbikePhysics {
       state.restingTarget = undefined;
       state.recoveryTarget = undefined;
       state.invertedDeparture = false;
+      state.invertedSupport = false;
     }
     if (dt <= 0) return { speed, verticalSpeed, travel: 0, grounded: state.grounded, crashed: false, toppled: bike.userData.vehicleToppled === true };
     const departing = this.departingRiders.get(bike);
@@ -223,9 +225,9 @@ export class MotorbikePhysics {
       const minimumSpeed = 5 * THREE.MathUtils.smoothstep(1 - slope, 0.35, 1);
       const hasTraction = slope > 0.65 || state.velocity.clone().projectOnPlane(normal).length() >= minimumSpeed;
       const wheelSupport = hasTraction && !bike.userData.vehicleToppled && !gravity.start && contacts.length > 0 && state.jumpTime === 0 && !separating;
-      // Eligibility comes from leaving wheel support upside down, never from
-      // merely rotating upside down during a ramp jump. Keep it for this fall.
-      if (state.surfaceSupported && !wheelSupport && !gravity.start) state.invertedDeparture = up.dot(gravityUp) < -0.05;
+      // Use the last actual support, not the airborne pose at departure: a
+      // near-vertical ramp lip or a subsequent flip is not ceiling riding.
+      if (state.surfaceSupported && !wheelSupport && !gravity.start) state.invertedDeparture = state.invertedSupport === true;
       const landingAssist = controls.stabilize && bike.userData.logicProperties?.landingAssistEnabled !== false &&
         (bike.userData.logicProperties?.landingAssistMode !== 'inverted-detach' || state.invertedDeparture) &&
         !bike.userData.vehicleToppled && !state.groundRecovery;
@@ -305,6 +307,10 @@ export class MotorbikePhysics {
       }
       state.grounded = Boolean(supported);
       state.surfaceSupported = Boolean(supported);
+      // Both the supporting surface and the bike must face within 45 degrees
+      // of upside down. Clear on other support so eligibility cannot go stale.
+      state.invertedSupport = Boolean(supported && normal.dot(gravityUp) < -Math.SQRT1_2 &&
+        Y.clone().applyQuaternion(bike.quaternion).dot(gravityUp) < -Math.SQRT1_2);
       state.stableTime = supported && contacts.length === 2 ? state.stableTime + h : 0;
       if (state.stableTime > 0.3) { state.crashLatched = false; state.restingTarget = undefined; }
       body.setRotation(bike.quaternion, true);

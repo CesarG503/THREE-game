@@ -1295,6 +1295,7 @@ export class ObjectInspector {
             object.userData.mapObjectType === 'impulse_jump' ||
             object.userData.mapObjectType === 'impulse_lateral' ||
             object.userData.mapObjectType === 'gravity_pad' ||
+            object.userData.mapObjectType === 'fuel_zone' ||
             object.userData.mapObjectType === 'farming_zone'
         )
 

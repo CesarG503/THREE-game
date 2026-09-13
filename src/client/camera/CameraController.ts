@@ -545,6 +545,7 @@ export class CameraController {
           "impulse_lateral",
           "gravity_pad",
           "farming_zone",
+          "fuel_zone",
           "target",
           "logic_camera",
           "camera_panel",

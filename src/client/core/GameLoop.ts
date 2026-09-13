@@ -551,6 +551,7 @@ export function animate(this: any) {
 
 	updateMapImpulsePads(this);
 	updateMapGravityPads(this);
+	this.fuelZoneSystem?.update(dt);
 	updateMapFarmingZones(this, dt);
 
 	if (this.projectiles) {

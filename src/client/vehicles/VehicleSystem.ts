@@ -489,8 +489,7 @@ export class VehicleSystem {
       type: 'jetpack'
     });
     if (before > 0 && jetpack.consumableUse <= 0) {
-      if (this.game.inventoryManager?.removeCurrentItem) this.game.inventoryManager.removeCurrentItem();
-      else character.setHeldItem?.(null);
+      // Empty jetpacks remain equipped for contact refueling.
       this.vehicleJetpackActive = false;
       character.isUsingJetpack = false;
     }

@@ -1,3 +1,5 @@
+import { normalizeFuelZone } from '../fuel/FuelZoneSettings';
+import { FuelZoneVisual } from '../fuel/FuelZoneVisual';
 import { motorbikeCollider } from "../vehicles/MotorbikePhysics";
 import { createCurvedGeometry, curvatureCollider, resolveCurvature, type CurvatureSettings } from "../utils/CurvatureUtils";
 import { orientationFromRotation } from '../vehicles/VehicleGravity';
@@ -322,6 +324,11 @@ export class MapObjectItem extends Item {
         ctx.lineTo(38, 44);
       }
       ctx.stroke();
+    } else if (this.type === "fuel_zone") {
+      ctx.fillStyle = "#103d37"; ctx.fillRect(8, 10, 48, 44);
+      ctx.strokeStyle = "#42ffd2"; ctx.strokeRect(8, 10, 48, 44);
+      ctx.fillStyle = "#a9ffe3"; ctx.font = "bold 18px Arial";
+      ctx.textAlign = "center"; ctx.fillText("GAS", 32, 37);
     } else if (this.type === "farming_zone") {
       ctx.fillStyle = "#ff4500";
       ctx.globalAlpha = 0.75;
@@ -1194,6 +1201,15 @@ export class MapObjectItem extends Item {
       if (this.logicProperties.strength === undefined) this.logicProperties.strength = isJump ? 25 : 40;
       if (this.logicProperties.cooldown === undefined) this.logicProperties.cooldown = 0.25;
       this.logicProperties.padKind = isJump ? "jump" : "lateral";
+    } else if (this.type === "fuel_zone") {
+      this.logicProperties = { ...this.logicProperties, ...normalizeFuelZone(this.logicProperties) };
+      this.opacity ??= 0.14;
+      const geometry = new THREE.BoxGeometry(this.scale.x, this.scale.y, this.scale.z);
+      object3D = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({
+        color: this.color ?? 0x19c99a, transparent: true, opacity: this.opacity ?? .14,
+        emissive: 0x075c47, emissiveIntensity: .3, depthWrite: false, roughness: .6
+      }));
+      collidersDesc.push(RAPIER.ColliderDesc.cuboid(this.scale.x / 2, this.scale.y / 2, this.scale.z / 2).setSensor(true));
     } else if (this.type === "farming_zone") {
       const geometry = new THREE.BoxGeometry(this.scale.x, this.scale.y, this.scale.z);
       const material = new THREE.MeshStandardMaterial({
@@ -1593,7 +1609,7 @@ export class MapObjectItem extends Item {
     }
 
     object3D.position.copy(position);
-    const surfaceAlignedTypes = ["interaction_button", "target", "gravity_pad", "impulse_jump", "impulse_lateral", "farming_zone", "logic_camera", "camera_panel", "camera_prop", "cone", "spiked_floor"];
+    const surfaceAlignedTypes = ["interaction_button", "target", "gravity_pad", "impulse_jump", "impulse_lateral", "farming_zone", "fuel_zone", "logic_camera", "camera_panel", "camera_prop", "cone", "spiked_floor"];
     const isSurfaceAligned = surfaceAlignedTypes.includes(this.type);
     if (!isSurfaceAligned && this.type !== "motorbike" && this.type !== "spawn_point" && this.type !== "tube" && !isCenterPosition) {
       object3D.position.y += this.scale.y / 2;
@@ -1638,6 +1654,8 @@ export class MapObjectItem extends Item {
     if (typeof object3D.updateLightVisuals === "function") {
       object3D.updateLightVisuals();
     }
+
+    if (this.type === "fuel_zone") object3D.fuelZoneVisual = new FuelZoneVisual(object3D, this.scale);
 
     scene.add(object3D);
 

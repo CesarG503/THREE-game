@@ -1342,7 +1342,7 @@ export class PlacementManager {
 
             const gridSize = this.gridSize || 1;
             let targetPos = hit.point.clone();
-	            const surfaceAlignedTypes = ["interaction_button", "target", "gravity_pad", "impulse_jump", "impulse_lateral", "farming_zone", "logic_camera", "camera_panel", "camera_prop", "cone", "spiked_floor"];
+	            const surfaceAlignedTypes = ["interaction_button", "target", "gravity_pad", "impulse_jump", "impulse_lateral", "farming_zone", "fuel_zone", "logic_camera", "camera_panel", "camera_prop", "cone", "spiked_floor"];
 
             // --- Snapping Logic ---
             if (this.snapToGrid || this.aerialGridActive) {

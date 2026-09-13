@@ -1,3 +1,4 @@
+import { FuelZoneSystem } from './fuel/FuelZoneSystem';
 import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
 import { SceneManager } from "./core/SceneManager";
@@ -53,6 +54,7 @@ export class Game {
 	roomId: any;
 	character: any;
 	vehicleSystem: VehicleSystem;
+	fuelZoneSystem: FuelZoneSystem;
 	playerConfigManager: any;
 	hud: any;
 	floatingTextManager: any;
@@ -220,6 +222,7 @@ export class Game {
 
 		this.character.cameraController = this.cameraController;
 		this.vehicleSystem = new VehicleSystem(this);
+		this.fuelZoneSystem = new FuelZoneSystem(this);
 
 		this.networkManager = new NetworkManager(this.sceneManager.scene, this.world, this.roomId, (id: any) => {
 			console.log("Player joined", id);
@@ -342,6 +345,10 @@ export class Game {
 		};
 
 		this.networkManager.onPlayerAction = (playerId: any, actionType: any, data: any) => {
+            if (actionType === 'fuelZoneRequest' || actionType === 'fuelZoneSupply') {
+                this.fuelZoneSystem?.receiveAction(playerId, actionType, data);
+                return;
+            }
 			if (actionType === "motorbikeExplosion") {
 				this.vehicleSystem?.receiveExplosion(playerId, data);
 				return;
@@ -801,6 +808,7 @@ export class Game {
 		this.itemDropManager?.droppedItems?.forEach((item: any) => item.dispose?.());
 		this.fxBlasterSystem?.Destroy?.();
 		this.vehicleSystem?.dispose();
+		this.fuelZoneSystem?.dispose();
 		this.character?.dispose?.();
 			this.hud?.destroy?.();
 			this.objectInspector?.destroy?.();

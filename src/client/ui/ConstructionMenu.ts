@@ -1,4 +1,6 @@
 // @ts-nocheck
+import { FuelZoneLogic } from './logic_items/FuelZoneLogic';
+import { normalizeFuelZone } from '../fuel/FuelZoneSettings';
 
 import * as THREE from "three";
 import { MapObjectItem } from "../items/MapObjectItem";
@@ -467,6 +469,11 @@ export class ConstructionMenu {
             cooldown: 0.35
         };
         this.logicItems.push(gravityPad);
+
+        const fuelZone = new MapObjectItem("fuel_zone", "Zona de recarga de gasolina", "fuel_zone", "", 0x19c99a, { x: 4, y: 2, z: 4 });
+        fuelZone.opacity = 0.14;
+        fuelZone.logicProperties = normalizeFuelZone();
+        this.logicItems.push(fuelZone);
 
         const farmingZone = new MapObjectItem(
             "farming_zone",
@@ -4480,7 +4487,7 @@ export class ConstructionMenu {
             },
             {
                 title: "Pads y Zonas",
-                types: ["impulse_jump", "impulse_lateral", "gravity_pad", "farming_zone"]
+                types: ["impulse_jump", "impulse_lateral", "gravity_pad", "fuel_zone", "farming_zone"]
             }
         ];
 
@@ -6494,7 +6501,7 @@ export class ConstructionMenu {
     updateLogicControls(baseItem) {
         this.editorLogicControlsContainer.innerHTML = "";
 
-        const logicTypes = ["spawn_point", "movement_controller", "interaction_button", "interactive_collision", "target", "impulse_jump", "impulse_lateral", "gravity_pad", "farming_zone", "gravity_sphere", "logic_camera", "camera_panel", "damage_controller", "logic_light"];
+        const logicTypes = ["spawn_point", "movement_controller", "interaction_button", "interactive_collision", "target", "impulse_jump", "impulse_lateral", "gravity_pad", "fuel_zone", "farming_zone", "gravity_sphere", "logic_camera", "camera_panel", "damage_controller", "logic_light"];
         if (!logicTypes.includes(baseItem.type) && !baseItem.logicProperties) {
             this.editorLogicControlsContainer.style.display = "none";
             return;
@@ -6600,6 +6607,10 @@ export class ConstructionMenu {
             this.createLogicDraftSelect(this.editorLogicControlsContainer, "Orientación:", "gravityOrientation", GRAVITY_ORIENTATION_OPTIONS, "up");
             this.createLogicDraftInput(this.editorLogicControlsContainer, "Duración Giro (s):", "transitionDuration", "number", 0.8);
             this.createLogicDraftInput(this.editorLogicControlsContainer, "Recarga (s):", "cooldown", "number", 0.35);
+        } else if (type === "fuel_zone") {
+            new FuelZoneLogic().render(this.editorLogicControlsContainer, this.currentDraftItem.logicProperties, (key, value) => {
+                this.currentDraftItem.logicProperties[key] = value;
+            });
         } else if (type === "farming_zone") {
             this.createLogicDraftInput(this.editorLogicControlsContainer, "Nombre:", "name", "text", "Zona de Farmeo");
             this.createLogicDraftInput(this.editorLogicControlsContainer, "Intervalo Spawn (s):", "spawnInterval", "number", 1.0);
@@ -7123,7 +7134,7 @@ export class ConstructionMenu {
             // Determine primary logic category
             if (obj.userData.mapObjectType === "spawn_point") {
                 type = "spawn_point";
-            } else if (["impulse_jump", "impulse_lateral", "gravity_pad", "farming_zone", "gravity_sphere"].includes(obj.userData.mapObjectType)) {
+            } else if (["impulse_jump", "impulse_lateral", "gravity_pad", "fuel_zone", "farming_zone", "gravity_sphere"].includes(obj.userData.mapObjectType)) {
                 type = "interactive_zones";
             } else if (
                 obj.userData.logicProperties &&

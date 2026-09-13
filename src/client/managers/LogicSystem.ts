@@ -1,3 +1,5 @@
+import { FuelZoneLogic } from '../ui/logic_items/FuelZoneLogic';
+import { normalizeFuelZone } from '../fuel/FuelZoneSettings';
 import * as THREE from "three";
 import { LogicToolbar } from "../ui/LogicToolbar";
 import { LogicSequenceEditor } from "../ui/LogicSequenceEditor";
@@ -737,7 +739,7 @@ export class LogicSystem {
 					const isTarget = child.userData.mapObjectType === "target";
 					const isLogicCamera = child.userData.mapObjectType === "logic_camera";
 					const isCameraPanel = child.userData.mapObjectType === "camera_panel";
-					const isInteractiveZone = ["impulse_jump", "impulse_lateral", "gravity_pad", "farming_zone", "gravity_sphere"].includes(child.userData.mapObjectType);
+					const isInteractiveZone = ["impulse_jump", "impulse_lateral", "gravity_pad", "fuel_zone", "farming_zone", "gravity_sphere"].includes(child.userData.mapObjectType);
 					const hasWaypoints = this.hasMovementLogic(child);
 					const isDamageController = child.userData.mapObjectType === "damage_controller";
 					const hasDamage = child.userData.logicProperties?.enableDamage === true;
@@ -882,6 +884,15 @@ export class LogicSystem {
 		if (object.userData.mapObjectType === "gravity_pad") {
 			this.renderGravityPadUI(container, object, props);
 		}
+
+        if (object.userData.mapObjectType === "fuel_zone") {
+            Object.assign(props, normalizeFuelZone(props));
+            new FuelZoneLogic().render(container, props, (key, value) => {
+                props[key] = value;
+                this.broadcastObjectLogicUpdate(object);
+                if (refreshCallback) refreshCallback();
+            });
+        }
 
 		if (object.userData.mapObjectType === "farming_zone") {
 			this.renderFarmingZoneUI(container, object, props);
@@ -1858,6 +1869,7 @@ export class LogicSystem {
 			case "impulse_jump": return "Pad de Salto";
 			case "impulse_lateral": return "Pad de Empuje";
 			case "gravity_pad": return "Pad de Gravedad";
+			case "fuel_zone": return "Zona de recarga de gasolina";
 			case "farming_zone": return "Zona de Farmeo";
 			default: return type ? (type.charAt(0).toUpperCase() + type.slice(1)) : "Objeto";
 		}

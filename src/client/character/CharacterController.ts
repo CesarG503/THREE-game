@@ -846,13 +846,8 @@ export class CharacterController {
       });
 
       if (this.equippedItem.consumableUse <= 0) {
-        console.log("Jetpack exhausted!");
-        const game = (this.scene as any).userData?.game || (this as any).game;
-        if (game && game.inventoryManager) {
-          game.inventoryManager.removeCurrentItem();
-        } else {
-          this.setHeldItem(null);
-        }
+        // Keep the empty jetpack equipped so a fuel zone can refill it.
+        this.isUsingJetpack = false;
       }
     } else if (isGrounded && input.keys.jump) {
       this.verticalVelocity = this.jumpForce;
@@ -909,13 +904,8 @@ export class CharacterController {
         });
 
         if (this.equippedItem.consumableUse <= 0) {
-          console.log("Jetpack exhausted!");
-          const game = (this.scene as any).userData?.game || (this as any).game;
-          if (game && game.inventoryManager) {
-            game.inventoryManager.removeCurrentItem();
-          } else {
-            this.setHeldItem(null);
-          }
+          // Keep the empty jetpack equipped so a fuel zone can refill it.
+          this.isUsingJetpack = false;
         }
       } else {
         if (jumpJustPressed && this.jumpCount < this.maxMultiJumps) {

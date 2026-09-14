@@ -5,6 +5,7 @@ import type { Game } from "../Game";
 
 export function setupGameInput(this: Game) {
 	this.placementRotationIndex = 0;
+    window.addEventListener('blur', () => this.fuelZoneSystem?.interaction.release());
 
 	document.addEventListener("keydown", (e: KeyboardEvent) => {
 		const activeElement = document.activeElement as HTMLElement | null;
@@ -100,6 +101,7 @@ export function setupGameInput(this: Game) {
 
 		if (key === "f") {
 			if (e.repeat) return;
+            if (this.fuelZoneSystem?.interaction.press()) { e.preventDefault(); return; }
 			const vehicleHoldTime = this.vehicleSystem?.nearestMountHoldTime?.();
 			if (this.vehicleSystem?.mounted || vehicleHoldTime === 0) {
 				if (this.vehicleSystem?.interact()) return;
@@ -219,6 +221,7 @@ export function setupGameInput(this: Game) {
 
 	document.addEventListener("keyup", (e: KeyboardEvent) => {
 		if (e.key.toLowerCase() === "f") {
+			this.fuelZoneSystem?.interaction.release();
 			this.isFKeyDown = false;
 			this.fKeyHeldTime = 0;
 			const progressBar = document.getElementById("move-progress-bar");

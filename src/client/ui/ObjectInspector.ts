@@ -1,5 +1,7 @@
 // @ts-nocheck
 
+import { renderFuelZoneBorder } from "./logic_items/FuelZoneLogic"
+
 import * as THREE from "three"
 import { StairsUtils } from "../utils/StairsUtils"
 import { RampUtils } from "../utils/RampUtils"
@@ -798,6 +800,8 @@ export class ObjectInspector {
                 palette.appendChild(s)
             })
             section.appendChild(palette)
+            this.fuelBorderControls = document.createElement('div')
+            section.appendChild(this.fuelBorderControls)
         })
 
         // 4. Texture Controls
@@ -1249,6 +1253,15 @@ export class ObjectInspector {
             op = (object.userData.opacity !== undefined) ? object.userData.opacity : 1.0;
         }
 
+        this.fuelBorderControls.replaceChildren()
+        this.fuelBorderControls.style.display = object.userData.mapObjectType === 'fuel_zone' ? '' : 'none'
+        if (object.userData.mapObjectType === 'fuel_zone') {
+            renderFuelZoneBorder(this.fuelBorderControls, object.userData.logicProperties, (key, value) => {
+                object.userData.logicProperties[key] = value
+                object.fuelZoneVisual?.update(0, [])
+                this.game?.broadcastObjectUpdate?.(object)
+            })
+        }
         // Color
         if (groupColor) {
             this.colorPicker.value = groupColor.startsWith("#") ? groupColor : '#' + groupColor;
@@ -2033,6 +2046,7 @@ export class ObjectInspector {
         if (this.selectedObject.userData.texturePath && !curvedGeometry) {
             this.reapplySelectedTexture()
         }
+        this.selectedObject.fuelZoneVisual?.update(0, [])
         this.syncCurvatureInputs()
         this.transformGizmo.update()
         this.syncTransformInputs()
@@ -2080,6 +2094,7 @@ export class ObjectInspector {
         }
 
         this.selectedObject.userData.color = colorNum
+        this.selectedObject.fuelZoneVisual?.update(0, [])
 
         if (this.selectedObject.material) {
             this.selectedObject.material.color.set(hex)

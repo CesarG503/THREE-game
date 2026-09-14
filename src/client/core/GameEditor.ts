@@ -536,6 +536,9 @@ export function updateButtonInteraction(this: any, dt: number) {
 	if (!promptEl || !progressCircle) return;
 
 	promptEl.style.display = "none";
+    const fuelCaption = document.getElementById('fuel-interaction-caption');
+    if (fuelCaption) fuelCaption.style.display = 'none';
+    if (this.fuelZoneSystem?.interaction.renderPrompt(promptEl, progressCircle)) return;
 
 	const charPos = this.character ? this.character.getPosition() : null;
 	if (!charPos) return;

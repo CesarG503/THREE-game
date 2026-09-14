@@ -1,8 +1,9 @@
+import { FuelZoneInteraction } from './FuelZoneInteraction';
 import * as THREE from 'three';
 import { distributeFuel, normalizeFuelZone } from './FuelZoneSettings';
 import { FuelZoneVisual } from './FuelZoneVisual';
 
-type Demand = { key: string; kind: 'vehicle' | 'jetpack'; vehicleId?: string; fuel: number; maxFuel: number };
+type Demand = { key: string; kind: 'vehicle' | 'jetpack'; vehicleId?: string; fuel: number; maxFuel: number; activeZones?: string[] };
 type Target = Demand & { tank: any; collider: any; position: THREE.Vector3 };
 type Request = { requestId: string; targets: Demand[] };
 type Grant = { playerId: string; requestId: string; key: string; amount: number; zoneId: string; vehicleId?: string };
@@ -29,7 +30,10 @@ export class FuelZoneSystem {
   private authorityId = '';
   private sequence = 0;
   private receivedSequence = -1;
-  constructor(private game: any) {}
+  readonly interaction: FuelZoneInteraction;
+  constructor(private game: any) {
+    this.interaction = new FuelZoneInteraction(game, () => this.zones, () => this.localTargets(this.zones, false, false), touchesFuelZone);
+  }
   private get network() { return this.game.networkManager; }
   private get localId(): string { return this.network?.playerId || 'local'; }
   private get peers(): string[] { return this.network?.isConnected ? [this.localId, ...this.network.remotePlayers.keys()].sort() : [this.localId]; }
@@ -50,11 +54,11 @@ export class FuelZoneSystem {
     }
     return this.authority;
   }
-  private localTargets(zones: THREE.Object3D[]): Target[] {
+  private localTargets(zones: THREE.Object3D[], needsFuel = true, ownedOnly = true): Target[] {
     const targets: Target[] = [];
     for (const bike of this.objects) {
       const props = bike.userData.logicProperties;
-      if (!(props?.vehicleKind || bike.userData.mapObjectType === 'motorbike') || !bike.visible || this.vehicleOwner(bike) !== this.localId) continue;
+      if (!(props?.vehicleKind || bike.userData.mapObjectType === 'motorbike') || !bike.visible || (ownedOnly && this.vehicleOwner(bike) !== this.localId)) continue;
       const collider = bike.userData.rigidBody?.isValid?.() ? bike.userData.rigidBody.collider(0) : null;
       targets.push({key: `vehicle:${bike.userData.uuid}`, kind: 'vehicle', vehicleId: bike.userData.uuid,
         tank: props, fuel: props.consumableUse, maxFuel: props.maxConsumableUse, collider, position: bike.getWorldPosition(new THREE.Vector3())});
@@ -67,7 +71,7 @@ export class FuelZoneSystem {
       targets.push({key, kind: 'jetpack', tank: item, fuel: item.consumableUse, maxFuel: item.maxConsumableUse,
         collider: character.collider, position: character.getPosition().clone().addScaledVector(character.getGravityUpVector?.() ?? new THREE.Vector3(0, 1, 0), 1)});
     }
-    return targets.filter(t => Number.isFinite(t.fuel) && Number.isFinite(t.maxFuel) && t.maxFuel > 0 && t.fuel < t.maxFuel &&
+    return targets.filter(t => Number.isFinite(t.fuel) && Number.isFinite(t.maxFuel) && t.maxFuel > 0 && (!needsFuel || t.fuel < t.maxFuel) &&
       zones.some(z => touchesFuelZone(z, t.collider)));
   }
   private apply(target: Target, amount: number) {
@@ -85,12 +89,13 @@ export class FuelZoneSystem {
     this.effects.set(zoneId, effects);
   }
   receiveAction(playerId: string, action: string, data: any) {
+    if (action === 'fuelZoneActivate') { this.interaction.receive(playerId, data); return; }
     if (!this.network?.isConnected || !data || !this.peers.includes(playerId)) return;
     if (action === 'fuelZoneRequest' && this.authority === this.localId) {
       if (typeof data.requestId !== 'string' || data.requestId.length > 80 || !Array.isArray(data.targets) || data.targets.length > 64 ||
         this.seenRequests.get(playerId)?.has(data.requestId)) return;
       const valid = data.targets.every((t: Demand) => t && typeof t.key === 'string' && t.key.length <= 100 &&
-        ['vehicle', 'jetpack'].includes(t.kind) && Number.isFinite(t.fuel) && Number.isFinite(t.maxFuel) && t.fuel >= 0 && t.maxFuel > 0 && t.maxFuel <= 1e7 && t.fuel <= t.maxFuel &&
+        (t.activeZones === undefined || (Array.isArray(t.activeZones) && t.activeZones.length <= 64 && t.activeZones.every(id => typeof id === 'string'))) && ['vehicle', 'jetpack'].includes(t.kind) && Number.isFinite(t.fuel) && Number.isFinite(t.maxFuel) && t.fuel >= 0 && t.maxFuel > 0 && t.maxFuel <= 1e7 && t.fuel <= t.maxFuel &&
         (t.kind !== 'vehicle' || (typeof t.vehicleId === 'string' && t.key === `vehicle:${t.vehicleId}`)));
       if (valid && data.targets.filter((t: Demand) => t.kind === 'jetpack').length <= 1 && new Set(data.targets.map((t: Demand) => t.key)).size === data.targets.length) this.requests.set(playerId, data);
     } else if (action === 'fuelZoneSupply' && playerId === this.authority) {
@@ -131,6 +136,7 @@ export class FuelZoneSystem {
       this.requests.clear(); this.seenRequests.clear(); this.elapsed = 0;
     }
     const zones = this.zones;
+    this.interaction.update(dt);
     for (const [zone] of this.visuals) if (!zones.includes(zone)) this.visuals.delete(zone);
     for (const [id, effects] of this.effects) {
       for (const [key, effect] of effects) { effect.remaining -= dt; if (effect.remaining <= 0) effects.delete(key); }
@@ -148,6 +154,7 @@ export class FuelZoneSystem {
     }
     if (!zones.length) { this.requests.clear(); this.pending = undefined; this.elapsed = 0; return; }
     const local = this.localTargets(zones);
+    for (const target of local) target.activeZones = zones.filter(z => this.interaction.isActive(z, target.key)).map(z => z.userData.uuid);
     const connected = this.network?.isConnected;
     this.elapsed += dt; this.requestClock += dt;
     if (this.pending) { this.pending.age += dt; if (this.pending.age > 2) this.pending = undefined; }
@@ -155,7 +162,7 @@ export class FuelZoneSystem {
       if (!this.pending && this.requestClock >= .1 && local.length) {
         const requestId = THREE.MathUtils.generateUUID();
         this.pending = {requestId, targets: new Map(local.map(t => [t.key, t])), age: 0}; this.requestClock = 0;
-        this.network.sendPlayerAction('fuelZoneRequest', {requestId, targets: local.map(({key, kind, vehicleId, fuel, maxFuel}) => ({key, kind, vehicleId, fuel, maxFuel}))});
+        this.network.sendPlayerAction('fuelZoneRequest', {requestId, targets: local.map(({key, kind, vehicleId, fuel, maxFuel, activeZones}) => ({key, kind, vehicleId, fuel, maxFuel, activeZones}))});
       }
       return;
     }
@@ -183,7 +190,8 @@ export class FuelZoneSystem {
     for (const zone of zones) {
       const props = normalizeFuelZone(zone.userData.logicProperties);
       if (!props.fuelEnabled || props.fuelRate <= 0) continue;
-      const eligible = candidates.filter(c => (c.target.kind === 'vehicle' ? props.refuelVehicles : props.refuelJetpacks) && touchesFuelZone(zone, c.target.collider));
+      const eligible = candidates.filter(c => (c.target.kind === 'vehicle' ? props.refuelVehicles : props.refuelJetpacks) && touchesFuelZone(zone, c.target.collider) &&
+        (props.fuelActivation === 'automatic' || (c.target.kind === 'vehicle' ? this.interaction.isActive(zone, c.target.key) : c.target.activeZones?.includes(zone.userData.uuid))));
       const amounts = distributeFuel(eligible.map(c => c.target.maxFuel - c.target.fuel), Math.min(props.fuelRate * step, props.fuelLimited ? props.fuelRemaining : Infinity));
       let used = 0;
       for (let i = 0; i < eligible.length; i++) {
@@ -198,5 +206,5 @@ export class FuelZoneSystem {
     }
     if (connected && (grants.length || acks.length)) this.network.sendPlayerAction('fuelZoneSupply', {sequence: ++this.sequence, zones: states, grants, acks});
   }
-  dispose() { this.visuals.clear(); this.effects.clear(); this.requests.clear(); this.seenRequests.clear(); this.pending = undefined; }
+  dispose() { this.interaction.dispose(); this.visuals.clear(); this.effects.clear(); this.requests.clear(); this.seenRequests.clear(); this.pending = undefined; }
 }

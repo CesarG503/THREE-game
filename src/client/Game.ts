@@ -345,7 +345,7 @@ export class Game {
 		};
 
 		this.networkManager.onPlayerAction = (playerId: any, actionType: any, data: any) => {
-            if (actionType === 'fuelZoneRequest' || actionType === 'fuelZoneSupply') {
+            if (actionType === 'fuelZoneRequest' || actionType === 'fuelZoneSupply' || actionType === 'fuelZoneActivate') {
                 this.fuelZoneSystem?.receiveAction(playerId, actionType, data);
                 return;
             }

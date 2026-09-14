@@ -10,6 +10,17 @@ export interface FuelZoneSettings {
   refuelJetpacks: boolean;
   showFuelIndicator: boolean;
   showFuelEffects: boolean;
+  showFuelStatus: boolean;
+  showFuelReserve: boolean;
+  showFuelRate: boolean;
+  showFuelBar: boolean;
+  fuelActivation: 'automatic' | 'interact';
+  fuelHoldSeconds: number;
+  fuelBorderVisible: boolean;
+  fuelBorderColor: string;
+  fuelBorderUseZoneColor: boolean;
+  fuelBorderOpacity: number;
+  fuelBorderThickness: number;
 }
 const finite = (value: unknown, fallback: number, max = 1e7) =>
   typeof value === 'number' && Number.isFinite(value) ? Math.min(max, Math.max(0, value)) : fallback;
@@ -24,6 +35,15 @@ export function normalizeFuelZone(props: any = {}): FuelZoneSettings {
     fuelRemaining: Math.min(capacity, finite(props.fuelRemaining, capacity)),
     refuelVehicles: props.refuelVehicles !== false, refuelJetpacks: props.refuelJetpacks !== false,
     showFuelIndicator: props.showFuelIndicator !== false, showFuelEffects: props.showFuelEffects !== false,
+    showFuelStatus: props.showFuelStatus !== false, showFuelReserve: props.showFuelReserve !== false,
+    showFuelRate: props.showFuelRate !== false, showFuelBar: props.showFuelBar !== false,
+    fuelActivation: props.fuelActivation === 'interact' ? 'interact' : 'automatic',
+    fuelHoldSeconds: finite(props.fuelHoldSeconds, 0, 60),
+    fuelBorderVisible: props.fuelBorderVisible !== false,
+    fuelBorderColor: typeof props.fuelBorderColor === 'string' && /^#[0-9a-f]{6}$/i.test(props.fuelBorderColor) ? props.fuelBorderColor : '#42ffd2',
+    fuelBorderUseZoneColor: props.fuelBorderUseZoneColor === true,
+    fuelBorderOpacity: finite(props.fuelBorderOpacity, .75, 1),
+    fuelBorderThickness: Math.max(.005, finite(props.fuelBorderThickness, .025, .5)),
   };
 }
 

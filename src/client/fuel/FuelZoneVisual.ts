@@ -144,12 +144,28 @@ export class FuelZoneVisual {
     const fraction = props.fuelLimited ? (props.fuelCapacity > 0 ? props.fuelRemaining / props.fuelCapacity : 0) : 1;
     const empty = props.fuelLimited && props.fuelRemaining <= 1e-8;
 
-    // Pick color from settings
-    let colorHex = props.fuelBarColor;
+    // Determine level base color according to percentage:
+    // 1. Red if disabled or empty
+    // 2. Yellow if at or below low threshold (default 25%)
+    // 3. Green if full / normal
+    let levelColor = props.fuelBarColor;
     if (!props.fuelEnabled || empty) {
-      colorHex = props.fuelBarEmptyColor;
-    } else if (active) {
-      colorHex = props.fuelBarActiveColor;
+      levelColor = props.fuelBarEmptyColor;
+    } else if (fraction <= (props.fuelBarLowThreshold ?? 0.25)) {
+      levelColor = props.fuelBarLowColor;
+    }
+
+    // When refuel is active, blink/pulse between the level color and active color (#00ff11)
+    let barColorHex = levelColor;
+    let emissiveIntensity = Math.max(0, props.fuelBarEmissive ?? 0.8);
+
+    if (active) {
+      const pulseT = (Math.sin(this.time * 10) + 1) * 0.5;
+      const cLevel = new THREE.Color(levelColor);
+      const cActive = new THREE.Color(props.fuelBarActiveColor || '#00ff11');
+      cLevel.lerp(cActive, pulseT);
+      barColorHex = `#${cLevel.getHexString()}`;
+      emissiveIntensity *= 0.7 + 0.7 * pulseT;
     }
 
     // 1. Reserve Bar positioning, sizing and fill
@@ -181,7 +197,7 @@ export class FuelZoneVisual {
       this.barEdges.scale.set(W, H, D);
       this.barEdges.position.set(0, 0, 0);
       this.barEdges.visible = props.fuelBarBgVisible && props.fuelBarBorderVisible !== false;
-      (this.barEdges.material as THREE.LineBasicMaterial).color.set(colorHex);
+      (this.barEdges.material as THREE.LineBasicMaterial).color.set(barColorHex);
     }
 
     // Directional filling calculation
@@ -232,9 +248,9 @@ export class FuelZoneVisual {
     this.bar.visible = fraction > 1e-6;
 
     const barMat = this.bar.material as THREE.MeshStandardMaterial;
-    barMat.color.set(colorHex);
-    barMat.emissive.set(colorHex);
-    barMat.emissiveIntensity = Math.max(0, props.fuelBarEmissive ?? 0.8);
+    barMat.color.set(barColorHex);
+    barMat.emissive.set(barColorHex);
+    barMat.emissiveIntensity = emissiveIntensity;
 
     // 2. Pulse effect
     this.pulse.visible = props.showFuelEffects && active;
@@ -272,14 +288,15 @@ export class FuelZoneVisual {
       const height = Math.max(1, lines.length) * 52 + 24;
       this.label.scale.set(3.8 * baseScale, (3.8 * height / 768) * baseScale, 1);
 
-      const text = `${lines.join('|')}|${colorHex}`;
+      const labelColor = active ? (props.fuelBarActiveColor || '#00ff11') : levelColor;
+      const text = `${lines.join('|')}|${labelColor}`;
       if (text !== this.lastText) {
         this.lastText = text;
         this.canvas.height = height;
         const ctx = this.canvas.getContext('2d');
         if (ctx) {
           ctx.clearRect(0, 0, 768, height); ctx.fillStyle = 'rgba(7,25,29,.92)'; ctx.fillRect(0, 0, 768, height);
-          ctx.strokeStyle = colorHex; ctx.lineWidth = 5; ctx.strokeRect(3, 3, 762, height - 6);
+          ctx.strokeStyle = labelColor; ctx.lineWidth = 5; ctx.strokeRect(3, 3, 762, height - 6);
           ctx.textAlign = 'center'; ctx.fillStyle = '#d5eee7'; ctx.font = 'bold 30px sans-serif';
           lines.forEach((line, index) => ctx.fillText(line, 384, 48 + index * 52, 736));
           (this.label.material as THREE.SpriteMaterial).map!.needsUpdate = true;

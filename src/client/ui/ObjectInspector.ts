@@ -3017,13 +3017,15 @@ export class ObjectInspector {
 
             // 2. Colores y Apariencia
             const styleTitle = document.createElement("div");
-            styleTitle.textContent = "Colores y Brillo Emisivo";
+            styleTitle.textContent = "Colores y Brillo Emisivo (Lleno / Bajo / Vacío / Recarga)";
             styleTitle.style.cssText = "font-size:11px;font-weight:bold;color:#42ffd2;text-transform:uppercase;margin-top:4px;";
             panel.appendChild(styleTitle);
 
-            panel.appendChild(createColorRow("Color normal (reposo)", "fuelBarColor", props.fuelBarColor || '#42ffd2'));
-            panel.appendChild(createColorRow("Color recargando", "fuelBarActiveColor", props.fuelBarActiveColor || '#99ffce'));
-            panel.appendChild(createColorRow("Color agotado / alerta", "fuelBarEmptyColor", props.fuelBarEmptyColor || '#f07865'));
+            panel.appendChild(createColorRow("Color lleno / normal", "fuelBarColor", props.fuelBarColor || '#00cc22'));
+            panel.appendChild(createColorRow("Color nivel bajo", "fuelBarLowColor", props.fuelBarLowColor || '#ffcc00'));
+            panel.appendChild(createSliderRow("Umbral nivel bajo (% reserva)", "fuelBarLowThreshold", props.fuelBarLowThreshold ?? 0.25, 0.05, 0.75, 0.05));
+            panel.appendChild(createColorRow("Color agotado / vacío", "fuelBarEmptyColor", props.fuelBarEmptyColor || '#ff1111'));
+            panel.appendChild(createColorRow("Color recargando (parpadeante)", "fuelBarActiveColor", props.fuelBarActiveColor || '#00ff11'));
             panel.appendChild(createSliderRow("Brillo / Glow emisivo", "fuelBarEmissive", props.fuelBarEmissive ?? 0.8, 0, 2.5, 0.05));
 
             // 3. Contenedor y Chasis Exterior
@@ -3075,9 +3077,11 @@ export class ObjectInspector {
                     fuelBarRotationY: 0,
                     fuelBarRotationZ: 0,
                     fuelBarDirection: 'horizontal',
-                    fuelBarColor: '#42ffd2',
-                    fuelBarActiveColor: '#99ffce',
-                    fuelBarEmptyColor: '#f07865',
+                    fuelBarColor: '#00cc22',
+                    fuelBarLowColor: '#ffcc00',
+                    fuelBarLowThreshold: 0.25,
+                    fuelBarActiveColor: '#00ff11',
+                    fuelBarEmptyColor: '#ff1111',
                     fuelBarEmissive: 0.8,
                     fuelBarBgVisible: true,
                     fuelBarBgOpacity: 0.35,

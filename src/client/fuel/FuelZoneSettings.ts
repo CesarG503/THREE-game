@@ -36,6 +36,8 @@ export interface FuelZoneSettings {
   // Reserve Bar Styling & Configurations
   fuelBarDirection: 'horizontal' | 'horizontal-rl' | 'vertical' | 'vertical-tb';
   fuelBarColor: string;
+  fuelBarLowColor: string;
+  fuelBarLowThreshold: number;
   fuelBarActiveColor: string;
   fuelBarEmptyColor: string;
   fuelBarEmissive: number;
@@ -91,9 +93,19 @@ export function normalizeFuelZone(props: any = {}): FuelZoneSettings {
     fuelBarDirection: (['horizontal', 'horizontal-rl', 'vertical', 'vertical-tb'].includes(props.fuelBarDirection)
       ? props.fuelBarDirection
       : 'horizontal') as FuelZoneSettings['fuelBarDirection'],
-    fuelBarColor: typeof props.fuelBarColor === 'string' && /^#[0-9a-f]{6}$/i.test(props.fuelBarColor) ? props.fuelBarColor : '#42ffd2',
-    fuelBarActiveColor: typeof props.fuelBarActiveColor === 'string' && /^#[0-9a-f]{6}$/i.test(props.fuelBarActiveColor) ? props.fuelBarActiveColor : '#99ffce',
-    fuelBarEmptyColor: typeof props.fuelBarEmptyColor === 'string' && /^#[0-9a-f]{6}$/i.test(props.fuelBarEmptyColor) ? props.fuelBarEmptyColor : '#f07865',
+    fuelBarColor: typeof props.fuelBarColor === 'string' && /^#[0-9a-f]{6}$/i.test(props.fuelBarColor) && props.fuelBarColor.toLowerCase() !== '#42ffd2'
+      ? props.fuelBarColor
+      : '#00cc22',
+    fuelBarLowColor: typeof props.fuelBarLowColor === 'string' && /^#[0-9a-f]{6}$/i.test(props.fuelBarLowColor)
+      ? props.fuelBarLowColor
+      : '#ffcc00',
+    fuelBarLowThreshold: Math.max(0.01, Math.min(0.9, finite(props.fuelBarLowThreshold, 0.25, 1))),
+    fuelBarActiveColor: typeof props.fuelBarActiveColor === 'string' && /^#[0-9a-f]{6}$/i.test(props.fuelBarActiveColor) && props.fuelBarActiveColor.toLowerCase() !== '#99ffce'
+      ? props.fuelBarActiveColor
+      : '#00ff11',
+    fuelBarEmptyColor: typeof props.fuelBarEmptyColor === 'string' && /^#[0-9a-f]{6}$/i.test(props.fuelBarEmptyColor) && props.fuelBarEmptyColor.toLowerCase() !== '#f07865'
+      ? props.fuelBarEmptyColor
+      : '#ff1111',
     fuelBarEmissive: finite(props.fuelBarEmissive, 0.8, 5),
     fuelBarBgVisible: props.fuelBarBgVisible !== false,
     fuelBarBgOpacity: finite(props.fuelBarBgOpacity, 0.35, 1),

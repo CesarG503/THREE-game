@@ -11,6 +11,14 @@ const GIZMO_LAYER = 31;
 const MIN_DIMENSION = 0.1;
 
 function cloneDimensions(source: any) {
+	if (source?.userData?.customDimensions) {
+		const d = source.userData.customDimensions;
+		return {
+			x: Number(d.x) || 1,
+			y: Number(d.y) || 1,
+			z: Number(d.z) || 1,
+		};
+	}
 	const dims = source?.userData?.originalScale || { x: 1, y: 1, z: 1 };
 	return {
 		x: Number(dims.x) || 1,
@@ -320,6 +328,9 @@ export class TransformGizmo {
 	private handleMouseDown = () => {
 		if (!this.target) return;
 
+		this.target.updateWorldMatrix(true, true);
+		this.target.userData.isGizmoDragging = true;
+
 		this.dragState = {
 			mode: this.getMode(),
 			moveCurveOrigin: this.curvatureOriginEditing,
@@ -349,9 +360,12 @@ export class TransformGizmo {
 			return;
 		}
 
+		this.target.userData.isGizmoDragging = false;
+
 		if (this.dragState.mode === "scale") {
 			this.inspector.applyGizmoDimensions?.(this.getPreviewDimensions(), this.dragState.dimensionsStart);
 		} else {
+			this.inspector.applyGizmoTransform?.(this.target, this.dragState.mode);
 			this.inspector.syncTransformInputs?.();
 			this.inspector.refreshPhysicsAndVisuals?.();
 		}
@@ -384,6 +398,7 @@ export class TransformGizmo {
 			const delta = this.proxy.position.clone().sub(this.dragState.proxyPositionStart);
 			const nextWorld = this.dragState.targetWorldPositionStart.clone().add(delta);
 			this.applyWorldPositionToTarget(nextWorld);
+			this.inspector.applyGizmoTransform?.(this.target, mode);
 			this.inspector.syncTransformInputs?.();
 		} else if (mode === "rotate") {
 			if (this.target.parent && this.target.parent.name !== "TransformGizmoProxy" && this.target.parent.constructor.name !== "Scene") {
@@ -394,6 +409,7 @@ export class TransformGizmo {
 				const deltaQuat = this.proxy.quaternion.clone().multiply(this.dragState.proxyQuaternionStart.clone().invert());
 				this.target.quaternion.copy(deltaQuat.multiply(this.dragState.targetQuaternionStart));
 			}
+			this.inspector.applyGizmoTransform?.(this.target, mode);
 			this.inspector.syncTransformInputs?.();
 		} else if (mode === "scale") {
 			this.inspector.previewGizmoDimensions?.(this.getPreviewDimensions());
@@ -519,6 +535,11 @@ export class TransformGizmo {
 		if (!this.target) return new THREE.Vector3();
 
 		this.target.updateWorldMatrix(true, true);
+
+		if (this.target.userData?.isFuelBarRoot || this.target.userData?.isFuelIndicator || (this.target as any).isSprite) {
+			return this.target.getWorldPosition(new THREE.Vector3());
+		}
+
 		this.tmpBox.setFromObject(this.target);
 		this.tmpBox.getBoundingSphere(this.tmpSphere);
 		this.tmpBox.getSize(this.tmpSize);
@@ -539,6 +560,7 @@ export class TransformGizmo {
 		if (!this.target) return;
 
 		if (this.target.parent) {
+			this.target.parent.updateWorldMatrix(true, false);
 			const localPosition = worldPosition.clone();
 			this.target.parent.worldToLocal(localPosition);
 			this.target.position.copy(localPosition);

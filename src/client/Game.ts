@@ -712,18 +712,19 @@ export class Game {
 					while (target && (!target.userData || !target.userData.isEditableMapObject)) {
 						target = target.parent;
 					}
-					return target || null;
+					return target ? { target, hitPart: hit.object } : null;
 				};
 
 					if (this.objectInspector && e.button === 2) {
-						const target = selectEditableObjectFromPointer();
-						if (target) {
+						const selectResult = selectEditableObjectFromPointer();
+						if (selectResult) {
+							const target = selectResult.target;
 							if (this.objectInspector.isVisible && this.objectInspector.selectedObject && this.objectInspector.selectedObject !== target) {
 								if (!this.objectInspector.allowDynamicSwitch) {
 									return;
 								}
 							}
-							this.objectInspector.show(target);
+							this.objectInspector.show(target, selectResult.hitPart);
 						}
 					}
 				}

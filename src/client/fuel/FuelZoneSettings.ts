@@ -21,9 +21,40 @@ export interface FuelZoneSettings {
   fuelBorderUseZoneColor: boolean;
   fuelBorderOpacity: number;
   fuelBorderThickness: number;
+
+  // Individual object controls: Reserve Bar
+  fuelBarOffsetX: number;
+  fuelBarOffsetY: number;
+  fuelBarOffsetZ: number;
+  fuelBarWidth: number;
+  fuelBarHeight: number;
+  fuelBarDepth: number;
+  fuelBarRotationX: number;
+  fuelBarRotationY: number;
+  fuelBarRotationZ: number;
+
+  // Reserve Bar Styling & Configurations
+  fuelBarDirection: 'horizontal' | 'horizontal-rl' | 'vertical' | 'vertical-tb';
+  fuelBarColor: string;
+  fuelBarActiveColor: string;
+  fuelBarEmptyColor: string;
+  fuelBarEmissive: number;
+  fuelBarBgVisible: boolean;
+  fuelBarBgOpacity: number;
+  fuelBarBgColor: string;
+  fuelBarBorderVisible: boolean;
+
+  // Individual object controls: Floating Indicator
+  fuelIndicatorOffsetX: number;
+  fuelIndicatorOffsetY: number;
+  fuelIndicatorOffsetZ: number;
+  fuelIndicatorScale: number;
 }
 const finite = (value: unknown, fallback: number, max = 1e7) =>
   typeof value === 'number' && Number.isFinite(value) ? Math.min(max, Math.max(0, value)) : fallback;
+
+const finiteSigned = (value: unknown, fallback: number, min = -1e5, max = 1e5) =>
+  typeof value === 'number' && Number.isFinite(value) ? Math.min(max, Math.max(min, value)) : fallback;
 
 export function normalizeFuelZone(props: any = {}): FuelZoneSettings {
   props ??= {};
@@ -44,6 +75,36 @@ export function normalizeFuelZone(props: any = {}): FuelZoneSettings {
     fuelBorderUseZoneColor: props.fuelBorderUseZoneColor === true,
     fuelBorderOpacity: finite(props.fuelBorderOpacity, .75, 1),
     fuelBorderThickness: Math.max(.005, finite(props.fuelBorderThickness, .025, .5)),
+
+    // Reserve bar individual controls (defaults preserve original 1.8m width, 0.09m height, 0.06m depth, offset 0.32m above zone)
+    fuelBarOffsetX: finiteSigned(props.fuelBarOffsetX ?? props.barOffsetX, 0),
+    fuelBarOffsetY: finiteSigned(props.fuelBarOffsetY ?? props.barOffsetY, 0.32),
+    fuelBarOffsetZ: finiteSigned(props.fuelBarOffsetZ ?? props.barOffsetZ, 0),
+    fuelBarWidth: Math.max(0.01, finite(props.fuelBarWidth ?? props.barWidth ?? props.fuelBarLength, 1.8, 100)),
+    fuelBarHeight: Math.max(0.01, finite(props.fuelBarHeight ?? props.barHeight, 0.09, 50)),
+    fuelBarDepth: Math.max(0.01, finite(props.fuelBarDepth ?? props.barDepth, 0.06, 50)),
+    fuelBarRotationX: finiteSigned(props.fuelBarRotationX ?? props.barRotationX, 0, -360, 360),
+    fuelBarRotationY: finiteSigned(props.fuelBarRotationY ?? props.barRotationY, 0, -360, 360),
+    fuelBarRotationZ: finiteSigned(props.fuelBarRotationZ ?? props.barRotationZ, 0, -360, 360),
+
+    // Reserve bar direction & appearance
+    fuelBarDirection: (['horizontal', 'horizontal-rl', 'vertical', 'vertical-tb'].includes(props.fuelBarDirection)
+      ? props.fuelBarDirection
+      : 'horizontal') as FuelZoneSettings['fuelBarDirection'],
+    fuelBarColor: typeof props.fuelBarColor === 'string' && /^#[0-9a-f]{6}$/i.test(props.fuelBarColor) ? props.fuelBarColor : '#42ffd2',
+    fuelBarActiveColor: typeof props.fuelBarActiveColor === 'string' && /^#[0-9a-f]{6}$/i.test(props.fuelBarActiveColor) ? props.fuelBarActiveColor : '#99ffce',
+    fuelBarEmptyColor: typeof props.fuelBarEmptyColor === 'string' && /^#[0-9a-f]{6}$/i.test(props.fuelBarEmptyColor) ? props.fuelBarEmptyColor : '#f07865',
+    fuelBarEmissive: finite(props.fuelBarEmissive, 0.8, 5),
+    fuelBarBgVisible: props.fuelBarBgVisible !== false,
+    fuelBarBgOpacity: finite(props.fuelBarBgOpacity, 0.35, 1),
+    fuelBarBgColor: typeof props.fuelBarBgColor === 'string' && /^#[0-9a-f]{6}$/i.test(props.fuelBarBgColor) ? props.fuelBarBgColor : '#071b18',
+    fuelBarBorderVisible: props.fuelBarBorderVisible !== false,
+
+    // Floating indicator individual controls (defaults preserve original 0.85m offset above zone, 1.0 scale)
+    fuelIndicatorOffsetX: finiteSigned(props.fuelIndicatorOffsetX ?? props.indicatorOffsetX, 0),
+    fuelIndicatorOffsetY: finiteSigned(props.fuelIndicatorOffsetY ?? props.indicatorOffsetY, 0.85),
+    fuelIndicatorOffsetZ: finiteSigned(props.fuelIndicatorOffsetZ ?? props.indicatorOffsetZ, 0),
+    fuelIndicatorScale: Math.max(0.1, finite(props.fuelIndicatorScale ?? props.indicatorScale, 1.0, 20)),
   };
 }
 

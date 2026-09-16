@@ -13,6 +13,7 @@ import { CameraPanelLogic } from "./CameraPanelLogic"
 import { DamageLogic } from "./DamageLogic"
 import { MotorbikeLogic } from "./MotorbikeLogic"
 import { LightLogic } from "./LightLogic"
+import { FuelZoneLogic } from "./FuelZoneLogic"
 
 export class LogicItemsManager {
     constructor(game = null, logicSystem = null) {
@@ -33,7 +34,8 @@ export class LogicItemsManager {
             new EventSubscriptionLogic(),
             new DamageLogic(),
             new LightLogic(),
-            new MotorbikeLogic()
+            new MotorbikeLogic(),
+            new FuelZoneLogic()
         ]
     }
 

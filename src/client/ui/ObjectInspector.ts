@@ -1,6 +1,7 @@
 // @ts-nocheck
 
 import { renderFuelZoneBorder } from "./logic_items/FuelZoneLogic"
+import { normalizeFuelZone } from "../fuel/FuelZoneSettings"
 
 import * as THREE from "three"
 import { StairsUtils } from "../utils/StairsUtils"
@@ -20,6 +21,8 @@ export class ObjectInspector {
         this.allowDynamicSwitch = false
         this.isCollapsed = false
         this.spikeTextureSelectionMode = false
+        this.fuelActiveSubElement = 'zone'
+        this.fuelSubElementButtons = new Map()
 
         this.setupUI()
         this.transformGizmo = new TransformGizmo(this.game, this)
@@ -710,11 +713,11 @@ export class ObjectInspector {
             this.rowTubeBends = tubeRow;
         })
 
-        // ...
-
-
-        // ...
-
+        // 2.5 Fuel Zone Components Controls
+        this.fuelZoneSection = this.createSection("⛽ Componentes de Zona de Gasolina", (section) => {
+            this.fuelZoneSectionContent = section;
+        });
+        this.fuelZoneSection.style.display = "none";
 
         // 3. Color Controls
         this.colorSection = this.createSection("Color", (section) => {
@@ -1045,6 +1048,7 @@ export class ObjectInspector {
         lbl.textContent = title
         lbl.style.cssText = `font-size: 12px; color: #aaa; margin-bottom: 8px; font-weight: bold; text-transform: uppercase;`
         section.appendChild(lbl)
+        section._titleElement = lbl
 
         contentBuilder(section)
         this.content.appendChild(section)
@@ -1186,12 +1190,24 @@ export class ObjectInspector {
         }
     }
 
-    show(object) {
+    show(object, hitPart = null) {
         if (!object) return
         if (this.transformGizmo?.target && this.selectedObject !== object) this.transformGizmo.detach()
         this.selectedObject = object
         this.isVisible = true
         this.container.style.display = 'flex'
+
+        if (object.userData.mapObjectType === "fuel_zone") {
+            if (hitPart?.userData?.isFuelBar || hitPart?.parent?.userData?.isFuelBar) {
+                this.fuelActiveSubElement = 'bar';
+            } else if (hitPart?.userData?.isFuelIndicator) {
+                this.fuelActiveSubElement = 'indicator';
+            } else if (!['zone', 'bar', 'indicator'].includes(this.fuelActiveSubElement)) {
+                this.fuelActiveSubElement = 'zone';
+            }
+        } else {
+            this.fuelActiveSubElement = 'zone';
+        }
 
         const isEnv = object.userData.mapObjectType?.startsWith("environment_");
         
@@ -1254,13 +1270,15 @@ export class ObjectInspector {
         }
 
         this.fuelBorderControls.replaceChildren()
-        this.fuelBorderControls.style.display = object.userData.mapObjectType === 'fuel_zone' ? '' : 'none'
+        this.fuelBorderControls.style.display = 'none'
+
         if (object.userData.mapObjectType === 'fuel_zone') {
-            renderFuelZoneBorder(this.fuelBorderControls, object.userData.logicProperties, (key, value) => {
-                object.userData.logicProperties[key] = value
-                object.fuelZoneVisual?.update(0, [])
-                this.game?.broadcastObjectUpdate?.(object)
-            })
+            if (this.fuelZoneSection) {
+                this.fuelZoneSection.style.display = 'block';
+                this.renderFuelZoneUI();
+            }
+        } else {
+            if (this.fuelZoneSection) this.fuelZoneSection.style.display = 'none';
         }
         // Color
         if (groupColor) {
@@ -1386,6 +1404,55 @@ export class ObjectInspector {
 
     syncTransformInputs(dimensionsOverride = null) {
         if (!this.selectedObject) return
+
+        if (this.positionSection?._titleElement) {
+            if (this.selectedObject?.userData?.mapObjectType === "fuel_zone" && this.fuelActiveSubElement === "bar") {
+                this.positionSection._titleElement.textContent = "POSICIÓN (BARRA DE RESERVA)";
+            } else if (this.selectedObject?.userData?.mapObjectType === "fuel_zone" && this.fuelActiveSubElement === "indicator") {
+                this.positionSection._titleElement.textContent = "POSICIÓN (INDICADOR FLOTANTE)";
+            } else {
+                this.positionSection._titleElement.textContent = "POSICIÓN";
+            }
+        }
+        if (this.dimensionsSection?._titleElement) {
+            if (this.selectedObject?.userData?.mapObjectType === "fuel_zone" && this.fuelActiveSubElement === "bar") {
+                this.dimensionsSection._titleElement.textContent = "DIMENSIONES (BARRA: LARGO / ALTO / GROSOR)";
+            } else if (this.selectedObject?.userData?.mapObjectType === "fuel_zone" && this.fuelActiveSubElement === "indicator") {
+                this.dimensionsSection._titleElement.textContent = "DIMENSIONES (INDICADOR: ESCALA)";
+            } else {
+                this.dimensionsSection._titleElement.textContent = "DIMENSIONES";
+            }
+        }
+
+        if (this.selectedObject.userData.mapObjectType === "fuel_zone" && this.fuelActiveSubElement !== "zone") {
+            const props = normalizeFuelZone(this.selectedObject.userData.logicProperties);
+            if (this.fuelActiveSubElement === "bar") {
+                this.inputPosX.input.value = props.fuelBarOffsetX.toFixed(2);
+                this.inputPosY.input.value = props.fuelBarOffsetY.toFixed(2);
+                this.inputPosZ.input.value = props.fuelBarOffsetZ.toFixed(2);
+
+                this.inputRotX.input.value = (props.fuelBarRotationX || 0).toFixed(1);
+                this.inputRotY.input.value = (props.fuelBarRotationY || 0).toFixed(1);
+                this.inputRotZ.input.value = (props.fuelBarRotationZ || 0).toFixed(1);
+
+                this.inputScaleX.input.value = props.fuelBarWidth.toFixed(2);
+                this.inputScaleY.input.value = props.fuelBarHeight.toFixed(2);
+                this.inputScaleZ.input.value = props.fuelBarDepth.toFixed(2);
+            } else if (this.fuelActiveSubElement === "indicator") {
+                this.inputPosX.input.value = props.fuelIndicatorOffsetX.toFixed(2);
+                this.inputPosY.input.value = props.fuelIndicatorOffsetY.toFixed(2);
+                this.inputPosZ.input.value = props.fuelIndicatorOffsetZ.toFixed(2);
+
+                this.inputRotX.input.value = "0.0";
+                this.inputRotY.input.value = "0.0";
+                this.inputRotZ.input.value = "0.0";
+
+                this.inputScaleX.input.value = props.fuelIndicatorScale.toFixed(2);
+                this.inputScaleY.input.value = props.fuelIndicatorScale.toFixed(2);
+                this.inputScaleZ.input.value = "1.00";
+            }
+            return;
+        }
 
         this.inputPosX.input.value = this.selectedObject.position.x.toFixed(2)
         this.inputPosY.input.value = this.selectedObject.position.y.toFixed(2)
@@ -1652,8 +1719,69 @@ export class ObjectInspector {
         this.transformGizmo.update()
     }
 
+    applyGizmoTransform(target, mode) {
+        if (!this.selectedObject || !target) return;
+
+        if (this.selectedObject.userData.mapObjectType === "fuel_zone" && this.fuelActiveSubElement !== "zone") {
+            const props = this.selectedObject.userData.logicProperties;
+            const dims = this.selectedObject.userData.originalScale || { x: 1, y: 1, z: 1 };
+            if (this.fuelActiveSubElement === "bar") {
+                if (mode === "translate") {
+                    props.fuelBarOffsetX = Number(target.position.x.toFixed(2));
+                    props.fuelBarOffsetY = Number((target.position.y - dims.y / 2).toFixed(2));
+                    props.fuelBarOffsetZ = Number(target.position.z.toFixed(2));
+                } else if (mode === "rotate") {
+                    const euler = new THREE.Euler().setFromQuaternion(target.quaternion, 'YXZ');
+                    props.fuelBarRotationX = Number(THREE.MathUtils.radToDeg(euler.x).toFixed(1));
+                    props.fuelBarRotationY = Number(THREE.MathUtils.radToDeg(euler.y).toFixed(1));
+                    props.fuelBarRotationZ = Number(THREE.MathUtils.radToDeg(euler.z).toFixed(1));
+                }
+            } else if (this.fuelActiveSubElement === "indicator") {
+                if (mode === "translate") {
+                    props.fuelIndicatorOffsetX = Number(target.position.x.toFixed(2));
+                    props.fuelIndicatorOffsetY = Number((target.position.y - dims.y / 2).toFixed(2));
+                    props.fuelIndicatorOffsetZ = Number(target.position.z.toFixed(2));
+                }
+            }
+            this.syncTransformInputs();
+            return;
+        }
+    }
+
     applyGizmoDimensions(dimensions, previousDimensions = null) {
         if (!this.selectedObject || !dimensions) return
+
+        if (this.selectedObject.userData.mapObjectType === "fuel_zone" && this.fuelActiveSubElement !== "zone") {
+            const props = this.selectedObject.userData.logicProperties;
+            if (this.fuelActiveSubElement === "bar") {
+                props.fuelBarWidth = Math.max(0.05, Number(dimensions.x) || props.fuelBarWidth || 1.8);
+                props.fuelBarHeight = Math.max(0.01, Number(dimensions.y) || props.fuelBarHeight || 0.09);
+                props.fuelBarDepth = Math.max(0.01, Number(dimensions.z) || props.fuelBarDepth || 0.06);
+                if (this.selectedObject.fuelZoneVisual?.barRoot) {
+                    this.selectedObject.fuelZoneVisual.barRoot.userData.customDimensions = {
+                        x: props.fuelBarWidth,
+                        y: props.fuelBarHeight,
+                        z: props.fuelBarDepth
+                    };
+                }
+            } else if (this.fuelActiveSubElement === "indicator") {
+                const prev = previousDimensions?.x || 1.0;
+                props.fuelIndicatorScale = Math.max(0.1, Number(((dimensions.x / prev) * (props.fuelIndicatorScale || 1.0)).toFixed(2)));
+                if (this.selectedObject.fuelZoneVisual?.label) {
+                    this.selectedObject.fuelZoneVisual.label.userData.customDimensions = {
+                        x: props.fuelIndicatorScale,
+                        y: props.fuelIndicatorScale,
+                        z: props.fuelIndicatorScale
+                    };
+                }
+            }
+            this.selectedObject.fuelZoneVisual?.update(0, []);
+            this.syncTransformInputs();
+            this.syncFuelZoneUI();
+            this.transformGizmo.update();
+            this.game?.broadcastObjectUpdate?.(this.selectedObject);
+            return;
+        }
 
         const prev = previousDimensions || this.selectedObject.userData.originalScale || { x: 1, y: 1, z: 1 }
         const next = {
@@ -1673,6 +1801,22 @@ export class ObjectInspector {
     previewGizmoDimensions(dimensions) {
         if (!this.selectedObject || !dimensions) return
 
+        if (this.selectedObject.userData.mapObjectType === "fuel_zone" && this.fuelActiveSubElement !== "zone") {
+            const props = this.selectedObject.userData.logicProperties;
+            if (this.fuelActiveSubElement === "bar") {
+                props.fuelBarWidth = Math.max(0.05, Number(dimensions.x) || props.fuelBarWidth || 1.8);
+                props.fuelBarHeight = Math.max(0.01, Number(dimensions.y) || props.fuelBarHeight || 0.09);
+                props.fuelBarDepth = Math.max(0.01, Number(dimensions.z) || props.fuelBarDepth || 0.06);
+            } else if (this.fuelActiveSubElement === "indicator") {
+                const startX = this.transformGizmo.dragState?.dimensionsStart?.x || 1.0;
+                props.fuelIndicatorScale = Math.max(0.1, Number(((dimensions.x / startX) * (props.fuelIndicatorScale || 1.0)).toFixed(2)));
+            }
+            this.selectedObject.fuelZoneVisual?.update(0, []);
+            this.syncTransformInputs(dimensions);
+            this.syncFuelZoneUI();
+            return;
+        }
+
         this.updateDimensions('x', dimensions.x, false)
         this.updateDimensions('y', dimensions.y, false)
         this.updateDimensions('z', dimensions.z, false)
@@ -1686,6 +1830,18 @@ export class ObjectInspector {
 
     updatePosition(axis, value) {
         if (!this.selectedObject) return
+        if (this.selectedObject.userData.mapObjectType === "fuel_zone" && this.fuelActiveSubElement !== "zone") {
+            const props = this.selectedObject.userData.logicProperties;
+            const key = this.fuelActiveSubElement === "bar"
+                ? (axis === "x" ? "fuelBarOffsetX" : axis === "y" ? "fuelBarOffsetY" : "fuelBarOffsetZ")
+                : (axis === "x" ? "fuelIndicatorOffsetX" : axis === "y" ? "fuelIndicatorOffsetY" : "fuelIndicatorOffsetZ");
+            props[key] = Number(value) || 0;
+            this.selectedObject.fuelZoneVisual?.update(0, []);
+            this.syncFuelZoneUI();
+            this.transformGizmo.update();
+            this.game?.broadcastObjectUpdate?.(this.selectedObject);
+            return;
+        }
         this.selectedObject.position[axis] = value
         this.transformGizmo.update()
         this.refreshPhysicsAndVisuals()
@@ -1694,6 +1850,21 @@ export class ObjectInspector {
     nudge(axisAxis, amount) {
         if (!this.selectedObject) return
         const axis = axisAxis.toLowerCase()
+        if (this.selectedObject.userData.mapObjectType === "fuel_zone" && this.fuelActiveSubElement !== "zone") {
+            const props = this.selectedObject.userData.logicProperties;
+            const key = this.fuelActiveSubElement === "bar"
+                ? (axis === "x" ? "fuelBarOffsetX" : axis === "y" ? "fuelBarOffsetY" : "fuelBarOffsetZ")
+                : (axis === "x" ? "fuelIndicatorOffsetX" : axis === "y" ? "fuelIndicatorOffsetY" : "fuelIndicatorOffsetZ");
+            props[key] = Number(((props[key] || 0) + amount).toFixed(2));
+            if (axis === 'x') this.inputPosX.input.value = props[key].toFixed(2);
+            if (axis === 'y') this.inputPosY.input.value = props[key].toFixed(2);
+            if (axis === 'z') this.inputPosZ.input.value = props[key].toFixed(2);
+            this.selectedObject.fuelZoneVisual?.update(0, []);
+            this.syncFuelZoneUI();
+            this.transformGizmo.update();
+            this.game?.broadcastObjectUpdate?.(this.selectedObject);
+            return;
+        }
         this.selectedObject.position[axis] += amount
         // Update input
         if (axis === 'x') this.inputPosX.input.value = this.selectedObject.position.x.toFixed(2)
@@ -1706,6 +1877,16 @@ export class ObjectInspector {
 
     updateRotation(axis, valueDegrees) {
         if (!this.selectedObject) return
+        if (this.selectedObject.userData.mapObjectType === "fuel_zone" && this.fuelActiveSubElement === "bar") {
+            const props = this.selectedObject.userData.logicProperties;
+            const key = axis === "x" ? "fuelBarRotationX" : axis === "y" ? "fuelBarRotationY" : "fuelBarRotationZ";
+            props[key] = Number(valueDegrees) || 0;
+            this.selectedObject.fuelZoneVisual?.update(0, []);
+            this.syncFuelZoneUI();
+            this.transformGizmo.update();
+            this.game?.broadcastObjectUpdate?.(this.selectedObject);
+            return;
+        }
         // Convert to radians
         const radians = valueDegrees * (Math.PI / 180)
         this.selectedObject.rotation[axis] = radians
@@ -1716,7 +1897,21 @@ export class ObjectInspector {
     nudgeRotation(axisAxis, amountDegrees) {
         if (!this.selectedObject) return
         const axis = axisAxis.toLowerCase()
-
+        if (this.selectedObject.userData.mapObjectType === "fuel_zone" && this.fuelActiveSubElement === "bar") {
+            const props = this.selectedObject.userData.logicProperties;
+            const key = axis === "x" ? "fuelBarRotationX" : axis === "y" ? "fuelBarRotationY" : "fuelBarRotationZ";
+            const current = props[key] || 0;
+            const next = Math.round(current + amountDegrees);
+            props[key] = next;
+            if (axis === 'x') this.inputRotX.input.value = next.toFixed(1);
+            if (axis === 'y') this.inputRotY.input.value = next.toFixed(1);
+            if (axis === 'z') this.inputRotZ.input.value = next.toFixed(1);
+            this.selectedObject.fuelZoneVisual?.update(0, []);
+            this.syncFuelZoneUI();
+            this.transformGizmo.update();
+            this.game?.broadcastObjectUpdate?.(this.selectedObject);
+            return;
+        }
         // Add degrees, handle wrapping logic if we want, or just let Three.js handle > 360
         this.selectedObject.rotation[axis] += amountDegrees * (Math.PI / 180)
 
@@ -1733,6 +1928,36 @@ export class ObjectInspector {
 
     updateDimensions(axis, value, shouldRefresh = true) {
         if (!this.selectedObject) return
+        if (this.selectedObject.userData.mapObjectType === "fuel_zone" && this.fuelActiveSubElement !== "zone") {
+            const props = this.selectedObject.userData.logicProperties;
+            value = Math.max(0.01, Number(value) || 0.1);
+            if (this.fuelActiveSubElement === "bar") {
+                if (axis === "x") props.fuelBarWidth = value;
+                else if (axis === "y") props.fuelBarHeight = value;
+                else if (axis === "z") props.fuelBarDepth = value;
+                if (this.selectedObject.fuelZoneVisual?.barRoot) {
+                    this.selectedObject.fuelZoneVisual.barRoot.userData.customDimensions = {
+                        x: props.fuelBarWidth,
+                        y: props.fuelBarHeight,
+                        z: props.fuelBarDepth
+                    };
+                }
+            } else if (this.fuelActiveSubElement === "indicator") {
+                props.fuelIndicatorScale = value;
+                if (this.selectedObject.fuelZoneVisual?.label) {
+                    this.selectedObject.fuelZoneVisual.label.userData.customDimensions = {
+                        x: props.fuelIndicatorScale,
+                        y: props.fuelIndicatorScale,
+                        z: props.fuelIndicatorScale
+                    };
+                }
+            }
+            this.selectedObject.fuelZoneVisual?.update(0, []);
+            this.syncFuelZoneUI();
+            this.transformGizmo.update();
+            this.game?.broadcastObjectUpdate?.(this.selectedObject);
+            return;
+        }
         value = Math.max(0.1, Number(value) || 0.1)
 
         // Update userData dimensions
@@ -2564,7 +2789,394 @@ export class ObjectInspector {
             }
         }
 
+        if (this.selectedObject.userData.mapObjectType === "fuel_zone") {
+            const visual = this.selectedObject.fuelZoneVisual;
+            const props = normalizeFuelZone(this.selectedObject.userData.logicProperties);
+            if (this.fuelActiveSubElement === "bar" && visual?.barRoot) {
+                visual.barRoot.userData.customDimensions = {
+                    x: props.fuelBarWidth,
+                    y: props.fuelBarHeight,
+                    z: props.fuelBarDepth
+                };
+                this.transformGizmo.attach(visual.barRoot);
+                return;
+            } else if (this.fuelActiveSubElement === "indicator" && visual?.label) {
+                visual.label.userData.customDimensions = {
+                    x: props.fuelIndicatorScale,
+                    y: props.fuelIndicatorScale,
+                    z: props.fuelIndicatorScale
+                };
+                this.transformGizmo.attach(visual.label);
+                return;
+            }
+        }
+
         this.transformGizmo.attach(this.selectedObject);
+    }
+
+    setFuelActiveSubElement(subElement) {
+        this.fuelActiveSubElement = subElement;
+        this.updateGizmoAttachment();
+        this.syncTransformInputs();
+        this.syncFuelZoneUI();
+    }
+
+    renderFuelZoneUI() {
+        if (!this.selectedObject || this.selectedObject.userData.mapObjectType !== "fuel_zone") return;
+        const container = this.fuelZoneSectionContent;
+        if (!container) return;
+        container.replaceChildren();
+
+        const props = normalizeFuelZone(this.selectedObject.userData.logicProperties);
+        this.selectedObject.userData.logicProperties = props;
+
+        // Sub-element selector toolbar
+        const toolbar = document.createElement("div");
+        toolbar.style.cssText = "display:flex;gap:4px;margin-bottom:12px;background:#0c1a17;padding:4px;border-radius:6px;border:1px solid #1f4239;";
+
+        const tabs = [
+            { id: 'zone', label: '🟩 Zona Base', desc: 'Plataforma' },
+            { id: 'bar', label: '⛽ Barra Reserva', desc: 'Largo y Pos' },
+            { id: 'indicator', label: '💬 Cartel Flotante', desc: 'Texto y Escala' }
+        ];
+
+        this.fuelSubElementButtons = new Map();
+        tabs.forEach(tab => {
+            const btn = document.createElement("button");
+            btn.type = "button";
+            btn.innerHTML = `<div style="font-weight:bold;font-size:11px;">${tab.label}</div><div style="font-size:9px;opacity:0.75;">${tab.desc}</div>`;
+            btn.style.cssText = "flex:1;padding:6px 4px;border:1px solid transparent;border-radius:4px;cursor:pointer;text-align:center;transition:all 0.15s ease;color:#aaa;background:transparent;";
+            btn.onclick = () => this.setFuelActiveSubElement(tab.id);
+            toolbar.appendChild(btn);
+            this.fuelSubElementButtons.set(tab.id, btn);
+        });
+        container.appendChild(toolbar);
+
+        this.fuelSubElementPanels = document.createElement("div");
+        this.fuelSubElementPanels.style.cssText = "display:flex;flex-direction:column;gap:10px;";
+        container.appendChild(this.fuelSubElementPanels);
+
+        this.syncFuelZoneUI();
+    }
+
+    syncFuelZoneUI() {
+        if (!this.selectedObject || this.selectedObject.userData.mapObjectType !== "fuel_zone" || !this.fuelSubElementPanels) return;
+        const props = normalizeFuelZone(this.selectedObject.userData.logicProperties);
+
+        // Update button active styles
+        this.fuelSubElementButtons?.forEach((btn, id) => {
+            const active = id === this.fuelActiveSubElement;
+            btn.style.background = active ? "#143d35" : "#182626";
+            btn.style.borderColor = active ? "#42ffd2" : "#2b4742";
+            btn.style.color = active ? "#a6ffeb" : "#8cb5ac";
+            btn.style.boxShadow = active ? "0 0 8px rgba(66,255,210,0.3)" : "none";
+        });
+
+        const panel = this.fuelSubElementPanels;
+        panel.replaceChildren();
+
+        const updateProp = (key, val) => {
+            if (!this.selectedObject) return;
+            this.selectedObject.userData.logicProperties[key] = val;
+            this.selectedObject.fuelZoneVisual?.update(0, []);
+            this.syncTransformInputs();
+            this.syncFuelZoneUI();
+            this.transformGizmo.update();
+            this.game?.broadcastObjectUpdate?.(this.selectedObject);
+        };
+
+        const createNudgeRow = (label, key, val, step, min, max, unit = "m") => {
+            const row = document.createElement("div");
+            row.style.cssText = "display:flex;align-items:center;justify-content:space-between;gap:6px;font-size:12px;color:#ccc;";
+            const lbl = document.createElement("span");
+            lbl.textContent = label;
+            const controls = document.createElement("div");
+            controls.style.cssText = "display:flex;align-items:center;gap:3px;";
+
+            const input = document.createElement("input");
+            input.type = "number";
+            input.step = String(step);
+            if (min !== undefined) input.min = String(min);
+            if (max !== undefined) input.max = String(max);
+            input.value = String(val);
+            input.style.cssText = "width:65px;background:#222;color:white;border:1px solid #444;border-radius:4px;padding:3px 5px;font-size:11px;";
+            input.onchange = () => updateProp(key, input.valueAsNumber);
+
+            const btnMinus = document.createElement("button");
+            btnMinus.textContent = `-${step}`;
+            btnMinus.style.cssText = "background:#333;color:white;border:none;padding:3px 5px;border-radius:3px;cursor:pointer;font-size:10px;";
+            btnMinus.onclick = () => updateProp(key, Number((props[key] - step).toFixed(2)));
+
+            const btnPlus = document.createElement("button");
+            btnPlus.textContent = `+${step}`;
+            btnPlus.style.cssText = "background:#333;color:white;border:none;padding:3px 5px;border-radius:3px;cursor:pointer;font-size:10px;";
+            btnPlus.onclick = () => updateProp(key, Number((props[key] + step).toFixed(2)));
+
+            controls.append(btnMinus, input, btnPlus);
+            row.append(lbl, controls);
+            return row;
+        };
+
+        const createColorRow = (labelText, key, val) => {
+            const row = document.createElement("label");
+            row.style.cssText = "display:flex;align-items:center;justify-content:space-between;gap:6px;font-size:12px;color:#ccc;cursor:pointer;";
+            const lbl = document.createElement("span");
+            lbl.textContent = labelText;
+            const input = document.createElement("input");
+            input.type = "color";
+            input.value = val;
+            input.style.cssText = "border:none;background:transparent;width:32px;height:24px;cursor:pointer;";
+            input.onchange = () => updateProp(key, input.value);
+            row.append(lbl, input);
+            return row;
+        };
+
+        const createSliderRow = (labelText, key, val, min, max, step) => {
+            const row = document.createElement("div");
+            row.style.cssText = "display:flex;align-items:center;justify-content:space-between;gap:6px;font-size:12px;color:#ccc;";
+            const lbl = document.createElement("span");
+            lbl.textContent = labelText;
+            const container = document.createElement("div");
+            container.style.cssText = "display:flex;align-items:center;gap:6px;";
+            const input = document.createElement("input");
+            input.type = "range";
+            input.min = String(min); input.max = String(max); input.step = String(step);
+            input.value = String(val);
+            input.style.cssText = "width:75px;cursor:pointer;";
+            const valDisplay = document.createElement("span");
+            valDisplay.style.cssText = "font-size:11px;min-width:28px;color:#42ffd2;text-align:right;";
+            valDisplay.textContent = Number(val).toFixed(2);
+            input.oninput = () => {
+                valDisplay.textContent = Number(input.valueAsNumber).toFixed(2);
+            };
+            input.onchange = () => updateProp(key, input.valueAsNumber);
+            container.append(input, valDisplay);
+            row.append(lbl, container);
+            return row;
+        };
+
+        const createSelectRow = (labelText, key, val, options) => {
+            const row = document.createElement("div");
+            row.style.cssText = "display:flex;align-items:center;justify-content:space-between;gap:6px;font-size:12px;color:#ccc;";
+            const lbl = document.createElement("span");
+            lbl.textContent = labelText;
+            const select = document.createElement("select");
+            select.style.cssText = "background:#222;color:#a5ebe0;border:1px solid #444;border-radius:4px;padding:3px 6px;font-size:11px;max-width:160px;";
+            options.forEach(([optVal, optText]) => {
+                const o = document.createElement("option");
+                o.value = optVal;
+                o.textContent = optText;
+                if (optVal === val) o.selected = true;
+                select.appendChild(o);
+            });
+            select.onchange = () => updateProp(key, select.value);
+            row.append(lbl, select);
+            return row;
+        };
+
+        const createCheckboxRow = (labelText, key, val) => {
+            const row = document.createElement("label");
+            row.style.cssText = "display:flex;align-items:center;justify-content:space-between;gap:6px;font-size:12px;color:#ccc;cursor:pointer;";
+            const lbl = document.createElement("span");
+            lbl.textContent = labelText;
+            const input = document.createElement("input");
+            input.type = "checkbox";
+            input.checked = !!val;
+            input.onchange = () => updateProp(key, input.checked);
+            row.append(lbl, input);
+            return row;
+        };
+
+        if (this.fuelActiveSubElement === "bar") {
+            const banner = document.createElement("div");
+            banner.style.cssText = "padding:6px 8px;background:#102e28;border-left:3px solid #42ffd2;color:#78ffd6;font-size:11px;border-radius:3px;line-height:1.4;";
+            banner.textContent = "⛽ Edición de Barra de Reserva: Puedes moverla y rotarla en el visor 3D con el Gizmo (R para alternar Mover / Rotar / Escalar) o con estos controles:";
+            panel.appendChild(banner);
+
+            const chkRow = document.createElement("label");
+            chkRow.style.cssText = "display:flex;align-items:center;gap:8px;font-size:12px;color:#ddd;cursor:pointer;";
+            const chk = document.createElement("input");
+            chk.type = "checkbox";
+            chk.checked = props.showFuelBar;
+            chk.onchange = () => updateProp("showFuelBar", chk.checked);
+            chkRow.append(chk, document.createTextNode("Mostrar barra de reserva"));
+            panel.appendChild(chkRow);
+
+            // 1. Orientación y Dirección de Llenado
+            const dirTitle = document.createElement("div");
+            dirTitle.textContent = "Orientación de Llenado";
+            dirTitle.style.cssText = "font-size:11px;font-weight:bold;color:#42ffd2;text-transform:uppercase;margin-top:4px;";
+            panel.appendChild(dirTitle);
+
+            panel.appendChild(createSelectRow("Dirección", "fuelBarDirection", props.fuelBarDirection || 'horizontal', [
+                ['horizontal', 'Horizontal: Izq a Der'],
+                ['horizontal-rl', 'Horizontal: Der a Izq'],
+                ['vertical', 'Vertical: Abajo a Arriba (Tótem/Columna)'],
+                ['vertical-tb', 'Vertical: Arriba a Abajo']
+            ]));
+
+            // 2. Colores y Apariencia
+            const styleTitle = document.createElement("div");
+            styleTitle.textContent = "Colores y Brillo Emisivo";
+            styleTitle.style.cssText = "font-size:11px;font-weight:bold;color:#42ffd2;text-transform:uppercase;margin-top:4px;";
+            panel.appendChild(styleTitle);
+
+            panel.appendChild(createColorRow("Color normal (reposo)", "fuelBarColor", props.fuelBarColor || '#42ffd2'));
+            panel.appendChild(createColorRow("Color recargando", "fuelBarActiveColor", props.fuelBarActiveColor || '#99ffce'));
+            panel.appendChild(createColorRow("Color agotado / alerta", "fuelBarEmptyColor", props.fuelBarEmptyColor || '#f07865'));
+            panel.appendChild(createSliderRow("Brillo / Glow emisivo", "fuelBarEmissive", props.fuelBarEmissive ?? 0.8, 0, 2.5, 0.05));
+
+            // 3. Contenedor y Chasis Exterior
+            const frameTitle = document.createElement("div");
+            frameTitle.textContent = "Chasis y Contenedor Exterior";
+            frameTitle.style.cssText = "font-size:11px;font-weight:bold;color:#42ffd2;text-transform:uppercase;margin-top:4px;";
+            panel.appendChild(frameTitle);
+
+            panel.appendChild(createCheckboxRow("Mostrar fondo/envolvente", "fuelBarBgVisible", props.fuelBarBgVisible !== false));
+            panel.appendChild(createSliderRow("Opacidad del fondo", "fuelBarBgOpacity", props.fuelBarBgOpacity ?? 0.35, 0, 1, 0.05));
+            panel.appendChild(createColorRow("Color del fondo", "fuelBarBgColor", props.fuelBarBgColor || '#071b18'));
+            panel.appendChild(createCheckboxRow("Bordes nítidos del chasis", "fuelBarBorderVisible", props.fuelBarBorderVisible !== false));
+
+            // 4. Dimensiones
+            const dimTitle = document.createElement("div");
+            dimTitle.textContent = "Dimensiones de la Barra (m)";
+            dimTitle.style.cssText = "font-size:11px;font-weight:bold;color:#42ffd2;text-transform:uppercase;margin-top:4px;";
+            panel.appendChild(dimTitle);
+
+            panel.appendChild(createNudgeRow("Ancho / Largo (X)", "fuelBarWidth", props.fuelBarWidth, 0.2, 0.01, 50));
+            panel.appendChild(createNudgeRow("Alto (Y)", "fuelBarHeight", props.fuelBarHeight, 0.02, 0.01, 50));
+            panel.appendChild(createNudgeRow("Grosor / Fondo (Z)", "fuelBarDepth", props.fuelBarDepth, 0.02, 0.01, 50));
+
+            // 5. Posición y Rotación 3D
+            const posTitle = document.createElement("div");
+            posTitle.textContent = "Posición y Rotación 3D";
+            posTitle.style.cssText = "font-size:11px;font-weight:bold;color:#42ffd2;text-transform:uppercase;margin-top:4px;";
+            panel.appendChild(posTitle);
+
+            panel.appendChild(createNudgeRow("Desplazamiento X", "fuelBarOffsetX", props.fuelBarOffsetX, 0.2, -50, 50));
+            panel.appendChild(createNudgeRow("Altura sobre zona Y", "fuelBarOffsetY", props.fuelBarOffsetY, 0.05, -50, 50));
+            panel.appendChild(createNudgeRow("Desplazamiento Z", "fuelBarOffsetZ", props.fuelBarOffsetZ, 0.2, -50, 50));
+            panel.appendChild(createNudgeRow("Rotación X (°)", "fuelBarRotationX", props.fuelBarRotationX || 0, 15, -360, 360, "°"));
+            panel.appendChild(createNudgeRow("Rotación Y (°)", "fuelBarRotationY", props.fuelBarRotationY || 0, 15, -360, 360, "°"));
+            panel.appendChild(createNudgeRow("Rotación Z (°)", "fuelBarRotationZ", props.fuelBarRotationZ || 0, 15, -360, 360, "°"));
+
+            const resetBtn = document.createElement("button");
+            resetBtn.textContent = "↺ Restablecer barra a valores por defecto";
+            resetBtn.style.cssText = "background:#182e2b;color:#a5ebe0;border:1px solid #3d635c;padding:6px;border-radius:4px;cursor:pointer;font-size:11px;margin-top:4px;";
+            resetBtn.onclick = () => {
+                const defaults = {
+                    fuelBarWidth: 1.8,
+                    fuelBarHeight: 0.09,
+                    fuelBarDepth: 0.06,
+                    fuelBarOffsetX: 0,
+                    fuelBarOffsetY: 0.32,
+                    fuelBarOffsetZ: 0,
+                    fuelBarRotationX: 0,
+                    fuelBarRotationY: 0,
+                    fuelBarRotationZ: 0,
+                    fuelBarDirection: 'horizontal',
+                    fuelBarColor: '#42ffd2',
+                    fuelBarActiveColor: '#99ffce',
+                    fuelBarEmptyColor: '#f07865',
+                    fuelBarEmissive: 0.8,
+                    fuelBarBgVisible: true,
+                    fuelBarBgOpacity: 0.35,
+                    fuelBarBgColor: '#071b18',
+                    fuelBarBorderVisible: true
+                };
+                Object.assign(props, defaults);
+                this.selectedObject.userData.logicProperties = props;
+                this.selectedObject.fuelZoneVisual?.update(0, []);
+                this.syncTransformInputs();
+                this.syncFuelZoneUI();
+                this.transformGizmo.update();
+                this.game?.broadcastObjectUpdate?.(this.selectedObject);
+            };
+            panel.appendChild(resetBtn);
+
+        } else if (this.fuelActiveSubElement === "indicator") {
+            const banner = document.createElement("div");
+            banner.style.cssText = "padding:6px 8px;background:#102e28;border-left:3px solid #42ffd2;color:#78ffd6;font-size:11px;border-radius:3px;line-height:1.4;";
+            banner.textContent = "💬 Edición de Indicador Flotante (Cartel): Puedes moverlo y escalarlo en el visor 3D con el Gizmo o modificar su altura, escala y texto aquí:";
+            panel.appendChild(banner);
+
+            const chkRow = document.createElement("label");
+            chkRow.style.cssText = "display:flex;align-items:center;gap:8px;font-size:12px;color:#ddd;cursor:pointer;";
+            const chk = document.createElement("input");
+            chk.type = "checkbox";
+            chk.checked = props.showFuelIndicator;
+            chk.onchange = () => updateProp("showFuelIndicator", chk.checked);
+            chkRow.append(chk, document.createTextNode("Mostrar cartel flotante"));
+            panel.appendChild(chkRow);
+
+            const flagsRow = document.createElement("div");
+            flagsRow.style.cssText = "display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:4px 0;";
+            [
+                ["showFuelStatus", "Estado (Gasolina)"],
+                ["showFuelReserve", "Combustible disp."],
+                ["showFuelRate", "Caudal por segundo"],
+                ["showFuelEffects", "Estelas de flujo 3D"]
+            ].forEach(([key, text]) => {
+                const l = document.createElement("label");
+                l.style.cssText = "display:flex;align-items:center;gap:6px;font-size:11px;color:#ccc;cursor:pointer;";
+                const c = document.createElement("input");
+                c.type = "checkbox";
+                c.checked = props[key];
+                c.onchange = () => updateProp(key, c.checked);
+                l.append(c, document.createTextNode(text));
+                flagsRow.appendChild(l);
+            });
+            panel.appendChild(flagsRow);
+
+            const scaleTitle = document.createElement("div");
+            scaleTitle.textContent = "Tamaño y Escala del Cartel";
+            scaleTitle.style.cssText = "font-size:11px;font-weight:bold;color:#42ffd2;text-transform:uppercase;margin-top:4px;";
+            panel.appendChild(scaleTitle);
+
+            panel.appendChild(createNudgeRow("Escala del cartel", "fuelIndicatorScale", props.fuelIndicatorScale, 0.1, 0.1, 5));
+
+            const posTitle = document.createElement("div");
+            posTitle.textContent = "Posición Relativa a la Estación";
+            posTitle.style.cssText = "font-size:11px;font-weight:bold;color:#42ffd2;text-transform:uppercase;margin-top:4px;";
+            panel.appendChild(posTitle);
+
+            panel.appendChild(createNudgeRow("Desplazamiento X", "fuelIndicatorOffsetX", props.fuelIndicatorOffsetX, 0.2, -50, 50));
+            panel.appendChild(createNudgeRow("Altura sobre zona Y", "fuelIndicatorOffsetY", props.fuelIndicatorOffsetY, 0.05, -50, 50));
+            panel.appendChild(createNudgeRow("Desplazamiento Z", "fuelIndicatorOffsetZ", props.fuelIndicatorOffsetZ, 0.2, -50, 50));
+
+            const resetBtn = document.createElement("button");
+            resetBtn.textContent = "↺ Restablecer cartel (escala 1.0, altura normal)";
+            resetBtn.style.cssText = "background:#182e2b;color:#a5ebe0;border:1px solid #3d635c;padding:6px;border-radius:4px;cursor:pointer;font-size:11px;margin-top:4px;";
+            resetBtn.onclick = () => {
+                const defaults = { fuelIndicatorScale: 1.0, fuelIndicatorOffsetX: 0, fuelIndicatorOffsetY: 0.85, fuelIndicatorOffsetZ: 0 };
+                Object.assign(props, defaults);
+                this.selectedObject.userData.logicProperties = props;
+                this.selectedObject.fuelZoneVisual?.update(0, []);
+                this.syncTransformInputs();
+                this.syncFuelZoneUI();
+                this.transformGizmo.update();
+                this.game?.broadcastObjectUpdate?.(this.selectedObject);
+            };
+            panel.appendChild(resetBtn);
+
+        } else {
+            // Zone base view
+            const banner = document.createElement("div");
+            banner.style.cssText = "padding:6px 8px;background:#102e28;border-left:3px solid #42ffd2;color:#78ffd6;font-size:11px;border-radius:3px;line-height:1.4;";
+            banner.textContent = "🟩 Editando Plataforma Base: Ajusta la posición, rotación y dimensiones del volumen de recarga con los paneles superiores o el Gizmo 3D.";
+            panel.appendChild(banner);
+
+            const borderBox = document.createElement("div");
+            borderBox.style.cssText = "border-top:1px solid #23473f;padding-top:8px;margin-top:4px;";
+            renderFuelZoneBorder(borderBox, props, updateProp);
+            panel.appendChild(borderBox);
+
+            const logicBtn = document.createElement("button");
+            logicBtn.textContent = "⚙ Abrir Panel de Lógica Avanzada (Caudal, Capacidad, F)";
+            logicBtn.style.cssText = "background:#1e4039;color:#b2fff0;border:1px solid #42ffd2;padding:8px;border-radius:4px;cursor:pointer;font-size:11px;font-weight:bold;margin-top:6px;";
+            logicBtn.onclick = () => this.openLogicPanel();
+            panel.appendChild(logicBtn);
+        }
     }
 }
 

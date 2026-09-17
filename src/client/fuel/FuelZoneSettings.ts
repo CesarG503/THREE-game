@@ -46,10 +46,16 @@ export interface FuelZoneSettings {
   fuelBarBgColor: string;
   fuelBarBorderVisible: boolean;
 
-  // Individual object controls: Floating Indicator
+  // Individual object controls: Floating / Surface Indicator (Cartel)
+  fuelIndicatorMode: 'billboard' | 'surface';
   fuelIndicatorOffsetX: number;
   fuelIndicatorOffsetY: number;
   fuelIndicatorOffsetZ: number;
+  fuelIndicatorWidth: number;
+  fuelIndicatorHeight: number;
+  fuelIndicatorRotationX: number;
+  fuelIndicatorRotationY: number;
+  fuelIndicatorRotationZ: number;
   fuelIndicatorScale: number;
 }
 const finite = (value: unknown, fallback: number, max = 1e7) =>
@@ -112,10 +118,16 @@ export function normalizeFuelZone(props: any = {}): FuelZoneSettings {
     fuelBarBgColor: typeof props.fuelBarBgColor === 'string' && /^#[0-9a-f]{6}$/i.test(props.fuelBarBgColor) ? props.fuelBarBgColor : '#071b18',
     fuelBarBorderVisible: props.fuelBarBorderVisible !== false,
 
-    // Floating indicator individual controls (defaults preserve original 0.85m offset above zone, 1.0 scale)
+    // Floating / Surface indicator individual controls (cartel)
+    fuelIndicatorMode: (props.fuelIndicatorMode === 'surface' || props.fuelIndicatorFixed === true) ? 'surface' : 'billboard',
     fuelIndicatorOffsetX: finiteSigned(props.fuelIndicatorOffsetX ?? props.indicatorOffsetX, 0),
     fuelIndicatorOffsetY: finiteSigned(props.fuelIndicatorOffsetY ?? props.indicatorOffsetY, 0.85),
     fuelIndicatorOffsetZ: finiteSigned(props.fuelIndicatorOffsetZ ?? props.indicatorOffsetZ, 0),
+    fuelIndicatorWidth: Math.max(0.2, finite(props.fuelIndicatorWidth, props.fuelIndicatorScale ? props.fuelIndicatorScale * 2.8 : 2.8, 100)),
+    fuelIndicatorHeight: Math.max(0.1, finite(props.fuelIndicatorHeight, props.fuelIndicatorScale ? props.fuelIndicatorScale * 1.4 : 1.4, 100)),
+    fuelIndicatorRotationX: finiteSigned(props.fuelIndicatorRotationX, 0, -360, 360),
+    fuelIndicatorRotationY: finiteSigned(props.fuelIndicatorRotationY, 0, -360, 360),
+    fuelIndicatorRotationZ: finiteSigned(props.fuelIndicatorRotationZ, 0, -360, 360),
     fuelIndicatorScale: Math.max(0.1, finite(props.fuelIndicatorScale ?? props.indicatorScale, 1.0, 20)),
   };
 }

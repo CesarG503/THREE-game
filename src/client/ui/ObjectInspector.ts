@@ -1200,7 +1200,7 @@ export class ObjectInspector {
         if (object.userData.mapObjectType === "fuel_zone") {
             if (hitPart?.userData?.isFuelBar || hitPart?.parent?.userData?.isFuelBar) {
                 this.fuelActiveSubElement = 'bar';
-            } else if (hitPart?.userData?.isFuelIndicator) {
+            } else if (hitPart?.userData?.isFuelIndicator || hitPart?.parent?.userData?.isFuelIndicator) {
                 this.fuelActiveSubElement = 'indicator';
             } else if (!['zone', 'bar', 'indicator'].includes(this.fuelActiveSubElement)) {
                 this.fuelActiveSubElement = 'zone';
@@ -1443,12 +1443,12 @@ export class ObjectInspector {
                 this.inputPosY.input.value = props.fuelIndicatorOffsetY.toFixed(2);
                 this.inputPosZ.input.value = props.fuelIndicatorOffsetZ.toFixed(2);
 
-                this.inputRotX.input.value = "0.0";
-                this.inputRotY.input.value = "0.0";
-                this.inputRotZ.input.value = "0.0";
+                this.inputRotX.input.value = (props.fuelIndicatorRotationX || 0).toFixed(1);
+                this.inputRotY.input.value = (props.fuelIndicatorRotationY || 0).toFixed(1);
+                this.inputRotZ.input.value = (props.fuelIndicatorRotationZ || 0).toFixed(1);
 
-                this.inputScaleX.input.value = props.fuelIndicatorScale.toFixed(2);
-                this.inputScaleY.input.value = props.fuelIndicatorScale.toFixed(2);
+                this.inputScaleX.input.value = props.fuelIndicatorWidth.toFixed(2);
+                this.inputScaleY.input.value = props.fuelIndicatorHeight.toFixed(2);
                 this.inputScaleZ.input.value = "1.00";
             }
             return;
@@ -1741,6 +1741,11 @@ export class ObjectInspector {
                     props.fuelIndicatorOffsetX = Number(target.position.x.toFixed(2));
                     props.fuelIndicatorOffsetY = Number((target.position.y - dims.y / 2).toFixed(2));
                     props.fuelIndicatorOffsetZ = Number(target.position.z.toFixed(2));
+                } else if (mode === "rotate") {
+                    const euler = new THREE.Euler().setFromQuaternion(target.quaternion, 'YXZ');
+                    props.fuelIndicatorRotationX = Number(THREE.MathUtils.radToDeg(euler.x).toFixed(1));
+                    props.fuelIndicatorRotationY = Number(THREE.MathUtils.radToDeg(euler.y).toFixed(1));
+                    props.fuelIndicatorRotationZ = Number(THREE.MathUtils.radToDeg(euler.z).toFixed(1));
                 }
             }
             this.syncTransformInputs();
@@ -1765,13 +1770,13 @@ export class ObjectInspector {
                     };
                 }
             } else if (this.fuelActiveSubElement === "indicator") {
-                const prev = previousDimensions?.x || 1.0;
-                props.fuelIndicatorScale = Math.max(0.1, Number(((dimensions.x / prev) * (props.fuelIndicatorScale || 1.0)).toFixed(2)));
+                props.fuelIndicatorWidth = Math.max(0.1, Number(dimensions.x) || props.fuelIndicatorWidth || 2.8);
+                props.fuelIndicatorHeight = Math.max(0.1, Number(dimensions.y) || props.fuelIndicatorHeight || 1.4);
                 if (this.selectedObject.fuelZoneVisual?.label) {
                     this.selectedObject.fuelZoneVisual.label.userData.customDimensions = {
-                        x: props.fuelIndicatorScale,
-                        y: props.fuelIndicatorScale,
-                        z: props.fuelIndicatorScale
+                        x: props.fuelIndicatorWidth,
+                        y: props.fuelIndicatorHeight,
+                        z: 1.0
                     };
                 }
             }
@@ -1808,8 +1813,8 @@ export class ObjectInspector {
                 props.fuelBarHeight = Math.max(0.01, Number(dimensions.y) || props.fuelBarHeight || 0.09);
                 props.fuelBarDepth = Math.max(0.01, Number(dimensions.z) || props.fuelBarDepth || 0.06);
             } else if (this.fuelActiveSubElement === "indicator") {
-                const startX = this.transformGizmo.dragState?.dimensionsStart?.x || 1.0;
-                props.fuelIndicatorScale = Math.max(0.1, Number(((dimensions.x / startX) * (props.fuelIndicatorScale || 1.0)).toFixed(2)));
+                props.fuelIndicatorWidth = Math.max(0.1, Number(dimensions.x) || props.fuelIndicatorWidth || 2.8);
+                props.fuelIndicatorHeight = Math.max(0.1, Number(dimensions.y) || props.fuelIndicatorHeight || 1.4);
             }
             this.selectedObject.fuelZoneVisual?.update(0, []);
             this.syncTransformInputs(dimensions);
@@ -1877,9 +1882,11 @@ export class ObjectInspector {
 
     updateRotation(axis, valueDegrees) {
         if (!this.selectedObject) return
-        if (this.selectedObject.userData.mapObjectType === "fuel_zone" && this.fuelActiveSubElement === "bar") {
+        if (this.selectedObject.userData.mapObjectType === "fuel_zone" && (this.fuelActiveSubElement === "bar" || this.fuelActiveSubElement === "indicator")) {
             const props = this.selectedObject.userData.logicProperties;
-            const key = axis === "x" ? "fuelBarRotationX" : axis === "y" ? "fuelBarRotationY" : "fuelBarRotationZ";
+            const key = this.fuelActiveSubElement === "bar"
+                ? (axis === "x" ? "fuelBarRotationX" : axis === "y" ? "fuelBarRotationY" : "fuelBarRotationZ")
+                : (axis === "x" ? "fuelIndicatorRotationX" : axis === "y" ? "fuelIndicatorRotationY" : "fuelIndicatorRotationZ");
             props[key] = Number(valueDegrees) || 0;
             this.selectedObject.fuelZoneVisual?.update(0, []);
             this.syncFuelZoneUI();
@@ -1897,9 +1904,11 @@ export class ObjectInspector {
     nudgeRotation(axisAxis, amountDegrees) {
         if (!this.selectedObject) return
         const axis = axisAxis.toLowerCase()
-        if (this.selectedObject.userData.mapObjectType === "fuel_zone" && this.fuelActiveSubElement === "bar") {
+        if (this.selectedObject.userData.mapObjectType === "fuel_zone" && (this.fuelActiveSubElement === "bar" || this.fuelActiveSubElement === "indicator")) {
             const props = this.selectedObject.userData.logicProperties;
-            const key = axis === "x" ? "fuelBarRotationX" : axis === "y" ? "fuelBarRotationY" : "fuelBarRotationZ";
+            const key = this.fuelActiveSubElement === "bar"
+                ? (axis === "x" ? "fuelBarRotationX" : axis === "y" ? "fuelBarRotationY" : "fuelBarRotationZ")
+                : (axis === "x" ? "fuelIndicatorRotationX" : axis === "y" ? "fuelIndicatorRotationY" : "fuelIndicatorRotationZ");
             const current = props[key] || 0;
             const next = Math.round(current + amountDegrees);
             props[key] = next;
@@ -1943,12 +1952,14 @@ export class ObjectInspector {
                     };
                 }
             } else if (this.fuelActiveSubElement === "indicator") {
-                props.fuelIndicatorScale = value;
+                if (axis === "x") props.fuelIndicatorWidth = value;
+                else if (axis === "y") props.fuelIndicatorHeight = value;
+                else props.fuelIndicatorScale = value;
                 if (this.selectedObject.fuelZoneVisual?.label) {
                     this.selectedObject.fuelZoneVisual.label.userData.customDimensions = {
-                        x: props.fuelIndicatorScale,
-                        y: props.fuelIndicatorScale,
-                        z: props.fuelIndicatorScale
+                        x: props.fuelIndicatorWidth,
+                        y: props.fuelIndicatorHeight,
+                        z: 1.0
                     };
                 }
             }
@@ -2802,9 +2813,9 @@ export class ObjectInspector {
                 return;
             } else if (this.fuelActiveSubElement === "indicator" && visual?.label) {
                 visual.label.userData.customDimensions = {
-                    x: props.fuelIndicatorScale,
-                    y: props.fuelIndicatorScale,
-                    z: props.fuelIndicatorScale
+                    x: props.fuelIndicatorWidth,
+                    y: props.fuelIndicatorHeight,
+                    z: 1.0
                 };
                 this.transformGizmo.attach(visual.label);
                 return;
@@ -3132,12 +3143,45 @@ export class ObjectInspector {
             });
             panel.appendChild(flagsRow);
 
+            // Modo del Cartel (Billboard vs Surface)
+            const modeTitle = document.createElement("div");
+            modeTitle.textContent = "Modo de Visualización";
+            modeTitle.style.cssText = "font-size:11px;font-weight:bold;color:#42ffd2;text-transform:uppercase;margin-top:4px;";
+            panel.appendChild(modeTitle);
+
+            const modeRow = document.createElement("div");
+            modeRow.style.cssText = "display:flex;gap:6px;margin:2px 0 6px 0;";
+            const modes = [
+                { id: "billboard", label: "Flotante (Cámara)", desc: "Gira para mirar siempre a la cámara" },
+                { id: "surface", label: "Fijo en Superficie", desc: "Plano 3D orientable para fijar en paredes/suelo" }
+            ];
+            modes.forEach(m => {
+                const btn = document.createElement("button");
+                btn.textContent = m.label;
+                btn.title = m.desc;
+                const isActive = (props.fuelIndicatorMode || "billboard") === m.id;
+                btn.style.cssText = `flex:1;padding:5px 4px;font-size:10px;border-radius:4px;cursor:pointer;border:1px solid ${isActive ? '#42ffd2' : '#2d4f48'};background:${isActive ? '#1c4d44' : '#102422'};color:${isActive ? '#fff' : '#85bfb5'};font-weight:${isActive ? 'bold' : 'normal'};`;
+                btn.onclick = () => updateProp("fuelIndicatorMode", m.id);
+                modeRow.appendChild(btn);
+            });
+            panel.appendChild(modeRow);
+
             const scaleTitle = document.createElement("div");
-            scaleTitle.textContent = "Tamaño y Escala del Cartel";
+            scaleTitle.textContent = "Dimensiones del Cartel (Estirar / Cambiar)";
             scaleTitle.style.cssText = "font-size:11px;font-weight:bold;color:#42ffd2;text-transform:uppercase;margin-top:4px;";
             panel.appendChild(scaleTitle);
 
-            panel.appendChild(createNudgeRow("Escala del cartel", "fuelIndicatorScale", props.fuelIndicatorScale, 0.1, 0.1, 5));
+            panel.appendChild(createNudgeRow("Ancho (X)", "fuelIndicatorWidth", props.fuelIndicatorWidth, 0.1, 0.2, 50));
+            panel.appendChild(createNudgeRow("Alto (Y)", "fuelIndicatorHeight", props.fuelIndicatorHeight, 0.1, 0.1, 50));
+
+            const rotTitle = document.createElement("div");
+            rotTitle.textContent = "Rotación 3D del Cartel";
+            rotTitle.style.cssText = "font-size:11px;font-weight:bold;color:#42ffd2;text-transform:uppercase;margin-top:4px;";
+            panel.appendChild(rotTitle);
+
+            panel.appendChild(createNudgeRow("Rotación X", "fuelIndicatorRotationX", props.fuelIndicatorRotationX || 0, 5, -360, 360));
+            panel.appendChild(createNudgeRow("Rotación Y", "fuelIndicatorRotationY", props.fuelIndicatorRotationY || 0, 5, -360, 360));
+            panel.appendChild(createNudgeRow("Rotación Z", "fuelIndicatorRotationZ", props.fuelIndicatorRotationZ || 0, 5, -360, 360));
 
             const posTitle = document.createElement("div");
             posTitle.textContent = "Posición Relativa a la Estación";
@@ -3149,10 +3193,21 @@ export class ObjectInspector {
             panel.appendChild(createNudgeRow("Desplazamiento Z", "fuelIndicatorOffsetZ", props.fuelIndicatorOffsetZ, 0.2, -50, 50));
 
             const resetBtn = document.createElement("button");
-            resetBtn.textContent = "↺ Restablecer cartel (escala 1.0, altura normal)";
+            resetBtn.textContent = "↺ Restablecer cartel (valores predeterminados)";
             resetBtn.style.cssText = "background:#182e2b;color:#a5ebe0;border:1px solid #3d635c;padding:6px;border-radius:4px;cursor:pointer;font-size:11px;margin-top:4px;";
             resetBtn.onclick = () => {
-                const defaults = { fuelIndicatorScale: 1.0, fuelIndicatorOffsetX: 0, fuelIndicatorOffsetY: 0.85, fuelIndicatorOffsetZ: 0 };
+                const defaults = {
+                    fuelIndicatorMode: 'billboard',
+                    fuelIndicatorWidth: 2.8,
+                    fuelIndicatorHeight: 1.4,
+                    fuelIndicatorRotationX: 0,
+                    fuelIndicatorRotationY: 0,
+                    fuelIndicatorRotationZ: 0,
+                    fuelIndicatorScale: 1.0,
+                    fuelIndicatorOffsetX: 0,
+                    fuelIndicatorOffsetY: 0.85,
+                    fuelIndicatorOffsetZ: 0
+                };
                 Object.assign(props, defaults);
                 this.selectedObject.userData.logicProperties = props;
                 this.selectedObject.fuelZoneVisual?.update(0, []);

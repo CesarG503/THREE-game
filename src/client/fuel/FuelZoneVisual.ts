@@ -12,19 +12,27 @@ export function fuelZoneTextLines(props: ReturnType<typeof normalizeFuelZone>, a
 export class FuelZoneVisual {
   readonly root = new THREE.Group();
   readonly barRoot = new THREE.Group();
+  readonly labelRoot = new THREE.Group();
   private barBackground: THREE.Mesh;
   private barEdges: THREE.LineSegments;
   private bar: THREE.Mesh;
   private border: THREE.InstancedMesh;
   private pulse: THREE.Mesh;
   private streams: THREE.Mesh[] = [];
-  readonly label?: THREE.Sprite;
+  private spriteLabel?: THREE.Sprite;
+  private surfaceMesh?: THREE.Mesh;
   private canvas?: HTMLCanvasElement;
+  private texture?: THREE.CanvasTexture;
   private lastText = '';
   private borderLayout = '';
   private time = 0;
   private burst = 0;
   private wasActive = false;
+
+  get label(): THREE.Object3D {
+    return this.labelRoot;
+  }
+
   constructor(private zone: THREE.Object3D, private dims: {x: number; y: number; z: number}) {
     this.dims = { ...dims };
     this.root.name = 'fuel-zone-indicator';
@@ -33,9 +41,10 @@ export class FuelZoneVisual {
     this.border.userData.ignoreRaycast = true;
     this.root.add(this.border);
 
+    // Ripple pulse torus placed at the bottom floor surface of the zone (-dims.y / 2)
     this.pulse = new THREE.Mesh(new THREE.TorusGeometry(Math.min(dims.x, dims.z) * .3, .025, 6, 48),
       new THREE.MeshBasicMaterial({color: 0x74fff0, transparent: true, opacity: 0, depthWrite: false}));
-    this.pulse.rotation.x = Math.PI / 2; this.pulse.position.y = dims.y / 2 + .04;
+    this.pulse.rotation.x = Math.PI / 2; this.pulse.position.y = -dims.y / 2 + .04;
     this.pulse.userData.ignoreRaycast = true;
     this.root.add(this.pulse);
 
@@ -90,15 +99,45 @@ export class FuelZoneVisual {
     this.barRoot.position.set(0, dims.y / 2 + .32, 0);
     this.root.add(this.barRoot);
 
+    // Fuel indicator container (supports billboard camera-facing and fixed 3D surface plane)
+    this.labelRoot.name = 'fuel-zone-label-root';
+    this.labelRoot.userData.isFuelIndicator = true;
+
     if (typeof document !== 'undefined') {
-      this.canvas = document.createElement('canvas'); this.canvas.width = 768; this.canvas.height = 192;
-      const texture = new THREE.CanvasTexture(this.canvas); texture.colorSpace = THREE.SRGBColorSpace;
-      this.label = new THREE.Sprite(new THREE.SpriteMaterial({map: texture, transparent: true, depthWrite: false}));
-      this.label.name = 'fuel-zone-label';
-      this.label.userData.isFuelIndicator = true;
-      this.label.position.set(0, dims.y / 2 + .85, 0);
-      this.label.scale.set(3.8, .95, 1);
-      this.root.add(this.label);
+      this.canvas = document.createElement('canvas');
+      this.canvas.width = 1024;
+      this.canvas.height = 512;
+      this.texture = new THREE.CanvasTexture(this.canvas);
+      this.texture.colorSpace = THREE.SRGBColorSpace;
+      this.texture.minFilter = THREE.LinearFilter;
+      this.texture.magFilter = THREE.LinearFilter;
+
+      // 1. Sprite for billboard mode (always faces camera)
+      const spriteMat = new THREE.SpriteMaterial({
+        map: this.texture,
+        transparent: true,
+        depthWrite: false
+      });
+      this.spriteLabel = new THREE.Sprite(spriteMat);
+      this.spriteLabel.name = 'fuel-zone-sprite-label';
+      this.spriteLabel.userData.isFuelIndicator = true;
+      this.labelRoot.add(this.spriteLabel);
+
+      // 2. Plane mesh for fixed surface mode (stays fixed on walls/floors, honors 3D rotation)
+      const planeGeo = new THREE.PlaneGeometry(1, 1);
+      const meshMat = new THREE.MeshBasicMaterial({
+        map: this.texture,
+        transparent: true,
+        side: THREE.DoubleSide,
+        depthWrite: false
+      });
+      this.surfaceMesh = new THREE.Mesh(planeGeo, meshMat);
+      this.surfaceMesh.name = 'fuel-zone-surface-label';
+      this.surfaceMesh.userData.isFuelIndicator = true;
+      this.labelRoot.add(this.surfaceMesh);
+
+      this.labelRoot.position.set(0, dims.y / 2 + .85, 0);
+      this.root.add(this.labelRoot);
     }
     const streakGeometry = new THREE.CylinderGeometry(.018, .035, 1, 5);
     const streakMaterial = new THREE.MeshBasicMaterial({color: 0x9affde, transparent: true, opacity: .85, depthWrite: false, blending: THREE.AdditiveBlending});
@@ -117,7 +156,7 @@ export class FuelZoneVisual {
       this.pulse.geometry.dispose();
       this.pulse.geometry = new THREE.TorusGeometry(Math.min(this.dims.x, this.dims.z) * .3, .025, 6, 48);
     }
-    this.pulse.position.y = this.dims.y / 2 + .04;
+    this.pulse.position.y = -this.dims.y / 2 + .04;
 
     const borderMaterial = this.border.material as THREE.MeshBasicMaterial;
     borderMaterial.color.set(props.fuelBorderUseZoneColor ? (this.zone.userData.color ?? 0x19c99a) : props.fuelBorderColor);
@@ -252,7 +291,7 @@ export class FuelZoneVisual {
     barMat.emissive.set(barColorHex);
     barMat.emissiveIntensity = emissiveIntensity;
 
-    // 2. Pulse effect
+    // 2. Pulse effect - emerges from bottom floor of zone
     this.pulse.visible = props.showFuelEffects && active;
     this.pulse.scale.setScalar(this.burst > 0 ? 1 + (1 - this.burst / .45) * 1.8 : 1 + Math.sin(this.time * 9) * .06);
     (this.pulse.material as THREE.MeshBasicMaterial).opacity = this.burst > 0 ? this.burst / .45 : .45;
@@ -272,34 +311,113 @@ export class FuelZoneVisual {
       streak.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), b.sub(a).normalize());
     }
 
-    // 4. Floating indicator label positioning and scale
-    if (this.label && this.canvas) {
+    // 4. Floating / Surface indicator label positioning, dimensions and rendering
+    if (this.canvas && this.texture) {
+      const isSurface = props.fuelIndicatorMode === 'surface';
+      if (this.spriteLabel) this.spriteLabel.visible = !isSurface;
+      if (this.surfaceMesh) this.surfaceMesh.visible = isSurface;
+
       const lines = fuelZoneTextLines(props, active);
-      this.label.visible = props.showFuelIndicator && lines.length > 0;
-      if (!this.label.userData.isGizmoDragging) {
-        this.label.position.set(
+      this.labelRoot.visible = props.showFuelIndicator && lines.length > 0;
+
+      if (!this.labelRoot.userData.isGizmoDragging) {
+        this.labelRoot.position.set(
           props.fuelIndicatorOffsetX,
           this.dims.y / 2 + props.fuelIndicatorOffsetY,
           props.fuelIndicatorOffsetZ
         );
+        this.labelRoot.rotation.set(
+          THREE.MathUtils.degToRad(props.fuelIndicatorRotationX || 0),
+          THREE.MathUtils.degToRad(props.fuelIndicatorRotationY || 0),
+          THREE.MathUtils.degToRad(props.fuelIndicatorRotationZ || 0)
+        );
       }
 
-      const baseScale = Math.max(0.1, props.fuelIndicatorScale || 1.0);
-      const height = Math.max(1, lines.length) * 52 + 24;
-      this.label.scale.set(3.8 * baseScale, (3.8 * height / 768) * baseScale, 1);
+      const indW = Math.max(0.1, props.fuelIndicatorWidth || 2.8);
+      const indH = Math.max(0.1, props.fuelIndicatorHeight || 1.4);
+      this.labelRoot.scale.set(indW, indH, 1);
 
       const labelColor = active ? (props.fuelBarActiveColor || '#00ff11') : levelColor;
       const text = `${lines.join('|')}|${labelColor}`;
       if (text !== this.lastText) {
         this.lastText = text;
-        this.canvas.height = height;
         const ctx = this.canvas.getContext('2d');
         if (ctx) {
-          ctx.clearRect(0, 0, 768, height); ctx.fillStyle = 'rgba(7,25,29,.92)'; ctx.fillRect(0, 0, 768, height);
-          ctx.strokeStyle = labelColor; ctx.lineWidth = 5; ctx.strokeRect(3, 3, 762, height - 6);
-          ctx.textAlign = 'center'; ctx.fillStyle = '#d5eee7'; ctx.font = 'bold 30px sans-serif';
-          lines.forEach((line, index) => ctx.fillText(line, 384, 48 + index * 52, 736));
-          (this.label.material as THREE.SpriteMaterial).map!.needsUpdate = true;
+          ctx.clearRect(0, 0, 1024, 512);
+
+          // Sleek futuristic card with rounded corners and glowing border
+          const pad = 24;
+          const cardW = 1024 - pad * 2;
+          const cardH = 512 - pad * 2;
+          const radius = 28;
+
+          ctx.save();
+          ctx.beginPath();
+          ctx.moveTo(pad + radius, pad);
+          ctx.lineTo(pad + cardW - radius, pad);
+          ctx.quadraticCurveTo(pad + cardW, pad, pad + cardW, pad + radius);
+          ctx.lineTo(pad + cardW, pad + cardH - radius);
+          ctx.quadraticCurveTo(pad + cardW, pad + cardH, pad + cardW - radius, pad + cardH);
+          ctx.lineTo(pad + radius, pad + cardH);
+          ctx.quadraticCurveTo(pad, pad + cardH, pad, pad + cardH - radius);
+          ctx.lineTo(pad, pad + radius);
+          ctx.quadraticCurveTo(pad, pad, pad + radius, pad);
+          ctx.closePath();
+
+          // Dark sci-fi translucent glass card fill
+          ctx.fillStyle = 'rgba(7, 24, 28, 0.92)';
+          ctx.fill();
+
+          // Outer glow border without internal divider lines
+          ctx.lineWidth = 10;
+          ctx.strokeStyle = labelColor;
+          ctx.shadowColor = labelColor;
+          ctx.shadowBlur = 18;
+          ctx.stroke();
+          ctx.restore();
+
+          // Typography with clean vertical centering
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          const centerX = 512;
+          const centerY = 256;
+
+          if (lines.length === 1) {
+            ctx.fillStyle = labelColor;
+            ctx.font = 'bold 52px system-ui, -apple-system, sans-serif';
+            ctx.shadowColor = labelColor;
+            ctx.shadowBlur = 12;
+            ctx.fillText(lines[0], centerX, centerY, 920);
+          } else if (lines.length === 2) {
+            ctx.fillStyle = labelColor;
+            ctx.font = 'bold 46px system-ui, -apple-system, sans-serif';
+            ctx.shadowColor = labelColor;
+            ctx.shadowBlur = 10;
+            ctx.fillText(lines[0], centerX, centerY - 55, 920);
+
+            ctx.fillStyle = '#d5eee7';
+            ctx.font = 'bold 36px system-ui, -apple-system, sans-serif';
+            ctx.shadowBlur = 0;
+            ctx.fillText(lines[1], centerX, centerY + 55, 920);
+          } else if (lines.length >= 3) {
+            ctx.fillStyle = labelColor;
+            ctx.font = 'bold 44px system-ui, -apple-system, sans-serif';
+            ctx.shadowColor = labelColor;
+            ctx.shadowBlur = 10;
+            ctx.fillText(lines[0], centerX, centerY - 100, 920);
+
+            ctx.fillStyle = '#d5eee7';
+            ctx.font = 'bold 34px system-ui, -apple-system, sans-serif';
+            ctx.shadowBlur = 0;
+            ctx.fillText(lines[1], centerX, centerY, 920);
+
+            ctx.fillStyle = '#7de8d3';
+            ctx.font = 'bold 30px system-ui, -apple-system, sans-serif';
+            ctx.shadowBlur = 0;
+            ctx.fillText(lines[2], centerX, centerY + 95, 920);
+          }
+
+          this.texture.needsUpdate = true;
         }
       }
     }
@@ -314,11 +432,18 @@ export class FuelZoneVisual {
     this.barEdges.geometry.dispose();
     (this.barEdges.material as THREE.Material).dispose();
     (this.bar.material as THREE.Material).dispose();
-    if (this.label) {
-      this.label.geometry.dispose();
-      (this.label.material as THREE.SpriteMaterial).map?.dispose();
-      (this.label.material as THREE.Material).dispose();
+    if (this.spriteLabel) {
+      this.spriteLabel.geometry.dispose();
+      (this.spriteLabel.material as THREE.Material).dispose();
     }
+    if (this.surfaceMesh) {
+      this.surfaceMesh.geometry.dispose();
+      (this.surfaceMesh.material as THREE.Material).dispose();
+    }
+    if (this.texture) {
+      this.texture.dispose();
+    }
+    this.labelRoot.removeFromParent();
     for (const streak of this.streams) {
       streak.geometry.dispose();
       (streak.material as THREE.Material).dispose();

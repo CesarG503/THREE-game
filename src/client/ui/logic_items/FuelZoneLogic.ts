@@ -184,14 +184,40 @@ export class FuelZoneLogic {
     container.appendChild(resetBarBtn);
 
     // Floating Indicator Section
-    makeSectionHeader('Indicador Flotante (Cartel 3D y Posición)', '💬');
+    makeSectionHeader('Indicador del Cartel (Flotante o Fijo en Superficie)', '💬');
+
+    // Mode selector dropdown
+    const indicatorModeLabel = document.createElement('label');
+    indicatorModeLabel.style.cssText = 'display:flex;flex-direction:column;gap:6px;margin:8px 0;color:#ddd;font-size:12px;width:100%';
+    indicatorModeLabel.append('Modo de orientación del cartel:');
+    const indicatorModeSelect = document.createElement('select');
+    indicatorModeSelect.setAttribute('aria-label', 'Modo del cartel');
+    indicatorModeSelect.style.cssText = 'box-sizing:border-box;max-width:100%;background:#182626;color:white;border:1px solid #42635f;border-radius:4px;padding:5px';
+    const optBillboard = document.createElement('option');
+    optBillboard.value = 'billboard';
+    optBillboard.textContent = 'Flotante (Mira siempre a la cámara)';
+    const optSurface = document.createElement('option');
+    optSurface.value = 'surface';
+    optSurface.textContent = 'Fijo en superficie (Plano 3D orientable)';
+    indicatorModeSelect.append(optBillboard, optSurface);
+    indicatorModeSelect.value = settings.fuelIndicatorMode || 'billboard';
+    indicatorModeSelect.onchange = () => {
+      update('fuelIndicatorMode', indicatorModeSelect.value);
+    };
+    indicatorModeLabel.appendChild(indicatorModeSelect);
+    container.appendChild(indicatorModeLabel);
+
     const fieldsIndicator = [
       ['showFuelIndicator', 'Mostrar cartel e indicadores flotantes', 'checkbox', 0, 0, 0],
       ['showFuelStatus', 'Mostrar texto de estado (Gasolina / Recargando)', 'checkbox', 0, 0, 0],
       ['showFuelReserve', 'Mostrar combustible disponible en cartel', 'checkbox', 0, 0, 0],
       ['showFuelRate', 'Mostrar caudal por segundo en cartel', 'checkbox', 0, 0, 0],
       ['showFuelEffects', 'Mostrar estela 3D al recargar', 'checkbox', 0, 0, 0],
-      ['fuelIndicatorScale', 'Tamaño / Escala del cartel', 'number', 0.2, 5, 0.05],
+      ['fuelIndicatorWidth', 'Ancho del cartel (metros)', 'number', 0.2, 50, 0.1],
+      ['fuelIndicatorHeight', 'Alto del cartel (metros)', 'number', 0.1, 50, 0.1],
+      ['fuelIndicatorRotationX', 'Rotación X del cartel (grados)', 'number', -360, 360, 5],
+      ['fuelIndicatorRotationY', 'Rotación Y del cartel (grados)', 'number', -360, 360, 5],
+      ['fuelIndicatorRotationZ', 'Rotación Z del cartel (grados)', 'number', -360, 360, 5],
       ['fuelIndicatorOffsetX', 'Posición X del cartel (metros)', 'number', -50, 50, 0.1],
       ['fuelIndicatorOffsetY', 'Altura Y del cartel (sobre zona en metros)', 'number', -50, 50, 0.05],
       ['fuelIndicatorOffsetZ', 'Posición Z del cartel (metros)', 'number', -50, 50, 0.1],
@@ -216,14 +242,26 @@ export class FuelZoneLogic {
     }
 
     const resetIndicatorBtn = document.createElement('button');
-    resetIndicatorBtn.textContent = '↺ Restablecer cartel por defecto (escala 1.0, encima de zona)';
+    resetIndicatorBtn.textContent = '↺ Restablecer cartel por defecto';
     resetIndicatorBtn.style.cssText = 'background:#1a3130;color:#98d6cb;border:1px solid #365b55;padding:5px;border-radius:4px;cursor:pointer;font-size:11px;margin:4px 0 10px 0;width:100%';
     resetIndicatorBtn.onclick = () => {
-      const defaults = { fuelIndicatorScale: 1.0, fuelIndicatorOffsetX: 0, fuelIndicatorOffsetY: 0.85, fuelIndicatorOffsetZ: 0 };
+      const defaults = {
+        fuelIndicatorMode: 'billboard',
+        fuelIndicatorWidth: 2.8,
+        fuelIndicatorHeight: 1.4,
+        fuelIndicatorRotationX: 0,
+        fuelIndicatorRotationY: 0,
+        fuelIndicatorRotationZ: 0,
+        fuelIndicatorScale: 1.0,
+        fuelIndicatorOffsetX: 0,
+        fuelIndicatorOffsetY: 0.85,
+        fuelIndicatorOffsetZ: 0
+      };
       for (const [k, v] of Object.entries(defaults)) {
         update(k, v);
         const c = controls.get(k); if (c) c.value = String(v);
       }
+      indicatorModeSelect.value = 'billboard';
     };
     container.appendChild(resetIndicatorBtn);
 

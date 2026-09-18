@@ -57,6 +57,7 @@ export interface FuelZoneSettings {
   fuelIndicatorRotationY: number;
   fuelIndicatorRotationZ: number;
   fuelIndicatorScale: number;
+  fuelIndicatorFontSize: number;
 }
 const finite = (value: unknown, fallback: number, max = 1e7) =>
   typeof value === 'number' && Number.isFinite(value) ? Math.min(max, Math.max(0, value)) : fallback;
@@ -129,6 +130,7 @@ export function normalizeFuelZone(props: any = {}): FuelZoneSettings {
     fuelIndicatorRotationY: finiteSigned(props.fuelIndicatorRotationY, 0, -360, 360),
     fuelIndicatorRotationZ: finiteSigned(props.fuelIndicatorRotationZ, 0, -360, 360),
     fuelIndicatorScale: Math.max(0.1, finite(props.fuelIndicatorScale ?? props.indicatorScale, 1.0, 20)),
+    fuelIndicatorFontSize: Math.max(12, Math.min(100, finite(props.fuelIndicatorFontSize, 38, 100))),
   };
 }
 

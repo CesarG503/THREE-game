@@ -3173,6 +3173,7 @@ export class ObjectInspector {
 
             panel.appendChild(createNudgeRow("Ancho (X)", "fuelIndicatorWidth", props.fuelIndicatorWidth, 0.1, 0.2, 50));
             panel.appendChild(createNudgeRow("Alto (Y)", "fuelIndicatorHeight", props.fuelIndicatorHeight, 0.1, 0.1, 50));
+            panel.appendChild(createNudgeRow("Tamaño de letra (auto-ajuste)", "fuelIndicatorFontSize", props.fuelIndicatorFontSize, 2, 14, 80));
 
             const rotTitle = document.createElement("div");
             rotTitle.textContent = "Rotación 3D del Cartel";
@@ -3200,6 +3201,7 @@ export class ObjectInspector {
                     fuelIndicatorMode: 'billboard',
                     fuelIndicatorWidth: 2.8,
                     fuelIndicatorHeight: 1.4,
+                    fuelIndicatorFontSize: 38,
                     fuelIndicatorRotationX: 0,
                     fuelIndicatorRotationY: 0,
                     fuelIndicatorRotationZ: 0,

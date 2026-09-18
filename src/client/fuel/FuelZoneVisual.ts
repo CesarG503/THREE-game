@@ -337,85 +337,133 @@ export class FuelZoneVisual {
       const indH = Math.max(0.1, props.fuelIndicatorHeight || 1.4);
       this.labelRoot.scale.set(indW, indH, 1);
 
+      // Dynamic aspect-correct canvas resolution:
+      // Matches the aspect ratio of the 3D plane so pixels in 3D world space are perfectly 1:1 square.
+      // This prevents ANY stretching, squashing, or distortion of letters when resizing or making the cartel narrow/wide.
+      const aspect = Math.max(0.05, indW / indH);
+      let targetW = 1024;
+      let targetH = 512;
+      if (aspect >= 1) {
+        targetW = 1024;
+        targetH = Math.max(96, Math.min(1024, Math.round(1024 / aspect)));
+      } else {
+        targetH = 1024;
+        targetW = Math.max(96, Math.min(1024, Math.round(1024 * aspect)));
+      }
+      targetW = Math.round(targetW / 8) * 8;
+      targetH = Math.round(targetH / 8) * 8;
+
+      if (this.canvas.width !== targetW || this.canvas.height !== targetH) {
+        this.canvas.width = targetW;
+        this.canvas.height = targetH;
+        this.texture.dispose();
+        this.texture.needsUpdate = true;
+        this.lastText = '';
+      }
+
       const labelColor = active ? (props.fuelBarActiveColor || '#00ff11') : levelColor;
-      const text = `${lines.join('|')}|${labelColor}`;
-      if (text !== this.lastText) {
-        this.lastText = text;
+      const baseFontSize = props.fuelIndicatorFontSize || 38;
+      const textKey = `${lines.join('|')}|${labelColor}|${targetW}x${targetH}|${baseFontSize}`;
+      if (textKey !== this.lastText) {
+        this.lastText = textKey;
         const ctx = this.canvas.getContext('2d');
         if (ctx) {
-          ctx.clearRect(0, 0, 1024, 512);
+          const cW = this.canvas.width;
+          const cH = this.canvas.height;
+          ctx.clearRect(0, 0, cW, cH);
 
-          // Sleek futuristic card with rounded corners and glowing border
-          const pad = 24;
-          const cardW = 1024 - pad * 2;
-          const cardH = 512 - pad * 2;
-          const radius = 28;
+          // Card padding and dimensions
+          const padX = Math.max(14, Math.round(cW * 0.035));
+          const padY = Math.max(12, Math.round(cH * 0.045));
+          const cardW = cW - padX * 2;
+          const cardH = cH - padY * 2;
+          const radius = Math.max(10, Math.min(28, Math.round(Math.min(cardW, cardH) * 0.16)));
 
           ctx.save();
           ctx.beginPath();
-          ctx.moveTo(pad + radius, pad);
-          ctx.lineTo(pad + cardW - radius, pad);
-          ctx.quadraticCurveTo(pad + cardW, pad, pad + cardW, pad + radius);
-          ctx.lineTo(pad + cardW, pad + cardH - radius);
-          ctx.quadraticCurveTo(pad + cardW, pad + cardH, pad + cardW - radius, pad + cardH);
-          ctx.lineTo(pad + radius, pad + cardH);
-          ctx.quadraticCurveTo(pad, pad + cardH, pad, pad + cardH - radius);
-          ctx.lineTo(pad, pad + radius);
-          ctx.quadraticCurveTo(pad, pad, pad + radius, pad);
+          ctx.moveTo(padX + radius, padY);
+          ctx.lineTo(padX + cardW - radius, padY);
+          ctx.quadraticCurveTo(padX + cardW, padY, padX + cardW, padY + radius);
+          ctx.lineTo(padX + cardW, padY + cardH - radius);
+          ctx.quadraticCurveTo(padX + cardW, padY + cardH, padX + cardW - radius, padY + cardH);
+          ctx.lineTo(padX + radius, padY + cardH);
+          ctx.quadraticCurveTo(padX, padY + cardH, padX, padY + cardH - radius);
+          ctx.lineTo(padX, padY + radius);
+          ctx.quadraticCurveTo(padX, padY, padX + radius, padY);
           ctx.closePath();
 
           // Dark sci-fi translucent glass card fill
           ctx.fillStyle = 'rgba(7, 24, 28, 0.92)';
           ctx.fill();
 
-          // Outer glow border without internal divider lines
-          ctx.lineWidth = 10;
+          // Outer glow border
+          const borderStroke = Math.max(3, Math.min(10, Math.round(Math.min(cardW, cardH) * 0.045)));
+          ctx.lineWidth = borderStroke;
           ctx.strokeStyle = labelColor;
           ctx.shadowColor = labelColor;
-          ctx.shadowBlur = 18;
+          ctx.shadowBlur = Math.min(18, borderStroke * 2.2);
           ctx.stroke();
           ctx.restore();
 
-          // Typography with clean vertical centering
+          // Typography with Auto-Fit overflow protection:
+          // Text expands up to baseFontSize, but if cartel is narrow or font is large,
+          // it automatically scales down so it NEVER spills out of the card.
+          const availW = Math.max(40, cardW - borderStroke * 2 - 24);
+          const availH = Math.max(30, cardH - borderStroke * 2 - 20);
+
+          // Relative font scale weights per line
+          const weights = lines.length === 1 ? [1.35] : lines.length === 2 ? [1.25, 0.95] : [1.20, 0.92, 0.82];
+          const rawSizes = lines.map((_, i) => Math.round(baseFontSize * weights[i]));
+
+          // Measure width of each line at scale 1.0 to find horizontal constraint
+          ctx.save();
+          let maxNeededW = 0;
+          lines.forEach((line, i) => {
+            ctx.font = `bold ${rawSizes[i]}px system-ui, -apple-system, sans-serif`;
+            const m = ctx.measureText(line).width;
+            if (m > maxNeededW) maxNeededW = m;
+          });
+
+          // Measure vertical height needed (line height ~ 1.35)
+          const totalRawH = rawSizes.reduce((sum, s) => sum + s * 1.35, 0);
+
+          // Compute uniform fitScale so text NEVER overflows horizontally or vertically
+          const scaleW = maxNeededW > availW ? availW / maxNeededW : 1.0;
+          const scaleH = totalRawH > availH ? availH / totalRawH : 1.0;
+          const fitScale = Math.min(1.0, scaleW, scaleH);
+
+          // Final sizes & line heights
+          const finalSizes = rawSizes.map(s => Math.max(10, Math.round(s * fitScale)));
+          const finalLineHeights = finalSizes.map(s => Math.round(s * 1.35));
+          const totalBlockH = finalLineHeights.reduce((a, b) => a + b, 0);
+
+          // Render centered inside the card
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
-          const centerX = 512;
-          const centerY = 256;
+          const centerX = cW / 2;
+          const centerY = cH / 2;
+          let currentY = centerY - totalBlockH / 2;
 
-          if (lines.length === 1) {
-            ctx.fillStyle = labelColor;
-            ctx.font = 'bold 52px system-ui, -apple-system, sans-serif';
-            ctx.shadowColor = labelColor;
-            ctx.shadowBlur = 12;
-            ctx.fillText(lines[0], centerX, centerY, 920);
-          } else if (lines.length === 2) {
-            ctx.fillStyle = labelColor;
-            ctx.font = 'bold 46px system-ui, -apple-system, sans-serif';
-            ctx.shadowColor = labelColor;
-            ctx.shadowBlur = 10;
-            ctx.fillText(lines[0], centerX, centerY - 55, 920);
+          lines.forEach((line, i) => {
+            const h = finalLineHeights[i];
+            const y = currentY + h / 2;
+            currentY += h;
 
-            ctx.fillStyle = '#d5eee7';
-            ctx.font = 'bold 36px system-ui, -apple-system, sans-serif';
-            ctx.shadowBlur = 0;
-            ctx.fillText(lines[1], centerX, centerY + 55, 920);
-          } else if (lines.length >= 3) {
-            ctx.fillStyle = labelColor;
-            ctx.font = 'bold 44px system-ui, -apple-system, sans-serif';
-            ctx.shadowColor = labelColor;
-            ctx.shadowBlur = 10;
-            ctx.fillText(lines[0], centerX, centerY - 100, 920);
-
-            ctx.fillStyle = '#d5eee7';
-            ctx.font = 'bold 34px system-ui, -apple-system, sans-serif';
-            ctx.shadowBlur = 0;
-            ctx.fillText(lines[1], centerX, centerY, 920);
-
-            ctx.fillStyle = '#7de8d3';
-            ctx.font = 'bold 30px system-ui, -apple-system, sans-serif';
-            ctx.shadowBlur = 0;
-            ctx.fillText(lines[2], centerX, centerY + 95, 920);
-          }
+            ctx.font = `bold ${finalSizes[i]}px system-ui, -apple-system, sans-serif`;
+            if (i === 0) {
+              ctx.fillStyle = labelColor;
+              ctx.shadowColor = labelColor;
+              ctx.shadowBlur = Math.min(12, Math.round(finalSizes[i] * 0.25));
+            } else if (i === 1) {
+              ctx.fillStyle = '#d5eee7';
+              ctx.shadowBlur = 0;
+            } else {
+              ctx.fillStyle = '#7de8d3';
+              ctx.shadowBlur = 0;
+            }
+            ctx.fillText(line, centerX, y);
+          });
+          ctx.restore();
 
           this.texture.needsUpdate = true;
         }

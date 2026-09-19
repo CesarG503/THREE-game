@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { FuegoItem } from "../items/FuegoItem";
 import { normalizeGravityOrientation } from "../utils/GravityOrientation";
+import { vehicleUp } from "../vehicles/VehicleGravity";
 
 export function setupDebugRender(this: any) {
 	this.debugMesh = new THREE.LineSegments(
@@ -68,11 +69,14 @@ function getEditableMapObjects(game: any, types: string[]) {
 }
 
 function updateMapImpulsePads(game: any) {
-	if (!game.character || !game.sceneManager?.scene) return;
+	if (!game.sceneManager?.scene) return;
 
-	const charPos = game.character.getPosition();
 	const now = game.clock ? game.clock.getElapsedTime() : performance.now() / 1000;
 	const pads = getEditableMapObjects(game, ["impulse_jump", "impulse_lateral"]);
+	if (!pads.length) return;
+
+	const mountedBike = game.vehicleSystem?.mounted;
+	const character = game.character;
 
 	pads.forEach((pad: any) => {
 		if (!pad.userData.logicProperties) pad.userData.logicProperties = {};
@@ -80,48 +84,134 @@ function updateMapImpulsePads(game: any) {
 		if (!pad.userData.runtimeState) pad.userData.runtimeState = {};
 		const state = pad.userData.runtimeState;
 		const dims = pad.userData.originalScale || { x: 3, y: 0.2, z: 3 };
-		const localPos = pad.worldToLocal(charPos.clone());
-
-		const inZone =
-			Math.abs(localPos.x) < dims.x / 2 &&
-			Math.abs(localPos.z) < dims.z / 2 &&
-			localPos.y >= -dims.y / 2 - 0.15 &&
-			localPos.y < dims.y / 2 + 0.75;
-
-		if (!inZone) {
-			state.wasInZone = false;
-			return;
-		}
-
 		const cooldown = Math.max(0, Number(props.cooldown ?? 0.25));
-		const canTrigger = !state.wasInZone && (!state.lastImpulseTime || now - state.lastImpulseTime >= cooldown);
-		if (!canTrigger) return;
 
-		const strength = Number(props.strength ?? (pad.userData.mapObjectType === "impulse_jump" ? 25 : 40));
-		let direction: THREE.Vector3;
+		// 1. Mounted vehicle driven by player
+		if (mountedBike && mountedBike.parent) {
+			const localPos = pad.worldToLocal(mountedBike.position.clone());
+			const inZoneBike =
+				Math.abs(localPos.x) < dims.x / 2 + 0.4 &&
+				Math.abs(localPos.z) < dims.z / 2 + 0.8 &&
+				localPos.y >= -dims.y / 2 - 0.25 &&
+				localPos.y < dims.y / 2 + 1.4;
 
-		const charUp = (typeof game.character.getGravityUpVector === "function") 
-			? game.character.getGravityUpVector() 
-			: new THREE.Vector3(0, 1, 0);
+			if (inZoneBike) {
+				const canTrigger = !state.wasInZoneBike && (!state.lastBikeImpulseTime || now - state.lastBikeImpulseTime >= cooldown);
+				if (canTrigger) {
+					const strength = Number(props.strength ?? (pad.userData.mapObjectType === "impulse_jump" ? 25 : 40));
+					const bikeUp = vehicleUp(mountedBike);
+					let direction: THREE.Vector3;
 
-		if (pad.userData.mapObjectType === "impulse_jump") {
-			direction = charUp.clone();
-		} else {
-			const padForward = new THREE.Vector3(0, 0, -1).applyQuaternion(pad.quaternion);
-			direction = padForward.clone().projectOnPlane(charUp);
-			if (direction.lengthSq() < 0.001) {
-				const padRight = new THREE.Vector3(1, 0, 0).applyQuaternion(pad.quaternion);
-				direction = padRight.projectOnPlane(charUp);
-				if (direction.lengthSq() < 0.001) {
-					direction.set(0, 0, -1).projectOnPlane(charUp);
+					if (pad.userData.mapObjectType === "impulse_jump") {
+						const padUp = new THREE.Vector3(0, 1, 0).applyQuaternion(pad.quaternion);
+						direction = padUp.dot(bikeUp) > 0.3 ? padUp.normalize() : bikeUp.clone();
+					} else {
+						const padForward = new THREE.Vector3(0, 0, -1).applyQuaternion(pad.quaternion);
+						direction = padForward.clone().projectOnPlane(bikeUp);
+						if (direction.lengthSq() < 0.001) {
+							const padRight = new THREE.Vector3(1, 0, 0).applyQuaternion(pad.quaternion);
+							direction = padRight.projectOnPlane(bikeUp);
+							if (direction.lengthSq() < 0.001) {
+								direction.set(0, 0, -1).projectOnPlane(bikeUp);
+							}
+						}
+						direction.normalize();
+					}
+
+					game.vehicleSystem.applyImpulse(mountedBike, direction.multiplyScalar(strength));
+					state.wasInZoneBike = true;
+					state.lastBikeImpulseTime = now;
 				}
+			} else {
+				state.wasInZoneBike = false;
 			}
-			direction.normalize();
 		}
 
-		game.character.applyImpulse(direction.multiplyScalar(strength));
-		state.wasInZone = true;
-		state.lastImpulseTime = now;
+		// 2. Coasting / unmounted bikes
+		if (game.vehicleSystem?.coasting) {
+			for (const [bike] of game.vehicleSystem.coasting) {
+				if (bike === mountedBike || !bike.parent) continue;
+				const localPos = pad.worldToLocal(bike.position.clone());
+				const inZoneBike =
+					Math.abs(localPos.x) < dims.x / 2 + 0.4 &&
+					Math.abs(localPos.z) < dims.z / 2 + 0.8 &&
+					localPos.y >= -dims.y / 2 - 0.25 &&
+					localPos.y < dims.y / 2 + 1.4;
+
+				if (!pad.userData.coastingState) pad.userData.coastingState = new WeakMap();
+				const cMap = pad.userData.coastingState;
+				const cState = cMap.get(bike) || { wasInZone: false, lastTime: 0 };
+
+				if (inZoneBike) {
+					if (!cState.wasInZone && now - cState.lastTime >= cooldown) {
+						const strength = Number(props.strength ?? (pad.userData.mapObjectType === "impulse_jump" ? 25 : 40));
+						const bikeUp = vehicleUp(bike);
+						let direction: THREE.Vector3;
+						if (pad.userData.mapObjectType === "impulse_jump") {
+							const padUp = new THREE.Vector3(0, 1, 0).applyQuaternion(pad.quaternion);
+							direction = padUp.dot(bikeUp) > 0.3 ? padUp.normalize() : bikeUp.clone();
+						} else {
+							const padForward = new THREE.Vector3(0, 0, -1).applyQuaternion(pad.quaternion);
+							direction = padForward.clone().projectOnPlane(bikeUp);
+							if (direction.lengthSq() < 0.001) direction.set(0, 0, -1).projectOnPlane(bikeUp);
+							direction.normalize();
+						}
+						game.vehicleSystem.applyImpulse(bike, direction.multiplyScalar(strength));
+						cState.wasInZone = true;
+						cState.lastTime = now;
+					}
+				} else {
+					cState.wasInZone = false;
+				}
+				cMap.set(bike, cState);
+			}
+		}
+
+		// 3. Player character on foot (only if not mounted)
+		if (!mountedBike && character && typeof character.getPosition === "function") {
+			const charPos = character.getPosition();
+			const localPos = pad.worldToLocal(charPos.clone());
+
+			const inZone =
+				Math.abs(localPos.x) < dims.x / 2 &&
+				Math.abs(localPos.z) < dims.z / 2 &&
+				localPos.y >= -dims.y / 2 - 0.15 &&
+				localPos.y < dims.y / 2 + 0.75;
+
+			if (!inZone) {
+				state.wasInZone = false;
+				return;
+			}
+
+			const canTrigger = !state.wasInZone && (!state.lastImpulseTime || now - state.lastImpulseTime >= cooldown);
+			if (!canTrigger) return;
+
+			const strength = Number(props.strength ?? (pad.userData.mapObjectType === "impulse_jump" ? 25 : 40));
+			let direction: THREE.Vector3;
+
+			const charUp = (typeof character.getGravityUpVector === "function") 
+				? character.getGravityUpVector() 
+				: new THREE.Vector3(0, 1, 0);
+
+			if (pad.userData.mapObjectType === "impulse_jump") {
+				direction = charUp.clone();
+			} else {
+				const padForward = new THREE.Vector3(0, 0, -1).applyQuaternion(pad.quaternion);
+				direction = padForward.clone().projectOnPlane(charUp);
+				if (direction.lengthSq() < 0.001) {
+					const padRight = new THREE.Vector3(1, 0, 0).applyQuaternion(pad.quaternion);
+					direction = padRight.projectOnPlane(charUp);
+					if (direction.lengthSq() < 0.001) {
+						direction.set(0, 0, -1).projectOnPlane(charUp);
+					}
+				}
+				direction.normalize();
+			}
+
+			character.applyImpulse(direction.multiplyScalar(strength));
+			state.wasInZone = true;
+			state.lastImpulseTime = now;
+		}
 	});
 }
 
@@ -542,7 +632,7 @@ export function animate(this: any) {
 	if (this.npc) this.npc.update(dt);
 
 	if (this.platforms) {
-		this.platforms.forEach((p: any) => p.update(this.character));
+		this.platforms.forEach((p: any) => p.update(this.character, this.vehicleSystem));
 	}
 
 	if (this.farmingZones) {

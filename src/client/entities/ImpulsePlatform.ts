@@ -16,6 +16,7 @@ export class ImpulsePlatform {
     collider: any;
     mesh: any;
     wasInZone: boolean;
+    wasInZoneBike: boolean;
 
     constructor(scene: any, world: any, position: any, direction: any, strength: number, type: string = "pad") {
         this.scene = scene;
@@ -32,6 +33,7 @@ export class ImpulsePlatform {
         this.collider = null;
         this.mesh = null;
         this.wasInZone = false;
+        this.wasInZoneBike = false;
         this.initPhysics();
         this.initVisuals();
     }
@@ -103,13 +105,46 @@ export class ImpulsePlatform {
         this.mesh.add(arrowMesh);
     }
 
-    update(character: any) {
-        if (!character || !character.rigidBody || !this.collider) return;
-
-        const charPos = character.getPosition();
+    update(character: any, vehicleSystem?: any) {
+        if (!this.collider) return;
 
         const halfW = this.width / 2;
         const halfD = this.depth / 2;
+
+        // 1. Vehicle impulse check (mounted player driving vehicle)
+        if (vehicleSystem?.mounted && vehicleSystem.mounted.parent) {
+            const bike = vehicleSystem.mounted;
+            const bikePos = bike.position;
+            let inZoneBike = false;
+            if (this.mesh) {
+                const local = this.mesh.worldToLocal(bikePos.clone());
+                inZoneBike = Math.abs(local.x) < halfW + 0.4 &&
+                             Math.abs(local.z) < halfD + 0.8 &&
+                             local.y >= -this.height / 2 - 0.25 &&
+                             local.y < this.height / 2 + 1.4;
+            } else {
+                const bdx = Math.abs(bikePos.x - this.position.x);
+                const bdz = Math.abs(bikePos.z - this.position.z);
+                const bdy = bikePos.y - this.position.y;
+                inZoneBike = bdx < halfW + 0.4 && bdz < halfD + 0.8 && bdy >= -0.25 && bdy < 1.4;
+            }
+
+            if (inZoneBike) {
+                if (!this.wasInZoneBike) {
+                    const force = this.direction.clone().multiplyScalar(this.strength);
+                    vehicleSystem.applyImpulse(bike, force);
+                    this.wasInZoneBike = true;
+                }
+            } else {
+                this.wasInZoneBike = false;
+            }
+            return;
+        }
+
+        // 2. Character on foot impulse check
+        if (!character || !character.rigidBody || !character.getPosition) return;
+
+        const charPos = character.getPosition();
 
         const dx = Math.abs(charPos.x - this.position.x);
         const dz = Math.abs(charPos.z - this.position.z);

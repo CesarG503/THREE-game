@@ -13,6 +13,8 @@ import { advanceVehicleGravity, beginVehicleGravity, vehicleGravity, vehicleHead
 import { getGravityQuaternion } from '../utils/GravityOrientation';
 import { TireTrackManager } from './TireTrackManager';
 
+const FORWARD = new THREE.Vector3(0, 0, -1);
+
 /** Heading around the current gravity axis, without Euler angle folding. */
 export function getMotorbikeHeading(bike: THREE.Object3D): number {
   return vehicleHeading(bike);
@@ -356,7 +358,8 @@ export class VehicleSystem {
     const brakeRate = Math.max(3, props.braking * (drift ? props.driftBrakeMultiplier : 1));
     const acceleration = props.acceleration + (jetpackActive ? props.jetpackAccelerationBonus : 0);
     const rate = brake || (driveThrottle !== 0 && Math.sign(this.speed) !== Math.sign(driveThrottle) && Math.abs(this.speed) > 0.1) ? brakeRate : powered ? acceleration : 3;
-    if (this.grounded) this.speed += Math.sign(targetSpeed - this.speed) * Math.min(Math.abs(targetSpeed - this.speed), rate * dt);
+    const effectiveRate = Math.abs(this.speed) > maxForwardSpeed ? Math.max(rate, 9) : rate;
+    if (this.grounded) this.speed += Math.sign(targetSpeed - this.speed) * Math.min(Math.abs(targetSpeed - this.speed), effectiveRate * dt);
     if (jetpackActive) this.consumeVehicleJetpack(jetpack, dt);
     else if (powered) consumeFuel(bike.userData.logicProperties, dt, props.fuelConsumption);
     const steeringTarget = this.paused ? 0 : Number(keys.left) - Number(keys.right);
@@ -626,6 +629,64 @@ export class VehicleSystem {
           this.game.networkManager.sendPlayerAction('motorbikePark', this.networkStateFor(bike, 0, 0, 0, 0));
         }
       }
+    }
+  }
+
+  applyImpulse(bike: MotorbikeVisual, force: THREE.Vector3) {
+    if (!bike || !bike.parent) return;
+    this.physics.applyImpulse(bike, force);
+
+    const gravityUp = vehicleUp(bike);
+    const vertForce = force.dot(gravityUp);
+    const forward = FORWARD.clone().applyQuaternion(bike.quaternion).projectOnPlane(gravityUp).normalize();
+    const forwardPush = force.dot(forward);
+
+    if (bike === this.mounted) {
+      if (vertForce > 0.1) {
+        this.verticalSpeed = Math.max(this.verticalSpeed + vertForce, vertForce);
+        this.grounded = false;
+        this.jumpCooldown = 0.35;
+      }
+      if (Math.abs(forwardPush) > 0.1) {
+        if (forwardPush > 0) {
+          this.speed = Math.max(this.speed + forwardPush * 0.75, forwardPush);
+        } else {
+          this.speed = Math.min(this.speed + forwardPush * 0.75, forwardPush);
+        }
+      }
+      const lateralPlanar = force.clone().projectOnPlane(gravityUp);
+      if (lateralPlanar.lengthSq() > 1) {
+        const padDir = lateralPlanar.normalize();
+        if (padDir.dot(forward) > 0.25) {
+          const right = new THREE.Vector3().crossVectors(padDir, gravityUp).normalize();
+          const targetRot = new THREE.Quaternion().setFromRotationMatrix(
+            new THREE.Matrix4().makeBasis(right, gravityUp, padDir.clone().negate())
+          );
+          bike.quaternion.rotateTowards(targetRot, 0.2);
+        }
+      }
+      if (this.game.networkManager?.isConnected) {
+        this.game.networkManager.sendPlayerAction('motorbike', this.getNetworkState());
+      }
+      return;
+    }
+
+    const cState = this.coasting.get(bike);
+    if (cState) {
+      if (vertForce > 0.1) cState.verticalSpeed = Math.max(cState.verticalSpeed + vertForce, vertForce);
+      if (forwardPush > 0) cState.speed = Math.max(cState.speed + forwardPush * 0.75, forwardPush);
+      else cState.speed += forwardPush;
+      return;
+    }
+
+    const initSpeed = forwardPush > 0 ? forwardPush : 0;
+    const initVert = vertForce > 0.1 ? vertForce : 0;
+    if (initSpeed > 0.1 || initVert > 0.1) {
+      const body: RAPIER.RigidBody = bike.userData.rigidBody;
+      if (body?.isValid() && body.bodyType() === RAPIER.RigidBodyType.Fixed) {
+        body.setBodyType(RAPIER.RigidBodyType.KinematicPositionBased, true);
+      }
+      this.startCoasting(bike, initSpeed, initVert, true);
     }
   }
 

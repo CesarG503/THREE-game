@@ -50,6 +50,30 @@ export class MotorbikePhysics {
   velocity(bike: THREE.Object3D) { return this.states.get(bike)?.velocity.clone(); }
   surfaceSupported(bike: THREE.Object3D) { return this.states.get(bike)?.surfaceSupported === true; }
   reset(bike: THREE.Object3D, velocity?: number[]) { this.states.delete(bike); if (velocity) this.initialVelocities.set(bike, new THREE.Vector3().fromArray(velocity)); }
+  applyImpulse(bike: THREE.Object3D, force: THREE.Vector3) {
+    let state = this.states.get(bike);
+    const gravityUp = vehicleUp(bike);
+    if (!state) {
+      const initial = this.initialVelocities.get(bike) ?? new THREE.Vector3();
+      initial.add(force);
+      this.initialVelocities.set(bike, initial);
+      return;
+    }
+    const vert = force.dot(gravityUp);
+    if (vert > 0.1) {
+      state.jumpTime = 0.35;
+      state.grounded = false;
+      state.surfaceSupported = false;
+      const currentVert = state.velocity.dot(gravityUp);
+      if (currentVert < vert) {
+        state.velocity.addScaledVector(gravityUp, vert - currentVert);
+      } else {
+        state.velocity.addScaledVector(gravityUp, vert * 0.5);
+      }
+    }
+    const planar = force.clone().projectOnPlane(gravityUp);
+    state.velocity.add(planar);
+  }
   dispose() { this.world.removeCharacterController(this.controller); }
 
   /** Recover around the contact footprint, checking clearance before moving.

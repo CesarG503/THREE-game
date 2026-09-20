@@ -11,6 +11,7 @@ import { listAssets, uploadAsset } from "../platform/api"
 import { applyMapObjectTexture, normalizeTextureSettings } from "../utils/TextureMapping"
 import { createCurvedGeometry, normalizeCurvature, patchCurvature, resolveCurvature, supportsCurvature, curveAngleRange } from "../utils/CurvatureUtils"
 import { TransformGizmo } from "../editor/TransformGizmo"
+import { updateImpulsePadVisuals } from "../fx/NeonImpulseVisual"
 
 export class ObjectInspector {
     constructor(gameInstance) {
@@ -1325,6 +1326,7 @@ export class ObjectInspector {
             object.userData.mapObjectType === 'camera_panel' ||
             object.userData.mapObjectType === 'impulse_jump' ||
             object.userData.mapObjectType === 'impulse_lateral' ||
+            object.userData.mapObjectType === 'impulse_neon' ||
             object.userData.mapObjectType === 'gravity_pad' ||
             object.userData.mapObjectType === 'fuel_zone' ||
             object.userData.mapObjectType === 'farming_zone'
@@ -2281,6 +2283,11 @@ export class ObjectInspector {
 
         if (this.selectedObject.userData.texturePath && !curvedGeometry) {
             this.reapplySelectedTexture()
+        }
+        if (this.selectedObject.userData.mapObjectType === "impulse_neon") {
+            this.selectedObject.userData.neonVisual?.update(dims);
+        } else if (this.selectedObject.userData.mapObjectType === "impulse_jump" || this.selectedObject.userData.mapObjectType === "impulse_lateral") {
+            updateImpulsePadVisuals(this.selectedObject, dims);
         }
         this.selectedObject.fuelZoneVisual?.update(0, [])
         this.syncCurvatureInputs()

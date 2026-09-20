@@ -543,6 +543,7 @@ export class CameraController {
           "gravity_sphere",
           "impulse_jump",
           "impulse_lateral",
+          "impulse_neon",
           "gravity_pad",
           "farming_zone",
           "fuel_zone",

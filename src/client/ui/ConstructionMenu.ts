@@ -428,7 +428,7 @@ export class ConstructionMenu {
             "impulse_jump",
             "",
             0x00FFFF,
-            { x: 3, y: 0.2, z: 3 }
+            { x: 3, y: 0.10, z: 3 }
         );
         impulseJump.logicProperties = {
             name: "Pad de Salto",
@@ -444,7 +444,7 @@ export class ConstructionMenu {
             "impulse_lateral",
             "",
             0x00FF00,
-            { x: 3, y: 0.2, z: 3 }
+            { x: 3, y: 0.10, z: 3 }
         );
         impulseLateral.logicProperties = {
             name: "Pad de Empuje",
@@ -453,6 +453,22 @@ export class ConstructionMenu {
             padKind: "lateral"
         };
         this.logicItems.push(impulseLateral);
+
+        const impulseNeon = new MapObjectItem(
+            "impulse_neon",
+            "Pad Neón de Impulso",
+            "impulse_neon",
+            "",
+            0x242830,
+            { x: 3, y: 0.10, z: 4.5 }
+        );
+        impulseNeon.logicProperties = {
+            name: "Pad Neón de Impulso",
+            strength: 40,
+            cooldown: 0.25,
+            padKind: "lateral"
+        };
+        this.logicItems.push(impulseNeon);
 
         const gravityPad = new MapObjectItem(
             "gravity_pad",
@@ -4487,7 +4503,7 @@ export class ConstructionMenu {
             },
             {
                 title: "Pads y Zonas",
-                types: ["impulse_jump", "impulse_lateral", "gravity_pad", "fuel_zone", "farming_zone"]
+                types: ["impulse_jump", "impulse_lateral", "impulse_neon", "gravity_pad", "fuel_zone", "farming_zone"]
             }
         ];
 
@@ -6501,7 +6517,7 @@ export class ConstructionMenu {
     updateLogicControls(baseItem) {
         this.editorLogicControlsContainer.innerHTML = "";
 
-        const logicTypes = ["spawn_point", "movement_controller", "interaction_button", "interactive_collision", "target", "impulse_jump", "impulse_lateral", "gravity_pad", "fuel_zone", "farming_zone", "gravity_sphere", "logic_camera", "camera_panel", "damage_controller", "logic_light"];
+        const logicTypes = ["spawn_point", "movement_controller", "interaction_button", "interactive_collision", "target", "impulse_jump", "impulse_lateral", "impulse_neon", "gravity_pad", "fuel_zone", "farming_zone", "gravity_sphere", "logic_camera", "camera_panel", "damage_controller", "logic_light"];
         if (!logicTypes.includes(baseItem.type) && !baseItem.logicProperties) {
             this.editorLogicControlsContainer.style.display = "none";
             return;
@@ -6597,11 +6613,16 @@ export class ConstructionMenu {
         } else if (type === "target") {
             this.createLogicDraftInput(this.editorLogicControlsContainer, "Anillos:", "rings", "number", 3);
             this.createLogicDraftInput(this.editorLogicControlsContainer, "Daño Base:", "baseDamage", "number", 10);
-        } else if (type === "impulse_jump" || type === "impulse_lateral") {
+        } else if (type === "impulse_jump" || type === "impulse_lateral" || type === "impulse_neon") {
             const isJump = type === "impulse_jump";
-            this.createLogicDraftInput(this.editorLogicControlsContainer, "Nombre:", "name", "text", isJump ? "Pad de Salto" : "Pad de Empuje");
+            const isNeon = type === "impulse_neon";
+            const defaultName = isNeon ? "Pad Neón de Impulso" : isJump ? "Pad de Salto" : "Pad de Empuje";
+            this.createLogicDraftInput(this.editorLogicControlsContainer, "Nombre:", "name", "text", defaultName);
             this.createLogicDraftInput(this.editorLogicControlsContainer, "Fuerza:", "strength", "number", isJump ? 25 : 40);
             this.createLogicDraftInput(this.editorLogicControlsContainer, "Recarga (s):", "cooldown", "number", 0.25);
+            if (!isNeon) {
+                this.createLogicDraftInput(this.editorLogicControlsContainer, "Mostrar Flecha:", "showImage", "boolean", true);
+            }
         } else if (type === "gravity_pad") {
             this.createLogicDraftInput(this.editorLogicControlsContainer, "Nombre:", "name", "text", "Pad de Gravedad");
             this.createLogicDraftSelect(this.editorLogicControlsContainer, "Orientación:", "gravityOrientation", GRAVITY_ORIENTATION_OPTIONS, "up");
@@ -7134,7 +7155,7 @@ export class ConstructionMenu {
             // Determine primary logic category
             if (obj.userData.mapObjectType === "spawn_point") {
                 type = "spawn_point";
-            } else if (["impulse_jump", "impulse_lateral", "gravity_pad", "fuel_zone", "farming_zone", "gravity_sphere"].includes(obj.userData.mapObjectType)) {
+            } else if (["impulse_jump", "impulse_lateral", "impulse_neon", "gravity_pad", "fuel_zone", "farming_zone", "gravity_sphere"].includes(obj.userData.mapObjectType)) {
                 type = "interactive_zones";
             } else if (
                 obj.userData.logicProperties &&

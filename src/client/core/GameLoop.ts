@@ -72,7 +72,7 @@ function updateMapImpulsePads(game: any) {
 	if (!game.sceneManager?.scene) return;
 
 	const now = game.clock ? game.clock.getElapsedTime() : performance.now() / 1000;
-	const pads = getEditableMapObjects(game, ["impulse_jump", "impulse_lateral"]);
+	const pads = getEditableMapObjects(game, ["impulse_jump", "impulse_lateral", "impulse_neon"]);
 	if (!pads.length) return;
 
 	const mountedBike = game.vehicleSystem?.mounted;
@@ -83,7 +83,7 @@ function updateMapImpulsePads(game: any) {
 		const props = pad.userData.logicProperties;
 		if (!pad.userData.runtimeState) pad.userData.runtimeState = {};
 		const state = pad.userData.runtimeState;
-		const dims = pad.userData.originalScale || { x: 3, y: 0.2, z: 3 };
+		const dims = pad.userData.originalScale || { x: 3, y: 0.10, z: 3 };
 		const cooldown = Math.max(0, Number(props.cooldown ?? 0.25));
 
 		// 1. Mounted vehicle driven by player

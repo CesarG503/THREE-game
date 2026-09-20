@@ -12,6 +12,8 @@ import { PlayerConfigManager } from "./PlayerConfigManager";
 import { getActiveFarmingGroups } from "../ui/GameHUD";
 import { WaypointTransformGizmo } from "../editor/WaypointTransformGizmo";
 import { GRAVITY_ORIENTATION_OPTIONS, normalizeGravityOrientation } from "../utils/GravityOrientation";
+import { listAssets } from "../platform/api";
+import { updateImpulsePadVisuals } from "../fx/NeonImpulseVisual";
 import {
 	applyAnimatedObjectScale,
 	createMovementWaypointFromTransform,
@@ -739,7 +741,7 @@ export class LogicSystem {
 					const isTarget = child.userData.mapObjectType === "target";
 					const isLogicCamera = child.userData.mapObjectType === "logic_camera";
 					const isCameraPanel = child.userData.mapObjectType === "camera_panel";
-					const isInteractiveZone = ["impulse_jump", "impulse_lateral", "gravity_pad", "fuel_zone", "farming_zone", "gravity_sphere"].includes(child.userData.mapObjectType);
+					const isInteractiveZone = ["impulse_jump", "impulse_lateral", "impulse_neon", "gravity_pad", "fuel_zone", "farming_zone", "gravity_sphere"].includes(child.userData.mapObjectType);
 					const hasWaypoints = this.hasMovementLogic(child);
 					const isDamageController = child.userData.mapObjectType === "damage_controller";
 					const hasDamage = child.userData.logicProperties?.enableDamage === true;
@@ -877,7 +879,7 @@ export class LogicSystem {
 				this.renderCameraPanelUI(container, object, props);
 			}
 
-			if (object.userData.mapObjectType === "impulse_jump" || object.userData.mapObjectType === "impulse_lateral") {
+			if (object.userData.mapObjectType === "impulse_jump" || object.userData.mapObjectType === "impulse_lateral" || object.userData.mapObjectType === "impulse_neon") {
 				this.renderImpulsePadUI(container, object, props);
 			}
 
@@ -1016,18 +1018,151 @@ export class LogicSystem {
 		}
 
 	renderImpulsePadUI(container: HTMLElement, object: any, props: any) {
+		const type = object.userData.mapObjectType;
+		const isNeon = type === "impulse_neon";
+		const isJump = type === "impulse_jump";
+
 		if (props.name === undefined) {
-			props.name = object.userData.mapObjectType === "impulse_jump" ? "Pad de Salto" : "Pad de Empuje";
+			props.name = isNeon ? "Pad Neón de Impulso" : isJump ? "Pad de Salto" : "Pad de Empuje";
 		}
 		if (props.strength === undefined) {
-			props.strength = object.userData.mapObjectType === "impulse_jump" ? 25 : 40;
+			props.strength = isJump ? 25 : 40;
 		}
 		if (props.cooldown === undefined) props.cooldown = 0.25;
-		props.padKind = object.userData.mapObjectType === "impulse_jump" ? "jump" : "lateral";
+		props.padKind = isJump ? "jump" : "lateral";
 
 		this.createInput(container, object, "name", props.name, "text", "Nombre");
 		this.createInput(container, object, "strength", props.strength, "number", "Fuerza");
 		this.createInput(container, object, "cooldown", props.cooldown, "number", "Cooldown (s)");
+
+		if (isNeon) {
+			const info = document.createElement("div");
+			info.style.cssText = "font-size:11px; color:#ffaa00; margin-top:8px; line-height:1.35; padding: 6px; background: rgba(255, 170, 0, 0.1); border-radius: 4px; border: 1px solid rgba(255, 170, 0, 0.25);";
+			info.textContent = "⚡ Visual Neón Experimental: Degradado dinámico de amarillo a rojo, fondo animado en dos colores y flechas continuas en movimiento hacia adelante. Al estirar el pad, las flechas se adaptan proceduralmente.";
+			container.appendChild(info);
+		} else {
+			// Section for image customization (quitar imagen o usar galería)
+			if (props.showImage === undefined) props.showImage = true;
+
+			const imgSection = document.createElement("div");
+			imgSection.style.cssText = "margin-top: 12px; padding-top: 10px; border-top: 1px solid #333; display: flex; flex-direction: column; gap: 6px;";
+
+			// Checkbox: Mostrar Imagen / Flecha
+			const checkRow = document.createElement("label");
+			checkRow.style.cssText = "display: flex; align-items: center; justify-content: space-between; cursor: pointer; color: #ddd; font-size: 13px;";
+			const checkText = document.createElement("span");
+			checkText.textContent = "Mostrar Imagen / Flecha";
+			const checkbox = document.createElement("input");
+			checkbox.type = "checkbox";
+			checkbox.checked = props.showImage !== false;
+			checkRow.appendChild(checkText);
+			checkRow.appendChild(checkbox);
+			imgSection.appendChild(checkRow);
+
+			// Container for image source selector (visible only when showImage is checked)
+			const sourceContainer = document.createElement("div");
+			sourceContainer.style.cssText = checkbox.checked ? "display: flex; flex-direction: column; gap: 6px; margin-top: 4px;" : "display: none;";
+
+			const defaultTexturePath = isJump ? "/assets/textures/salto.png" : "/assets/textures/impulso.png";
+
+			const sourceLabel = document.createElement("span");
+			sourceLabel.textContent = "Imagen / Textura:";
+			sourceLabel.style.cssText = "color: #aaa; font-size: 12px;";
+			sourceContainer.appendChild(sourceLabel);
+
+			const select = document.createElement("select");
+			select.style.cssText = "background: #111; border: 1px solid #444; color: white; padding: 5px; border-radius: 4px; width: 100%; cursor: pointer;";
+
+			const optDefault = document.createElement("option");
+			optDefault.value = "default";
+			optDefault.textContent = `Predeterminada (${isJump ? "Salto" : "Impulso"})`;
+			select.appendChild(optDefault);
+
+			const optCustom = document.createElement("option");
+			optCustom.value = "custom";
+			optCustom.textContent = "Galería / URL Personalizada...";
+			select.appendChild(optCustom);
+
+			const isCustom = Boolean(props.customImage && props.customImage !== defaultTexturePath);
+			select.value = isCustom ? "custom" : "default";
+			sourceContainer.appendChild(select);
+
+			// Custom input and gallery thumbnails container
+			const customContainer = document.createElement("div");
+			customContainer.style.cssText = isCustom ? "display: flex; flex-direction: column; gap: 6px;" : "display: none; flex-direction: column; gap: 6px;";
+
+			const customInput = document.createElement("input");
+			customInput.type = "text";
+			customInput.placeholder = "URL de imagen (PNG) o ruta...";
+			customInput.value = props.customImage || "";
+			customInput.style.cssText = "background: #111; border: 1px solid #444; color: white; padding: 5px; border-radius: 4px; width: 100%; box-sizing: border-box; font-size: 12px;";
+			customContainer.appendChild(customInput);
+
+			// Gallery grid container
+			const galleryGrid = document.createElement("div");
+			galleryGrid.style.cssText = "display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; max-height: 120px; overflow-y: auto; padding: 2px;";
+			customContainer.appendChild(galleryGrid);
+
+			// Load user textures from platform API
+			listAssets("mine", "TEXTURE")
+				.then((assets: any[]) => {
+					galleryGrid.innerHTML = "";
+					if (!assets || !assets.length) {
+						const noAssets = document.createElement("div");
+						noAssets.textContent = "Sin texturas en galería.";
+						noAssets.style.cssText = "grid-column: 1 / -1; color: #666; font-size: 11px; padding: 4px 0;";
+						galleryGrid.appendChild(noAssets);
+						return;
+					}
+					assets.forEach((asset: any) => {
+						const thumb = document.createElement("div");
+						thumb.title = asset.name || "Textura";
+						thumb.style.cssText = `aspect-ratio: 1; border: 1px solid ${props.customImage === asset.fileUrl ? '#ffaa00' : '#444'}; border-radius: 4px; background: url('${asset.fileUrl}') center/cover no-repeat; cursor: pointer;`;
+						thumb.onclick = () => {
+							props.customImage = asset.fileUrl;
+							customInput.value = asset.fileUrl;
+							updateImpulsePadVisuals(object);
+							this.broadcastObjectLogicUpdate(object);
+							this.renderImpulsePadUI(container, object, props);
+						};
+						galleryGrid.appendChild(thumb);
+					});
+				})
+				.catch(() => {
+					galleryGrid.innerHTML = "";
+				});
+
+			sourceContainer.appendChild(customContainer);
+			imgSection.appendChild(sourceContainer);
+			container.appendChild(imgSection);
+
+			// Event listeners
+			checkbox.onchange = () => {
+				props.showImage = checkbox.checked;
+				sourceContainer.style.display = checkbox.checked ? "flex" : "none";
+				updateImpulsePadVisuals(object);
+				this.broadcastObjectLogicUpdate(object);
+			};
+
+			select.onchange = () => {
+				if (select.value === "default") {
+					customContainer.style.display = "none";
+					props.customImage = null;
+				} else {
+					customContainer.style.display = "flex";
+					if (!props.customImage) props.customImage = customInput.value.trim() || "";
+				}
+				updateImpulsePadVisuals(object);
+				this.broadcastObjectLogicUpdate(object);
+			};
+
+			customInput.oninput = () => {
+				const val = customInput.value.trim();
+				props.customImage = val || null;
+				updateImpulsePadVisuals(object);
+				this.broadcastObjectLogicUpdate(object);
+			};
+		}
 
 		const hint = document.createElement("div");
 		hint.textContent = props.padKind === "lateral"
@@ -1868,6 +2003,7 @@ export class LogicSystem {
 			case "interactive_zones": return "Pads y Zonas";
 			case "impulse_jump": return "Pad de Salto";
 			case "impulse_lateral": return "Pad de Empuje";
+			case "impulse_neon": return "Pad Neón de Impulso";
 			case "gravity_pad": return "Pad de Gravedad";
 			case "fuel_zone": return "Zona de recarga de gasolina";
 			case "farming_zone": return "Zona de Farmeo";

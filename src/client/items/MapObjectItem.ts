@@ -14,6 +14,7 @@ import { applyMapObjectTexture, normalizeTextureSettings, type MapTextureSetting
 import type { ItemContext } from "../types";
 import { normalizeGravityOrientation } from "../utils/GravityOrientation";
 import { MapAssetManager } from "../map/MapAssetManager";
+import { NeonImpulseVisual, updateImpulsePadVisuals } from "../fx/NeonImpulseVisual";
 
 type MapObjectScale = {
   curvature?: CurvatureSettings;
@@ -84,6 +85,37 @@ export class MapObjectItem extends Item {
     }
     if (this.type === "impulse_lateral") {
       return "/assets/textures/impulso.png";
+    }
+    if (this.type === "impulse_neon") {
+      const canvas = document.createElement("canvas");
+      canvas.width = 64;
+      canvas.height = 64;
+      const ctx = canvas.getContext("2d");
+      if (ctx) {
+        ctx.fillStyle = "#1e2228";
+        ctx.fillRect(4, 4, 56, 56);
+        const grad = ctx.createLinearGradient(8, 0, 56, 0);
+        grad.addColorStop(0, "#ffe600");
+        grad.addColorStop(0.5, "#ff5500");
+        grad.addColorStop(1, "#ff0022");
+        ctx.fillStyle = grad;
+        ctx.fillRect(8, 8, 48, 48);
+        ctx.strokeStyle = "white";
+        ctx.lineWidth = 4;
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+        ctx.beginPath();
+        ctx.moveTo(18, 30);
+        ctx.lineTo(32, 18);
+        ctx.lineTo(46, 30);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(18, 46);
+        ctx.lineTo(32, 34);
+        ctx.lineTo(46, 46);
+        ctx.stroke();
+      }
+      return canvas.toDataURL();
     }
 
     const canvas = document.createElement("canvas");
@@ -1158,6 +1190,8 @@ export class MapObjectItem extends Item {
       collidersDesc.push(col);
     } else if (this.type === "impulse_jump" || this.type === "impulse_lateral") {
       const isJump = this.type === "impulse_jump";
+      const padHeight = this.scale.y !== undefined ? this.scale.y : 0.10;
+      this.scale.y = padHeight;
       const geometry = new THREE.BoxGeometry(this.scale.x, this.scale.y, this.scale.z);
       const defaultColor = isJump ? 0x00ffff : 0x00ff00;
       const padColor = this.color !== undefined ? this.color : defaultColor;
@@ -1175,7 +1209,11 @@ export class MapObjectItem extends Item {
       object3D = new THREE.Mesh(geometry, material);
       object3D.receiveShadow = true;
 
-      const texturePath = isJump ? "/assets/textures/salto.png" : "/assets/textures/impulso.png";
+      const defaultTexture = isJump ? "/assets/textures/salto.png" : "/assets/textures/impulso.png";
+      const texturePath = (this.logicProperties && this.logicProperties.customImage)
+        ? this.logicProperties.customImage
+        : defaultTexture;
+
       const arrowGeometry = new THREE.PlaneGeometry(this.scale.x * 0.8, this.scale.z * 0.8);
       const arrowMaterial = new THREE.MeshBasicMaterial({
         transparent: true,
@@ -1189,9 +1227,15 @@ export class MapObjectItem extends Item {
         console.error("Failed to load pad texture:", texturePath, err);
       });
       const arrowMesh = new THREE.Mesh(arrowGeometry, arrowMaterial);
-      arrowMesh.position.y = this.scale.y / 2 + 0.01;
+      arrowMesh.name = "padArrowMesh";
+      arrowMesh.userData.isPadArrow = true;
+      arrowMesh.userData.currentLoadedTex = texturePath;
+      arrowMesh.position.y = this.scale.y / 2 + 0.005;
       arrowMesh.rotation.x = -Math.PI / 2;
       if (!isJump) arrowMesh.rotation.z = 0;
+      if (this.logicProperties && this.logicProperties.showImage === false) {
+        arrowMesh.visible = false;
+      }
       object3D.add(arrowMesh);
 
       const col = RAPIER.ColliderDesc.cuboid(this.scale.x / 2, this.scale.y / 2, this.scale.z / 2).setSensor(true);
@@ -1201,6 +1245,31 @@ export class MapObjectItem extends Item {
       if (this.logicProperties.strength === undefined) this.logicProperties.strength = isJump ? 25 : 40;
       if (this.logicProperties.cooldown === undefined) this.logicProperties.cooldown = 0.25;
       this.logicProperties.padKind = isJump ? "jump" : "lateral";
+      if (this.logicProperties.showImage === undefined) this.logicProperties.showImage = true;
+    } else if (this.type === "impulse_neon") {
+      const padHeight = this.scale.y !== undefined ? this.scale.y : 0.10;
+      this.scale.y = padHeight;
+      const geometry = new THREE.BoxGeometry(this.scale.x, this.scale.y, this.scale.z);
+      const frameColor = this.color !== undefined ? this.color : 0x242830;
+      const material = new THREE.MeshStandardMaterial({
+        color: frameColor,
+        roughness: 0.45,
+        metalness: 0.75
+      });
+
+      object3D = new THREE.Mesh(geometry, material);
+      object3D.receiveShadow = true;
+
+      new NeonImpulseVisual(object3D, this.scale);
+
+      const col = RAPIER.ColliderDesc.cuboid(this.scale.x / 2, this.scale.y / 2, this.scale.z / 2).setSensor(true);
+      collidersDesc.push(col);
+
+      if (!this.logicProperties) this.logicProperties = {};
+      if (this.logicProperties.strength === undefined) this.logicProperties.strength = 40;
+      if (this.logicProperties.cooldown === undefined) this.logicProperties.cooldown = 0.25;
+      this.logicProperties.padKind = "lateral";
+      if (!this.logicProperties.name) this.logicProperties.name = "Pad Neón de Impulso";
     } else if (this.type === "fuel_zone") {
       this.logicProperties = { ...this.logicProperties, ...normalizeFuelZone(this.logicProperties) };
       this.opacity ??= 0.14;
@@ -1609,7 +1678,7 @@ export class MapObjectItem extends Item {
     }
 
     object3D.position.copy(position);
-    const surfaceAlignedTypes = ["interaction_button", "target", "gravity_pad", "impulse_jump", "impulse_lateral", "farming_zone", "fuel_zone", "logic_camera", "camera_panel", "camera_prop", "cone", "spiked_floor"];
+    const surfaceAlignedTypes = ["interaction_button", "target", "gravity_pad", "impulse_jump", "impulse_lateral", "impulse_neon", "farming_zone", "fuel_zone", "logic_camera", "camera_panel", "camera_prop", "cone", "spiked_floor"];
     const isSurfaceAligned = surfaceAlignedTypes.includes(this.type);
     if (!isSurfaceAligned && this.type !== "motorbike" && this.type !== "spawn_point" && this.type !== "tube" && !isCenterPosition) {
       object3D.position.y += this.scale.y / 2;

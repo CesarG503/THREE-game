@@ -27,7 +27,7 @@ export class ImpulsePlatform {
         this.type = type;
 
         this.width = 3;
-        this.height = 0.2;
+        this.height = 0.10;
         this.depth = 3;
 
         this.collider = null;

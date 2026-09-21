@@ -466,7 +466,11 @@ export class ConstructionMenu {
             name: "Pad Neón de Impulso",
             strength: 40,
             cooldown: 0.25,
-            padKind: "lateral"
+            padKind: "lateral",
+            arrowColumnsMode: "auto",
+            arrowColumns: 2,
+            arrowSpanMode: "clamped",
+            ovalDensity: 14
         };
         this.logicItems.push(impulseNeon);
 
@@ -6620,7 +6624,22 @@ export class ConstructionMenu {
             this.createLogicDraftInput(this.editorLogicControlsContainer, "Nombre:", "name", "text", defaultName);
             this.createLogicDraftInput(this.editorLogicControlsContainer, "Fuerza:", "strength", "number", isJump ? 25 : 40);
             this.createLogicDraftInput(this.editorLogicControlsContainer, "Recarga (s):", "cooldown", "number", 0.25);
-            if (!isNeon) {
+            if (isNeon) {
+                const ARROW_DIST_OPTIONS = [
+                    { value: "auto", label: "Auto (según ancho)" },
+                    { value: "1", label: "1 Flecha (Centrada)" },
+                    { value: "2", label: "2 Flechas paralelas" },
+                    { value: "3", label: "3 Flechas paralelas" },
+                    { value: "4", label: "4 Flechas paralelas" }
+                ];
+                const ARROW_SPAN_OPTIONS = [
+                    { value: "clamped", label: "Proporcional Nítida" },
+                    { value: "full", label: "Expandir al carril" }
+                ];
+                this.createLogicDraftSelect(this.editorLogicControlsContainer, "Distribución Flechas:", "arrowColumnsMode", ARROW_DIST_OPTIONS, "auto");
+                this.createLogicDraftSelect(this.editorLogicControlsContainer, "Proporción Flecha:", "arrowSpanMode", ARROW_SPAN_OPTIONS, "clamped");
+                this.createLogicDraftInput(this.editorLogicControlsContainer, "Densidad Óvalos:", "ovalDensity", "number", 14);
+            } else {
                 this.createLogicDraftInput(this.editorLogicControlsContainer, "Mostrar Flecha:", "showImage", "boolean", true);
             }
         } else if (type === "gravity_pad") {

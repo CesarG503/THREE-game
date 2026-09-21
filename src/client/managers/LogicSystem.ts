@@ -1036,10 +1036,148 @@ export class LogicSystem {
 		this.createInput(container, object, "cooldown", props.cooldown, "number", "Cooldown (s)");
 
 		if (isNeon) {
+			if (props.arrowColumnsMode === undefined) props.arrowColumnsMode = "auto";
+			if (props.arrowColumns === undefined) props.arrowColumns = 2;
+			if (props.arrowSpanMode === undefined) props.arrowSpanMode = "clamped";
+			if (props.ovalDensity === undefined) props.ovalDensity = 14;
+
+			const neonSection = document.createElement("div");
+			neonSection.style.cssText = "margin-top: 12px; padding-top: 10px; border-top: 1px solid #333; display: flex; flex-direction: column; gap: 8px;";
+
+			const title = document.createElement("span");
+			title.textContent = "⚡ Configuración Visual Neón";
+			title.style.cssText = "color: #ffaa00; font-size: 12px; font-weight: bold;";
+			neonSection.appendChild(title);
+
+			// 1. Arrow distribution dropdown
+			const colRow = document.createElement("div");
+			colRow.style.cssText = "display: flex; flex-direction: column; gap: 4px;";
+			const colLabel = document.createElement("span");
+			colLabel.textContent = "Distribución de Flechas:";
+			colLabel.style.cssText = "color: #ccc; font-size: 12px;";
+			colRow.appendChild(colLabel);
+
+			const colSelect = document.createElement("select");
+			colSelect.style.cssText = "background: #111; border: 1px solid #444; color: white; padding: 5px; border-radius: 4px; width: 100%; cursor: pointer;";
+
+			const options = [
+				{ value: "auto", label: "Automático (según ancho)" },
+				{ value: "1", label: "1 Flecha (Mantener 1 sola flecha)" },
+				{ value: "2", label: "2 Flechas paralelas" },
+				{ value: "3", label: "3 Flechas paralelas" },
+				{ value: "4", label: "4 Flechas paralelas" },
+				{ value: "custom", label: "Personalizado..." }
+			];
+
+			options.forEach(opt => {
+				const o = document.createElement("option");
+				o.value = opt.value;
+				o.textContent = opt.label;
+				if (props.arrowColumnsMode === opt.value) o.selected = true;
+				colSelect.appendChild(o);
+			});
+			colRow.appendChild(colSelect);
+			neonSection.appendChild(colRow);
+
+			// 2. Custom number input (visible if custom)
+			const customRow = document.createElement("div");
+			customRow.style.cssText = props.arrowColumnsMode === "custom" 
+				? "display: flex; align-items: center; justify-content: space-between; gap: 8px;" 
+				: "display: none; align-items: center; justify-content: space-between; gap: 8px;";
+			const customLabel = document.createElement("span");
+			customLabel.textContent = "Cantidad de Flechas:";
+			customLabel.style.cssText = "color: #aaa; font-size: 12px;";
+			const customInput = document.createElement("input");
+			customInput.type = "number";
+			customInput.min = "1";
+			customInput.max = "12";
+			customInput.step = "1";
+			customInput.value = props.arrowColumns || 2;
+			customInput.style.cssText = "background: #111; border: 1px solid #444; color: white; padding: 4px; border-radius: 4px; width: 60px; text-align: right;";
+			customRow.appendChild(customLabel);
+			customRow.appendChild(customInput);
+			neonSection.appendChild(customRow);
+
+			// 3. Arrow Span Mode (Proporcional vs Expandir)
+			const spanRow = document.createElement("div");
+			spanRow.style.cssText = "display: flex; flex-direction: column; gap: 4px;";
+			const spanLabel = document.createElement("span");
+			spanLabel.textContent = "Proporción de Flecha:";
+			spanLabel.style.cssText = "color: #ccc; font-size: 12px;";
+			spanRow.appendChild(spanLabel);
+
+			const spanSelect = document.createElement("select");
+			spanSelect.style.cssText = "background: #111; border: 1px solid #444; color: white; padding: 5px; border-radius: 4px; width: 100%; cursor: pointer;";
+			const spanOpts = [
+				{ value: "clamped", label: "Proporcional Nítida (Recomendado)" },
+				{ value: "full", label: "Expandir a todo el carril" }
+			];
+			spanOpts.forEach(opt => {
+				const o = document.createElement("option");
+				o.value = opt.value;
+				o.textContent = opt.label;
+				if (props.arrowSpanMode === opt.value) o.selected = true;
+				spanSelect.appendChild(o);
+			});
+			spanRow.appendChild(spanSelect);
+			neonSection.appendChild(spanRow);
+
+			// 4. Oval Density input
+			const densRow = document.createElement("div");
+			densRow.style.cssText = "display: flex; align-items: center; justify-content: space-between; gap: 8px;";
+			const densLabel = document.createElement("span");
+			densLabel.textContent = "Densidad Óvalos Delgados:";
+			densLabel.style.cssText = "color: #ccc; font-size: 12px;";
+			const densInput = document.createElement("input");
+			densInput.type = "number";
+			densInput.min = "6";
+			densInput.max = "30";
+			densInput.step = "1";
+			densInput.value = props.ovalDensity || 14;
+			densInput.style.cssText = "background: #111; border: 1px solid #444; color: white; padding: 4px; border-radius: 4px; width: 60px; text-align: right;";
+			densRow.appendChild(densLabel);
+			densRow.appendChild(densInput);
+			neonSection.appendChild(densRow);
+
+			// Informative description
 			const info = document.createElement("div");
-			info.style.cssText = "font-size:11px; color:#ffaa00; margin-top:8px; line-height:1.35; padding: 6px; background: rgba(255, 170, 0, 0.1); border-radius: 4px; border: 1px solid rgba(255, 170, 0, 0.25);";
-			info.textContent = "⚡ Visual Neón Experimental: Degradado dinámico de amarillo a rojo, fondo animado en dos colores y flechas continuas en movimiento hacia adelante. Al estirar el pad, las flechas se adaptan proceduralmente.";
-			container.appendChild(info);
+			info.style.cssText = "font-size:11px; color:#ffaa00; line-height:1.35; padding: 6px; background: rgba(255, 170, 0, 0.1); border-radius: 4px; border: 1px solid rgba(255, 170, 0, 0.25);";
+			info.textContent = "Al ensanchar el pad se crean más óvalos delgados automáticamente sin formar círculos gruesos. Puedes configurar múltiples flechas o mantener 1 sola flecha centrada y nítida.";
+			neonSection.appendChild(info);
+
+			container.appendChild(neonSection);
+
+			// Listeners
+			colSelect.onchange = () => {
+				props.arrowColumnsMode = colSelect.value;
+				customRow.style.display = colSelect.value === "custom" ? "flex" : "none";
+				updateImpulsePadVisuals(object);
+				this.broadcastObjectLogicUpdate(object);
+			};
+
+			customInput.oninput = () => {
+				const val = parseInt(customInput.value, 10);
+				if (!isNaN(val) && val >= 1) {
+					props.arrowColumns = val;
+					updateImpulsePadVisuals(object);
+					this.broadcastObjectLogicUpdate(object);
+				}
+			};
+
+			spanSelect.onchange = () => {
+				props.arrowSpanMode = spanSelect.value;
+				updateImpulsePadVisuals(object);
+				this.broadcastObjectLogicUpdate(object);
+			};
+
+			densInput.oninput = () => {
+				const val = parseFloat(densInput.value);
+				if (!isNaN(val) && val >= 4) {
+					props.ovalDensity = val;
+					updateImpulsePadVisuals(object);
+					this.broadcastObjectLogicUpdate(object);
+				}
+			};
 		} else {
 			// Section for image customization (quitar imagen o usar galería)
 			if (props.showImage === undefined) props.showImage = true;

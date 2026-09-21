@@ -1270,6 +1270,10 @@ export class MapObjectItem extends Item {
       if (this.logicProperties.cooldown === undefined) this.logicProperties.cooldown = 0.25;
       this.logicProperties.padKind = "lateral";
       if (!this.logicProperties.name) this.logicProperties.name = "Pad Neón de Impulso";
+      if (this.logicProperties.arrowColumnsMode === undefined) this.logicProperties.arrowColumnsMode = "auto";
+      if (this.logicProperties.arrowColumns === undefined) this.logicProperties.arrowColumns = 2;
+      if (this.logicProperties.arrowSpanMode === undefined) this.logicProperties.arrowSpanMode = "clamped";
+      if (this.logicProperties.ovalDensity === undefined) this.logicProperties.ovalDensity = 14;
     } else if (this.type === "fuel_zone") {
       this.logicProperties = { ...this.logicProperties, ...normalizeFuelZone(this.logicProperties) };
       this.opacity ??= 0.14;

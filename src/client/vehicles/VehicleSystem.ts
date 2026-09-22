@@ -12,6 +12,7 @@ import type { MotorbikeVisual } from './MotorbikeModel';
 import { advanceVehicleGravity, beginVehicleGravity, vehicleGravity, vehicleHeading, vehicleUp, receiveVehicleGravity, syncVehicleGravity } from './VehicleGravity';
 import { getGravityQuaternion } from '../utils/GravityOrientation';
 import { TireTrackManager } from './TireTrackManager';
+import { SpeedLinesEffect } from './SpeedLinesEffect';
 
 const FORWARD = new THREE.Vector3(0, 0, -1);
 
@@ -53,9 +54,11 @@ export class VehicleSystem {
   private lastSeatSwitchTime = 0;
   private remoteMotionSamples = new WeakMap<MotorbikeVisual, { state: any; age: number }>();
   tireTracks: TireTrackManager;
+  speedLines: SpeedLinesEffect;
   isSkidding = false;
 
   constructor(private game: any) {
+    this.speedLines = new SpeedLinesEffect(game);
     this.damageEffects = new VehicleDamageEffects(game.sceneManager?.scene ?? game.scene ?? new THREE.Scene());
     this.durability = new VehicleDurability(game, bike => this.damageEffects.hit(bike));
     this.physics = new MotorbikePhysics(game.world);
@@ -253,6 +256,7 @@ export class VehicleSystem {
     if (!bike.userData.vehicleDriver) bike.animateMotorbike?.(0, 0, 0);
     this.endBikeTracks(bike);
     this.isSkidding = false;
+    this.speedLines.reset();
     this.mounted = null;
     this.game.hud?.updateVehicle?.(null);
     this.seat = null;
@@ -303,6 +307,7 @@ export class VehicleSystem {
     }
     this.updateCoasting(dt);
     if (!this.mounted) {
+      this.speedLines.update(dt, 0, null);
       this.game.hud?.updateVehicle?.(null);
       if (this.hud) this.hud.style.display = 'none';
       const nearby = this.nearest();
@@ -335,7 +340,9 @@ export class VehicleSystem {
       if (!hasRemoteDriver) {
         this.syncRider(dt);
       }
-      this.show(`Pasajero · ${Math.round(Math.abs(this.speed) * 3.6)} km/h\nArmas y construcción disponibles · R cambiar asiento · F bajar\nMayús + R recargar / rotar construcción`, props.consumableUse, props.maxConsumableUse);
+      const currentSpeedKmh = Math.abs(this.speed) * 3.6;
+      this.speedLines.update(dt, currentSpeedKmh, props);
+      this.show(`Pasajero · ${Math.round(currentSpeedKmh)} km/h\nArmas y construcción disponibles · R cambiar asiento · F bajar\nMayús + R recargar / rotar construcción`, props.consumableUse, props.maxConsumableUse);
       return true;
     }
     this.updateBikeGravity(bike, dt);
@@ -417,9 +424,11 @@ export class VehicleSystem {
       this.endBikeTracks(bike);
     }
     this.syncRider(dt);
+    const currentSpeedKmh = Math.abs(this.speed) * 3.6;
+    this.speedLines.update(dt, currentSpeedKmh, props);
     const fuel = bike.userData.logicProperties.consumableUse;
     const jetpackFuel = jetpackActive ? ` · Jetpack ${Math.ceil(jetpack.consumableUse)} / ${jetpack.maxConsumableUse}` : '';
-    this.show(`Conductor · ${Math.round(Math.abs(this.speed) * 3.6)} km/h · Combustible ${Math.ceil(fuel)} / ${props.maxConsumableUse}${jetpackFuel}${fuel <= 0 ? ' · SIN COMBUSTIBLE' : ''}\nW/S acelerar · A/D girar · Shift frenar/drift · Espacio saltar/jetpack · En el aire: W/S inclinar, A/D girar, ${props.landingAssistEnabled ? (props.landingAssistMode === 'inverted-detach' ? 'Shift para aterrizar tras soltarte de cabeza' : 'mantener Shift para aterrizar') : 'Shift+A/D rodar'} · R cambiar asiento · F bajar`, fuel, props.maxConsumableUse);
+    this.show(`Conductor · ${Math.round(currentSpeedKmh)} km/h · Combustible ${Math.ceil(fuel)} / ${props.maxConsumableUse}${jetpackFuel}${fuel <= 0 ? ' · SIN COMBUSTIBLE' : ''}\nW/S acelerar · A/D girar · Shift frenar/drift · Espacio saltar/jetpack · En el aire: W/S inclinar, A/D girar, ${props.landingAssistEnabled ? (props.landingAssistMode === 'inverted-detach' ? 'Shift para aterrizar tras soltarte de cabeza' : 'mantener Shift para aterrizar') : 'Shift+A/D rodar'} · R cambiar asiento · F bajar`, fuel, props.maxConsumableUse);
     return true;
   }
 
@@ -1021,6 +1030,7 @@ Durabilidad ${Math.ceil(props.durability)} / ${props.maxDurability}${isMotorbike
   }
   dispose() {
     this.dismount(true);
+    this.speedLines.dispose();
     this.tireTracks.dispose();
     this.damageEffects.dispose();
     this.fall.reset(this.game.character);

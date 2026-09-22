@@ -8,7 +8,7 @@ export const MOTORBIKE_FIELDS = [
   { key: 'durability', label: 'Durabilidad disponible', value: 100, min: 0, max: 100000, step: 1 },
   { key: 'crashDamagePercent', label: 'Daño por caída (% de durabilidad máxima)', value: 10, min: 0, max: 100, step: 1 },
   { key: 'crashDamageFixed', label: 'Daño por caída (cantidad fija)', value: 10, min: 0, max: 100000, step: 1 },
-  { key: 'maxSpeed', label: 'Velocidad máxima (m/s)', value: 22, min: 1, max: 60, step: 1 },
+  { key: 'maxSpeed', label: 'Velocidad máxima (m/s)', value: 22, min: 1, max: 120, step: 1 },
   { key: 'reverseSpeed', label: 'Velocidad en reversa (m/s)', value: 5, min: 0, max: 15, step: 0.5 },
   { key: 'acceleration', label: 'Aceleración (m/s²)', value: 9, min: 0.1, max: 40, step: 0.5 },
   { key: 'braking', label: 'Frenado (m/s²)', value: 18, min: 1, max: 60, step: 1 },
@@ -33,12 +33,29 @@ export const MOTORBIKE_FIELDS = [
   { key: 'holdTime', label: 'Tiempo manteniendo F para subir (s)', value: 0, min: 0, max: 10, step: 0.1 },
   { key: 'dismountFallSpeed', label: 'Velocidad mínima de caída al bajar (km/h)', value: 30, min: 1, max: 216, step: 1 },
   { key: 'dismountDamagePercent', label: 'Daño al jugador por caída (% de vida máxima)', value: 10, min: 0, max: 100, step: 1 },
+  { key: 'speedEffectThreshold', label: 'Velocidad efecto en pantalla (km/h)', value: 150, min: 10, max: 400, step: 5 },
+  { key: 'speedEffectMax', label: 'Velocidad efecto al 100% (km/h)', value: 220, min: 20, max: 500, step: 5 },
+  { key: 'speedEffectLines', label: 'Cantidad de líneas de velocidad', value: 140, min: 20, max: 300, step: 10 },
+  { key: 'speedEffectFovBonus', label: 'Expansión dinámica de FOV (°)', value: 8, min: 0, max: 30, step: 1 },
+  { key: 'speedEffectOpacity', label: 'Opacidad máxima del efecto (%)', value: 85, min: 10, max: 100, step: 5 },
 ] as const;
 
 /** Ángulo máximo de giro relativo del torso y cámara del pasajero (85°). */
 export const MAX_PASSENGER_YAW = (85 * Math.PI) / 180;
 
-export type MotorbikeSettings = Record<(typeof MOTORBIKE_FIELDS)[number]['key'], number> & { vehicleKind: 'motorbike'; autoStabilize: boolean; landingAssistEnabled: boolean; landingAssistMode: 'any-airborne' | 'inverted-detach'; dismountPenaltyEnabled: boolean; durabilityEnabled: boolean; crashDamageMode: 'percent' | 'fixed'; explosionDamageEnabled: boolean; gravityOrientation: GravityOrientation | 'inherit' };
+export type MotorbikeSettings = Record<(typeof MOTORBIKE_FIELDS)[number]['key'], number> & {
+  vehicleKind: 'motorbike';
+  autoStabilize: boolean;
+  landingAssistEnabled: boolean;
+  landingAssistMode: 'any-airborne' | 'inverted-detach';
+  dismountPenaltyEnabled: boolean;
+  durabilityEnabled: boolean;
+  crashDamageMode: 'percent' | 'fixed';
+  explosionDamageEnabled: boolean;
+  gravityOrientation: GravityOrientation | 'inherit';
+  speedEffectEnabled: boolean;
+  speedEffectColor: string;
+};
 
 export function normalizeMotorbikeSettings(props: any = {}): MotorbikeSettings {
   props = props ?? {};
@@ -51,6 +68,8 @@ export function normalizeMotorbikeSettings(props: any = {}): MotorbikeSettings {
   result.durabilityEnabled = props.durabilityEnabled === true;
   result.dismountPenaltyEnabled = props.dismountPenaltyEnabled === true;
   result.crashDamageMode = props.crashDamageMode === 'fixed' ? 'fixed' : 'percent';
+  result.speedEffectEnabled = props.speedEffectEnabled !== false;
+  result.speedEffectColor = typeof props.speedEffectColor === 'string' && props.speedEffectColor ? props.speedEffectColor : '#d4ecff';
   for (const field of MOTORBIKE_FIELDS) {
     const value = Number(props[field.key] ?? field.value);
     result[field.key] = Number.isFinite(value) ? Math.min(field.max, Math.max(field.min, value)) : field.value;

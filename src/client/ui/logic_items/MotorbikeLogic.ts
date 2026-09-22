@@ -102,6 +102,36 @@ export class MotorbikeLogic {
     const explosionSettings = document.createElement('div');
     explosionSettings.style.cssText = 'padding-left:12px;border-left:2px solid #f97316';
     container.appendChild(explosionSettings);
+
+    const speedEffectLabel = document.createElement('label');
+    speedEffectLabel.style.cssText = penaltyLabel.style.cssText;
+    const speedEffect = document.createElement('input');
+    speedEffect.type = 'checkbox';
+    speedEffect.checked = normalizeMotorbikeSettings(props).speedEffectEnabled;
+    speedEffectLabel.append(speedEffect, '⚡ Efecto de velocidad en pantalla (Speed Lines y FOV)');
+    container.appendChild(speedEffectLabel);
+    const speedEffectSettings = document.createElement('div');
+    speedEffectSettings.style.cssText = 'padding-left:12px;border-left:2px solid #38bdf8;margin:8px 0;display:flex;flex-direction:column;gap:6px;';
+    container.appendChild(speedEffectSettings);
+
+    const speedEffectHint = document.createElement('p');
+    speedEffectHint.style.cssText = hint.style.cssText;
+    speedEffectHint.textContent = 'Al alcanzar la velocidad configurada (ej. 150 km/h), la pantalla despliega líneas radiales de alta velocidad con apertura y cierre suaves y aceleración dinámica.';
+    speedEffectSettings.appendChild(speedEffectHint);
+
+    const colorRow = document.createElement('label');
+    colorRow.style.cssText = 'display:flex;align-items:center;justify-content:space-between;color:#ccc;font-size:12px;margin:4px 0;';
+    colorRow.textContent = 'Color de las líneas de velocidad: ';
+    const colorInput = document.createElement('input');
+    colorInput.type = 'color';
+    colorInput.value = normalizeMotorbikeSettings(props).speedEffectColor || '#d4ecff';
+    colorInput.style.cssText = 'background:none;border:none;width:40px;height:24px;cursor:pointer;';
+    colorInput.onchange = () => update('speedEffectColor', colorInput.value);
+    colorRow.appendChild(colorInput);
+    speedEffectSettings.appendChild(colorRow);
+
+    const speedEffectKeys = ['speedEffectThreshold', 'speedEffectMax', 'speedEffectLines', 'speedEffectFovBonus', 'speedEffectOpacity'];
+
     const inputs = new Map<string, HTMLInputElement>();
     const refreshCrash = () => {
       crashMode.disabled = !penalty.checked || !durability.checked;
@@ -133,6 +163,14 @@ export class MotorbikeLogic {
         if (input) input.disabled = !durability.checked;
       }
     };
+    const refreshSpeedEffect = () => {
+      speedEffectSettings.style.display = speedEffect.checked ? 'flex' : 'none';
+      colorInput.disabled = !speedEffect.checked;
+      for (const key of speedEffectKeys) {
+        const input = inputs.get(key);
+        if (input) input.disabled = !speedEffect.checked;
+      }
+    };
     explosion.onchange = () => {
       update('explosionDamageEnabled', explosion.checked);
       refreshDurability();
@@ -144,6 +182,10 @@ export class MotorbikeLogic {
     penalty.onchange = () => {
       update('dismountPenaltyEnabled', penalty.checked);
       refreshPenalty();
+    };
+    speedEffect.onchange = () => {
+      update('speedEffectEnabled', speedEffect.checked);
+      refreshSpeedEffect();
     };
     for (const field of MOTORBIKE_FIELDS) {
       const label = document.createElement('label');
@@ -172,10 +214,13 @@ export class MotorbikeLogic {
       label.appendChild(input);
       const parent = ['explosionDamage', 'explosionRadius'].includes(field.key) ? explosionSettings
         : ['crashDamagePercent', 'crashDamageFixed'].includes(field.key) ? crashSettings
-        : ['maxDurability', 'durability'].includes(field.key) ? durabilitySettings : container;
+        : ['maxDurability', 'durability'].includes(field.key) ? durabilitySettings
+        : speedEffectKeys.includes(field.key) ? speedEffectSettings
+        : container;
       parent.appendChild(label);
     }
     refreshPenalty();
     refreshDurability();
+    refreshSpeedEffect();
   }
 }

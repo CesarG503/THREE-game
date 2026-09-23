@@ -121,7 +121,7 @@ export class MotorbikeLogic {
 
     const colorRow = document.createElement('label');
     colorRow.style.cssText = 'display:flex;align-items:center;justify-content:space-between;color:#ccc;font-size:12px;margin:4px 0;';
-    colorRow.textContent = 'Color de las líneas de velocidad: ';
+    colorRow.textContent = 'Color de las líneas en pantalla: ';
     const colorInput = document.createElement('input');
     colorInput.type = 'color';
     colorInput.value = normalizeMotorbikeSettings(props).speedEffectColor || '#d4ecff';
@@ -130,7 +130,34 @@ export class MotorbikeLogic {
     colorRow.appendChild(colorInput);
     speedEffectSettings.appendChild(colorRow);
 
-    const speedEffectKeys = ['speedEffectThreshold', 'speedEffectMax', 'speedEffectLines', 'speedEffectFovBonus', 'speedEffectOpacity'];
+    const speedTrailsLabel = document.createElement('label');
+    speedTrailsLabel.style.cssText = penaltyLabel.style.cssText;
+    const speedTrails = document.createElement('input');
+    speedTrails.type = 'checkbox';
+    speedTrails.checked = normalizeMotorbikeSettings(props).speedTrailsEnabled;
+    speedTrailsLabel.append(speedTrails, '🌐 Estelas 3D en vehículo y personaje (visibles por otros jugadores)');
+    speedEffectSettings.appendChild(speedTrailsLabel);
+
+    const speedTrailsHint = document.createElement('p');
+    speedTrailsHint.style.cssText = hint.style.cssText;
+    speedTrailsHint.textContent = 'Genera estelas aerodinámicas 3D saliendo de los costados del vehículo, cola y hombros del personaje que se desplazan físicamente en el mundo y son visibles para los demás jugadores.';
+    speedEffectSettings.appendChild(speedTrailsHint);
+
+    const trailsColorRow = document.createElement('label');
+    trailsColorRow.style.cssText = 'display:flex;align-items:center;justify-content:space-between;color:#ccc;font-size:12px;margin:4px 0;';
+    trailsColorRow.textContent = 'Color de las estelas 3D: ';
+    const trailsColorInput = document.createElement('input');
+    trailsColorInput.type = 'color';
+    trailsColorInput.value = normalizeMotorbikeSettings(props).speedTrailsColor || normalizeMotorbikeSettings(props).speedEffectColor || '#d4ecff';
+    trailsColorInput.style.cssText = 'background:none;border:none;width:40px;height:24px;cursor:pointer;';
+    trailsColorInput.onchange = () => update('speedTrailsColor', trailsColorInput.value);
+    trailsColorRow.appendChild(trailsColorInput);
+    speedEffectSettings.appendChild(trailsColorRow);
+
+    const speedEffectKeys = [
+      'speedEffectThreshold', 'speedEffectMax', 'speedEffectLines', 'speedEffectFovBonus', 'speedEffectOpacity',
+      'speedTrailsCount', 'speedTrailsLength', 'speedTrailsWidth'
+    ];
 
     const inputs = new Map<string, HTMLInputElement>();
     const refreshCrash = () => {
@@ -166,9 +193,17 @@ export class MotorbikeLogic {
     const refreshSpeedEffect = () => {
       speedEffectSettings.style.display = speedEffect.checked ? 'flex' : 'none';
       colorInput.disabled = !speedEffect.checked;
+      speedTrails.disabled = !speedEffect.checked;
+      trailsColorInput.disabled = !speedEffect.checked || !speedTrails.checked;
       for (const key of speedEffectKeys) {
         const input = inputs.get(key);
-        if (input) input.disabled = !speedEffect.checked;
+        if (input) {
+          if (['speedTrailsCount', 'speedTrailsLength', 'speedTrailsWidth'].includes(key)) {
+            input.disabled = !speedEffect.checked || !speedTrails.checked;
+          } else {
+            input.disabled = !speedEffect.checked;
+          }
+        }
       }
     };
     explosion.onchange = () => {
@@ -185,6 +220,10 @@ export class MotorbikeLogic {
     };
     speedEffect.onchange = () => {
       update('speedEffectEnabled', speedEffect.checked);
+      refreshSpeedEffect();
+    };
+    speedTrails.onchange = () => {
+      update('speedTrailsEnabled', speedTrails.checked);
       refreshSpeedEffect();
     };
     for (const field of MOTORBIKE_FIELDS) {

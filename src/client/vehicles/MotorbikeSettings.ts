@@ -35,9 +35,12 @@ export const MOTORBIKE_FIELDS = [
   { key: 'dismountDamagePercent', label: 'Daño al jugador por caída (% de vida máxima)', value: 10, min: 0, max: 100, step: 1 },
   { key: 'speedEffectThreshold', label: 'Velocidad efecto en pantalla (km/h)', value: 150, min: 10, max: 400, step: 5 },
   { key: 'speedEffectMax', label: 'Velocidad efecto al 100% (km/h)', value: 220, min: 20, max: 500, step: 5 },
-  { key: 'speedEffectLines', label: 'Cantidad de líneas de velocidad', value: 140, min: 20, max: 300, step: 10 },
+  { key: 'speedEffectLines', label: 'Cantidad de líneas de velocidad en pantalla', value: 140, min: 20, max: 300, step: 10 },
   { key: 'speedEffectFovBonus', label: 'Expansión dinámica de FOV (°)', value: 8, min: 0, max: 30, step: 1 },
-  { key: 'speedEffectOpacity', label: 'Opacidad máxima del efecto (%)', value: 85, min: 10, max: 100, step: 5 },
+  { key: 'speedEffectOpacity', label: 'Opacidad máxima del efecto en pantalla (%)', value: 85, min: 10, max: 100, step: 5 },
+  { key: 'speedTrailsCount', label: 'Cantidad de estelas 3D (vehículo y personaje)', value: 6, min: 2, max: 12, step: 1 },
+  { key: 'speedTrailsLength', label: 'Longitud de estelas 3D (m)', value: 3.5, min: 0.5, max: 10, step: 0.5 },
+  { key: 'speedTrailsWidth', label: 'Grosor de estelas 3D (cm)', value: 4, min: 1, max: 20, step: 1 },
 ] as const;
 
 /** Ángulo máximo de giro relativo del torso y cámara del pasajero (85°). */
@@ -55,6 +58,8 @@ export type MotorbikeSettings = Record<(typeof MOTORBIKE_FIELDS)[number]['key'],
   gravityOrientation: GravityOrientation | 'inherit';
   speedEffectEnabled: boolean;
   speedEffectColor: string;
+  speedTrailsEnabled: boolean;
+  speedTrailsColor: string;
 };
 
 export function normalizeMotorbikeSettings(props: any = {}): MotorbikeSettings {
@@ -70,6 +75,8 @@ export function normalizeMotorbikeSettings(props: any = {}): MotorbikeSettings {
   result.crashDamageMode = props.crashDamageMode === 'fixed' ? 'fixed' : 'percent';
   result.speedEffectEnabled = props.speedEffectEnabled !== false;
   result.speedEffectColor = typeof props.speedEffectColor === 'string' && props.speedEffectColor ? props.speedEffectColor : '#d4ecff';
+  result.speedTrailsEnabled = props.speedTrailsEnabled !== false;
+  result.speedTrailsColor = typeof props.speedTrailsColor === 'string' && props.speedTrailsColor ? props.speedTrailsColor : (result.speedEffectColor || '#d4ecff');
   for (const field of MOTORBIKE_FIELDS) {
     const value = Number(props[field.key] ?? field.value);
     result[field.key] = Number.isFinite(value) ? Math.min(field.max, Math.max(field.min, value)) : field.value;

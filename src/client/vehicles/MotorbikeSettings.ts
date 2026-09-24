@@ -41,6 +41,7 @@ export const MOTORBIKE_FIELDS = [
   { key: 'speedTrailsCount', label: 'Cantidad de estelas 3D (vehículo y personaje)', value: 6, min: 2, max: 12, step: 1 },
   { key: 'speedTrailsLength', label: 'Longitud de estelas 3D (m)', value: 3.5, min: 0.5, max: 10, step: 0.5 },
   { key: 'speedTrailsWidth', label: 'Grosor de estelas 3D (cm)', value: 4, min: 1, max: 20, step: 1 },
+  { key: 'speedTrailsInterval', label: 'Duración de ráfagas dinámicas (s)', value: 0.14, min: 0.04, max: 0.6, step: 0.02 },
 ] as const;
 
 /** Ángulo máximo de giro relativo del torso y cámara del pasajero (85°). */
@@ -59,6 +60,7 @@ export type MotorbikeSettings = Record<(typeof MOTORBIKE_FIELDS)[number]['key'],
   speedEffectEnabled: boolean;
   speedEffectColor: string;
   speedTrailsEnabled: boolean;
+  speedTrailsDynamic: boolean;
   speedTrailsColor: string;
 };
 
@@ -76,6 +78,7 @@ export function normalizeMotorbikeSettings(props: any = {}): MotorbikeSettings {
   result.speedEffectEnabled = props.speedEffectEnabled !== false;
   result.speedEffectColor = typeof props.speedEffectColor === 'string' && props.speedEffectColor ? props.speedEffectColor : '#d4ecff';
   result.speedTrailsEnabled = props.speedTrailsEnabled !== false;
+  result.speedTrailsDynamic = props.speedTrailsDynamic !== false;
   result.speedTrailsColor = typeof props.speedTrailsColor === 'string' && props.speedTrailsColor ? props.speedTrailsColor : (result.speedEffectColor || '#d4ecff');
   for (const field of MOTORBIKE_FIELDS) {
     const value = Number(props[field.key] ?? field.value);

@@ -154,9 +154,22 @@ export class MotorbikeLogic {
     trailsColorRow.appendChild(trailsColorInput);
     speedEffectSettings.appendChild(trailsColorRow);
 
+    const speedTrailsDynamicLabel = document.createElement('label');
+    speedTrailsDynamicLabel.style.cssText = penaltyLabel.style.cssText;
+    const speedTrailsDynamic = document.createElement('input');
+    speedTrailsDynamic.type = 'checkbox';
+    speedTrailsDynamic.checked = normalizeMotorbikeSettings(props).speedTrailsDynamic;
+    speedTrailsDynamicLabel.append(speedTrailsDynamic, '✨ Ráfagas dinámicas (aparecen y desaparecen en diferentes puntos)');
+    speedEffectSettings.appendChild(speedTrailsDynamicLabel);
+
+    const speedTrailsDynamicHint = document.createElement('p');
+    speedTrailsDynamicHint.style.cssText = hint.style.cssText;
+    speedTrailsDynamicHint.textContent = 'Al activarse, las estelas brotan y desaparecen rápidamente en distintos puntos aleatorios del personaje y la moto, simulando ráfagas continuas de viento y velocidad.';
+    speedEffectSettings.appendChild(speedTrailsDynamicHint);
+
     const speedEffectKeys = [
       'speedEffectThreshold', 'speedEffectMax', 'speedEffectLines', 'speedEffectFovBonus', 'speedEffectOpacity',
-      'speedTrailsCount', 'speedTrailsLength', 'speedTrailsWidth'
+      'speedTrailsCount', 'speedTrailsLength', 'speedTrailsWidth', 'speedTrailsInterval'
     ];
 
     const inputs = new Map<string, HTMLInputElement>();
@@ -194,11 +207,15 @@ export class MotorbikeLogic {
       speedEffectSettings.style.display = speedEffect.checked ? 'flex' : 'none';
       colorInput.disabled = !speedEffect.checked;
       speedTrails.disabled = !speedEffect.checked;
+      speedTrailsDynamic.disabled = !speedEffect.checked || !speedTrails.checked;
       trailsColorInput.disabled = !speedEffect.checked || !speedTrails.checked;
       for (const key of speedEffectKeys) {
         const input = inputs.get(key);
         if (input) {
-          if (['speedTrailsCount', 'speedTrailsLength', 'speedTrailsWidth'].includes(key)) {
+          if (key === 'speedTrailsInterval') {
+            input.disabled = !speedEffect.checked || !speedTrails.checked || !speedTrailsDynamic.checked;
+            input.parentElement!.style.display = speedTrailsDynamic.checked ? 'flex' : 'none';
+          } else if (['speedTrailsCount', 'speedTrailsLength', 'speedTrailsWidth'].includes(key)) {
             input.disabled = !speedEffect.checked || !speedTrails.checked;
           } else {
             input.disabled = !speedEffect.checked;
@@ -224,6 +241,10 @@ export class MotorbikeLogic {
     };
     speedTrails.onchange = () => {
       update('speedTrailsEnabled', speedTrails.checked);
+      refreshSpeedEffect();
+    };
+    speedTrailsDynamic.onchange = () => {
+      update('speedTrailsDynamic', speedTrailsDynamic.checked);
       refreshSpeedEffect();
     };
     for (const field of MOTORBIKE_FIELDS) {

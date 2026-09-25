@@ -159,12 +159,12 @@ export class MotorbikeLogic {
     const speedTrailsDynamic = document.createElement('input');
     speedTrailsDynamic.type = 'checkbox';
     speedTrailsDynamic.checked = normalizeMotorbikeSettings(props).speedTrailsDynamic;
-    speedTrailsDynamicLabel.append(speedTrailsDynamic, '✨ Ráfagas dinámicas (aparecen y desaparecen en diferentes puntos)');
+    speedTrailsDynamicLabel.append(speedTrailsDynamic, '✨ Ráfagas dinámicas (al desactivar: estelas fijas y continuas)');
     speedEffectSettings.appendChild(speedTrailsDynamicLabel);
 
     const speedTrailsDynamicHint = document.createElement('p');
     speedTrailsDynamicHint.style.cssText = hint.style.cssText;
-    speedTrailsDynamicHint.textContent = 'Al activarse, las estelas brotan y desaparecen rápidamente en distintos puntos aleatorios del personaje y la moto, simulando ráfagas continuas de viento y velocidad.';
+    speedTrailsDynamicHint.textContent = 'Al activarse, las estelas brotan y se desvanecen suavemente en distintos puntos aleatorios. Al desactivar la casilla, se convierten en estelas aerodinámicas fijas y constantes sin estar cambiando de lugar.';
     speedEffectSettings.appendChild(speedTrailsDynamicHint);
 
     const speedEffectKeys = [

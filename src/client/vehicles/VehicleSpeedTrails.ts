@@ -14,6 +14,15 @@ interface Streamline {
   history: TrailHistoryPoint[];
   age: number;
   lifetime: number;
+  alpha: number; // 0..1 smooth dynamic envelope or 1.0 for fixed mode
+}
+
+interface FadingTrail {
+  points: TrailHistoryPoint[];
+  currentAlpha: number;
+  initialAlpha: number;
+  fadeAge: number;
+  fadeDuration: number;
 }
 
 interface BikeTrailData {
@@ -21,13 +30,15 @@ interface BikeTrailData {
   geometry: THREE.BufferGeometry;
   material: THREE.MeshBasicMaterial;
   streamlines: Streamline[];
+  fadingTrails: FadingTrail[];
   intensity: number;
+  wasDynamic?: boolean;
 }
 
 export class VehicleSpeedTrails {
   private trailsByBike = new WeakMap<MotorbikeVisual, BikeTrailData>();
   private allTrackedBikes = new Set<MotorbikeVisual>();
-  private maxPointsPerTrail = 20;
+  private maxPointsPerTrail = 24;
 
   constructor(private scene: THREE.Scene) {}
 
@@ -43,7 +54,7 @@ export class VehicleSpeedTrails {
     let data = this.trailsByBike.get(bike);
     if (!data) {
       const geometry = new THREE.BufferGeometry();
-      const maxTrails = 16;
+      const maxTrails = 32;
       const maxVerts = maxTrails * this.maxPointsPerTrail * 2;
       const maxIndices = maxTrails * (this.maxPointsPerTrail - 1) * 6;
 
@@ -76,7 +87,9 @@ export class VehicleSpeedTrails {
         geometry,
         material,
         streamlines: [],
-        intensity: 0
+        fadingTrails: [],
+        intensity: 0,
+        wasDynamic: props.speedTrailsDynamic !== false
       };
 
       this.trailsByBike.set(bike, data);
@@ -88,6 +101,8 @@ export class VehicleSpeedTrails {
   /**
    * Generates candidate sockets around the vehicle and character.
    * Accurately accounts for rider forward lean so upper trails start directly on the character.
+   * Sockets are grouped in symmetrical left/right pairs so fixed continuous mode produces
+   * perfectly balanced aerodynamic streamlines.
    */
   private getCandidateSockets(bike: MotorbikeVisual, props: any, hasRider: boolean): { id: string; offset: THREE.Vector3; isRider: boolean }[] {
     const dims = bike.userData.originalScale ?? { x: 0.85, y: 1.25, z: 2.4 };
@@ -107,38 +122,50 @@ export class VehicleSpeedTrails {
 
     if (hasRider) {
       list.push(
-        // Rider shoulders (direct contact with character jacket)
+        // Symmetrical Pair 1: Rider shoulders (direct contact with character jacket)
         { id: 'rider_shoulder_l', offset: new THREE.Vector3(-0.20, seatH + 0.16, shoulderZ), isRider: true },
         { id: 'rider_shoulder_r', offset: new THREE.Vector3( 0.20, seatH + 0.16, shoulderZ), isRider: true },
-        // Rider helmet crown / apex
+        // Symmetrical Pair 2: Bike handlebars / fairing edges
+        { id: 'bike_handlebar_l', offset: new THREE.Vector3(-halfX * 0.95, dims.y * 0.36, frontZ), isRider: false },
+        { id: 'bike_handlebar_r', offset: new THREE.Vector3( halfX * 0.95, dims.y * 0.36, frontZ), isRider: false },
+        // Symmetrical Pair 3: Bike rear tail edges
+        { id: 'bike_tail_l',      offset: new THREE.Vector3(-halfX * 0.72, dims.y * 0.18, rearZ), isRider: false },
+        { id: 'bike_tail_r',      offset: new THREE.Vector3( halfX * 0.72, dims.y * 0.18, rearZ), isRider: false },
+        // Central Top pair: Rider helmet apex & Bike tail top fin
         { id: 'rider_helmet',     offset: new THREE.Vector3( 0.00, seatH + 0.44, headZ), isRider: true },
-        // Rider upper back
-        { id: 'rider_back_mid',   offset: new THREE.Vector3( 0.00, seatH + 0.18, backZ), isRider: true },
-        // Rider upper back flanks
+        { id: 'bike_tail_top',    offset: new THREE.Vector3( 0.00, dims.y * 0.28, rearZ * 0.96), isRider: false },
+        // Symmetrical Pair 4: Rider upper back flanks
         { id: 'rider_back_l',     offset: new THREE.Vector3(-0.14, seatH + 0.14, backZ), isRider: true },
         { id: 'rider_back_r',     offset: new THREE.Vector3( 0.14, seatH + 0.14, backZ), isRider: true },
+        // Symmetrical Pair 5: Bike mirrors / upper shield
+        { id: 'bike_mirror_l',    offset: new THREE.Vector3(-halfX * 1.05, dims.y * 0.44, frontZ * 1.08), isRider: false },
+        { id: 'bike_mirror_r',    offset: new THREE.Vector3( halfX * 1.05, dims.y * 0.44, frontZ * 1.08), isRider: false },
+        // Central Back & front nose
+        { id: 'rider_back_mid',   offset: new THREE.Vector3( 0.00, seatH + 0.18, backZ), isRider: true },
+        { id: 'bike_front_nose',  offset: new THREE.Vector3( 0.00, dims.y * 0.40, -dims.z * 0.46), isRider: false },
+        // Lower flanks
+        { id: 'bike_flank_l',     offset: new THREE.Vector3(-halfX * 0.98, dims.y * 0.04, -0.05), isRider: false },
+        { id: 'bike_flank_r',     offset: new THREE.Vector3( halfX * 0.98, dims.y * 0.04, -0.05), isRider: false },
+      );
+    } else {
+      list.push(
+        // Bike handlebars
+        { id: 'bike_handlebar_l', offset: new THREE.Vector3(-halfX * 0.95, dims.y * 0.36, frontZ), isRider: false },
+        { id: 'bike_handlebar_r', offset: new THREE.Vector3( halfX * 0.95, dims.y * 0.36, frontZ), isRider: false },
+        // Bike rear tail
+        { id: 'bike_tail_l',      offset: new THREE.Vector3(-halfX * 0.72, dims.y * 0.18, rearZ), isRider: false },
+        { id: 'bike_tail_r',      offset: new THREE.Vector3( halfX * 0.72, dims.y * 0.18, rearZ), isRider: false },
+        // Bike mirrors
+        { id: 'bike_mirror_l',    offset: new THREE.Vector3(-halfX * 1.05, dims.y * 0.44, frontZ * 1.08), isRider: false },
+        { id: 'bike_mirror_r',    offset: new THREE.Vector3( halfX * 1.05, dims.y * 0.44, frontZ * 1.08), isRider: false },
+        // Bike top and nose
+        { id: 'bike_tail_top',    offset: new THREE.Vector3( 0.00, dims.y * 0.28, rearZ * 0.96), isRider: false },
+        { id: 'bike_front_nose',  offset: new THREE.Vector3( 0.00, dims.y * 0.40, -dims.z * 0.46), isRider: false },
+        // Lower flanks
+        { id: 'bike_flank_l',     offset: new THREE.Vector3(-halfX * 0.98, dims.y * 0.04, -0.05), isRider: false },
+        { id: 'bike_flank_r',     offset: new THREE.Vector3( halfX * 0.98, dims.y * 0.04, -0.05), isRider: false },
       );
     }
-
-    // Vehicle sockets
-    list.push(
-      // Bike front handlebars / fairing edges
-      { id: 'bike_handlebar_l', offset: new THREE.Vector3(-halfX * 0.95, dims.y * 0.36, frontZ), isRider: false },
-      { id: 'bike_handlebar_r', offset: new THREE.Vector3( halfX * 0.95, dims.y * 0.36, frontZ), isRider: false },
-      // Bike mirrors / upper shield
-      { id: 'bike_mirror_l',    offset: new THREE.Vector3(-halfX * 1.05, dims.y * 0.44, frontZ * 1.08), isRider: false },
-      { id: 'bike_mirror_r',    offset: new THREE.Vector3( halfX * 1.05, dims.y * 0.44, frontZ * 1.08), isRider: false },
-      // Bike front nose tip
-      { id: 'bike_front_nose',  offset: new THREE.Vector3( 0.00, dims.y * 0.40, -dims.z * 0.46), isRider: false },
-      // Bike rear tail edges
-      { id: 'bike_tail_l',      offset: new THREE.Vector3(-halfX * 0.72, dims.y * 0.18, rearZ), isRider: false },
-      { id: 'bike_tail_r',      offset: new THREE.Vector3( halfX * 0.72, dims.y * 0.18, rearZ), isRider: false },
-      // Bike tail top fin
-      { id: 'bike_tail_top',    offset: new THREE.Vector3( 0.00, dims.y * 0.28, rearZ * 0.96), isRider: false },
-      // Lower flanks / side pods
-      { id: 'bike_flank_l',     offset: new THREE.Vector3(-halfX * 0.98, dims.y * 0.04, -0.05), isRider: false },
-      { id: 'bike_flank_r',     offset: new THREE.Vector3( halfX * 0.98, dims.y * 0.04, -0.05), isRider: false },
-    );
 
     return list;
   }
@@ -199,25 +226,54 @@ export class VehicleSpeedTrails {
         data.intensity = 0;
         data.geometry.setDrawRange(0, 0);
         for (const s of data.streamlines) s.history.length = 0;
+        data.fadingTrails.length = 0;
         continue;
       }
 
       const hasRider = Boolean(bike.userData.vehicleDriver || bike.userData.vehiclePassenger || (bike as any).userData?.isMounted);
       const candidateSockets = this.getCandidateSockets(bike, props, hasRider);
 
+      // Smooth mode transition when user toggles the dynamic checkbox in settings:
+      // If switched from dynamic to fixed mode, move in-flight dynamic points to fadingTrails
+      // so they dissolve naturally in the wind rather than snapping or stretching across sockets.
+      if (data.wasDynamic && !isDynamic) {
+        for (const s of data.streamlines) {
+          if (s.history.length >= 2 && s.alpha > 0.05) {
+            data.fadingTrails.push({
+              points: s.history.map(p => ({ position: p.position.clone(), age: p.age })),
+              currentAlpha: s.alpha,
+              initialAlpha: s.alpha,
+              fadeAge: 0,
+              fadeDuration: 0.15
+            });
+          }
+          s.history = [];
+        }
+        data.wasDynamic = false;
+      } else if (!data.wasDynamic && isDynamic) {
+        data.wasDynamic = true;
+        // Stagger burst ages across the duration
+        for (const s of data.streamlines) {
+          s.age = Math.random() * s.lifetime;
+        }
+      }
+
       // Ensure streamlines array matches targetCount
       while (data.streamlines.length < targetCount) {
         const idx = data.streamlines.length;
         const sockIdx = isDynamic ? Math.floor(Math.random() * candidateSockets.length) : (idx % candidateSockets.length);
         const sock = candidateSockets[sockIdx];
-        const life = burstInterval * (0.75 + Math.random() * 0.5);
+        const life = burstInterval * (0.8 + Math.random() * 0.4);
         data.streamlines.push({
           socketIndex: sockIdx,
           socketOffset: sock.offset.clone(),
-          jitterOffset: new THREE.Vector3((Math.random() - 0.5) * 0.04, (Math.random() - 0.5) * 0.04, (Math.random() - 0.5) * 0.04),
+          jitterOffset: isDynamic
+            ? new THREE.Vector3((Math.random() - 0.5) * 0.04, (Math.random() - 0.5) * 0.04, (Math.random() - 0.5) * 0.04)
+            : new THREE.Vector3(0, 0, 0),
           history: [],
-          age: Math.random() * life, // stagger start times
-          lifetime: life
+          age: isDynamic ? Math.random() * life : 0, // stagger dynamic bursts
+          lifetime: life,
+          alpha: isDynamic ? 0 : 1.0
         });
       }
       if (data.streamlines.length > targetCount) {
@@ -228,15 +284,41 @@ export class VehicleSpeedTrails {
       const effectiveSpeed = Math.max(22, speedMs);
       const maxTrailLife = Math.max(0.06, trailLengthMeters / effectiveSpeed);
 
-      // Update each streamline
+      // Update active streamlines
       for (let sIdx = 0; sIdx < data.streamlines.length; sIdx++) {
         const line = data.streamlines[sIdx];
 
         if (isDynamic) {
           line.age += dt * (1.0 + data.intensity * 0.6);
-          // If burst lifetime has completed, pick a NEW random socket and restart cleanly!
+          const progress = Math.min(1.0, Math.max(0, line.age / line.lifetime));
+
+          // Smooth trapezoidal sinusoidal envelope:
+          // 0.0 -> 0.20: fades in smoothly
+          // 0.20 -> 0.70: bright full streak
+          // 0.70 -> 1.0: fades out smoothly to 0
+          let envelope = 1.0;
+          if (progress < 0.20) {
+            envelope = progress / 0.20;
+          } else if (progress > 0.70) {
+            envelope = (1.0 - progress) / 0.30;
+          }
+          line.alpha = Math.sin(Math.max(0, Math.min(1, envelope)) * Math.PI * 0.5);
+
+          // If burst lifetime has completed:
           if (line.age >= line.lifetime) {
-            line.history.length = 0; // Clear history so no connection to previous spot
+            // Hand over existing points in the air to fadingTrails so they continue
+            // floating backward in the world and fade to zero smoothly! NEVER hard cut!
+            if (line.history.length >= 2) {
+              data.fadingTrails.push({
+                points: line.history.map(p => ({ position: p.position.clone(), age: p.age })),
+                currentAlpha: Math.max(0.12, line.alpha),
+                initialAlpha: Math.max(0.12, line.alpha),
+                fadeAge: 0,
+                fadeDuration: Math.max(0.12, maxTrailLife * 0.8)
+              });
+            }
+            line.history = []; // Clean start for new socket
+
             // Pick a different socket
             let newSockIdx = Math.floor(Math.random() * candidateSockets.length);
             if (candidateSockets.length > 1 && newSockIdx === line.socketIndex) {
@@ -249,14 +331,16 @@ export class VehicleSpeedTrails {
               (Math.random() - 0.5) * 0.05
             );
             line.age = 0;
-            line.lifetime = burstInterval * (0.75 + Math.random() * 0.5);
+            line.lifetime = burstInterval * (0.8 + Math.random() * 0.4);
+            line.alpha = 0;
           }
         } else {
-          // Continuous mode: lock to steady sockets
+          // Continuous fixed mode: strictly locked to fixed symmetrical sockets without moving or changing!
           line.socketIndex = sIdx % candidateSockets.length;
           line.jitterOffset.set(0, 0, 0);
           line.age = 0;
           line.lifetime = 1.0;
+          line.alpha = 1.0;
         }
 
         const currentSocket = candidateSockets[line.socketIndex % candidateSockets.length];
@@ -273,14 +357,33 @@ export class VehicleSpeedTrails {
         // Sample current socket in world coordinates
         const currentWorldPos = line.socketOffset.clone().applyMatrix4(bike.matrixWorld);
         const last = line.history[0];
-        // Only sample if moved at least 4 cm
-        if (!last || last.position.distanceToSquared(currentWorldPos) > 0.0016) {
+        // Only sample if moved at least 3 cm
+        if (!last || last.position.distanceToSquared(currentWorldPos) > 0.0009) {
           line.history.unshift({ position: currentWorldPos, age: 0 });
           if (line.history.length > this.maxPointsPerTrail) {
             line.history.length = this.maxPointsPerTrail;
           }
         } else {
           last.position.copy(currentWorldPos);
+        }
+      }
+
+      // Update fading trails (dissipating gracefully in the air)
+      for (let fIdx = data.fadingTrails.length - 1; fIdx >= 0; fIdx--) {
+        const fade = data.fadingTrails[fIdx];
+        fade.fadeAge += dt;
+        const fadeProg = Math.min(1.0, fade.fadeAge / fade.fadeDuration);
+        fade.currentAlpha = fade.initialAlpha * Math.pow(1.0 - fadeProg, 1.4);
+
+        for (let j = fade.points.length - 1; j >= 0; j--) {
+          fade.points[j].age += dt;
+          if (fade.points[j].age > maxTrailLife) {
+            fade.points.splice(j, 1);
+          }
+        }
+
+        if (fade.currentAlpha <= 0.005 || fade.points.length < 2) {
+          data.fadingTrails.splice(fIdx, 1);
         }
       }
 
@@ -298,15 +401,27 @@ export class VehicleSpeedTrails {
       const bikeForward = new THREE.Vector3(0, 0, -1).applyQuaternion(bike.quaternion).normalize();
       const bikeUp = new THREE.Vector3(0, 1, 0).applyQuaternion(bike.quaternion).normalize();
 
+      // Collect all ribbons to render: active streamlines + fading tails
+      const trailsToRender: { pts: TrailHistoryPoint[]; burstFactor: number }[] = [];
       for (const line of data.streamlines) {
-        const pts = line.history;
-        if (pts.length < 2) continue;
+        if (line.history.length >= 2 && line.alpha > 0.005) {
+          trailsToRender.push({ pts: line.history, burstFactor: line.alpha });
+        }
+      }
+      for (const fade of data.fadingTrails) {
+        if (fade.points.length >= 2 && fade.currentAlpha > 0.005) {
+          trailsToRender.push({ pts: fade.points, burstFactor: fade.currentAlpha });
+        }
+      }
 
-        // Dynamic burst alpha envelope (smooth fade-in and fade-out)
-        let burstFactor = 1.0;
-        if (isDynamic) {
-          const progress = Math.min(1.0, Math.max(0, line.age / line.lifetime));
-          burstFactor = Math.sin(progress * Math.PI);
+      for (const trail of trailsToRender) {
+        const pts = trail.pts;
+        const burstFactor = trail.burstFactor;
+        const quadCount = pts.length - 1;
+
+        // Ensure we don't overflow the pre-allocated buffer arrays
+        if (vertOffset + pts.length * 6 > posArr.length || indexOffset + quadCount * 6 > indexArr.length) {
+          break;
         }
 
         const startVertIndex = vertOffset / 3;
@@ -371,7 +486,6 @@ export class VehicleSpeedTrails {
         }
 
         // Indices for quad strip
-        const quadCount = pts.length - 1;
         for (let q = 0; q < quadCount; q++) {
           const v0 = startVertIndex + q * 2;
           const v1 = v0 + 1;
@@ -402,6 +516,8 @@ export class VehicleSpeedTrails {
     if (data) {
       data.geometry.setDrawRange(0, 0);
       for (const s of data.streamlines) s.history.length = 0;
+      data.fadingTrails.length = 0;
+      data.intensity = 0;
     }
   }
 

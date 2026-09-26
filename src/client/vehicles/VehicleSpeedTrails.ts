@@ -187,8 +187,9 @@ export class VehicleSpeedTrails {
       const props = normalizeMotorbikeSettings(bike.userData.logicProperties);
       const enabled = props.speedTrailsEnabled !== false && props.speedEffectEnabled !== false;
       const isDynamic = props.speedTrailsDynamic !== false;
-      const threshold = Number(props.speedEffectThreshold ?? 150);
-      const maxSpeed = Number(props.speedEffectMax ?? 220);
+      const customSpeed = props.speedTrailsCustomSpeed === true;
+      const threshold = Number((customSpeed ? props.speedTrailsThreshold : props.speedEffectThreshold) ?? 150);
+      const maxSpeed = Number((customSpeed ? props.speedTrailsMax : props.speedEffectMax) ?? 220);
       const targetCount = Math.max(2, Math.min(12, Math.round(Number(props.speedTrailsCount ?? 6))));
       const trailLengthMeters = Math.max(0.5, Math.min(10.0, Number(props.speedTrailsLength ?? 3.5)));
       const trailWidthMeters = Math.max(0.01, Math.min(0.20, Number(props.speedTrailsWidth ?? 4) / 100));

@@ -167,9 +167,23 @@ export class MotorbikeLogic {
     speedTrailsDynamicHint.textContent = 'Al activarse, las estelas brotan y se desvanecen suavemente en distintos puntos aleatorios. Al desactivar la casilla, se convierten en estelas aerodinámicas fijas y constantes sin estar cambiando de lugar.';
     speedEffectSettings.appendChild(speedTrailsDynamicHint);
 
+    const speedTrailsCustomSpeedLabel = document.createElement('label');
+    speedTrailsCustomSpeedLabel.style.cssText = penaltyLabel.style.cssText;
+    const speedTrailsCustomSpeed = document.createElement('input');
+    speedTrailsCustomSpeed.type = 'checkbox';
+    speedTrailsCustomSpeed.checked = normalizeMotorbikeSettings(props).speedTrailsCustomSpeed;
+    speedTrailsCustomSpeedLabel.append(speedTrailsCustomSpeed, '⏱️ Rango de velocidad independiente para estelas 3D');
+    speedEffectSettings.appendChild(speedTrailsCustomSpeedLabel);
+
+    const speedTrailsCustomSpeedHint = document.createElement('p');
+    speedTrailsCustomSpeedHint.style.cssText = hint.style.cssText;
+    speedTrailsCustomSpeedHint.textContent = 'Al activarse, las estelas 3D se activan y alcanzan su 100% en un rango de velocidad exclusivo, independiente del efecto de pantalla.';
+    speedEffectSettings.appendChild(speedTrailsCustomSpeedHint);
+
     const speedEffectKeys = [
       'speedEffectThreshold', 'speedEffectMax', 'speedEffectLines', 'speedEffectFovBonus', 'speedEffectOpacity',
-      'speedTrailsCount', 'speedTrailsLength', 'speedTrailsWidth', 'speedTrailsInterval'
+      'speedTrailsCount', 'speedTrailsLength', 'speedTrailsWidth', 'speedTrailsInterval',
+      'speedTrailsThreshold', 'speedTrailsMax'
     ];
 
     const inputs = new Map<string, HTMLInputElement>();
@@ -207,18 +221,33 @@ export class MotorbikeLogic {
       speedEffectSettings.style.display = speedEffect.checked ? 'flex' : 'none';
       colorInput.disabled = !speedEffect.checked;
       speedTrails.disabled = !speedEffect.checked;
-      speedTrailsDynamic.disabled = !speedEffect.checked || !speedTrails.checked;
-      trailsColorInput.disabled = !speedEffect.checked || !speedTrails.checked;
+      const trailsActive = speedEffect.checked && speedTrails.checked;
+      speedTrailsDynamic.disabled = !trailsActive;
+      speedTrailsCustomSpeed.disabled = !trailsActive;
+      trailsColorInput.disabled = !trailsActive;
+      trailsColorRow.style.display = trailsActive ? 'flex' : 'none';
+      speedTrailsDynamicLabel.style.display = trailsActive ? 'flex' : 'none';
+      speedTrailsDynamicHint.style.display = trailsActive ? 'block' : 'none';
+      speedTrailsCustomSpeedLabel.style.display = trailsActive ? 'flex' : 'none';
+      speedTrailsCustomSpeedHint.style.display = trailsActive ? 'block' : 'none';
+
       for (const key of speedEffectKeys) {
         const input = inputs.get(key);
         if (input) {
           if (key === 'speedTrailsInterval') {
-            input.disabled = !speedEffect.checked || !speedTrails.checked || !speedTrailsDynamic.checked;
-            input.parentElement!.style.display = speedTrailsDynamic.checked ? 'flex' : 'none';
+            const visible = trailsActive && speedTrailsDynamic.checked;
+            input.disabled = !visible;
+            input.parentElement!.style.display = visible ? 'flex' : 'none';
+          } else if (['speedTrailsThreshold', 'speedTrailsMax'].includes(key)) {
+            const visible = trailsActive && speedTrailsCustomSpeed.checked;
+            input.disabled = !visible;
+            input.parentElement!.style.display = visible ? 'flex' : 'none';
           } else if (['speedTrailsCount', 'speedTrailsLength', 'speedTrailsWidth'].includes(key)) {
-            input.disabled = !speedEffect.checked || !speedTrails.checked;
+            input.disabled = !trailsActive;
+            input.parentElement!.style.display = trailsActive ? 'flex' : 'none';
           } else {
             input.disabled = !speedEffect.checked;
+            input.parentElement!.style.display = speedEffect.checked ? 'flex' : 'none';
           }
         }
       }
@@ -245,6 +274,10 @@ export class MotorbikeLogic {
     };
     speedTrailsDynamic.onchange = () => {
       update('speedTrailsDynamic', speedTrailsDynamic.checked);
+      refreshSpeedEffect();
+    };
+    speedTrailsCustomSpeed.onchange = () => {
+      update('speedTrailsCustomSpeed', speedTrailsCustomSpeed.checked);
       refreshSpeedEffect();
     };
     for (const field of MOTORBIKE_FIELDS) {

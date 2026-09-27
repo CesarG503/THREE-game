@@ -44,6 +44,10 @@ export const MOTORBIKE_FIELDS = [
   { key: 'speedTrailsInterval', label: 'Duración de ráfagas dinámicas (s)', value: 0.14, min: 0.04, max: 0.6, step: 0.02 },
   { key: 'speedTrailsThreshold', label: 'Velocidad estelas 3D (km/h)', value: 150, min: 10, max: 400, step: 5 },
   { key: 'speedTrailsMax', label: 'Velocidad estelas 3D al 100% (km/h)', value: 220, min: 20, max: 500, step: 5 },
+  { key: 'tronWallHeight', label: 'Altura del muro Tron (m)', value: 1.8, min: 0.3, max: 6.0, step: 0.1 },
+  { key: 'tronWallDuration', label: 'Duración del muro Tron (s)', value: 5.0, min: 1.0, max: 30.0, step: 0.5 },
+  { key: 'tronWallSinkDuration', label: 'Tiempo de descenso al suelo (s)', value: 1.2, min: 0.2, max: 5.0, step: 0.1 },
+  { key: 'tronWallMinSpeed', label: 'Velocidad mínima para muro Tron (km/h)', value: 15, min: 1, max: 120, step: 1 },
 ] as const;
 
 /** Ángulo máximo de giro relativo del torso y cámara del pasajero (85°). */
@@ -65,6 +69,9 @@ export type MotorbikeSettings = Record<(typeof MOTORBIKE_FIELDS)[number]['key'],
   speedTrailsDynamic: boolean;
   speedTrailsCustomSpeed: boolean;
   speedTrailsColor: string;
+  tronWallEnabled: boolean;
+  tronWallColor: string;
+  tronWallCollision: boolean;
 };
 
 export function normalizeMotorbikeSettings(props: any = {}): MotorbikeSettings {
@@ -84,6 +91,9 @@ export function normalizeMotorbikeSettings(props: any = {}): MotorbikeSettings {
   result.speedTrailsDynamic = props.speedTrailsDynamic !== false;
   result.speedTrailsCustomSpeed = props.speedTrailsCustomSpeed === true;
   result.speedTrailsColor = typeof props.speedTrailsColor === 'string' && props.speedTrailsColor ? props.speedTrailsColor : (result.speedEffectColor || '#d4ecff');
+  result.tronWallEnabled = props.tronWallEnabled === true;
+  result.tronWallColor = typeof props.tronWallColor === 'string' && props.tronWallColor ? props.tronWallColor : '#00f0ff';
+  result.tronWallCollision = props.tronWallCollision === true;
   for (const field of MOTORBIKE_FIELDS) {
     const value = Number(props[field.key] ?? field.value);
     result[field.key] = Number.isFinite(value) ? Math.min(field.max, Math.max(field.min, value)) : field.value;

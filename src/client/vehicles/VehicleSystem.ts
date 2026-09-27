@@ -14,6 +14,7 @@ import { getGravityQuaternion } from '../utils/GravityOrientation';
 import { TireTrackManager } from './TireTrackManager';
 import { SpeedLinesEffect } from './SpeedLinesEffect';
 import { VehicleSpeedTrails } from './VehicleSpeedTrails';
+import { VehicleTronWall } from './VehicleTronWall';
 
 const FORWARD = new THREE.Vector3(0, 0, -1);
 
@@ -57,6 +58,7 @@ export class VehicleSystem {
   tireTracks: TireTrackManager;
   speedLines: SpeedLinesEffect;
   speedTrails: VehicleSpeedTrails;
+  tronWalls: VehicleTronWall;
   isSkidding = false;
 
   constructor(private game: any) {
@@ -71,6 +73,7 @@ export class VehicleSystem {
     const scene = game.sceneManager?.scene ?? game.scene ?? new THREE.Scene();
     this.tireTracks = new TireTrackManager(scene);
     this.speedTrails = new VehicleSpeedTrails(scene);
+    this.tronWalls = new VehicleTronWall(scene, game.world);
     if (typeof document !== 'undefined') {
       this.hud = document.createElement('div');
       this.hud.id = 'motorbike-hud';
@@ -300,6 +303,7 @@ export class VehicleSystem {
     this.durability.update(this.bikes, dt);
     this.damageEffects.update(this.bikes, dt);
     this.speedTrails.update(this.bikes, dt, this.game.cameraController?.camera);
+    this.tronWalls.update(this.bikes, dt);
     // Inspector edits also apply to parked motorcycles, which then fall toward their new surface.
     for (const bike of this.bikes) {
       if (bike.userData.vehicleToppled && bike.userData.logicProperties?.autoStabilize !== false && !this.coasting.has(bike) && !bike.userData.vehicleDriver) this.startCoasting(bike, 0, 0, true);
@@ -1036,6 +1040,7 @@ Durabilidad ${Math.ceil(props.durability)} / ${props.maxDurability}${isMotorbike
     this.dismount(true);
     this.speedLines.dispose();
     this.speedTrails.dispose();
+    this.tronWalls.dispose();
     this.tireTracks.dispose();
     this.damageEffects.dispose();
     this.fall.reset(this.game.character);

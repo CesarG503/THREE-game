@@ -180,6 +180,49 @@ export class MotorbikeLogic {
     speedTrailsCustomSpeedHint.textContent = 'Al activarse, las estelas 3D se activan y alcanzan su 100% en un rango de velocidad exclusivo, independiente del efecto de pantalla.';
     speedEffectSettings.appendChild(speedTrailsCustomSpeedHint);
 
+    const tronWallLabel = document.createElement('label');
+    tronWallLabel.style.cssText = penaltyLabel.style.cssText;
+    const tronWall = document.createElement('input');
+    tronWall.type = 'checkbox';
+    tronWall.checked = normalizeMotorbikeSettings(props).tronWallEnabled;
+    tronWallLabel.append(tronWall, '⚡ Muro de luz temporal (estilo Tron)');
+    container.appendChild(tronWallLabel);
+
+    const tronWallSettings = document.createElement('div');
+    tronWallSettings.style.cssText = 'padding-left:12px;border-left:2px solid #00f0ff;margin:8px 0;display:flex;flex-direction:column;gap:6px;';
+    container.appendChild(tronWallSettings);
+
+    const tronWallHint = document.createElement('p');
+    tronWallHint.style.cssText = hint.style.cssText;
+    tronWallHint.textContent = 'Al conducir, el vehículo levanta un muro vertical de energía luminosa que permanece activo y luego desciende y se desvanece hundiéndose en el suelo de donde brotó.';
+    tronWallSettings.appendChild(tronWallHint);
+
+    const tronColorRow = document.createElement('label');
+    tronColorRow.style.cssText = 'display:flex;align-items:center;justify-content:space-between;color:#ccc;font-size:12px;margin:4px 0;';
+    tronColorRow.textContent = 'Color del muro de luz: ';
+    const tronColorInput = document.createElement('input');
+    tronColorInput.type = 'color';
+    tronColorInput.value = normalizeMotorbikeSettings(props).tronWallColor || '#00f0ff';
+    tronColorInput.style.cssText = 'background:none;border:none;width:40px;height:24px;cursor:pointer;';
+    tronColorInput.onchange = () => update('tronWallColor', tronColorInput.value);
+    tronColorRow.appendChild(tronColorInput);
+    tronWallSettings.appendChild(tronColorRow);
+
+    const tronCollisionLabel = document.createElement('label');
+    tronCollisionLabel.style.cssText = penaltyLabel.style.cssText;
+    const tronCollision = document.createElement('input');
+    tronCollision.type = 'checkbox';
+    tronCollision.checked = normalizeMotorbikeSettings(props).tronWallCollision;
+    tronCollisionLabel.append(tronCollision, '🛡️ Colisión física sólida (bloquea vehículos y jugadores)');
+    tronWallSettings.appendChild(tronCollisionLabel);
+
+    const tronCollisionHint = document.createElement('p');
+    tronCollisionHint.style.cssText = hint.style.cssText;
+    tronCollisionHint.textContent = 'Si se activa, el muro actúa como una barrera física sólida en el mundo que bloquea el paso mientras esté erguido.';
+    tronWallSettings.appendChild(tronCollisionHint);
+
+    const tronWallKeys = ['tronWallHeight', 'tronWallDuration', 'tronWallSinkDuration', 'tronWallMinSpeed'];
+
     const speedEffectKeys = [
       'speedEffectThreshold', 'speedEffectMax', 'speedEffectLines', 'speedEffectFovBonus', 'speedEffectOpacity',
       'speedTrailsCount', 'speedTrailsLength', 'speedTrailsWidth', 'speedTrailsInterval',
@@ -280,6 +323,26 @@ export class MotorbikeLogic {
       update('speedTrailsCustomSpeed', speedTrailsCustomSpeed.checked);
       refreshSpeedEffect();
     };
+    const refreshTronWall = () => {
+      tronWallSettings.style.display = tronWall.checked ? 'flex' : 'none';
+      tronColorInput.disabled = !tronWall.checked;
+      tronCollision.disabled = !tronWall.checked;
+      for (const key of tronWallKeys) {
+        const input = inputs.get(key);
+        if (input) {
+          input.disabled = !tronWall.checked;
+          input.parentElement!.style.display = tronWall.checked ? 'flex' : 'none';
+        }
+      }
+    };
+    tronWall.onchange = () => {
+      update('tronWallEnabled', tronWall.checked);
+      refreshTronWall();
+    };
+    tronCollision.onchange = () => {
+      update('tronWallCollision', tronCollision.checked);
+      refreshTronWall();
+    };
     for (const field of MOTORBIKE_FIELDS) {
       const label = document.createElement('label');
       label.style.cssText = 'display:flex;flex-direction:column;gap:4px;margin:8px 0;color:#ccc;font-size:12px';
@@ -308,6 +371,7 @@ export class MotorbikeLogic {
       const parent = ['explosionDamage', 'explosionRadius'].includes(field.key) ? explosionSettings
         : ['crashDamagePercent', 'crashDamageFixed'].includes(field.key) ? crashSettings
         : ['maxDurability', 'durability'].includes(field.key) ? durabilitySettings
+        : tronWallKeys.includes(field.key) ? tronWallSettings
         : speedEffectKeys.includes(field.key) ? speedEffectSettings
         : container;
       parent.appendChild(label);
@@ -315,5 +379,6 @@ export class MotorbikeLogic {
     refreshPenalty();
     refreshDurability();
     refreshSpeedEffect();
+    refreshTronWall();
   }
 }

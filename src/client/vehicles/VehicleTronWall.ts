@@ -148,6 +148,8 @@ export class VehicleTronWall {
       const mesh = new THREE.Mesh(geometry, material);
       mesh.name = `tron_wall_${bike.userData.uuid || 'bike'}`;
       mesh.frustumCulled = false;
+      mesh.userData = { ignoreRaycast: true, isTronWall: true };
+      mesh.raycast = () => {};
       this.scene.add(mesh);
 
       data = {
@@ -189,61 +191,88 @@ export class VehicleTronWall {
 
       const data = this.getOrCreateBikeTron(bike, colorHex);
 
-      // Physical speed calculation: handles motion property, rigidBody velocity, and frame displacement
-      let speedMs = 0;
-      if (bike.userData.vehicleMotion?.speed !== undefined) {
-        speedMs = Math.abs(bike.userData.vehicleMotion.speed);
-      } else if (bike.userData.speed !== undefined) {
-        speedMs = Math.abs(bike.userData.speed);
-      } else {
-        const body = bike.userData.rigidBody;
-        if (body?.isValid()) {
-          const vel = body.linvel();
-          speedMs = Math.hypot(vel.x, vel.z);
-        }
-      }
+      const bikeForward = new THREE.Vector3(0, 0, -1).applyQuaternion(bike.quaternion).normalize();
+      const bikeUp = new THREE.Vector3(0, 1, 0).applyQuaternion(bike.quaternion).normalize();
 
-      // Check physical frame displacement as a reliable fallback
+      // Check motion speed (signed: positive = forward, negative = reverse)
+      const motionSpeed = bike.userData.vehicleMotion?.speed ?? bike.userData.speed ?? 0;
+
+      // Frame displacement vector
+      let frameForwardSpeed = 0;
       if (data.lastBikePos) {
-        const frameDist = bike.position.distanceTo(data.lastBikePos);
-        const frameSpeedMs = dt > 0.0001 ? frameDist / dt : 0;
-        speedMs = Math.max(speedMs, frameSpeedMs);
+        const frameDisp = bike.position.clone().sub(data.lastBikePos);
+        frameForwardSpeed = dt > 0.0001 ? frameDisp.dot(bikeForward) / dt : 0;
       }
       data.lastBikePos.copy(bike.position);
 
-      const speedKmh = speedMs * 3.6;
+      // Reversing detection:
+      // If motion speed is negative or physical displacement is moving backward
+      const isReversing = motionSpeed < -0.15 || (motionSpeed <= 0.05 && frameForwardSpeed < -0.2);
 
-      // 1. Emit new wall points if enabled and moving fast enough
+      if (isReversing) {
+        // When reversing, finalize active strip immediately and do not emit
+        data.activeStrip = null;
+        data.lowSpeedTimer = 0;
+      }
+
+      // Only forward speed counts for emitting wall
+      let forwardSpeedMs = 0;
+      if (!isReversing) {
+        forwardSpeedMs = Math.max(motionSpeed, frameForwardSpeed);
+        // Fallback to rigidBody forward component if motion properties not set
+        if (forwardSpeedMs <= 0 && bike.userData.rigidBody?.isValid()) {
+          const vel = bike.userData.rigidBody.linvel();
+          const linvelVec = new THREE.Vector3(vel.x, vel.y, vel.z);
+          forwardSpeedMs = Math.max(0, linvelVec.dot(bikeForward));
+        }
+      }
+
+      const speedKmh = Math.max(0, forwardSpeedMs) * 3.6;
+      const isFastEnough = enabled && !isReversing && (speedKmh >= minSpeedKmh);
+
+      // 1. Emit new wall points if enabled, driving forward, and moving fast enough
       const dims = bike.userData.originalScale ?? { x: 0.85, y: 1.25, z: 2.4 };
-      const bikeUp = new THREE.Vector3(0, 1, 0).applyQuaternion(bike.quaternion).normalize();
 
       // Rear wheel contact point in world coordinates
       const rearWheelLocal = new THREE.Vector3(0, -dims.y * 0.25, dims.z * 0.42);
       const rearWheelWorld = rearWheelLocal.clone().applyQuaternion(bike.quaternion).add(bike.position);
 
-      const isFastEnough = enabled && (speedKmh >= minSpeedKmh);
-
       if (isFastEnough) {
         data.lowSpeedTimer = 0;
 
-        // Ground raycast directly beneath rear wheel
+        // Ground raycast directly beneath rear wheel to find exact surface (handles ramps and walls)
         let groundPos = rearWheelWorld.clone().addScaledVector(bikeUp, -dims.y * 0.22);
-        const groundUp = bikeUp.clone();
+        let groundUp = bikeUp.clone();
 
         if (this.world) {
-          const rayOrigin = rearWheelWorld.clone().addScaledVector(bikeUp, 0.35);
+          const rayOrigin = rearWheelWorld.clone().addScaledVector(bikeUp, 0.40);
           const rayDir = bikeUp.clone().negate();
-          const hit = this.world.castRay(
+
+          const filter = (col: RAPIER.Collider) => {
+            // Exclude emitting bike's own body collider
+            if (bike.userData.rigidBody && col === bike.userData.rigidBody.collider(0)) return false;
+            // Exclude ALL Tron wall colliders so ground finding never snaps onto a Tron wall
+            if ((col as any).isTronWall) return false;
+            return true;
+          };
+
+          const hit = this.world.castRayAndGetNormal(
             new RAPIER.Ray(rayOrigin, rayDir),
-            dims.y * 1.2,
+            dims.y * 1.6,
             true,
             RAPIER.QueryFilterFlags.EXCLUDE_SENSORS,
             undefined,
             undefined,
-            bike.userData.rigidBody
+            bike.userData.rigidBody,
+            filter
           );
+
           if (hit && Number.isFinite(hit.timeOfImpact)) {
             groundPos = rayOrigin.clone().addScaledVector(rayDir, hit.timeOfImpact);
+            const hitNormal = new THREE.Vector3().copy(hit.normal as THREE.Vector3);
+            if (hitNormal.dot(bikeUp) > 0.25) {
+              groundUp.copy(hitNormal);
+            }
           }
         }
 
@@ -266,7 +295,7 @@ export class VehicleTronWall {
           const lastPt = pts[pts.length - 1];
           const dist = lastPt.groundPos.distanceTo(groundPos);
 
-          if (dist > 6.0) {
+          if (dist > 15.0) {
             // Discontinuity / teleport -> start a new strip
             const newStrip: TronWallStrip = { points: [] };
             data.strips.push(newStrip);
@@ -282,17 +311,36 @@ export class VehicleTronWall {
               currentHeight: wallHeight
             });
           } else if (dist >= 0.20) {
-            // Add new node along the path
-            pts.push({
-              groundPos: groundPos.clone(),
-              upVector: groundUp.clone(),
-              age: 0,
-              lifetime: wallDuration,
-              sinkDuration,
-              wallHeight,
-              distance: lastPt.distance + dist,
-              currentHeight: wallHeight
-            });
+            // Subdivide at high speed to maintain smooth curvature on ramps and turns
+            const steps = Math.min(5, Math.floor(dist / 0.35));
+            if (steps > 1) {
+              for (let s = 1; s <= steps; s++) {
+                const frac = s / steps;
+                const subPos = lastPt.groundPos.clone().lerp(groundPos, frac);
+                const subUp = lastPt.upVector.clone().lerp(groundUp, frac).normalize();
+                pts.push({
+                  groundPos: subPos,
+                  upVector: subUp,
+                  age: 0,
+                  lifetime: wallDuration,
+                  sinkDuration,
+                  wallHeight,
+                  distance: lastPt.distance + dist * frac,
+                  currentHeight: wallHeight
+                });
+              }
+            } else {
+              pts.push({
+                groundPos: groundPos.clone(),
+                upVector: groundUp.clone(),
+                age: 0,
+                lifetime: wallDuration,
+                sinkDuration,
+                wallHeight,
+                distance: lastPt.distance + dist,
+                currentHeight: wallHeight
+              });
+            }
           }
         }
       } else {
@@ -353,40 +401,55 @@ export class VehicleTronWall {
       if (this.world) {
         for (const strip of data.strips) {
           const pts = strip.points;
-          for (let i = 0; i < pts.length - 1; i++) {
+          const isThisActiveStrip = data.activeStrip === strip;
+          const ptsLen = pts.length;
+
+          for (let i = 0; i < ptsLen - 1; i++) {
             const p0 = pts[i];
             const p1 = pts[i + 1];
             const avgH = (p0.currentHeight + p1.currentHeight) * 0.5;
 
-            // Only activate collision if option enabled and wall is tall enough (>= 0.45m)
-            // and at least 3 segments (~0.8m) behind the vehicle's rear wheel
-            const isSafeDistance = (pts.length - 1 - i) >= 3;
-            const shouldHaveCollider = hasCollision && avgH >= 0.45 && isSafeDistance;
+            const segVec = p1.groundPos.clone().sub(p0.groundPos);
+            const segLen = segVec.length();
+            const mid = p0.groundPos.clone().add(p1.groundPos).multiplyScalar(0.5);
 
-            if (shouldHaveCollider && !p0.collider) {
-              const segVec = p1.groundPos.clone().sub(p0.groundPos);
-              const segLen = segVec.length();
-              if (segLen >= 0.18) {
-                const mid = p0.groundPos.clone().add(p1.groundPos).multiplyScalar(0.5);
-                mid.addScaledVector(p0.upVector, avgH * 0.5);
+            // The immediate tail wake directly behind the vehicle is kept uncollided
+            // to allow smooth forward acceleration, ramp climbs, and wall riding without sticking.
+            // Active strip: only the newest 5 segments (~1.3m behind rear wheel) are uncollided.
+            // Inactive strip: segments within 1.6m of the stopped bike wait until the bike moves away to arm.
+            const segsFromHead = isThisActiveStrip ? (ptsLen - 1 - i) : 999;
+            const isTailWake = isThisActiveStrip ? (segsFromHead < 6) : (mid.distanceTo(bike.position) < 1.6);
+            const canArmCollider = hasCollision && avgH >= 0.45 && segLen >= 0.15 && !isTailWake;
 
-                const dir = segVec.clone().normalize();
-                const normal = new THREE.Vector3().crossVectors(dir, p0.upVector).normalize();
-                if (normal.lengthSq() > 0.001) {
-                  const thickness = 0.14;
-                  const colDesc = RAPIER.ColliderDesc.cuboid(thickness * 0.5, avgH * 0.5, segLen * 0.5);
-                  colDesc.setTranslation(mid.x, mid.y, mid.z);
+            if (canArmCollider && !p0.collider) {
+              const colMid = mid.clone().addScaledVector(p0.upVector, avgH * 0.5);
 
-                  const rotMat = new THREE.Matrix4().makeBasis(normal, p0.upVector.clone().normalize(), dir);
-                  const quat = new THREE.Quaternion().setFromRotationMatrix(rotMat);
-                  colDesc.setRotation({ x: quat.x, y: quat.y, z: quat.z, w: quat.w });
+              const dir = segVec.clone().normalize();
+              const normal = new THREE.Vector3().crossVectors(dir, p0.upVector).normalize();
+              if (normal.lengthSq() > 0.001) {
+                const thickness = 0.16;
+                const colDesc = RAPIER.ColliderDesc.cuboid(thickness * 0.5, avgH * 0.5, segLen * 0.5);
+                colDesc.setTranslation(colMid.x, colMid.y, colMid.z);
 
-                  p0.collider = this.world.createCollider(colDesc);
-                }
+                const rotMat = new THREE.Matrix4().makeBasis(normal, p0.upVector.clone().normalize(), dir);
+                const quat = new THREE.Quaternion().setFromRotationMatrix(rotMat);
+                colDesc.setRotation({ x: quat.x, y: quat.y, z: quat.z, w: quat.w });
+
+                const col = this.world.createCollider(colDesc);
+                (col as any).isTronWall = true;
+                (col as any).ownerBike = bike;
+                (col as any).segMid = mid.clone();
+                (col as any).segAge = p0.age;
+
+                p0.collider = col;
               }
-            } else if (!shouldHaveCollider && p0.collider) {
+            } else if ((!hasCollision || avgH < 0.45) && p0.collider) {
+              // ONLY remove a collider when physical collision is disabled or the wall has sunk into the ground!
+              // NEVER remove a collider when the vehicle approaches it!
               this.world.removeCollider(p0.collider, false);
               p0.collider = null;
+            } else if (p0.collider) {
+              (p0.collider as any).segAge = p0.age;
             }
           }
         }

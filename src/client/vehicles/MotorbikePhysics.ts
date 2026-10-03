@@ -121,7 +121,12 @@ export class MotorbikePhysics {
 
   rightBike(bike: THREE.Object3D, excluded?: RAPIER.Collider) {
     const before = bike.position.clone(), rotation = bike.quaternion.clone();
-    const filter = (other: RAPIER.Collider) => other !== excluded;
+    const filter = (other: RAPIER.Collider) => {
+      if (other === excluded) return false;
+      const colAny = other as any;
+      if (colAny.isTronWall && colAny.ownerBike === bike) return false;
+      return true;
+    };
     // Validate the whole rotation, not just a clear final pose.
     for (let i = 0; i < 36; i++) {
       if (!this.stabilize(bike, Math.PI / 18, filter)) {

@@ -251,8 +251,13 @@ export class VehicleTronWall {
           const filter = (col: RAPIER.Collider) => {
             // Exclude emitting bike's own body collider
             if (bike.userData.rigidBody && col === bike.userData.rigidBody.collider(0)) return false;
-            // Exclude ALL Tron wall colliders so ground finding never snaps onto a Tron wall
-            if ((col as any).isTronWall) return false;
+            // Exclude this bike's own immediate trailing wake so it doesn't self-stack into its own recent points
+            const colAny = col as any;
+            if (colAny.isTronWall && colAny.ownerBike === bike) {
+              if (colAny.segMid && (colAny.segMid as THREE.Vector3).distanceTo(rearWheelWorld) < 2.0) {
+                return false;
+              }
+            }
             return true;
           };
 
@@ -422,27 +427,46 @@ export class VehicleTronWall {
             const canArmCollider = hasCollision && avgH >= 0.45 && segLen >= 0.15 && !isTailWake;
 
             if (canArmCollider && !p0.collider) {
-              const colMid = mid.clone().addScaledVector(p0.upVector, avgH * 0.5);
+              const segUp = p0.upVector.clone().add(p1.upVector).normalize();
+              if (segUp.lengthSq() < 0.01) segUp.copy(p0.upVector).normalize();
 
-              const dir = segVec.clone().normalize();
-              const normal = new THREE.Vector3().crossVectors(dir, p0.upVector).normalize();
-              if (normal.lengthSq() > 0.001) {
-                const thickness = 0.16;
-                const colDesc = RAPIER.ColliderDesc.cuboid(thickness * 0.5, avgH * 0.5, segLen * 0.5);
-                colDesc.setTranslation(colMid.x, colMid.y, colMid.z);
+              const colMid = mid.clone().addScaledVector(segUp, avgH * 0.5);
 
-                const rotMat = new THREE.Matrix4().makeBasis(normal, p0.upVector.clone().normalize(), dir);
-                const quat = new THREE.Quaternion().setFromRotationMatrix(rotMat);
-                colDesc.setRotation({ x: quat.x, y: quat.y, z: quat.z, w: quat.w });
-
-                const col = this.world.createCollider(colDesc);
-                (col as any).isTronWall = true;
-                (col as any).ownerBike = bike;
-                (col as any).segMid = mid.clone();
-                (col as any).segAge = p0.age;
-
-                p0.collider = col;
+              const yAxis = segUp.clone();
+              const zAxis = segVec.clone().normalize();
+              // Compute right-handed orthonormal basis: xAxis = yAxis × zAxis (determinant = +1.0)
+              const xAxis = new THREE.Vector3().crossVectors(yAxis, zAxis).normalize();
+              if (xAxis.lengthSq() < 0.001) {
+                xAxis.set(1, 0, 0);
+                if (Math.abs(yAxis.dot(xAxis)) > 0.9) xAxis.set(0, 0, 1);
+                xAxis.crossVectors(yAxis, xAxis).normalize();
               }
+              // Re-orthogonalize zAxis so all 3 axes are strictly perpendicular
+              zAxis.crossVectors(xAxis, yAxis).normalize();
+
+              const rotMat = new THREE.Matrix4().makeBasis(xAxis, yAxis, zAxis);
+              const quat = new THREE.Quaternion().setFromRotationMatrix(rotMat);
+
+              // 0.52m thickness ensures motorbikes (38cm side wheel raycasts) and players have
+              // a stable, wide surface to drive and walk on top of the wall without slipping off.
+              const thickness = 0.52;
+              const halfThick = thickness * 0.5;
+              const halfHeight = avgH * 0.5;
+              const halfLen = segLen * 0.5 + 0.02;
+
+              const colDesc = RAPIER.ColliderDesc.cuboid(halfThick, halfHeight, halfLen);
+              colDesc.setTranslation(colMid.x, colMid.y, colMid.z);
+              colDesc.setRotation({ x: quat.x, y: quat.y, z: quat.z, w: quat.w });
+              colDesc.setFriction(0.85);
+              colDesc.setRestitution(0.0);
+
+              const col = this.world.createCollider(colDesc);
+              (col as any).isTronWall = true;
+              (col as any).ownerBike = bike;
+              (col as any).segMid = mid.clone();
+              (col as any).segAge = p0.age;
+
+              p0.collider = col;
             } else if ((!hasCollision || avgH < 0.45) && p0.collider) {
               // ONLY remove a collider when physical collision is disabled or the wall has sunk into the ground!
               // NEVER remove a collider when the vehicle approaches it!

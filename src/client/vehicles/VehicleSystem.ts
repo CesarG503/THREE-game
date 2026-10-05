@@ -299,11 +299,29 @@ export class VehicleSystem {
   /** Returns true while the vehicle owns movement and avatar animation. */
   update(delta: number): boolean {
     const dt = Number.isFinite(delta) ? Math.min(0.05, Math.max(0, delta)) : 0;
+
+    const envConfig = this.game.environmentConfig;
+    const fallDeathEnabled = envConfig ? envConfig.fallDeath !== false : true;
+    const fallDeathY = envConfig?.fallDeathY !== undefined ? Number(envConfig.fallDeathY) : -20;
+    const fallLimitY = fallDeathEnabled ? fallDeathY : -100;
+
+    // Performance safeguard: Ensure spawn positions are cached and enforce fall limit on all vehicles
+    for (const bike of this.bikes) {
+      if (!bike.userData.spawnPosition) {
+        bike.userData.spawnPosition = bike.position.clone();
+        bike.userData.spawnQuaternion = bike.quaternion.clone();
+      }
+
+      if (bike.position.y < fallLimitY) {
+        this.handleBikeFallDeath(bike);
+      }
+    }
+
     this.tireTracks.update(dt);
     this.durability.update(this.bikes, dt);
     this.damageEffects.update(this.bikes, dt);
     this.speedTrails.update(this.bikes, dt, this.game.cameraController?.camera);
-    this.tronWalls.update(this.bikes, dt);
+    this.tronWalls.update(this.bikes, dt, fallLimitY);
     // Inspector edits also apply to parked motorcycles, which then fall toward their new surface.
     for (const bike of this.bikes) {
       if (bike.userData.vehicleToppled && bike.userData.logicProperties?.autoStabilize !== false && !this.coasting.has(bike) && !bike.userData.vehicleDriver) this.startCoasting(bike, 0, 0, true);
@@ -1036,6 +1054,60 @@ Durabilidad ${Math.ceil(props.durability)} / ${props.maxDurability}${isMotorbike
     this.fuelBar.max = maxFuel;
     this.fuelBar.value = fuel ?? 0;
   }
+
+  private handleBikeFallDeath(bike: MotorbikeVisual) {
+    // 1. Immediately cut all Tron wall segments and destroy all colliders/buffers
+    this.tronWalls.clearBike(bike);
+    this.endBikeTracks(bike);
+
+    // 2. If the local player is mounted on this bike, dismount and trigger fall death
+    if (this.mounted === bike) {
+      this.dismount(true);
+      if (!this.game.character.isDead) {
+        this.game.character.currentHealth = 0;
+        this.game.character.emit("healthChanged", { current: 0, max: this.game.character.maxHealth });
+        this.game.character.respawn();
+      }
+    }
+
+    // 3. Clear coasting and reset motion properties
+    this.coasting.delete(bike);
+    bike.userData.vehicleMotion = { speed: 0, verticalSpeed: 0, lean: 0 };
+    bike.userData.vehicleToppled = false;
+    bike.userData.vehicleDriver = null;
+    bike.userData.vehiclePassenger = null;
+
+    // 4. Reset transform back to initial spawn position and orientation
+    const spawnPos = bike.userData.spawnPosition ?? new THREE.Vector3(0, 5, 0);
+    const spawnQuat = bike.userData.spawnQuaternion ?? new THREE.Quaternion();
+
+    bike.position.copy(spawnPos);
+    bike.quaternion.copy(spawnQuat);
+
+    // 5. Reset Rapier rigid body translation, rotation, and velocities
+    const body = bike.userData.rigidBody;
+    if (body?.isValid()) {
+      body.setTranslation(spawnPos, true);
+      body.setRotation(spawnQuat, true);
+      body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+      body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+      body.setNextKinematicTranslation(spawnPos);
+      body.setNextKinematicRotation(spawnQuat);
+    }
+
+    // 6. Reset physics state and gravity orientation
+    this.physics.reset(bike, [0, 0, 0]);
+    const gravity = vehicleGravity(bike);
+    gravity.orientation = 'down';
+    gravity.frame.set(0, 0, 0, 1);
+    gravity.start = undefined;
+
+    // 7. Network sync if connected so all clients see the vehicle parked back at spawn
+    if (this.game.networkManager?.isConnected) {
+      this.game.networkManager.sendPlayerAction('motorbikePark', this.networkStateFor(bike, 0, 0, 0, 0));
+    }
+  }
+
   dispose() {
     this.dismount(true);
     this.speedLines.dispose();

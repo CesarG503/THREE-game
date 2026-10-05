@@ -1744,6 +1744,11 @@ export class MapObjectItem extends Item {
       collidersDesc.forEach((col: any) => {
         world.createCollider(col, rigidBody);
       });
+
+      if (this.type === "motorbike") {
+        object3D.userData.spawnPosition = object3D.position.clone();
+        object3D.userData.spawnQuaternion = object3D.quaternion.clone();
+      }
     }
 
     if (object3D.userData.needsBoundsUpdate) {

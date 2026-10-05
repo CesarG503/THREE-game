@@ -172,11 +172,17 @@ export class VehicleTronWall {
   /**
    * Updates Tron light walls for all motorbikes in the scene.
    */
-  update(bikes: MotorbikeVisual[], delta: number) {
+  update(bikes: MotorbikeVisual[], delta: number, fallDeathY?: number) {
     const dt = Math.min(0.08, Math.max(0, delta));
 
     for (const bike of bikes) {
       if (!bike || !bike.parent || !bike.visible || bike.userData.invisible) {
+        continue;
+      }
+
+      // Performance: If bike has fallen below the death limit, cut off wall generation and purge existing strips
+      if (fallDeathY !== undefined && bike.position.y < fallDeathY) {
+        this.clearBike(bike);
         continue;
       }
 
@@ -236,6 +242,12 @@ export class VehicleTronWall {
       // Rear wheel contact point in world coordinates
       const rearWheelLocal = new THREE.Vector3(0, -dims.y * 0.25, dims.z * 0.42);
       const rearWheelWorld = rearWheelLocal.clone().applyQuaternion(bike.quaternion).add(bike.position);
+
+      // Performance safeguard: do not emit walls into the void when falling off the map
+      if (fallDeathY !== undefined && bike.position.y < fallDeathY + 2.0) {
+        data.activeStrip = null;
+        continue;
+      }
 
       if (isFastEnough) {
         data.lowSpeedTimer = 0;

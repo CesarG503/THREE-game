@@ -28,13 +28,17 @@ interface BikeTronData {
   activeStrip: TronWallStrip | null;
   lastBikePos: THREE.Vector3;
   lowSpeedTimer: number;
+  activeColliderCount: number;
 }
 
 export class VehicleTronWall {
   private tronByBike = new WeakMap<MotorbikeVisual, BikeTronData>();
   private allTrackedBikes = new Set<MotorbikeVisual>();
   private wallTexture: THREE.CanvasTexture;
-  private maxPointsPerBike = 1600;
+  // Buffer capacity: 3,000 points = 6,000 vertices, 17,994 indices (~228 KB per bike, well within Uint16)
+  private maxPointsPerBike = 3000;
+  // Physical collider budget per bike (prevents Rapier physics saturation in multiplayer while keeping 500m+ of solid wall)
+  private maxCollidersPerBike = 250;
 
   constructor(private scene: THREE.Scene, private world?: RAPIER.World) {
     this.wallTexture = this.createTronWallTexture();
@@ -160,13 +164,75 @@ export class VehicleTronWall {
         currentColorHex: colorHex,
         activeStrip: null,
         lastBikePos: bike.position.clone(),
-        lowSpeedTimer: 0
+        lowSpeedTimer: 0,
+        activeColliderCount: 0
       };
 
       this.tronByBike.set(bike, data);
       this.allTrackedBikes.add(bike);
     }
     return data;
+  }
+
+  /**
+   * Ensures that total points across all strips do not exceed maxPointsPerBike.
+   * If approaching the limit, oldest points from the tail of the oldest strip are
+   * pruned in FIFO order, removing any active Rapier colliders attached to them.
+   * This completely prevents buffer overflow, rendering cutoffs, and visual flickering.
+   */
+  private ensureBufferCapacity(data: BikeTronData, neededCount: number) {
+    let totalPts = 0;
+    for (let i = 0; i < data.strips.length; i++) {
+      totalPts += data.strips[i].points.length;
+    }
+
+    const overflow = (totalPts + neededCount) - (this.maxPointsPerBike - 15);
+    if (overflow <= 0) return;
+
+    let pointsToPrune = overflow;
+    while (pointsToPrune > 0 && data.strips.length > 0) {
+      const oldestStrip = data.strips[0];
+      const canPruneFromStrip = oldestStrip === data.activeStrip
+        ? Math.max(0, oldestStrip.points.length - 2)
+        : oldestStrip.points.length;
+
+      if (canPruneFromStrip <= 0) break;
+
+      const count = Math.min(pointsToPrune, canPruneFromStrip);
+      for (let i = 0; i < count; i++) {
+        const removedPt = oldestStrip.points.shift();
+        if (removedPt?.collider && this.world) {
+          this.world.removeCollider(removedPt.collider, false);
+          removedPt.collider = null;
+          data.activeColliderCount = Math.max(0, data.activeColliderCount - 1);
+        }
+      }
+      pointsToPrune -= count;
+
+      if (oldestStrip.points.length === 0 && oldestStrip !== data.activeStrip) {
+        data.strips.shift();
+      }
+    }
+  }
+
+  /**
+   * Purges the oldest Rapier collider across all strips when active colliders reach the budget.
+   * Maintains smooth physics performance even at extreme speeds or with multiple players.
+   */
+  private purgeOldestCollider(data: BikeTronData) {
+    if (!this.world) return;
+    for (let s = 0; s < data.strips.length; s++) {
+      const pts = data.strips[s].points;
+      for (let p = 0; p < pts.length; p++) {
+        const pt = pts[p];
+        if (pt.collider) {
+          this.world.removeCollider(pt.collider, false);
+          pt.collider = null;
+          data.activeColliderCount = Math.max(0, data.activeColliderCount - 1);
+          return;
+        }
+      }
+    }
   }
 
   /**
@@ -294,6 +360,7 @@ export class VehicleTronWall {
         }
 
         if (!data.activeStrip) {
+          this.ensureBufferCapacity(data, 1);
           const newStrip: TronWallStrip = { points: [] };
           data.strips.push(newStrip);
           data.activeStrip = newStrip;
@@ -312,8 +379,9 @@ export class VehicleTronWall {
           const lastPt = pts[pts.length - 1];
           const dist = lastPt.groundPos.distanceTo(groundPos);
 
-          if (dist > 15.0) {
+          if (dist > 25.0) {
             // Discontinuity / teleport -> start a new strip
+            this.ensureBufferCapacity(data, 1);
             const newStrip: TronWallStrip = { points: [] };
             data.strips.push(newStrip);
             data.activeStrip = newStrip;
@@ -327,36 +395,72 @@ export class VehicleTronWall {
               distance: 0,
               currentHeight: wallHeight
             });
-          } else if (dist >= 0.20) {
-            // Subdivide at high speed to maintain smooth curvature on ramps and turns
-            const steps = Math.min(5, Math.floor(dist / 0.35));
-            if (steps > 1) {
-              for (let s = 1; s <= steps; s++) {
-                const frac = s / steps;
-                const subPos = lastPt.groundPos.clone().lerp(groundPos, frac);
-                const subUp = lastPt.upVector.clone().lerp(groundUp, frac).normalize();
+          } else {
+            // Curvature & incline change detection for adaptive LOD
+            let isCurving = false;
+            if (pts.length >= 2) {
+              const prevPt = pts[pts.length - 2];
+              const prevDx = lastPt.groundPos.x - prevPt.groundPos.x;
+              const prevDy = lastPt.groundPos.y - prevPt.groundPos.y;
+              const prevDz = lastPt.groundPos.z - prevPt.groundPos.z;
+              const prevLenSq = prevDx * prevDx + prevDy * prevDy + prevDz * prevDz;
+
+              const curDx = groundPos.x - lastPt.groundPos.x;
+              const curDy = groundPos.y - lastPt.groundPos.y;
+              const curDz = groundPos.z - lastPt.groundPos.z;
+              const curLenSq = curDx * curDx + curDy * curDy + curDz * curDz;
+
+              if (prevLenSq > 0.001 && curLenSq > 0.001) {
+                const invPrev = 1.0 / Math.sqrt(prevLenSq);
+                const invCur = 1.0 / Math.sqrt(curLenSq);
+                const dotHeading = (prevDx * curDx + prevDy * curDy + prevDz * curDz) * (invPrev * invCur);
+                const dotUp = lastPt.upVector.x * groundUp.x + lastPt.upVector.y * groundUp.y + lastPt.upVector.z * groundUp.z;
+
+                // If turning or riding onto ramp/wall slope
+                if (dotHeading < 0.9985 || dotUp < 0.9985) {
+                  isCurving = true;
+                }
+              }
+            }
+
+            // Adaptive spacing:
+            // High curve/ramp fidelity: 0.45m - 0.50m
+            // Straight high-speed run (up to 500 km/h): 0.50m to 2.20m (prevents point bloat by 80%)
+            const speedRatio = Math.min(1.0, speedKmh / 350.0);
+            const targetSpacing = isCurving ? 0.48 : (0.50 + speedRatio * 1.70);
+
+            if (dist >= targetSpacing) {
+              const steps = Math.min(3, Math.max(1, Math.floor(dist / targetSpacing)));
+              this.ensureBufferCapacity(data, steps);
+
+              if (steps > 1) {
+                for (let s = 1; s <= steps; s++) {
+                  const frac = s / steps;
+                  const subPos = lastPt.groundPos.clone().lerp(groundPos, frac);
+                  const subUp = lastPt.upVector.clone().lerp(groundUp, frac).normalize();
+                  pts.push({
+                    groundPos: subPos,
+                    upVector: subUp,
+                    age: 0,
+                    lifetime: wallDuration,
+                    sinkDuration,
+                    wallHeight,
+                    distance: lastPt.distance + dist * frac,
+                    currentHeight: wallHeight
+                  });
+                }
+              } else {
                 pts.push({
-                  groundPos: subPos,
-                  upVector: subUp,
+                  groundPos: groundPos.clone(),
+                  upVector: groundUp.clone(),
                   age: 0,
                   lifetime: wallDuration,
                   sinkDuration,
                   wallHeight,
-                  distance: lastPt.distance + dist * frac,
+                  distance: lastPt.distance + dist,
                   currentHeight: wallHeight
                 });
               }
-            } else {
-              pts.push({
-                groundPos: groundPos.clone(),
-                upVector: groundUp.clone(),
-                age: 0,
-                lifetime: wallDuration,
-                sinkDuration,
-                wallHeight,
-                distance: lastPt.distance + dist,
-                currentHeight: wallHeight
-              });
             }
           }
         }
@@ -392,6 +496,7 @@ export class VehicleTronWall {
             if (pt.collider && this.world) {
               this.world.removeCollider(pt.collider, false);
               pt.collider = null;
+              data.activeColliderCount = Math.max(0, data.activeColliderCount - 1);
             }
             pts.splice(pIdx, 1);
           }
@@ -401,10 +506,12 @@ export class VehicleTronWall {
         // An active strip that was just started naturally has 1 point and MUST NOT be deleted!
         const isAbandoned = data.activeStrip !== strip && pts.length < 2;
         if (pts.length === 0 || isAbandoned) {
-          for (const pt of pts) {
+          for (let p = 0; p < pts.length; p++) {
+            const pt = pts[p];
             if (pt.collider && this.world) {
               this.world.removeCollider(pt.collider, false);
               pt.collider = null;
+              data.activeColliderCount = Math.max(0, data.activeColliderCount - 1);
             }
           }
           if (data.activeStrip === strip) {
@@ -416,36 +523,80 @@ export class VehicleTronWall {
 
       // 3. Optional Physical Colliders in Rapier
       if (this.world) {
-        for (const strip of data.strips) {
-          const pts = strip.points;
-          const isThisActiveStrip = data.activeStrip === strip;
-          const ptsLen = pts.length;
+        if (!hasCollision && data.activeColliderCount > 0) {
+          // If collision toggled off, cleanly purge all colliders
+          for (let s = 0; s < data.strips.length; s++) {
+            const pts = data.strips[s].points;
+            for (let p = 0; p < pts.length; p++) {
+              if (pts[p].collider) {
+                this.world.removeCollider(pts[p].collider, false);
+                pts[p].collider = null;
+              }
+            }
+          }
+          data.activeColliderCount = 0;
+        } else if (hasCollision) {
+          for (let sIdx = 0; sIdx < data.strips.length; sIdx++) {
+            const strip = data.strips[sIdx];
+            const pts = strip.points;
+            const isThisActiveStrip = data.activeStrip === strip;
+            const ptsLen = pts.length;
 
-          for (let i = 0; i < ptsLen - 1; i++) {
-            const p0 = pts[i];
-            const p1 = pts[i + 1];
-            const avgH = (p0.currentHeight + p1.currentHeight) * 0.5;
+            for (let i = 0; i < ptsLen - 1; i++) {
+              const p0 = pts[i];
+              const p1 = pts[i + 1];
+              const avgH = (p0.currentHeight + p1.currentHeight) * 0.5;
 
-            const segVec = p1.groundPos.clone().sub(p0.groundPos);
-            const segLen = segVec.length();
-            const mid = p0.groundPos.clone().add(p1.groundPos).multiplyScalar(0.5);
+              // If collider already exists, only check if it needs to be removed due to sinking
+              if (p0.collider) {
+                if (avgH < 0.45) {
+                  this.world.removeCollider(p0.collider, false);
+                  p0.collider = null;
+                  data.activeColliderCount = Math.max(0, data.activeColliderCount - 1);
+                }
+                continue;
+              }
 
-            // The immediate tail wake directly behind the vehicle is kept uncollided
-            // to allow smooth forward acceleration, ramp climbs, and wall riding without sticking.
-            // Active strip: only the newest 5 segments (~1.3m behind rear wheel) are uncollided.
-            // Inactive strip: segments within 1.6m of the stopped bike wait until the bike moves away to arm.
-            const segsFromHead = isThisActiveStrip ? (ptsLen - 1 - i) : 999;
-            const isTailWake = isThisActiveStrip ? (segsFromHead < 6) : (mid.distanceTo(bike.position) < 1.6);
-            const canArmCollider = hasCollision && avgH >= 0.45 && segLen >= 0.15 && !isTailWake;
+              // Only continue if wall is high enough to collide
+              if (avgH < 0.45) continue;
 
-            if (canArmCollider && !p0.collider) {
+              // Tail wake protection:
+              // The newest segments directly behind the rear wheel are uncollided (~1.8m)
+              // to prevent sticky ramps, wall-ride self-collision, and reverse issues.
+              const midX = (p0.groundPos.x + p1.groundPos.x) * 0.5;
+              const midY = (p0.groundPos.y + p1.groundPos.y) * 0.5;
+              const midZ = (p0.groundPos.z + p1.groundPos.z) * 0.5;
+
+              const dx = midX - rearWheelWorld.x;
+              const dy = midY - rearWheelWorld.y;
+              const dz = midZ - rearWheelWorld.z;
+              const distSqToWheel = dx * dx + dy * dy + dz * dz;
+
+              const segsFromHead = isThisActiveStrip ? (ptsLen - 1 - i) : 999;
+              const isTailWake = isThisActiveStrip
+                ? (segsFromHead < 2 || distSqToWheel < 3.4)
+                : (distSqToWheel < 2.5);
+
+              if (isTailWake) continue;
+
+              const sx = p1.groundPos.x - p0.groundPos.x;
+              const sy = p1.groundPos.y - p0.groundPos.y;
+              const sz = p1.groundPos.z - p0.groundPos.z;
+              const segLen = Math.sqrt(sx * sx + sy * sy + sz * sz);
+              if (segLen < 0.15) continue;
+
+              // Enforce collider budget across the bike
+              if (data.activeColliderCount >= this.maxCollidersPerBike) {
+                this.purgeOldestCollider(data);
+              }
+
               const segUp = p0.upVector.clone().add(p1.upVector).normalize();
               if (segUp.lengthSq() < 0.01) segUp.copy(p0.upVector).normalize();
 
-              const colMid = mid.clone().addScaledVector(segUp, avgH * 0.5);
+              const colMid = new THREE.Vector3(midX, midY, midZ).addScaledVector(segUp, avgH * 0.5);
 
               const yAxis = segUp.clone();
-              const zAxis = segVec.clone().normalize();
+              const zAxis = new THREE.Vector3(sx, sy, sz).normalize();
               // Compute right-handed orthonormal basis: xAxis = yAxis × zAxis (determinant = +1.0)
               const xAxis = new THREE.Vector3().crossVectors(yAxis, zAxis).normalize();
               if (xAxis.lengthSq() < 0.001) {
@@ -459,8 +610,7 @@ export class VehicleTronWall {
               const rotMat = new THREE.Matrix4().makeBasis(xAxis, yAxis, zAxis);
               const quat = new THREE.Quaternion().setFromRotationMatrix(rotMat);
 
-              // 0.52m thickness ensures motorbikes (38cm side wheel raycasts) and players have
-              // a stable, wide surface to drive and walk on top of the wall without slipping off.
+              // 0.52m thickness ensures motorbikes and players have a stable, wide surface to drive and walk on top
               const thickness = 0.52;
               const halfThick = thickness * 0.5;
               const halfHeight = avgH * 0.5;
@@ -475,23 +625,17 @@ export class VehicleTronWall {
               const col = this.world.createCollider(colDesc);
               (col as any).isTronWall = true;
               (col as any).ownerBike = bike;
-              (col as any).segMid = mid.clone();
+              (col as any).segMid = new THREE.Vector3(midX, midY, midZ);
               (col as any).segAge = p0.age;
 
               p0.collider = col;
-            } else if ((!hasCollision || avgH < 0.45) && p0.collider) {
-              // ONLY remove a collider when physical collision is disabled or the wall has sunk into the ground!
-              // NEVER remove a collider when the vehicle approaches it!
-              this.world.removeCollider(p0.collider, false);
-              p0.collider = null;
-            } else if (p0.collider) {
-              (p0.collider as any).segAge = p0.age;
+              data.activeColliderCount++;
             }
           }
         }
       }
 
-      // 4. Rebuild 3D BufferGeometry
+      // 4. Rebuild 3D BufferGeometry with ZERO garbage collection allocations
       const posAttr = data.geometry.getAttribute('position') as THREE.BufferAttribute;
       const colAttr = data.geometry.getAttribute('color') as THREE.BufferAttribute;
       const uvAttr = data.geometry.getAttribute('uv') as THREE.BufferAttribute;
@@ -509,7 +653,8 @@ export class VehicleTronWall {
       let colOffset = 0;
       let indexOffset = 0;
 
-      for (const strip of data.strips) {
+      for (let sIdx = 0; sIdx < data.strips.length; sIdx++) {
+        const strip = data.strips[sIdx];
         const pts = strip.points;
         if (pts.length < 2) continue;
 
@@ -526,18 +671,33 @@ export class VehicleTronWall {
             alpha = Math.pow(Math.max(0, 1.0 - sinkProgress), 1.2);
           }
 
-          // Bottom vertex (ground seal, slightly elevated 2cm to avoid z-fighting)
-          const bPos = pt.groundPos.clone().addScaledVector(pt.upVector, 0.02);
-          // Top vertex (sinks down towards ground as currentHeight decreases!)
-          const tPos = bPos.clone().addScaledVector(pt.upVector, pt.currentHeight);
+          const gx = pt.groundPos.x;
+          const gy = pt.groundPos.y;
+          const gz = pt.groundPos.z;
 
-          posArr[vertOffset] = bPos.x;
-          posArr[vertOffset + 1] = bPos.y;
-          posArr[vertOffset + 2] = bPos.z;
+          const ux = pt.upVector.x;
+          const uy = pt.upVector.y;
+          const uz = pt.upVector.z;
 
-          posArr[vertOffset + 3] = tPos.x;
-          posArr[vertOffset + 4] = tPos.y;
-          posArr[vertOffset + 5] = tPos.z;
+          const ch = pt.currentHeight;
+
+          // Bottom vertex: ground contact seal, elevated 2cm to prevent z-fighting with terrain
+          const bx = gx + ux * 0.02;
+          const by = gy + uy * 0.02;
+          const bz = gz + uz * 0.02;
+
+          // Top vertex: rises from bottom by currentHeight along surface normal
+          const tx = bx + ux * ch;
+          const ty = by + uy * ch;
+          const tz = bz + uz * ch;
+
+          posArr[vertOffset] = bx;
+          posArr[vertOffset + 1] = by;
+          posArr[vertOffset + 2] = bz;
+
+          posArr[vertOffset + 3] = tx;
+          posArr[vertOffset + 4] = ty;
+          posArr[vertOffset + 5] = tz;
 
           // Texture coordinates along length
           const u = pt.distance * 0.40;
@@ -607,15 +767,17 @@ export class VehicleTronWall {
     const data = this.tronByBike.get(bike);
     if (data) {
       if (this.world) {
-        for (const strip of data.strips) {
-          for (const pt of strip.points) {
-            if (pt.collider) {
-              this.world.removeCollider(pt.collider, false);
-              pt.collider = null;
+        for (let s = 0; s < data.strips.length; s++) {
+          const pts = data.strips[s].points;
+          for (let p = 0; p < pts.length; p++) {
+            if (pts[p].collider) {
+              this.world.removeCollider(pts[p].collider, false);
+              pts[p].collider = null;
             }
           }
         }
       }
+      data.activeColliderCount = 0;
       data.strips = [];
       data.activeStrip = null;
       data.geometry.setDrawRange(0, 0);

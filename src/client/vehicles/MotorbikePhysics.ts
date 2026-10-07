@@ -168,8 +168,17 @@ export class MotorbikePhysics {
     const departing = this.departingRiders.get(bike);
     if (departing) { departing.remaining -= dt; if (departing.remaining <= 0) this.departingRiders.delete(bike); }
     const automatic = bike.userData.logicProperties?.autoStabilize !== false;
-    if (!automatic) state.groundRecovery = false;
-    const filter = (other: RAPIER.Collider) => other !== excluded && (!departing || departing.remaining <= 0 || other !== departing.collider);
+    const filter = (other: RAPIER.Collider) => {
+      if (other === excluded) return false;
+      if (departing && departing.remaining > 0 && other === departing.collider) return false;
+      const colAny = other as any;
+      if (colAny.isTronWall && colAny.ownerBike === bike) {
+        if (colAny.segMid && (colAny.segMid as THREE.Vector3).distanceTo(bike.position) < 3.0) {
+          return false;
+        }
+      }
+      return true;
+    };
     const steps = Math.max(1, Math.ceil(dt * 120));
     const h = dt / steps;
     let travel = 0;

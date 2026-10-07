@@ -29,6 +29,10 @@ interface BikeTronData {
   lastBikePos: THREE.Vector3;
   lowSpeedTimer: number;
   activeColliderCount: number;
+  // Dynamic live tip for continuous, jump-free ribbon stretching directly from the rear tire
+  liveTipPos: THREE.Vector3 | null;
+  liveTipUp: THREE.Vector3 | null;
+  liveTipDist: number;
 }
 
 export class VehicleTronWall {
@@ -165,7 +169,10 @@ export class VehicleTronWall {
         activeStrip: null,
         lastBikePos: bike.position.clone(),
         lowSpeedTimer: 0,
-        activeColliderCount: 0
+        activeColliderCount: 0,
+        liveTipPos: null,
+        liveTipUp: null,
+        liveTipDist: 0
       };
 
       this.tronByBike.set(bike, data);
@@ -260,6 +267,7 @@ export class VehicleTronWall {
       const sinkDuration = Math.max(0.2, Math.min(5.0, Number(props.tronWallSinkDuration ?? 1.2)));
       const minSpeedKmh = Math.max(1.0, Math.min(120.0, Number(props.tronWallMinSpeed ?? 15.0)));
       const hasCollision = props.tronWallCollision === true;
+      const animMode = props.tronWallAnimMode === 'instant' ? 'instant' : 'grow';
 
       const data = this.getOrCreateBikeTron(bike, colorHex);
 
@@ -285,6 +293,9 @@ export class VehicleTronWall {
         // When reversing, finalize active strip immediately and do not emit
         data.activeStrip = null;
         data.lowSpeedTimer = 0;
+        data.liveTipPos = null;
+        data.liveTipUp = null;
+        data.liveTipDist = 0;
       }
 
       // Only forward speed counts for emitting wall
@@ -312,6 +323,9 @@ export class VehicleTronWall {
       // Performance safeguard: do not emit walls into the void when falling off the map
       if (fallDeathY !== undefined && bike.position.y < fallDeathY + 2.0) {
         data.activeStrip = null;
+        data.liveTipPos = null;
+        data.liveTipUp = null;
+        data.liveTipDist = 0;
         continue;
       }
 
@@ -332,7 +346,7 @@ export class VehicleTronWall {
             // Exclude this bike's own immediate trailing wake so it doesn't self-stack into its own recent points
             const colAny = col as any;
             if (colAny.isTronWall && colAny.ownerBike === bike) {
-              if (colAny.segMid && (colAny.segMid as THREE.Vector3).distanceTo(rearWheelWorld) < 2.0) {
+              if (colAny.segMid && (colAny.segMid as THREE.Vector3).distanceTo(rearWheelWorld) < 3.0) {
                 return false;
               }
             }
@@ -359,6 +373,8 @@ export class VehicleTronWall {
           }
         }
 
+        const initialPointHeight = animMode === 'instant' ? wallHeight : Math.min(0.14, wallHeight * 0.08);
+
         if (!data.activeStrip) {
           this.ensureBufferCapacity(data, 1);
           const newStrip: TronWallStrip = { points: [] };
@@ -372,8 +388,13 @@ export class VehicleTronWall {
             sinkDuration,
             wallHeight,
             distance: 0,
-            currentHeight: wallHeight
+            currentHeight: initialPointHeight
           });
+
+          // Anchor the dynamic live tip right at the rear wheel
+          data.liveTipPos = groundPos.clone();
+          data.liveTipUp = groundUp.clone();
+          data.liveTipDist = 0;
         } else {
           const pts = data.activeStrip.points;
           const lastPt = pts[pts.length - 1];
@@ -393,9 +414,18 @@ export class VehicleTronWall {
               sinkDuration,
               wallHeight,
               distance: 0,
-              currentHeight: wallHeight
+              currentHeight: initialPointHeight
             });
+
+            data.liveTipPos = groundPos.clone();
+            data.liveTipUp = groundUp.clone();
+            data.liveTipDist = 0;
           } else {
+            // Continuously stretch the live tip to the moving vehicle every frame
+            data.liveTipPos = groundPos.clone();
+            data.liveTipUp = groundUp.clone();
+            data.liveTipDist = lastPt.distance + dist;
+
             // Curvature & incline change detection for adaptive LOD
             let isCurving = false;
             if (pts.length >= 2) {
@@ -441,12 +471,12 @@ export class VehicleTronWall {
                   pts.push({
                     groundPos: subPos,
                     upVector: subUp,
-                    age: 0,
+                    age: (1 - frac) * dt,
                     lifetime: wallDuration,
                     sinkDuration,
                     wallHeight,
                     distance: lastPt.distance + dist * frac,
-                    currentHeight: wallHeight
+                    currentHeight: initialPointHeight
                   });
                 }
               } else {
@@ -458,7 +488,7 @@ export class VehicleTronWall {
                   sinkDuration,
                   wallHeight,
                   distance: lastPt.distance + dist,
-                  currentHeight: wallHeight
+                  currentHeight: initialPointHeight
                 });
               }
             }
@@ -466,6 +496,9 @@ export class VehicleTronWall {
         }
       } else {
         // Vehicle stopped or below threshold: apply brief hysteresis before breaking the strip
+        data.liveTipPos = null;
+        data.liveTipUp = null;
+        data.liveTipDist = 0;
         data.lowSpeedTimer += dt;
         if (data.lowSpeedTimer > 0.25) {
           data.activeStrip = null;
@@ -473,6 +506,8 @@ export class VehicleTronWall {
       }
 
       // 2. Age points, calculate downward sinking, and prune expired points
+      const riseDuration = 0.22;
+
       for (let sIdx = data.strips.length - 1; sIdx >= 0; sIdx--) {
         const strip = data.strips[sIdx];
         const pts = strip.points;
@@ -481,15 +516,27 @@ export class VehicleTronWall {
           const pt = pts[pIdx];
           pt.age += dt;
 
+          let heightRatio = 1.0;
+          if (animMode === 'grow') {
+            if (pt.age < riseDuration) {
+              const riseProgress = Math.max(0, pt.age / riseDuration);
+              // Smoothstep curve (starts gentle, accelerates smoothly, lands softly)
+              heightRatio = riseProgress * riseProgress * (3.0 - 2.0 * riseProgress);
+            }
+          } else {
+            // Mode 'instant': immediate 100% full height without growth
+            heightRatio = 1.0;
+          }
+
+          // Sinking into the ground phase: smoothly drops height to 0
           const timeRemaining = Math.max(0, pt.lifetime - pt.age);
           if (timeRemaining < pt.sinkDuration) {
-            // Sinking into the ground phase: smoothly drops height to 0
             const sinkProgress = 1.0 - (timeRemaining / pt.sinkDuration);
             const sinkRatio = Math.pow(Math.max(0, 1.0 - sinkProgress), 1.4);
-            pt.currentHeight = pt.wallHeight * sinkRatio;
-          } else {
-            pt.currentHeight = pt.wallHeight;
+            heightRatio = Math.min(heightRatio, sinkRatio);
           }
+
+          pt.currentHeight = pt.wallHeight * heightRatio;
 
           // If expired (fully sunk into the ground)
           if (pt.age >= pt.lifetime) {
@@ -561,21 +608,16 @@ export class VehicleTronWall {
               if (avgH < 0.45) continue;
 
               // Tail wake protection:
-              // The newest segments directly behind the rear wheel are uncollided (~1.8m)
+              // The newest segments directly behind the rear wheel are uncollided (~2.6m)
               // to prevent sticky ramps, wall-ride self-collision, and reverse issues.
-              const midX = (p0.groundPos.x + p1.groundPos.x) * 0.5;
-              const midY = (p0.groundPos.y + p1.groundPos.y) * 0.5;
-              const midZ = (p0.groundPos.z + p1.groundPos.z) * 0.5;
-
-              const dx = midX - rearWheelWorld.x;
-              const dy = midY - rearWheelWorld.y;
-              const dz = midZ - rearWheelWorld.z;
-              const distSqToWheel = dx * dx + dy * dy + dz * dz;
-
+              const p1DistToWheel = p1.groundPos.distanceTo(rearWheelWorld);
+              const p0DistToWheel = p0.groundPos.distanceTo(rearWheelWorld);
               const segsFromHead = isThisActiveStrip ? (ptsLen - 1 - i) : 999;
+
+              // In active strip: keep at least 3 segments AND at least 2.6m behind rear wheel uncollided
               const isTailWake = isThisActiveStrip
-                ? (segsFromHead < 2 || distSqToWheel < 3.4)
-                : (distSqToWheel < 2.5);
+                ? (segsFromHead < 3 || p1DistToWheel < 2.6 || p0DistToWheel < 2.6)
+                : (p1DistToWheel < 2.0);
 
               if (isTailWake) continue;
 
@@ -593,6 +635,9 @@ export class VehicleTronWall {
               const segUp = p0.upVector.clone().add(p1.upVector).normalize();
               if (segUp.lengthSq() < 0.01) segUp.copy(p0.upVector).normalize();
 
+              const midX = (p0.groundPos.x + p1.groundPos.x) * 0.5;
+              const midY = (p0.groundPos.y + p1.groundPos.y) * 0.5;
+              const midZ = (p0.groundPos.z + p1.groundPos.z) * 0.5;
               const colMid = new THREE.Vector3(midX, midY, midZ).addScaledVector(segUp, avgH * 0.5);
 
               const yAxis = segUp.clone();
@@ -656,7 +701,11 @@ export class VehicleTronWall {
       for (let sIdx = 0; sIdx < data.strips.length; sIdx++) {
         const strip = data.strips[sIdx];
         const pts = strip.points;
-        if (pts.length < 2) continue;
+        const isThisActiveStrip = data.activeStrip === strip;
+        const hasLiveTip = isThisActiveStrip && data.liveTipPos !== null && pts.length >= 1;
+
+        if (pts.length < 1) continue;
+        if (pts.length < 2 && !hasLiveTip) continue;
 
         const stripStartVert = vertOffset / 3;
 
@@ -666,7 +715,10 @@ export class VehicleTronWall {
 
           const timeRemaining = Math.max(0, pt.lifetime - pt.age);
           let alpha = 1.0;
-          if (timeRemaining < pt.sinkDuration) {
+          if (animMode === 'grow' && pt.age < riseDuration) {
+            const riseProgress = Math.max(0, pt.age / riseDuration);
+            alpha = Math.min(1.0, 0.60 + 0.40 * riseProgress);
+          } else if (timeRemaining < pt.sinkDuration) {
             const sinkProgress = 1.0 - (timeRemaining / pt.sinkDuration);
             alpha = Math.pow(Math.max(0, 1.0 - sinkProgress), 1.2);
           }
@@ -731,8 +783,62 @@ export class VehicleTronWall {
           colOffset += 6;
         }
 
+        // Append dynamic live tip vertex pair to seal the ribbon directly to the moving vehicle
+        let hasAppendedLiveTip = false;
+        if (hasLiveTip && vertOffset + 6 <= posArr.length) {
+          const gx = data.liveTipPos!.x;
+          const gy = data.liveTipPos!.y;
+          const gz = data.liveTipPos!.z;
+
+          const ux = data.liveTipUp!.x;
+          const uy = data.liveTipUp!.y;
+          const uz = data.liveTipUp!.z;
+
+          // Tip height:
+          // 'instant' mode: full wallHeight at rear wheel!
+          // 'grow' mode: sleek emitter fin (~14cm) emerging from tire
+          const tipH = animMode === 'instant' ? wallHeight : Math.min(0.14, wallHeight * 0.08);
+
+          const bx = gx + ux * 0.02;
+          const by = gy + uy * 0.02;
+          const bz = gz + uz * 0.02;
+
+          const tx = bx + ux * tipH;
+          const ty = by + uy * tipH;
+          const tz = bz + uz * tipH;
+
+          posArr[vertOffset] = bx;
+          posArr[vertOffset + 1] = by;
+          posArr[vertOffset + 2] = bz;
+
+          posArr[vertOffset + 3] = tx;
+          posArr[vertOffset + 4] = ty;
+          posArr[vertOffset + 5] = tz;
+
+          const u = data.liveTipDist * 0.40;
+          uvArr[uvOffset] = u;
+          uvArr[uvOffset + 1] = 0.0;
+          uvArr[uvOffset + 2] = u;
+          uvArr[uvOffset + 3] = 1.0;
+
+          const tipAlpha = animMode === 'instant' ? 1.0 : 0.70;
+          colArr[colOffset] = baseColor.r * tipAlpha * 0.85;
+          colArr[colOffset + 1] = baseColor.g * tipAlpha * 0.85;
+          colArr[colOffset + 2] = baseColor.b * tipAlpha * 0.85;
+
+          colArr[colOffset + 3] = (baseColor.r * 0.50 + 0.50) * tipAlpha * 1.40;
+          colArr[colOffset + 4] = (baseColor.g * 0.50 + 0.50) * tipAlpha * 1.40;
+          colArr[colOffset + 5] = (baseColor.b * 0.50 + 0.50) * tipAlpha * 1.40;
+
+          vertOffset += 6;
+          uvOffset += 4;
+          colOffset += 6;
+          hasAppendedLiveTip = true;
+        }
+
         // Quad indices for this strip
-        const quadCount = pts.length - 1;
+        const totalVertPairs = pts.length + (hasAppendedLiveTip ? 1 : 0);
+        const quadCount = totalVertPairs - 1;
         for (let q = 0; q < quadCount; q++) {
           if (indexOffset + 6 > indexArr.length) break;
 
@@ -780,6 +886,9 @@ export class VehicleTronWall {
       data.activeColliderCount = 0;
       data.strips = [];
       data.activeStrip = null;
+      data.liveTipPos = null;
+      data.liveTipUp = null;
+      data.liveTipDist = 0;
       data.geometry.setDrawRange(0, 0);
     }
   }

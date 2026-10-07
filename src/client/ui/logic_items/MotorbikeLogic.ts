@@ -221,6 +221,28 @@ export class MotorbikeLogic {
     tronCollisionHint.textContent = 'Si se activa, el muro actúa como una barrera física sólida en el mundo que bloquea el paso mientras esté erguido.';
     tronWallSettings.appendChild(tronCollisionHint);
 
+    const tronAnimRow = document.createElement('label');
+    tronAnimRow.style.cssText = 'display:flex;align-items:center;justify-content:space-between;color:#ccc;font-size:12px;margin:6px 0 2px 0;gap:8px;';
+    tronAnimRow.textContent = 'Animación de salida: ';
+    const tronAnimSelect = document.createElement('select');
+    tronAnimSelect.style.cssText = 'background:#1a1a2e;color:#00f0ff;border:1px solid #00f0ff;border-radius:4px;padding:3px 6px;font-size:11px;cursor:pointer;outline:none;';
+    const optGrow = document.createElement('option');
+    optGrow.value = 'grow';
+    optGrow.textContent = '🌊 Elevación progresiva (crece desde el suelo)';
+    const optInstant = document.createElement('option');
+    optInstant.value = 'instant';
+    optInstant.textContent = '⚡ Aparición directa (altura completa sin crecer)';
+    tronAnimSelect.append(optGrow, optInstant);
+    tronAnimSelect.value = normalizeMotorbikeSettings(props).tronWallAnimMode || 'grow';
+    tronAnimSelect.onchange = () => update('tronWallAnimMode', tronAnimSelect.value);
+    tronAnimRow.appendChild(tronAnimSelect);
+    tronWallSettings.appendChild(tronAnimRow);
+
+    const tronAnimHint = document.createElement('p');
+    tronAnimHint.style.cssText = hint.style.cssText;
+    tronAnimHint.textContent = 'Permite elegir si el muro surge creciendo progresivamente desde el suelo o si emerge de inmediato a su altura completa con desplazamiento fluido.';
+    tronWallSettings.appendChild(tronAnimHint);
+
     const tronWallKeys = ['tronWallHeight', 'tronWallDuration', 'tronWallSinkDuration', 'tronWallMinSpeed'];
 
     const speedEffectKeys = [

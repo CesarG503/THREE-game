@@ -72,6 +72,7 @@ export type MotorbikeSettings = Record<(typeof MOTORBIKE_FIELDS)[number]['key'],
   tronWallEnabled: boolean;
   tronWallColor: string;
   tronWallCollision: boolean;
+  tronWallAnimMode: 'grow' | 'instant';
 };
 
 export function normalizeMotorbikeSettings(props: any = {}): MotorbikeSettings {
@@ -94,6 +95,7 @@ export function normalizeMotorbikeSettings(props: any = {}): MotorbikeSettings {
   result.tronWallEnabled = props.tronWallEnabled === true;
   result.tronWallColor = typeof props.tronWallColor === 'string' && props.tronWallColor ? props.tronWallColor : '#00f0ff';
   result.tronWallCollision = props.tronWallCollision === true;
+  result.tronWallAnimMode = props.tronWallAnimMode === 'instant' ? 'instant' : 'grow';
   for (const field of MOTORBIKE_FIELDS) {
     const value = Number(props[field.key] ?? field.value);
     result[field.key] = Number.isFinite(value) ? Math.min(field.max, Math.max(field.min, value)) : field.value;

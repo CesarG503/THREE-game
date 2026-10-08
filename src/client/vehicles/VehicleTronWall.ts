@@ -289,8 +289,26 @@ export class VehicleTronWall {
       // If motion speed is negative or physical displacement is moving backward
       const isReversing = motionSpeed < -0.15 || (motionSpeed <= 0.05 && frameForwardSpeed < -0.2);
 
-      if (isReversing) {
-        // When reversing, finalize active strip immediately and do not emit
+      if (isReversing && data.activeStrip) {
+        // When reversing, finalize active strip cleanly right where the reverse began
+        const pts = data.activeStrip.points;
+        if (pts.length > 0 && data.liveTipPos) {
+          const lastPt = pts[pts.length - 1];
+          const finalDist = lastPt.groundPos.distanceTo(data.liveTipPos);
+          if (finalDist >= 0.15) {
+            this.ensureBufferCapacity(data, 1);
+            pts.push({
+              groundPos: data.liveTipPos.clone(),
+              upVector: data.liveTipUp?.clone() ?? groundUp.clone(),
+              age: 0,
+              lifetime: wallDuration,
+              sinkDuration,
+              wallHeight,
+              distance: lastPt.distance + finalDist,
+              currentHeight: animMode === 'instant' ? wallHeight : lastPt.currentHeight
+            });
+          }
+        }
         data.activeStrip = null;
         data.lowSpeedTimer = 0;
         data.liveTipPos = null;
@@ -311,7 +329,15 @@ export class VehicleTronWall {
       }
 
       const speedKmh = Math.max(0, forwardSpeedMs) * 3.6;
-      const isFastEnough = enabled && !isReversing && (speedKmh >= minSpeedKmh);
+
+      // Hysteresis on speed threshold:
+      // To start emitting: speed must reach minSpeedKmh (e.g. 15 km/h)
+      // Once already emitting: stays emitting down to stopSpeedKmh (e.g. 8.5 km/h)
+      // This completely prevents flickering and abrupt cutoffs when decelerating or hovering around threshold
+      const stopSpeedKmh = Math.max(4.0, minSpeedKmh * 0.55);
+      const isEmitting = data.activeStrip !== null;
+      const isAboveThreshold = isEmitting ? (speedKmh >= stopSpeedKmh) : (speedKmh >= minSpeedKmh);
+      const isFastEnough = enabled && !isReversing && isAboveThreshold;
 
       // 1. Emit new wall points if enabled, driving forward, and moving fast enough
       const dims = bike.userData.originalScale ?? { x: 0.85, y: 1.25, z: 2.4 };
@@ -329,49 +355,49 @@ export class VehicleTronWall {
         continue;
       }
 
-      if (isFastEnough) {
-        data.lowSpeedTimer = 0;
+      // Ground raycast directly beneath rear wheel to find exact surface (handles ramps and walls)
+      let groundPos = rearWheelWorld.clone().addScaledVector(bikeUp, -dims.y * 0.22);
+      let groundUp = bikeUp.clone();
 
-        // Ground raycast directly beneath rear wheel to find exact surface (handles ramps and walls)
-        let groundPos = rearWheelWorld.clone().addScaledVector(bikeUp, -dims.y * 0.22);
-        let groundUp = bikeUp.clone();
+      if (this.world) {
+        const rayOrigin = rearWheelWorld.clone().addScaledVector(bikeUp, 0.40);
+        const rayDir = bikeUp.clone().negate();
 
-        if (this.world) {
-          const rayOrigin = rearWheelWorld.clone().addScaledVector(bikeUp, 0.40);
-          const rayDir = bikeUp.clone().negate();
-
-          const filter = (col: RAPIER.Collider) => {
-            // Exclude emitting bike's own body collider
-            if (bike.userData.rigidBody && col === bike.userData.rigidBody.collider(0)) return false;
-            // Exclude this bike's own immediate trailing wake so it doesn't self-stack into its own recent points
-            const colAny = col as any;
-            if (colAny.isTronWall && colAny.ownerBike === bike) {
-              if (colAny.segMid && (colAny.segMid as THREE.Vector3).distanceTo(rearWheelWorld) < 3.0) {
-                return false;
-              }
-            }
-            return true;
-          };
-
-          const hit = this.world.castRayAndGetNormal(
-            new RAPIER.Ray(rayOrigin, rayDir),
-            dims.y * 1.6,
-            true,
-            RAPIER.QueryFilterFlags.EXCLUDE_SENSORS,
-            undefined,
-            undefined,
-            bike.userData.rigidBody,
-            filter
-          );
-
-          if (hit && Number.isFinite(hit.timeOfImpact)) {
-            groundPos = rayOrigin.clone().addScaledVector(rayDir, hit.timeOfImpact);
-            const hitNormal = new THREE.Vector3().copy(hit.normal as THREE.Vector3);
-            if (hitNormal.dot(bikeUp) > 0.25) {
-              groundUp.copy(hitNormal);
+        const filter = (col: RAPIER.Collider) => {
+          // Exclude emitting bike's own body collider
+          if (bike.userData.rigidBody && col === bike.userData.rigidBody.collider(0)) return false;
+          // Exclude this bike's own immediate trailing wake so it doesn't self-stack into its own recent points
+          const colAny = col as any;
+          if (colAny.isTronWall && colAny.ownerBike === bike) {
+            if (colAny.segMid && (colAny.segMid as THREE.Vector3).distanceTo(rearWheelWorld) < 2.5) {
+              return false;
             }
           }
+          return true;
+        };
+
+        const hit = this.world.castRayAndGetNormal(
+          new RAPIER.Ray(rayOrigin, rayDir),
+          dims.y * 1.6,
+          true,
+          RAPIER.QueryFilterFlags.EXCLUDE_SENSORS,
+          undefined,
+          undefined,
+          bike.userData.rigidBody,
+          filter
+        );
+
+        if (hit && Number.isFinite(hit.timeOfImpact)) {
+          groundPos = rayOrigin.clone().addScaledVector(rayDir, hit.timeOfImpact);
+          const hitNormal = new THREE.Vector3().copy(hit.normal as THREE.Vector3);
+          if (hitNormal.dot(bikeUp) > 0.25) {
+            groundUp.copy(hitNormal);
+          }
         }
+      }
+
+      if (isFastEnough) {
+        data.lowSpeedTimer = 0;
 
         const initialPointHeight = animMode === 'instant' ? wallHeight : Math.min(0.14, wallHeight * 0.08);
 
@@ -495,13 +521,52 @@ export class VehicleTronWall {
           }
         }
       } else {
-        // Vehicle stopped or below threshold: apply brief hysteresis before breaking the strip
-        data.liveTipPos = null;
-        data.liveTipUp = null;
-        data.liveTipDist = 0;
-        data.lowSpeedTimer += dt;
-        if (data.lowSpeedTimer > 0.25) {
-          data.activeStrip = null;
+        // Vehicle stopped or below threshold: apply smooth deceleration grace period
+        if (data.activeStrip) {
+          data.lowSpeedTimer += dt;
+
+          // While rolling to a stop (brief 0.30s grace window):
+          // Keep stretching the live tip smoothly to the bike as it glides to rest!
+          if (data.lowSpeedTimer < 0.30 && forwardSpeedMs > 0.08 && data.liveTipPos) {
+            data.liveTipPos.copy(groundPos);
+            data.liveTipUp.copy(groundUp);
+            const pts = data.activeStrip.points;
+            const lastPt = pts[pts.length - 1];
+            if (lastPt) {
+              data.liveTipDist = lastPt.distance + lastPt.groundPos.distanceTo(groundPos);
+            }
+          } else {
+            // The vehicle has fully come to a stop or grace timer expired:
+            // Cleanly commit the final point right where the rear wheel stopped!
+            const pts = data.activeStrip.points;
+            if (pts.length > 0) {
+              const lastPt = pts[pts.length - 1];
+              const finalDist = lastPt.groundPos.distanceTo(groundPos);
+              if (finalDist >= 0.15) {
+                this.ensureBufferCapacity(data, 1);
+                pts.push({
+                  groundPos: groundPos.clone(),
+                  upVector: groundUp.clone(),
+                  age: 0,
+                  lifetime: wallDuration,
+                  sinkDuration,
+                  wallHeight,
+                  distance: lastPt.distance + finalDist,
+                  currentHeight: animMode === 'instant' ? wallHeight : lastPt.currentHeight
+                });
+              }
+            }
+            data.activeStrip = null;
+            data.liveTipPos = null;
+            data.liveTipUp = null;
+            data.liveTipDist = 0;
+            data.lowSpeedTimer = 0;
+          }
+        } else {
+          data.liveTipPos = null;
+          data.liveTipUp = null;
+          data.liveTipDist = 0;
+          data.lowSpeedTimer = 0;
         }
       }
 
@@ -608,16 +673,14 @@ export class VehicleTronWall {
               if (avgH < 0.45) continue;
 
               // Tail wake protection:
-              // The newest segments directly behind the rear wheel are uncollided (~2.6m)
-              // to prevent sticky ramps, wall-ride self-collision, and reverse issues.
-              const p1DistToWheel = p1.groundPos.distanceTo(rearWheelWorld);
-              const p0DistToWheel = p0.groundPos.distanceTo(rearWheelWorld);
+              // Only applies while this strip is actively being emitted by the moving bike.
+              // We do not arm a collider on the newest 1 segment directly behind the tire (~1.3m)
+              // so forward acceleration and ramp climbs never catch on the emerging wake.
+              // All older segments behind that HAVE FULL SOLID COLLIDERS!
+              // Inactive strips (when stopped or finished) have ALL segments solidly collidable!
               const segsFromHead = isThisActiveStrip ? (ptsLen - 1 - i) : 999;
-
-              // In active strip: keep at least 3 segments AND at least 2.6m behind rear wheel uncollided
-              const isTailWake = isThisActiveStrip
-                ? (segsFromHead < 3 || p1DistToWheel < 2.6 || p0DistToWheel < 2.6)
-                : (p1DistToWheel < 2.0);
+              const p1DistToWheel = p1.groundPos.distanceTo(rearWheelWorld);
+              const isTailWake = isThisActiveStrip && (segsFromHead <= 1 || p1DistToWheel < 1.3);
 
               if (isTailWake) continue;
 

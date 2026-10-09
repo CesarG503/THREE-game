@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import RAPIER from '@dimforge/rapier3d-compat';
 import type { MotorbikeVisual } from './MotorbikeModel';
 import { normalizeMotorbikeSettings } from './MotorbikeSettings';
+import { getControllerDamage } from '../utils/DamageController';
 
 interface TronWallPoint {
   groundPos: THREE.Vector3;
@@ -33,6 +34,7 @@ interface BikeTronData {
   liveTipPos: THREE.Vector3 | null;
   liveTipUp: THREE.Vector3 | null;
   liveTipDist: number;
+  lastDamageHits: Map<any, number>;
 }
 
 export class VehicleTronWall {
@@ -44,7 +46,7 @@ export class VehicleTronWall {
   // Physical collider budget per bike (prevents Rapier physics saturation in multiplayer while keeping 500m+ of solid wall)
   private maxCollidersPerBike = 250;
 
-  constructor(private scene: THREE.Scene, private world?: RAPIER.World) {
+  constructor(private scene: THREE.Scene, private world?: RAPIER.World, private game?: any) {
     this.wallTexture = this.createTronWallTexture();
   }
 
@@ -172,7 +174,8 @@ export class VehicleTronWall {
         activeColliderCount: 0,
         liveTipPos: null,
         liveTipUp: null,
-        liveTipDist: 0
+        liveTipDist: 0,
+        lastDamageHits: new Map()
       };
 
       this.tronByBike.set(bike, data);
@@ -332,9 +335,9 @@ export class VehicleTronWall {
 
       // Hysteresis on speed threshold:
       // To start emitting: speed must reach minSpeedKmh (e.g. 15 km/h)
-      // Once already emitting: stays emitting down to stopSpeedKmh (e.g. 8.5 km/h)
+      // Once already emitting: stays emitting down to stopSpeedKmh (~1.8 km/h or forwardSpeedMs >= 0.4 m/s)
       // This completely prevents flickering and abrupt cutoffs when decelerating or hovering around threshold
-      const stopSpeedKmh = Math.max(4.0, minSpeedKmh * 0.55);
+      const stopSpeedKmh = Math.max(1.8, Math.min(minSpeedKmh * 0.4, 4.0));
       const isEmitting = data.activeStrip !== null;
       const isAboveThreshold = isEmitting ? (speedKmh >= stopSpeedKmh) : (speedKmh >= minSpeedKmh);
       const isFastEnough = enabled && !isReversing && isAboveThreshold;
@@ -525,9 +528,9 @@ export class VehicleTronWall {
         if (data.activeStrip) {
           data.lowSpeedTimer += dt;
 
-          // While rolling to a stop (brief 0.30s grace window):
+          // While rolling to a stop (brief 0.35s grace window):
           // Keep stretching the live tip smoothly to the bike as it glides to rest!
-          if (data.lowSpeedTimer < 0.30 && forwardSpeedMs > 0.08 && data.liveTipPos) {
+          if (data.lowSpeedTimer < 0.35 && forwardSpeedMs > 0.05 && data.liveTipPos) {
             data.liveTipPos.copy(groundPos);
             data.liveTipUp.copy(groundUp);
             const pts = data.activeStrip.points;
@@ -542,7 +545,7 @@ export class VehicleTronWall {
             if (pts.length > 0) {
               const lastPt = pts[pts.length - 1];
               const finalDist = lastPt.groundPos.distanceTo(groundPos);
-              if (finalDist >= 0.15) {
+              if (finalDist >= 0.08) {
                 this.ensureBufferCapacity(data, 1);
                 pts.push({
                   groundPos: groundPos.clone(),
@@ -552,6 +555,19 @@ export class VehicleTronWall {
                   sinkDuration,
                   wallHeight,
                   distance: lastPt.distance + finalDist,
+                  currentHeight: animMode === 'instant' ? wallHeight : lastPt.currentHeight
+                });
+              } else if (pts.length === 1) {
+                // If strip only had 1 point, add an offset point so it has at least 2 points and is never deleted as abandoned
+                const offsetPos = groundPos.clone().addScaledVector(bikeForward, -0.2);
+                pts.unshift({
+                  groundPos: offsetPos,
+                  upVector: groundUp.clone(),
+                  age: 0,
+                  lifetime: wallDuration,
+                  sinkDuration,
+                  wallHeight,
+                  distance: 0,
                   currentHeight: animMode === 'instant' ? wallHeight : lastPt.currentHeight
                 });
               }
@@ -701,7 +717,7 @@ export class VehicleTronWall {
               const midX = (p0.groundPos.x + p1.groundPos.x) * 0.5;
               const midY = (p0.groundPos.y + p1.groundPos.y) * 0.5;
               const midZ = (p0.groundPos.z + p1.groundPos.z) * 0.5;
-              const colMid = new THREE.Vector3(midX, midY, midZ).addScaledVector(segUp, avgH * 0.5);
+              const colMid = new THREE.Vector3(midX, midY, midZ).addScaledVector(segUp, wallHeight * 0.5);
 
               const yAxis = segUp.clone();
               const zAxis = new THREE.Vector3(sx, sy, sz).normalize();
@@ -721,7 +737,7 @@ export class VehicleTronWall {
               // 0.52m thickness ensures motorbikes and players have a stable, wide surface to drive and walk on top
               const thickness = 0.52;
               const halfThick = thickness * 0.5;
-              const halfHeight = avgH * 0.5;
+              const halfHeight = wallHeight * 0.5;
               const halfLen = segLen * 0.5 + 0.02;
 
               const colDesc = RAPIER.ColliderDesc.cuboid(halfThick, halfHeight, halfLen);
@@ -929,6 +945,258 @@ export class VehicleTronWall {
       uvAttr.needsUpdate = true;
       indexAttr.needsUpdate = true;
       data.geometry.setDrawRange(0, indexOffset);
+
+      // 5. Evaluate Damage Controller for this vehicle's Tron wall against players and vehicles
+      this.processTronWallDamage(bike, data, props, rearWheelWorld, bikes);
+    }
+  }
+
+  /**
+   * Evaluates collision and proximity between Tron light walls and entities (players and vehicles),
+   * applying the configured Damage Controller logic:
+   * - Base damage, percentage damage, instant kill, max damage cap
+   * - Cooldown between damage instances per entity
+   * - Damage stop limit & accumulator
+   * - Knockback impulse
+   * - Floating damage text
+   */
+  private processTronWallDamage(
+    bike: MotorbikeVisual,
+    data: BikeTronData,
+    props: ReturnType<typeof normalizeMotorbikeSettings>,
+    rearWheelWorld: THREE.Vector3,
+    bikes: MotorbikeVisual[]
+  ) {
+    if (!props.tronWallDamageEnabled) return;
+
+    // Damage Controller properties
+    const damageProps = {
+      damage: props.tronWallDamage,
+      percentDamage: props.tronWallPercentDamage,
+      instantKill: props.tronWallInstantKill,
+      maxDamage: props.tronWallMaxDamage,
+      damageCooldown: props.tronWallDamageCooldown,
+      enableDamageStopLimit: props.tronWallEnableDamageStopLimit,
+      damageStopLimit: props.tronWallDamageStopLimit,
+      accumulatedDamage: props.tronWallAccumulatedDamage
+    };
+
+    // If stop limit enabled and already reached, no more damage can be dealt
+    if (damageProps.enableDamageStopLimit && damageProps.accumulatedDamage >= damageProps.damageStopLimit) {
+      return;
+    }
+
+    const now = performance.now() / 1000;
+    const wallThickness = 0.52;
+    const cooldown = Math.max(0.05, Number(props.tronWallDamageCooldown ?? 0.8));
+
+    // Helper: Test if an entity at entityPos with collision radius touches any segment of any strip
+    const testWallContact = (
+      entityPos: THREE.Vector3,
+      entityRadius: number,
+      isOwnerBike: boolean
+    ): { hit: boolean; hitPos: THREE.Vector3; pushDir: THREE.Vector3 } | null => {
+      for (let sIdx = 0; sIdx < data.strips.length; sIdx++) {
+        const strip = data.strips[sIdx];
+        const pts = strip.points;
+        const ptsLen = pts.length;
+        if (ptsLen < 2) continue;
+
+        const isThisActiveStrip = data.activeStrip === strip;
+
+        for (let i = 0; i < ptsLen - 1; i++) {
+          const p0 = pts[i];
+          const p1 = pts[i + 1];
+
+          // Owner bike wake protection: do not damage emitting bike from its own emerging tire wake
+          if (isOwnerBike && isThisActiveStrip) {
+            const segsFromHead = ptsLen - 1 - i;
+            const p1DistToWheel = p1.groundPos.distanceTo(rearWheelWorld);
+            if (segsFromHead <= 2 || p1DistToWheel < 2.5) {
+              continue;
+            }
+          }
+
+          // Segments that have already sunk below ground do not deal damage
+          if (p0.currentHeight < 0.20 && p1.currentHeight < 0.20) continue;
+
+          // Segment vector
+          const sx = p1.groundPos.x - p0.groundPos.x;
+          const sy = p1.groundPos.y - p0.groundPos.y;
+          const sz = p1.groundPos.z - p0.groundPos.z;
+          const segLenSq = sx * sx + sy * sy + sz * sz;
+          if (segLenSq < 0.01) continue;
+
+          // Project entityPos onto line segment [p0.groundPos, p1.groundPos]
+          const ex = entityPos.x - p0.groundPos.x;
+          const ey = entityPos.y - p0.groundPos.y;
+          const ez = entityPos.z - p0.groundPos.z;
+          const t = Math.max(0, Math.min(1, (ex * sx + ey * sy + ez * sz) / segLenSq));
+
+          const projX = p0.groundPos.x + t * sx;
+          const projY = p0.groundPos.y + t * sy;
+          const projZ = p0.groundPos.z + t * sz;
+
+          const segUp = p0.upVector.clone().lerp(p1.upVector, t).normalize();
+          const segHeight = p0.currentHeight * (1 - t) + p1.currentHeight * t;
+
+          // Height relative to base
+          const dx = entityPos.x - projX;
+          const dy = entityPos.y - projY;
+          const dz = entityPos.z - projZ;
+
+          const heightOffset = dx * segUp.x + dy * segUp.y + dz * segUp.z;
+          if (heightOffset < -0.35 || heightOffset > segHeight + 0.60) {
+            continue;
+          }
+
+          // Lateral horizontal distance from wall plane
+          const latX = dx - segUp.x * heightOffset;
+          const latY = dy - segUp.y * heightOffset;
+          const latZ = dz - segUp.z * heightOffset;
+          const latDist = Math.sqrt(latX * latX + latY * latY + latZ * latZ);
+
+          const maxDist = wallThickness * 0.5 + entityRadius;
+          if (latDist <= maxDist) {
+            const hitPos = new THREE.Vector3(projX, projY, projZ).addScaledVector(segUp, Math.max(0.3, heightOffset));
+            let pushDir = new THREE.Vector3(latX, latY, latZ);
+            if (pushDir.lengthSq() > 0.001) {
+              pushDir.normalize();
+            } else {
+              // Fallback perpendicular to segment
+              pushDir.crossVectors(new THREE.Vector3(sx, sy, sz), segUp).normalize();
+            }
+            // Add slight upward component to knockback for dramatic effect
+            pushDir.addScaledVector(segUp, 0.25).normalize();
+
+            return { hit: true, hitPos, pushDir };
+          }
+        }
+      }
+      return null;
+    };
+
+    // 1. Damage local player
+    if (props.tronWallDamagePlayers && this.game?.character && !this.game.character.isDead) {
+      const char = this.game.character;
+      const charPos = char.getPosition();
+      const isRidingThisBike = bike.userData.vehicleDriver === (this.game.networkManager?.playerId || 'local');
+
+      const contact = testWallContact(charPos, 0.45, isRidingThisBike);
+      if (contact) {
+        const lastHit = data.lastDamageHits.get(char) || 0;
+        if (now - lastHit >= cooldown) {
+          const finalDamage = getControllerDamage(damageProps, char.maxHealth || 100);
+          if (finalDamage > 0) {
+            char.takeDamage(finalDamage);
+            data.lastDamageHits.set(char, now);
+
+            // Floating combat text
+            if (this.game.floatingTextManager) {
+              this.game.floatingTextManager.spawnText(
+                `-${finalDamage}`,
+                contact.hitPos.clone().add(new THREE.Vector3(0, 0.8, 0)),
+                props.tronWallInstantKill ? '#ff0033' : '#ff3344',
+                2.0
+              );
+            }
+
+            // Knockback impulse
+            if (props.tronWallEnableKnockback) {
+              const kForce = Number(props.tronWallKnockbackForce ?? 15);
+              if (char.momentum) {
+                char.momentum.addScaledVector(contact.pushDir, kForce);
+              }
+              if (char.verticalVelocity !== undefined) {
+                char.verticalVelocity = Math.max(char.verticalVelocity, kForce * 0.35);
+              }
+            }
+
+            // Accumulate damage
+            props.tronWallAccumulatedDamage = (props.tronWallAccumulatedDamage || 0) + finalDamage;
+            bike.userData.logicProperties.tronWallAccumulatedDamage = props.tronWallAccumulatedDamage;
+          }
+        }
+      }
+    }
+
+    // 2. Damage remote players
+    if (props.tronWallDamagePlayers && this.game?.networkManager?.remotePlayers) {
+      this.game.networkManager.remotePlayers.forEach((rp: any) => {
+        if (!rp || !rp.currentPosition) return;
+        const rpPos = rp.currentPosition;
+        const isRidingThisBike = bike.userData.vehicleDriver === rp.id;
+
+        const contact = testWallContact(rpPos, 0.45, isRidingThisBike);
+        if (contact) {
+          const lastHit = data.lastDamageHits.get(rp) || 0;
+          if (now - lastHit >= cooldown) {
+            const finalDamage = getControllerDamage(damageProps, 100);
+            if (finalDamage > 0) {
+              data.lastDamageHits.set(rp, now);
+              if (this.game.floatingTextManager) {
+                this.game.floatingTextManager.spawnText(
+                  `-${finalDamage}`,
+                  contact.hitPos.clone().add(new THREE.Vector3(0, 0.8, 0)),
+                  props.tronWallInstantKill ? '#ff0033' : '#ff3344',
+                  2.0
+                );
+              }
+
+              props.tronWallAccumulatedDamage = (props.tronWallAccumulatedDamage || 0) + finalDamage;
+              bike.userData.logicProperties.tronWallAccumulatedDamage = props.tronWallAccumulatedDamage;
+            }
+          }
+        }
+      });
+    }
+
+    // 3. Damage vehicles (motorbikes)
+    if (props.tronWallDamageVehicles && bikes && bikes.length > 0) {
+      for (const targetBike of bikes) {
+        if (!targetBike || !targetBike.parent) continue;
+        const isOwner = targetBike === bike;
+        const targetProps = normalizeMotorbikeSettings(targetBike.userData.logicProperties);
+        const maxHealth = targetProps.maxDurability || 100;
+
+        const contact = testWallContact(targetBike.position, 0.65, isOwner);
+        if (contact) {
+          const lastHit = data.lastDamageHits.get(targetBike) || 0;
+          if (now - lastHit >= cooldown) {
+            const finalDamage = getControllerDamage(damageProps, maxHealth);
+            if (finalDamage > 0) {
+              data.lastDamageHits.set(targetBike, now);
+
+              // Apply durability damage
+              if (this.game?.vehicleSystem?.durability) {
+                this.game.vehicleSystem.durability.damage(targetBike, finalDamage);
+              }
+
+              // Floating text
+              if (this.game?.floatingTextManager) {
+                this.game.floatingTextManager.spawnText(
+                  `-${finalDamage}`,
+                  contact.hitPos.clone().add(new THREE.Vector3(0, 1.0, 0)),
+                  props.tronWallInstantKill ? '#ff0000' : '#ff8800',
+                  2.0
+                );
+              }
+
+              // Vehicle knockback impulse
+              if (props.tronWallEnableKnockback && this.game?.vehicleSystem?.applyImpulse) {
+                const kForce = Number(props.tronWallKnockbackForce ?? 15);
+                this.game.vehicleSystem.applyImpulse(
+                  targetBike,
+                  contact.pushDir.clone().multiplyScalar(kForce * 25)
+                );
+              }
+
+              props.tronWallAccumulatedDamage = (props.tronWallAccumulatedDamage || 0) + finalDamage;
+              bike.userData.logicProperties.tronWallAccumulatedDamage = props.tronWallAccumulatedDamage;
+            }
+          }
+        }
+      }
     }
   }
 
@@ -952,6 +1220,7 @@ export class VehicleTronWall {
       data.liveTipPos = null;
       data.liveTipUp = null;
       data.liveTipDist = 0;
+      data.lastDamageHits.clear();
       data.geometry.setDrawRange(0, 0);
     }
   }

@@ -73,7 +73,7 @@ export class VehicleSystem {
     const scene = game.sceneManager?.scene ?? game.scene ?? new THREE.Scene();
     this.tireTracks = new TireTrackManager(scene);
     this.speedTrails = new VehicleSpeedTrails(scene);
-    this.tronWalls = new VehicleTronWall(scene, game.world);
+    this.tronWalls = new VehicleTronWall(scene, game.world, game);
     if (typeof document !== 'undefined') {
       this.hud = document.createElement('div');
       this.hud.id = 'motorbike-hud';

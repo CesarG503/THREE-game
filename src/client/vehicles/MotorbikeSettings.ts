@@ -73,6 +73,19 @@ export type MotorbikeSettings = Record<(typeof MOTORBIKE_FIELDS)[number]['key'],
   tronWallColor: string;
   tronWallCollision: boolean;
   tronWallAnimMode: 'grow' | 'instant';
+  tronWallDamageEnabled: boolean;
+  tronWallDamage: number;
+  tronWallPercentDamage: number;
+  tronWallInstantKill: boolean;
+  tronWallMaxDamage: number;
+  tronWallDamageCooldown: number;
+  tronWallEnableDamageStopLimit: boolean;
+  tronWallDamageStopLimit: number;
+  tronWallAccumulatedDamage: number;
+  tronWallEnableKnockback: boolean;
+  tronWallKnockbackForce: number;
+  tronWallDamagePlayers: boolean;
+  tronWallDamageVehicles: boolean;
 };
 
 export function normalizeMotorbikeSettings(props: any = {}): MotorbikeSettings {
@@ -96,6 +109,19 @@ export function normalizeMotorbikeSettings(props: any = {}): MotorbikeSettings {
   result.tronWallColor = typeof props.tronWallColor === 'string' && props.tronWallColor ? props.tronWallColor : '#00f0ff';
   result.tronWallCollision = props.tronWallCollision === true;
   result.tronWallAnimMode = props.tronWallAnimMode === 'instant' ? 'instant' : 'grow';
+  result.tronWallDamageEnabled = props.tronWallDamageEnabled === true;
+  result.tronWallDamage = Number.isFinite(Number(props.tronWallDamage)) ? Math.max(0, Number(props.tronWallDamage)) : 20;
+  result.tronWallPercentDamage = Number.isFinite(Number(props.tronWallPercentDamage)) ? Math.max(0, Math.min(100, Number(props.tronWallPercentDamage))) : 0;
+  result.tronWallInstantKill = props.tronWallInstantKill === true;
+  result.tronWallMaxDamage = Number.isFinite(Number(props.tronWallMaxDamage)) ? Math.max(1, Number(props.tronWallMaxDamage)) : 100;
+  result.tronWallDamageCooldown = Number.isFinite(Number(props.tronWallDamageCooldown)) ? Math.max(0.05, Number(props.tronWallDamageCooldown)) : 0.8;
+  result.tronWallEnableDamageStopLimit = props.tronWallEnableDamageStopLimit === true;
+  result.tronWallDamageStopLimit = Number.isFinite(Number(props.tronWallDamageStopLimit)) ? Math.max(1, Number(props.tronWallDamageStopLimit)) : 100;
+  result.tronWallAccumulatedDamage = Number.isFinite(Number(props.tronWallAccumulatedDamage)) ? Math.max(0, Number(props.tronWallAccumulatedDamage)) : 0;
+  result.tronWallEnableKnockback = props.tronWallEnableKnockback === true;
+  result.tronWallKnockbackForce = Number.isFinite(Number(props.tronWallKnockbackForce)) ? Math.max(0, Number(props.tronWallKnockbackForce)) : 15;
+  result.tronWallDamagePlayers = props.tronWallDamagePlayers !== false;
+  result.tronWallDamageVehicles = props.tronWallDamageVehicles !== false;
   for (const field of MOTORBIKE_FIELDS) {
     const value = Number(props[field.key] ?? field.value);
     result[field.key] = Number.isFinite(value) ? Math.min(field.max, Math.max(field.min, value)) : field.value;

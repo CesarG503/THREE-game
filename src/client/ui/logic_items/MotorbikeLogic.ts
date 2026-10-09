@@ -243,6 +243,217 @@ export class MotorbikeLogic {
     tronAnimHint.textContent = 'Permite elegir si el muro surge creciendo progresivamente desde el suelo o si emerge de inmediato a su altura completa con desplazamiento fluido.';
     tronWallSettings.appendChild(tronAnimHint);
 
+    // ==========================================
+    // CONTROLADOR DE DAÑO DEL MURO TRON
+    // ==========================================
+    const tronDmgGroup = document.createElement('div');
+    tronDmgGroup.style.cssText = 'border-top:1px solid #ff4444;margin-top:12px;padding-top:10px;display:flex;flex-direction:column;gap:8px;';
+
+    const tronDmgHeader = document.createElement('div');
+    tronDmgHeader.textContent = '💥 Controlador de Daño del Muro Tron';
+    tronDmgHeader.style.cssText = 'font-weight:bold;font-size:12px;color:#ff5555;margin-bottom:2px;';
+    tronDmgGroup.appendChild(tronDmgHeader);
+
+    const tronDmgEnableLabel = document.createElement('label');
+    tronDmgEnableLabel.style.cssText = penaltyLabel.style.cssText;
+    const tronDmgEnable = document.createElement('input');
+    tronDmgEnable.type = 'checkbox';
+    tronDmgEnable.checked = normalizeMotorbikeSettings(props).tronWallDamageEnabled;
+    tronDmgEnableLabel.append(tronDmgEnable, '⚔️ Habilitar Daño por Colisión');
+    tronDmgGroup.appendChild(tronDmgEnableLabel);
+
+    const tronDmgHint = document.createElement('p');
+    tronDmgHint.style.cssText = hint.style.cssText;
+    tronDmgHint.textContent = 'Aplica daño inmediato o continuo a los jugadores y vehículos que colisionen o toquen el muro de energía mientras esté activo.';
+    tronDmgGroup.appendChild(tronDmgHint);
+
+    const tronDmgContent = document.createElement('div');
+    tronDmgContent.style.cssText = 'display:flex;flex-direction:column;gap:8px;padding-left:12px;border-left:2px solid #ef4444;margin-top:2px;';
+    tronDmgGroup.appendChild(tronDmgContent);
+
+    // Target checkboxes
+    const tronDmgTargetsRow = document.createElement('div');
+    tronDmgTargetsRow.style.cssText = 'display:flex;flex-direction:column;gap:5px;background:#1a1a2e;padding:6px;border-radius:4px;';
+    const tronDmgTargetsTitle = document.createElement('span');
+    tronDmgTargetsTitle.textContent = 'Objetivos afectados por el muro:';
+    tronDmgTargetsTitle.style.cssText = 'font-size:10px;color:#aaa;font-weight:bold;';
+    tronDmgTargetsRow.appendChild(tronDmgTargetsTitle);
+
+    const tronDmgPlayersLabel = document.createElement('label');
+    tronDmgPlayersLabel.style.cssText = 'display:flex;align-items:center;gap:6px;color:#ccc;font-size:11px;cursor:pointer;';
+    const tronDmgPlayers = document.createElement('input');
+    tronDmgPlayers.type = 'checkbox';
+    tronDmgPlayers.checked = normalizeMotorbikeSettings(props).tronWallDamagePlayers;
+    tronDmgPlayers.onchange = () => update('tronWallDamagePlayers', tronDmgPlayers.checked);
+    tronDmgPlayersLabel.append(tronDmgPlayers, '👤 Dañar Jugadores (Personajes)');
+    tronDmgTargetsRow.appendChild(tronDmgPlayersLabel);
+
+    const tronDmgVehiclesLabel = document.createElement('label');
+    tronDmgVehiclesLabel.style.cssText = 'display:flex;align-items:center;gap:6px;color:#ccc;font-size:11px;cursor:pointer;';
+    const tronDmgVehicles = document.createElement('input');
+    tronDmgVehicles.type = 'checkbox';
+    tronDmgVehicles.checked = normalizeMotorbikeSettings(props).tronWallDamageVehicles;
+    tronDmgVehicles.onchange = () => update('tronWallDamageVehicles', tronDmgVehicles.checked);
+    tronDmgVehiclesLabel.append(tronDmgVehicles, '🏍️ Dañar Vehículos (Durabilidad)');
+    tronDmgTargetsRow.appendChild(tronDmgVehiclesLabel);
+    tronDmgContent.appendChild(tronDmgTargetsRow);
+
+    // Base damage
+    const tronDmgBaseRow = document.createElement('div');
+    tronDmgBaseRow.style.cssText = 'display:flex;flex-direction:column;gap:3px;';
+    const tronDmgBaseLabel = document.createElement('label');
+    tronDmgBaseLabel.textContent = 'Daño Base';
+    tronDmgBaseLabel.style.cssText = 'color:#aaa;font-size:10px;';
+    const tronDmgBaseInput = document.createElement('input');
+    tronDmgBaseInput.type = 'number';
+    tronDmgBaseInput.min = '0';
+    tronDmgBaseInput.value = String(normalizeMotorbikeSettings(props).tronWallDamage);
+    tronDmgBaseInput.style.cssText = 'background:#222;border:1px solid #555;color:white;padding:4px;font-size:11px;border-radius:4px;';
+    tronDmgBaseInput.onchange = () => update('tronWallDamage', Math.max(0, parseFloat(tronDmgBaseInput.value) || 0));
+    tronDmgBaseRow.append(tronDmgBaseLabel, tronDmgBaseInput);
+    tronDmgContent.appendChild(tronDmgBaseRow);
+
+    // Percent damage
+    const tronDmgPctRow = document.createElement('div');
+    tronDmgPctRow.style.cssText = 'display:flex;flex-direction:column;gap:3px;';
+    const tronDmgPctLabel = document.createElement('label');
+    tronDmgPctLabel.textContent = 'Daño Porcentual (%)';
+    tronDmgPctLabel.style.cssText = 'color:#aaa;font-size:10px;';
+    const tronDmgPctInput = document.createElement('input');
+    tronDmgPctInput.type = 'number';
+    tronDmgPctInput.min = '0';
+    tronDmgPctInput.max = '100';
+    tronDmgPctInput.value = String(normalizeMotorbikeSettings(props).tronWallPercentDamage);
+    tronDmgPctInput.style.cssText = 'background:#222;border:1px solid #555;color:white;padding:4px;font-size:11px;border-radius:4px;';
+    tronDmgPctInput.onchange = () => update('tronWallPercentDamage', Math.max(0, Math.min(100, parseFloat(tronDmgPctInput.value) || 0)));
+    tronDmgPctRow.append(tronDmgPctLabel, tronDmgPctInput);
+    tronDmgContent.appendChild(tronDmgPctRow);
+
+    // Instant kill
+    const tronDmgIkRow = document.createElement('label');
+    tronDmgIkRow.style.cssText = 'display:flex;align-items:center;gap:6px;color:#ccc;font-size:11px;cursor:pointer;margin-top:2px;';
+    const tronDmgIk = document.createElement('input');
+    tronDmgIk.type = 'checkbox';
+    tronDmgIk.checked = normalizeMotorbikeSettings(props).tronWallInstantKill;
+    tronDmgIk.onchange = () => update('tronWallInstantKill', tronDmgIk.checked);
+    tronDmgIkRow.append(tronDmgIk, '💀 Muerte Instantánea');
+    tronDmgContent.appendChild(tronDmgIkRow);
+
+    // Max damage per hit
+    const tronDmgMaxRow = document.createElement('div');
+    tronDmgMaxRow.style.cssText = 'display:flex;flex-direction:column;gap:3px;';
+    const tronDmgMaxLabel = document.createElement('label');
+    tronDmgMaxLabel.textContent = 'Límite Máximo Daño (por golpe)';
+    tronDmgMaxLabel.style.cssText = 'color:#aaa;font-size:10px;';
+    const tronDmgMaxInput = document.createElement('input');
+    tronDmgMaxInput.type = 'number';
+    tronDmgMaxInput.min = '1';
+    tronDmgMaxInput.value = String(normalizeMotorbikeSettings(props).tronWallMaxDamage);
+    tronDmgMaxInput.style.cssText = 'background:#222;border:1px solid #555;color:white;padding:4px;font-size:11px;border-radius:4px;';
+    tronDmgMaxInput.onchange = () => update('tronWallMaxDamage', Math.max(1, parseFloat(tronDmgMaxInput.value) || 100));
+    tronDmgMaxRow.append(tronDmgMaxLabel, tronDmgMaxInput);
+    tronDmgContent.appendChild(tronDmgMaxRow);
+
+    // Damage cooldown
+    const tronDmgCdRow = document.createElement('div');
+    tronDmgCdRow.style.cssText = 'display:flex;flex-direction:column;gap:3px;';
+    const tronDmgCdLabel = document.createElement('label');
+    tronDmgCdLabel.textContent = 'Intervalo Cooldown (s)';
+    tronDmgCdLabel.style.cssText = 'color:#aaa;font-size:10px;';
+    const tronDmgCdInput = document.createElement('input');
+    tronDmgCdInput.type = 'number';
+    tronDmgCdInput.step = '0.1';
+    tronDmgCdInput.min = '0.05';
+    tronDmgCdInput.value = String(normalizeMotorbikeSettings(props).tronWallDamageCooldown);
+    tronDmgCdInput.style.cssText = 'background:#222;border:1px solid #555;color:white;padding:4px;font-size:11px;border-radius:4px;';
+    tronDmgCdInput.onchange = () => update('tronWallDamageCooldown', Math.max(0.05, parseFloat(tronDmgCdInput.value) || 0.8));
+    tronDmgCdRow.append(tronDmgCdLabel, tronDmgCdInput);
+    tronDmgContent.appendChild(tronDmgCdRow);
+
+    // Stop limit
+    const tronDmgSlCheckRow = document.createElement('label');
+    tronDmgSlCheckRow.style.cssText = 'display:flex;align-items:center;gap:6px;color:#ccc;font-size:11px;cursor:pointer;margin-top:2px;';
+    const tronDmgSlCheck = document.createElement('input');
+    tronDmgSlCheck.type = 'checkbox';
+    tronDmgSlCheck.checked = normalizeMotorbikeSettings(props).tronWallEnableDamageStopLimit;
+    tronDmgSlCheckRow.append(tronDmgSlCheck, '🛑 Habilitar Límite de Daño Total (Stop)');
+    tronDmgContent.appendChild(tronDmgSlCheckRow);
+
+    const tronDmgSlInputRow = document.createElement('div');
+    tronDmgSlInputRow.style.cssText = 'display:flex;flex-direction:column;gap:3px;padding-left:14px;';
+    const tronDmgSlLabel = document.createElement('label');
+    tronDmgSlLabel.textContent = 'Límite Daño Acumulado';
+    tronDmgSlLabel.style.cssText = 'color:#aaa;font-size:10px;';
+    const tronDmgSlInput = document.createElement('input');
+    tronDmgSlInput.type = 'number';
+    tronDmgSlInput.min = '1';
+    tronDmgSlInput.value = String(normalizeMotorbikeSettings(props).tronWallDamageStopLimit);
+    tronDmgSlInput.style.cssText = 'background:#222;border:1px solid #555;color:white;padding:4px;font-size:11px;border-radius:4px;';
+    tronDmgSlInput.onchange = () => update('tronWallDamageStopLimit', Math.max(1, parseFloat(tronDmgSlInput.value) || 100));
+    tronDmgSlInputRow.append(tronDmgSlLabel, tronDmgSlInput);
+    tronDmgContent.appendChild(tronDmgSlInputRow);
+
+    tronDmgSlCheck.onchange = () => {
+      update('tronWallEnableDamageStopLimit', tronDmgSlCheck.checked);
+      tronDmgSlInputRow.style.display = tronDmgSlCheck.checked ? 'flex' : 'none';
+    };
+    tronDmgSlInputRow.style.display = tronDmgSlCheck.checked ? 'flex' : 'none';
+
+    // Accumulated damage display and reset
+    const tronDmgAccRow = document.createElement('div');
+    tronDmgAccRow.style.cssText = 'display:flex;justify-content:space-between;align-items:center;background:#1a1a1a;padding:6px;border-radius:4px;margin-top:4px;border:1px dashed #555;';
+    const tronDmgAccText = document.createElement('span');
+    tronDmgAccText.textContent = `Daño total hecho: ${normalizeMotorbikeSettings(props).tronWallAccumulatedDamage || 0}`;
+    tronDmgAccText.style.cssText = 'font-size:10px;color:#aaa;';
+    const tronDmgAccBtn = document.createElement('button');
+    tronDmgAccBtn.textContent = 'Reset';
+    tronDmgAccBtn.type = 'button';
+    tronDmgAccBtn.style.cssText = 'background:#3f3f46;color:white;border:none;border-radius:3px;padding:2px 8px;font-size:10px;cursor:pointer;';
+    tronDmgAccBtn.onclick = (e) => {
+      e.preventDefault();
+      update('tronWallAccumulatedDamage', 0);
+      tronDmgAccText.textContent = 'Daño total hecho: 0';
+    };
+    tronDmgAccRow.append(tronDmgAccText, tronDmgAccBtn);
+    tronDmgContent.appendChild(tronDmgAccRow);
+
+    // Knockback
+    const tronDmgKbCheckRow = document.createElement('label');
+    tronDmgKbCheckRow.style.cssText = 'display:flex;align-items:center;gap:6px;color:#ccc;font-size:11px;cursor:pointer;margin-top:4px;';
+    const tronDmgKbCheck = document.createElement('input');
+    tronDmgKbCheck.type = 'checkbox';
+    tronDmgKbCheck.checked = normalizeMotorbikeSettings(props).tronWallEnableKnockback;
+    tronDmgKbCheckRow.append(tronDmgKbCheck, '💥 Activar Retroceso (Knockback)');
+    tronDmgContent.appendChild(tronDmgKbCheckRow);
+
+    const tronDmgKbInputRow = document.createElement('div');
+    tronDmgKbInputRow.style.cssText = 'display:flex;flex-direction:column;gap:3px;padding-left:14px;';
+    const tronDmgKbLabel = document.createElement('label');
+    tronDmgKbLabel.textContent = 'Fuerza de Retroceso';
+    tronDmgKbLabel.style.cssText = 'color:#aaa;font-size:10px;';
+    const tronDmgKbInput = document.createElement('input');
+    tronDmgKbInput.type = 'number';
+    tronDmgKbInput.min = '0';
+    tronDmgKbInput.value = String(normalizeMotorbikeSettings(props).tronWallKnockbackForce);
+    tronDmgKbInput.style.cssText = 'background:#222;border:1px solid #555;color:white;padding:4px;font-size:11px;border-radius:4px;';
+    tronDmgKbInput.onchange = () => update('tronWallKnockbackForce', Math.max(0, parseFloat(tronDmgKbInput.value) || 15));
+    tronDmgKbInputRow.append(tronDmgKbLabel, tronDmgKbInput);
+    tronDmgContent.appendChild(tronDmgKbInputRow);
+
+    tronDmgKbCheck.onchange = () => {
+      update('tronWallEnableKnockback', tronDmgKbCheck.checked);
+      tronDmgKbInputRow.style.display = tronDmgKbCheck.checked ? 'flex' : 'none';
+    };
+    tronDmgKbInputRow.style.display = tronDmgKbCheck.checked ? 'flex' : 'none';
+
+    tronDmgEnable.onchange = () => {
+      update('tronWallDamageEnabled', tronDmgEnable.checked);
+      tronDmgContent.style.display = tronDmgEnable.checked ? 'flex' : 'none';
+    };
+    tronDmgContent.style.display = tronDmgEnable.checked ? 'flex' : 'none';
+
+    tronWallSettings.appendChild(tronDmgGroup);
+
     const tronWallKeys = ['tronWallHeight', 'tronWallDuration', 'tronWallSinkDuration', 'tronWallMinSpeed'];
 
     const speedEffectKeys = [
@@ -349,6 +560,9 @@ export class MotorbikeLogic {
       tronWallSettings.style.display = tronWall.checked ? 'flex' : 'none';
       tronColorInput.disabled = !tronWall.checked;
       tronCollision.disabled = !tronWall.checked;
+      tronAnimSelect.disabled = !tronWall.checked;
+      tronDmgGroup.style.display = tronWall.checked ? 'flex' : 'none';
+      tronDmgContent.style.display = (tronWall.checked && tronDmgEnable.checked) ? 'flex' : 'none';
       for (const key of tronWallKeys) {
         const input = inputs.get(key);
         if (input) {

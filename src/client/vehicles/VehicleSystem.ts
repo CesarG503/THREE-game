@@ -324,7 +324,7 @@ export class VehicleSystem {
     this.tronWalls.update(this.bikes, dt, fallLimitY);
     // Inspector edits also apply to parked motorcycles, which then fall toward their new surface.
     for (const bike of this.bikes) {
-      if (bike.userData.vehicleToppled && bike.userData.logicProperties?.autoStabilize !== false && !this.coasting.has(bike) && !bike.userData.vehicleDriver) this.startCoasting(bike, 0, 0, true);
+      if (bike.userData.vehicleToppled && !isMotorbikeBroken(bike.userData.logicProperties) && (bike.userData.logicProperties?.durability ?? 1) > 0 && bike.userData.logicProperties?.autoStabilize !== false && !this.coasting.has(bike) && !bike.userData.vehicleDriver) this.startCoasting(bike, 0, 0, true);
       const requested = bike.userData.logicProperties?.gravityOrientation;
       if (bike !== this.mounted && !bike.userData.vehicleDriver && !bike.userData.vehiclePassenger && !this.coasting.has(bike) &&
           requested && requested !== 'inherit' && requested !== vehicleGravity(bike).orientation) {
@@ -643,7 +643,7 @@ export class VehicleSystem {
     if (dt <= 0) return;
     for (const [bike, state] of this.coasting) {
       const body: RAPIER.RigidBody = bike.userData.rigidBody;
-      if (!bike.parent || !body?.isValid() || bike.userData.vehicleDriver) {
+      if (!bike.parent || !body?.isValid() || bike.userData.vehicleDriver || isMotorbikeBroken(bike.userData.logicProperties) || (bike.userData.logicProperties?.durability !== undefined && bike.userData.logicProperties.durability <= 0)) {
         this.coasting.delete(bike);
         continue;
       }

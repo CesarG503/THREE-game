@@ -3,6 +3,7 @@ import RAPIER from '@dimforge/rapier3d-compat';
 import type { MotorbikeVisual } from './MotorbikeModel';
 import { normalizeMotorbikeSettings } from './MotorbikeSettings';
 import { getControllerDamage } from '../utils/DamageController';
+import { isMotorbikeBroken } from './VehicleDurability';
 
 interface TronWallPoint {
   groundPos: THREE.Vector3;
@@ -259,6 +260,16 @@ export class VehicleTronWall {
       // Performance: If bike has fallen below the death limit, cut off wall generation and purge existing strips
       if (fallDeathY !== undefined && bike.position.y < fallDeathY) {
         this.clearBike(bike);
+        continue;
+      }
+
+      const isBroken = isMotorbikeBroken(bike.userData.logicProperties) ||
+        (bike.userData.logicProperties?.durability !== undefined && bike.userData.logicProperties.durability <= 0);
+      if (bike.userData.vehicleToppled || isBroken) {
+        const existingData = this.tronByBike.get(bike);
+        if (existingData && existingData.activeStrip) {
+          this.clearBike(bike);
+        }
         continue;
       }
 
@@ -690,13 +701,14 @@ export class VehicleTronWall {
 
               // Tail wake protection:
               // Only applies while this strip is actively being emitted by the moving bike.
-              // We do not arm a collider on the newest 1 segment directly behind the tire (~1.3m)
+              // We do not arm a collider on the newest 2 segments directly behind the tire (~2.5m)
               // so forward acceleration and ramp climbs never catch on the emerging wake.
               // All older segments behind that HAVE FULL SOLID COLLIDERS!
               // Inactive strips (when stopped or finished) have ALL segments solidly collidable!
               const segsFromHead = isThisActiveStrip ? (ptsLen - 1 - i) : 999;
               const p1DistToWheel = p1.groundPos.distanceTo(rearWheelWorld);
-              const isTailWake = isThisActiveStrip && (segsFromHead <= 1 || p1DistToWheel < 1.3);
+              const p0DistToWheel = p0.groundPos.distanceTo(rearWheelWorld);
+              const isTailWake = isThisActiveStrip && (segsFromHead <= 2 || p1DistToWheel < 2.5 || p0DistToWheel < 2.5);
 
               if (isTailWake) continue;
 
@@ -990,11 +1002,11 @@ export class VehicleTronWall {
     const wallThickness = 0.52;
     const cooldown = Math.max(0.05, Number(props.tronWallDamageCooldown ?? 0.8));
 
-    // Helper: Test if an entity at entityPos with collision radius touches any segment of any strip
-    const testWallContact = (
-      entityPos: THREE.Vector3,
-      entityRadius: number,
-      isOwnerBike: boolean
+    // Helper: Test if a 3D sphere (samplePos, sampleRadius) touches any active segment of any strip
+    const testPointContact = (
+      samplePos: THREE.Vector3,
+      sampleRadius: number,
+      isOwner: boolean
     ): { hit: boolean; hitPos: THREE.Vector3; pushDir: THREE.Vector3 } | null => {
       for (let sIdx = 0; sIdx < data.strips.length; sIdx++) {
         const strip = data.strips[sIdx];
@@ -1004,15 +1016,24 @@ export class VehicleTronWall {
 
         const isThisActiveStrip = data.activeStrip === strip;
 
+        // For owner on active strip:
+        // A strip with fewer than 8 points (~4m) has just begun emitting and cannot have looped back.
+        // Skip entire active strip for owner if ptsLen < 8 so emerging wake NEVER damages owner!
+        if (isOwner && isThisActiveStrip && ptsLen < 8) {
+          continue;
+        }
+
         for (let i = 0; i < ptsLen - 1; i++) {
           const p0 = pts[i];
           const p1 = pts[i + 1];
 
-          // Owner bike wake protection: do not damage emitting bike from its own emerging tire wake
-          if (isOwnerBike && isThisActiveStrip) {
+          // Emerging wake protection for owner on active strip:
+          // The first sections and anything within 8 segments from head or within 5.5m Euclidean
+          // distance to rearWheelWorld NEVER damage the emitting vehicle!
+          if (isOwner && isThisActiveStrip) {
             const segsFromHead = ptsLen - 1 - i;
-            const p1DistToWheel = p1.groundPos.distanceTo(rearWheelWorld);
-            if (segsFromHead <= 2 || p1DistToWheel < 2.5) {
+            if (segsFromHead < 8) continue;
+            if (p0.groundPos.distanceTo(rearWheelWorld) < 5.5 || p1.groundPos.distanceTo(rearWheelWorld) < 5.5) {
               continue;
             }
           }
@@ -1027,10 +1048,10 @@ export class VehicleTronWall {
           const segLenSq = sx * sx + sy * sy + sz * sz;
           if (segLenSq < 0.01) continue;
 
-          // Project entityPos onto line segment [p0.groundPos, p1.groundPos]
-          const ex = entityPos.x - p0.groundPos.x;
-          const ey = entityPos.y - p0.groundPos.y;
-          const ez = entityPos.z - p0.groundPos.z;
+          // Project samplePos onto line segment [p0.groundPos, p1.groundPos]
+          const ex = samplePos.x - p0.groundPos.x;
+          const ey = samplePos.y - p0.groundPos.y;
+          const ez = samplePos.z - p0.groundPos.z;
           const t = Math.max(0, Math.min(1, (ex * sx + ey * sy + ez * sz) / segLenSq));
 
           const projX = p0.groundPos.x + t * sx;
@@ -1041,9 +1062,9 @@ export class VehicleTronWall {
           const segHeight = p0.currentHeight * (1 - t) + p1.currentHeight * t;
 
           // Height relative to base
-          const dx = entityPos.x - projX;
-          const dy = entityPos.y - projY;
-          const dz = entityPos.z - projZ;
+          const dx = samplePos.x - projX;
+          const dy = samplePos.y - projY;
+          const dz = samplePos.z - projZ;
 
           const heightOffset = dx * segUp.x + dy * segUp.y + dz * segUp.z;
           if (heightOffset < -0.35 || heightOffset > segHeight + 0.60) {
@@ -1056,7 +1077,7 @@ export class VehicleTronWall {
           const latZ = dz - segUp.z * heightOffset;
           const latDist = Math.sqrt(latX * latX + latY * latY + latZ * latZ);
 
-          const maxDist = wallThickness * 0.5 + entityRadius;
+          const maxDist = wallThickness * 0.5 + sampleRadius;
           if (latDist <= maxDist) {
             const hitPos = new THREE.Vector3(projX, projY, projZ).addScaledVector(segUp, Math.max(0.3, heightOffset));
             let pushDir = new THREE.Vector3(latX, latY, latZ);
@@ -1076,45 +1097,124 @@ export class VehicleTronWall {
       return null;
     };
 
+    // Helper: Test full vehicle collision against wall (head-on front, side, rear, and Rapier contacts)
+    const testVehicleContact = (
+      targetBike: MotorbikeVisual,
+      isOwner: boolean
+    ): { hit: boolean; hitPos: THREE.Vector3; pushDir: THREE.Vector3 } | null => {
+      const dims = targetBike.userData.originalScale ?? { x: 0.85, y: 1.25, z: 2.4 };
+      const targetForward = new THREE.Vector3(0, 0, -1).applyQuaternion(targetBike.quaternion).normalize();
+      const targetPos = targetBike.position;
+      const sampleRadius = Math.max(dims.x * 0.5, 0.48);
+
+      // 1. Direct Rapier physical collision event captured by MotorbikePhysics
+      const recentCol = targetBike.userData.recentTronCollision;
+      if (recentCol && (now - recentCol.time) < 0.25) {
+        if (recentCol.ownerBike === bike) {
+          // If owner bike: it can ONLY collide with its OWN wall in a genuine head-on crash
+          // into an older loop (hit point > 5.5m from rear wheel and in front of vehicle)
+          const distToRearWheel = (recentCol.hitPos as THREE.Vector3).distanceTo(rearWheelWorld);
+          const hitVec = (recentCol.hitPos as THREE.Vector3).clone().sub(targetBike.position);
+          const isFrontHit = hitVec.dot(targetForward) > 0.35;
+          if (!isOwner || (distToRearWheel > 5.5 && isFrontHit)) {
+            targetBike.userData.recentTronCollision = null;
+            return {
+              hit: true,
+              hitPos: recentCol.hitPos.clone(),
+              pushDir: recentCol.normal.clone().negate().addScaledVector(new THREE.Vector3(0, 1, 0), 0.2).normalize()
+            };
+          }
+        } else {
+          // Another bike hit this wall
+          targetBike.userData.recentTronCollision = null;
+          return {
+            hit: true,
+            hitPos: recentCol.hitPos.clone(),
+            pushDir: recentCol.normal.clone().negate().addScaledVector(new THREE.Vector3(0, 1, 0), 0.2).normalize()
+          };
+        }
+      }
+
+      // 2. Comprehensive multi-point footprint test along the motorbike chassis
+      // WAKE EXEMPTION FOR OWNER:
+      // The owner's rear wheel, rear bumper, and chassis center are along the emission line.
+      // They must NEVER self-collide with the active strip or fresh wake!
+      // An owner can ONLY crash into a wall head-on with its FRONT nose or front wheel!
+      const sampleOffsets = isOwner ? [
+        dims.z * 0.48,   // Front nose / bumper (+1.15m) - CRITICAL for head-on front crashes!
+        dims.z * 0.38    // Front wheel (+0.91m)
+      ] : [
+        dims.z * 0.48,   // Front nose / bumper (+1.15m)
+        dims.z * 0.38,   // Front wheel (+0.91m)
+        dims.z * 0.20,   // Forward chassis (+0.48m)
+        0.0,             // Chassis center (0.0m)
+        -dims.z * 0.20,  // Mid-rear chassis (-0.48m)
+        -dims.z * 0.38,  // Rear wheel (-0.91m)
+        -dims.z * 0.48   // Rear bumper (-1.15m)
+      ];
+
+      for (const offset of sampleOffsets) {
+        const samplePos = targetPos.clone().addScaledVector(targetForward, offset);
+        const contact = testPointContact(samplePos, sampleRadius, isOwner);
+        if (contact) {
+          return contact;
+        }
+      }
+
+      return null;
+    };
+
     // 1. Damage local player
     if (props.tronWallDamagePlayers && this.game?.character && !this.game.character.isDead) {
       const char = this.game.character;
-      const charPos = char.getPosition();
-      const isRidingThisBike = bike.userData.vehicleDriver === (this.game.networkManager?.playerId || 'local');
+      const isRidingThisBike = (bike.userData.vehicleDriver === (this.game.networkManager?.playerId || 'local')) ||
+                               (this.game?.vehicleSystem?.mounted === bike);
 
-      const contact = testWallContact(charPos, 0.45, isRidingThisBike);
-      if (contact) {
-        const lastHit = data.lastDamageHits.get(char) || 0;
-        if (now - lastHit >= cooldown) {
-          const finalDamage = getControllerDamage(damageProps, char.maxHealth || 100);
-          if (finalDamage > 0) {
-            char.takeDamage(finalDamage);
-            data.lastDamageHits.set(char, now);
+      // A player riding this emitting bike is enveloped by the bike and must NEVER be damaged
+      // by their own bike's active trailing wake or first emerging section!
+      // When the bike crashes into a wall, the vehicle crash logic cleanly handles player damage.
+      if (!isRidingThisBike) {
+        const charPos = char.getPosition();
+        const charUp = char.getGravityUpVector ? char.getGravityUpVector() : new THREE.Vector3(0, 1, 0);
 
-            // Floating combat text
-            if (this.game.floatingTextManager) {
-              this.game.floatingTextManager.spawnText(
-                `-${finalDamage}`,
-                contact.hitPos.clone().add(new THREE.Vector3(0, 0.8, 0)),
-                props.tronWallInstantKill ? '#ff0033' : '#ff3344',
-                2.0
-              );
-            }
+        let contact = testPointContact(charPos, 0.48, false);
+        if (!contact) {
+          contact = testPointContact(charPos.clone().addScaledVector(charUp, 0.9), 0.48, false);
+        }
 
-            // Knockback impulse
-            if (props.tronWallEnableKnockback) {
-              const kForce = Number(props.tronWallKnockbackForce ?? 15);
-              if (char.momentum) {
-                char.momentum.addScaledVector(contact.pushDir, kForce);
+        if (contact) {
+          const lastHit = data.lastDamageHits.get(char) || 0;
+          if (now - lastHit >= cooldown) {
+            const finalDamage = getControllerDamage(damageProps, char.maxHealth || 100);
+            if (finalDamage > 0) {
+              char.takeDamage(finalDamage);
+              data.lastDamageHits.set(char, now);
+
+              // Floating combat text
+              if (this.game.floatingTextManager) {
+                this.game.floatingTextManager.spawnText(
+                  `-${finalDamage}`,
+                  contact.hitPos.clone().add(new THREE.Vector3(0, 0.8, 0)),
+                  props.tronWallInstantKill ? '#ff0033' : '#ff3344',
+                  2.0
+                );
               }
-              if (char.verticalVelocity !== undefined) {
-                char.verticalVelocity = Math.max(char.verticalVelocity, kForce * 0.35);
-              }
-            }
 
-            // Accumulate damage
-            props.tronWallAccumulatedDamage = (props.tronWallAccumulatedDamage || 0) + finalDamage;
-            bike.userData.logicProperties.tronWallAccumulatedDamage = props.tronWallAccumulatedDamage;
+              // Knockback impulse
+              if (props.tronWallEnableKnockback) {
+                const kForce = Number(props.tronWallKnockbackForce ?? 15);
+                if (char.momentum) {
+                  char.momentum.addScaledVector(contact.pushDir, kForce);
+                }
+                if (char.verticalVelocity !== undefined) {
+                  char.verticalVelocity = Math.max(char.verticalVelocity, kForce * 0.35);
+                }
+              }
+
+              // Accumulate damage
+              props.tronWallAccumulatedDamage = (props.tronWallAccumulatedDamage || 0) + finalDamage;
+              bike.userData.logicProperties.tronWallAccumulatedDamage = props.tronWallAccumulatedDamage;
+            }
           }
         }
       }
@@ -1124,10 +1224,15 @@ export class VehicleTronWall {
     if (props.tronWallDamagePlayers && this.game?.networkManager?.remotePlayers) {
       this.game.networkManager.remotePlayers.forEach((rp: any) => {
         if (!rp || !rp.currentPosition) return;
-        const rpPos = rp.currentPosition;
         const isRidingThisBike = bike.userData.vehicleDriver === rp.id;
+        if (isRidingThisBike) return;
+        const rpPos = rp.currentPosition;
 
-        const contact = testWallContact(rpPos, 0.45, isRidingThisBike);
+        let contact = testPointContact(rpPos, 0.48, false);
+        if (!contact) {
+          contact = testPointContact(rpPos.clone().add(new THREE.Vector3(0, 0.9, 0)), 0.48, false);
+        }
+
         if (contact) {
           const lastHit = data.lastDamageHits.get(rp) || 0;
           if (now - lastHit >= cooldown) {
@@ -1151,7 +1256,7 @@ export class VehicleTronWall {
       });
     }
 
-    // 3. Damage vehicles (motorbikes)
+    // 3. Damage vehicles (motorbikes) - works head-on, side-on, and rear
     if (props.tronWallDamageVehicles && bikes && bikes.length > 0) {
       for (const targetBike of bikes) {
         if (!targetBike || !targetBike.parent) continue;
@@ -1159,7 +1264,7 @@ export class VehicleTronWall {
         const targetProps = normalizeMotorbikeSettings(targetBike.userData.logicProperties);
         const maxHealth = targetProps.maxDurability || 100;
 
-        const contact = testWallContact(targetBike.position, 0.65, isOwner);
+        const contact = testVehicleContact(targetBike, isOwner);
         if (contact) {
           const lastHit = data.lastDamageHits.get(targetBike) || 0;
           if (now - lastHit >= cooldown) {
@@ -1172,6 +1277,16 @@ export class VehicleTronWall {
                 this.game.vehicleSystem.durability.damage(targetBike, finalDamage);
               }
 
+              // Also ensure durability tracking even if durability was not explicitly toggled on the bike
+              if (targetBike.userData.logicProperties) {
+                const currentDur = targetBike.userData.logicProperties.durability ?? maxHealth;
+                const newDur = Math.max(0, currentDur - finalDamage);
+                targetBike.userData.logicProperties.durability = newDur;
+              }
+
+              // Trigger vehicle damage effects / sparks / smoke
+              this.game?.vehicleSystem?.damageEffects?.hit(targetBike);
+
               // Floating text
               if (this.game?.floatingTextManager) {
                 this.game.floatingTextManager.spawnText(
@@ -1182,12 +1297,43 @@ export class VehicleTronWall {
                 );
               }
 
-              // Vehicle knockback impulse
-              if (props.tronWallEnableKnockback && this.game?.vehicleSystem?.applyImpulse) {
+              // Instant destruction / explosion
+              const isDeadlyHit = props.tronWallInstantKill || (targetBike.userData.logicProperties?.durability ?? 0) <= 0;
+              if (isDeadlyHit) {
+                targetBike.userData.vehicleToppled = true;
+                if (targetBike.userData.logicProperties) {
+                  targetBike.userData.logicProperties.durability = 0;
+                }
+
+                // Immediately halt the destroyed bike to prevent runaway/glitched motion
+                if (targetBike.userData.rigidBody?.isValid()) {
+                  targetBike.userData.rigidBody.setLinvel({ x: 0, y: 0, z: 0 }, true);
+                  targetBike.userData.rigidBody.setAngvel({ x: 0, y: 0, z: 0 }, true);
+                }
+                targetBike.userData.vehicleMotion = { speed: 0, verticalSpeed: 0, lean: 0 };
+                if (this.game?.vehicleSystem?.coasting) {
+                  this.game.vehicleSystem.coasting.delete(targetBike);
+                }
+
+                // Derezz this bike's light wall immediately on destruction!
+                this.clearBike(targetBike);
+
+                // Spawn explosion visual effect
+                this.game?.character?.particleSystem?.spawnExplosionEffect?.(contact.hitPos);
+
+                // If local player is driving this bike, apply instant kill to rider as well
+                if (this.game?.character && !this.game.character.isDead &&
+                    (targetBike.userData.vehicleDriver === (this.game.networkManager?.playerId || 'local') ||
+                     targetBike === this.game?.vehicleSystem?.mounted)) {
+                  this.game.character.takeDamage(this.game.character.maxHealth || 100);
+                  this.game.vehicleSystem?.dismount(true, true);
+                }
+              } else if (props.tronWallEnableKnockback && this.game?.vehicleSystem?.applyImpulse) {
+                // Vehicle knockback impulse only on surviving vehicles
                 const kForce = Number(props.tronWallKnockbackForce ?? 15);
                 this.game.vehicleSystem.applyImpulse(
                   targetBike,
-                  contact.pushDir.clone().multiplyScalar(kForce * 25)
+                  contact.pushDir.clone().multiplyScalar(kForce * 30)
                 );
               }
 

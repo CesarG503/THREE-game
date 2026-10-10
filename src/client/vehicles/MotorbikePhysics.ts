@@ -384,6 +384,18 @@ export class MotorbikePhysics {
         const collision = this.controller.computedCollision(i);
         if (!collision) continue;
         const n = new THREE.Vector3().copy(collision.normal1 as THREE.Vector3);
+        const colAny = collision.collider as any;
+        if (colAny?.isTronWall) {
+          const witness = collision.witness2 || collision.witness1;
+          bike.userData.recentTronCollision = {
+            collider: collision.collider,
+            ownerBike: colAny.ownerBike,
+            segMid: colAny.segMid,
+            hitPos: witness ? new THREE.Vector3(witness.x, witness.y, witness.z) : bike.position.clone(),
+            normal: n.clone(),
+            time: performance.now() / 1000
+          };
+        }
         if (n.dot(gravityUp) > 0.55) { bodyOnFloor = true; state.restingNormal.copy(n); }
         const into = state.velocity.dot(n);
         const passedStep = supported && move.clone().projectOnPlane(gravityUp).length() >= desired.clone().projectOnPlane(gravityUp).length() * 0.8;

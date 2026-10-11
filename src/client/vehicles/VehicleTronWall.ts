@@ -265,13 +265,7 @@ export class VehicleTronWall {
 
       const isBroken = isMotorbikeBroken(bike.userData.logicProperties) ||
         (bike.userData.logicProperties?.durability !== undefined && bike.userData.logicProperties.durability <= 0);
-      if (bike.userData.vehicleToppled || isBroken) {
-        const existingData = this.tronByBike.get(bike);
-        if (existingData && existingData.activeStrip) {
-          this.clearBike(bike);
-        }
-        continue;
-      }
+      const isToppledOrBroken = bike.userData.vehicleToppled === true || isBroken;
 
       const props = normalizeMotorbikeSettings(bike.userData.logicProperties);
       const enabled = props.tronWallEnabled === true;
@@ -351,7 +345,7 @@ export class VehicleTronWall {
       const stopSpeedKmh = Math.max(1.8, Math.min(minSpeedKmh * 0.4, 4.0));
       const isEmitting = data.activeStrip !== null;
       const isAboveThreshold = isEmitting ? (speedKmh >= stopSpeedKmh) : (speedKmh >= minSpeedKmh);
-      const isFastEnough = enabled && !isReversing && isAboveThreshold;
+      const isFastEnough = enabled && !isReversing && !isToppledOrBroken && isAboveThreshold;
 
       // 1. Emit new wall points if enabled, driving forward, and moving fast enough
       const dims = bike.userData.originalScale ?? { x: 0.85, y: 1.25, z: 2.4 };
@@ -541,7 +535,8 @@ export class VehicleTronWall {
 
           // While rolling to a stop (brief 0.35s grace window):
           // Keep stretching the live tip smoothly to the bike as it glides to rest!
-          if (data.lowSpeedTimer < 0.35 && forwardSpeedMs > 0.05 && data.liveTipPos) {
+          // (If toppled or broken, bypass grace delay and commit final point immediately)
+          if (!isToppledOrBroken && data.lowSpeedTimer < 0.35 && forwardSpeedMs > 0.05 && data.liveTipPos) {
             data.liveTipPos.copy(groundPos);
             data.liveTipUp.copy(groundUp);
             const pts = data.activeStrip.points;
@@ -763,6 +758,7 @@ export class VehicleTronWall {
               (col as any).ownerBike = bike;
               (col as any).segMid = new THREE.Vector3(midX, midY, midZ);
               (col as any).segAge = p0.age;
+              (col as any).isLastContactPillar = (i >= ptsLen - 2);
 
               p0.collider = col;
               data.activeColliderCount++;
@@ -1038,6 +1034,15 @@ export class VehicleTronWall {
             }
           }
 
+          // The last collision pillar in contact with the motorcycle must NOT deal damage!
+          // Physical collision is maintained so it can be walked/stood upon, but it deals no damage
+          // so the vehicle and player are never damaged unintentionally when stopped or at 0 km/h.
+          const isLastPillar = (i >= ptsLen - 2);
+          const minPillarDist = Math.min(p0.groundPos.distanceTo(rearWheelWorld), p1.groundPos.distanceTo(rearWheelWorld));
+          if (isLastPillar && minPillarDist < 2.8) {
+            continue;
+          }
+
           // Segments that have already sunk below ground do not deal damage
           if (p0.currentHeight < 0.20 && p1.currentHeight < 0.20) continue;
 
@@ -1110,10 +1115,17 @@ export class VehicleTronWall {
       // 1. Direct Rapier physical collision event captured by MotorbikePhysics
       const recentCol = targetBike.userData.recentTronCollision;
       if (recentCol && (now - recentCol.time) < 0.25) {
-        if (recentCol.ownerBike === bike) {
+        const colAny = recentCol.collider as any;
+        const distToRearWheel = (recentCol.hitPos as THREE.Vector3).distanceTo(rearWheelWorld);
+        const isLastPillar = colAny?.isLastContactPillar || (isOwner && distToRearWheel < 2.8);
+
+        if (isLastPillar) {
+          // Physical collision happened with the last pillar in contact with the motorcycle,
+          // but it must NOT deal damage! Clear the event and skip damage.
+          targetBike.userData.recentTronCollision = null;
+        } else if (recentCol.ownerBike === bike) {
           // If owner bike: it can ONLY collide with its OWN wall in a genuine head-on crash
           // into an older loop (hit point > 5.5m from rear wheel and in front of vehicle)
-          const distToRearWheel = (recentCol.hitPos as THREE.Vector3).distanceTo(rearWheelWorld);
           const hitVec = (recentCol.hitPos as THREE.Vector3).clone().sub(targetBike.position);
           const isFrontHit = hitVec.dot(targetForward) > 0.35;
           if (!isOwner || (distToRearWheel > 5.5 && isFrontHit)) {
@@ -1315,8 +1327,15 @@ export class VehicleTronWall {
                   this.game.vehicleSystem.coasting.delete(targetBike);
                 }
 
-                // Derezz this bike's light wall immediately on destruction!
-                this.clearBike(targetBike);
+                // Cleanly finalize targetBike's active strip so its wall persists for its established duration
+                const targetData = this.tronByBike.get(targetBike);
+                if (targetData?.activeStrip) {
+                  targetData.activeStrip = null;
+                  targetData.liveTipPos = null;
+                  targetData.liveTipUp = null;
+                  targetData.liveTipDist = 0;
+                  targetData.lowSpeedTimer = 0;
+                }
 
                 // Spawn explosion visual effect
                 this.game?.character?.particleSystem?.spawnExplosionEffect?.(contact.hitPos);

@@ -669,27 +669,36 @@ export class VehicleSystem {
 
   applyImpulse(bike: MotorbikeVisual, force: THREE.Vector3) {
     if (!bike || !bike.parent) return;
-    this.physics.applyImpulse(bike, force);
+
+    // Safety guard: Clamp impulse magnitude so no collision or bug can ever launch vehicles at glitch speeds
+    let safeForce = force;
+    const maxImpulse = 40.0;
+    if (safeForce.length() > maxImpulse) {
+      safeForce = safeForce.clone().normalize().multiplyScalar(maxImpulse);
+    }
+
+    this.physics.applyImpulse(bike, safeForce);
 
     const gravityUp = vehicleUp(bike);
-    const vertForce = force.dot(gravityUp);
+    const vertForce = safeForce.dot(gravityUp);
     const forward = FORWARD.clone().applyQuaternion(bike.quaternion).projectOnPlane(gravityUp).normalize();
-    const forwardPush = force.dot(forward);
+    const forwardPush = safeForce.dot(forward);
 
     if (bike === this.mounted) {
       if (vertForce > 0.1) {
-        this.verticalSpeed = Math.max(this.verticalSpeed + vertForce, vertForce);
+        const targetVert = Math.min(25, this.verticalSpeed + vertForce);
+        this.verticalSpeed = Math.max(this.verticalSpeed, targetVert);
         this.grounded = false;
         this.jumpCooldown = 0.35;
       }
       if (Math.abs(forwardPush) > 0.1) {
         if (forwardPush > 0) {
-          this.speed = Math.max(this.speed + forwardPush * 0.75, forwardPush);
+          this.speed = Math.min(100, Math.max(this.speed + forwardPush * 0.75, forwardPush));
         } else {
-          this.speed = Math.min(this.speed + forwardPush * 0.75, forwardPush);
+          this.speed = Math.max(-30, Math.min(this.speed + forwardPush * 0.75, forwardPush));
         }
       }
-      const lateralPlanar = force.clone().projectOnPlane(gravityUp);
+      const lateralPlanar = safeForce.clone().projectOnPlane(gravityUp);
       if (lateralPlanar.lengthSq() > 1) {
         const padDir = lateralPlanar.normalize();
         if (padDir.dot(forward) > 0.25) {

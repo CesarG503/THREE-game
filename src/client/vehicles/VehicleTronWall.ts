@@ -4,6 +4,7 @@ import type { MotorbikeVisual } from './MotorbikeModel';
 import { normalizeMotorbikeSettings } from './MotorbikeSettings';
 import { getControllerDamage } from '../utils/DamageController';
 import { isMotorbikeBroken } from './VehicleDurability';
+import { vehicleUp } from './VehicleGravity';
 
 interface TronWallPoint {
   groundPos: THREE.Vector3;
@@ -1092,8 +1093,6 @@ export class VehicleTronWall {
               // Fallback perpendicular to segment
               pushDir.crossVectors(new THREE.Vector3(sx, sy, sz), segUp).normalize();
             }
-            // Add slight upward component to knockback for dramatic effect
-            pushDir.addScaledVector(segUp, 0.25).normalize();
 
             return { hit: true, hitPos, pushDir };
           }
@@ -1133,7 +1132,7 @@ export class VehicleTronWall {
             return {
               hit: true,
               hitPos: recentCol.hitPos.clone(),
-              pushDir: recentCol.normal.clone().negate().addScaledVector(new THREE.Vector3(0, 1, 0), 0.2).normalize()
+              pushDir: recentCol.normal.clone().normalize()
             };
           }
         } else {
@@ -1142,7 +1141,7 @@ export class VehicleTronWall {
           return {
             hit: true,
             hitPos: recentCol.hitPos.clone(),
-            pushDir: recentCol.normal.clone().negate().addScaledVector(new THREE.Vector3(0, 1, 0), 0.2).normalize()
+            pushDir: recentCol.normal.clone().normalize()
           };
         }
       }
@@ -1212,14 +1211,17 @@ export class VehicleTronWall {
                 );
               }
 
-              // Knockback impulse
+              // Knockback impulse for player on foot
               if (props.tronWallEnableKnockback) {
                 const kForce = Number(props.tronWallKnockbackForce ?? 15);
+                const charBounce = Math.min(15, Math.max(1, kForce * 0.5));
+                const charHoriz = contact.pushDir.clone().projectOnPlane(charUp).normalize();
+                if (charHoriz.lengthSq() < 0.001) charHoriz.set(0, 0, 1);
                 if (char.momentum) {
-                  char.momentum.addScaledVector(contact.pushDir, kForce);
+                  char.momentum.addScaledVector(charHoriz, charBounce);
                 }
                 if (char.verticalVelocity !== undefined) {
-                  char.verticalVelocity = Math.max(char.verticalVelocity, kForce * 0.35);
+                  char.verticalVelocity = Math.min(3.0, Math.max(char.verticalVelocity, charBounce * 0.20));
                 }
               }
 
@@ -1348,12 +1350,27 @@ export class VehicleTronWall {
                   this.game.vehicleSystem?.dismount(true, true);
                 }
               } else if (props.tronWallEnableKnockback && this.game?.vehicleSystem?.applyImpulse) {
-                // Vehicle knockback impulse only on surviving vehicles
+                // Vehicle knockback impulse: controlled horizontal deflection away from wall
                 const kForce = Number(props.tronWallKnockbackForce ?? 15);
-                this.game.vehicleSystem.applyImpulse(
-                  targetBike,
-                  contact.pushDir.clone().multiplyScalar(kForce * 30)
-                );
+                const gravityUp = targetBike ? vehicleUp(targetBike) : new THREE.Vector3(0, 1, 0);
+
+                // Horizontal bounce vector away from the wall plane
+                let horizPush = contact.pushDir.clone().projectOnPlane(gravityUp);
+                if (horizPush.lengthSq() < 0.001) {
+                  const targetForward = new THREE.Vector3(0, 0, -1).applyQuaternion(targetBike.quaternion).projectOnPlane(gravityUp).normalize();
+                  horizPush = targetForward.clone().negate();
+                } else {
+                  horizPush.normalize();
+                }
+
+                // Default 15 produces ~6-7 m/s (~24 km/h) crisp bounce back.
+                // Strict clamping ensures speed never exceeds 18 m/s (65 km/h).
+                const bounceSpeed = Math.min(18, Math.max(1, kForce * 0.45));
+                // Subtle vertical lift (at most 0.8 m/s, ~3cm hop) to avoid floor snagging without launching into air
+                const vertLift = Math.min(0.8, bounceSpeed * 0.08);
+
+                const impulseVec = horizPush.multiplyScalar(bounceSpeed).addScaledVector(gravityUp, vertLift);
+                this.game.vehicleSystem.applyImpulse(targetBike, impulseVec);
               }
 
               props.tronWallAccumulatedDamage = (props.tronWallAccumulatedDamage || 0) + finalDamage;

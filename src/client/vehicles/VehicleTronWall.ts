@@ -1350,27 +1350,41 @@ export class VehicleTronWall {
                   this.game.vehicleSystem?.dismount(true, true);
                 }
               } else if (props.tronWallEnableKnockback && this.game?.vehicleSystem?.applyImpulse) {
-                // Vehicle knockback impulse: controlled horizontal deflection away from wall
-                const kForce = Number(props.tronWallKnockbackForce ?? 15);
-                const gravityUp = targetBike ? vehicleUp(targetBike) : new THREE.Vector3(0, 1, 0);
+                // Vehicle knockback applies only when riding/driving the vehicle
+                const hasRider = Boolean(
+                  targetBike.userData.vehicleDriver ||
+                  targetBike === this.game?.vehicleSystem?.mounted
+                );
+                if (hasRider) {
+                  const kForce = Number(props.tronWallKnockbackForce ?? 15);
+                  const gravityUp = targetBike ? vehicleUp(targetBike) : new THREE.Vector3(0, 1, 0);
 
-                // Horizontal bounce vector away from the wall plane
-                let horizPush = contact.pushDir.clone().projectOnPlane(gravityUp);
-                if (horizPush.lengthSq() < 0.001) {
-                  const targetForward = new THREE.Vector3(0, 0, -1).applyQuaternion(targetBike.quaternion).projectOnPlane(gravityUp).normalize();
-                  horizPush = targetForward.clone().negate();
-                } else {
-                  horizPush.normalize();
+                  const bikeForward = new THREE.Vector3(0, 0, -1).applyQuaternion(targetBike.quaternion).projectOnPlane(gravityUp).normalize();
+                  const bikeBackward = bikeForward.clone().negate();
+
+                  // Direction away from the wall plane
+                  let wallDeflect = contact.pushDir.clone().projectOnPlane(gravityUp);
+                  if (wallDeflect.lengthSq() < 0.001) {
+                    wallDeflect.copy(bikeBackward);
+                  } else {
+                    wallDeflect.normalize();
+                  }
+
+                  // Blend backward along vehicle heading + deflection away from wall
+                  const horizontalPush = bikeBackward.clone().add(wallDeflect).normalize();
+                  if (horizontalPush.lengthSq() < 0.001) {
+                    horizontalPush.copy(bikeBackward);
+                  }
+
+                  // Dynamic scaling based on kForce (default 15):
+                  // Backward recoil speed: ~10-12 m/s (~36-43 km/h reverse)
+                  const backwardSpeed = Math.min(22, Math.max(3, kForce * 0.75));
+                  // Upward pop: ~5-6 m/s (~1.2-1.5m dynamic jump in the air)
+                  const upwardSpeed = Math.min(10, Math.max(2, kForce * 0.35));
+
+                  const impulseVec = horizontalPush.multiplyScalar(backwardSpeed).addScaledVector(gravityUp, upwardSpeed);
+                  this.game.vehicleSystem.applyImpulse(targetBike, impulseVec);
                 }
-
-                // Default 15 produces ~6-7 m/s (~24 km/h) crisp bounce back.
-                // Strict clamping ensures speed never exceeds 18 m/s (65 km/h).
-                const bounceSpeed = Math.min(18, Math.max(1, kForce * 0.45));
-                // Subtle vertical lift (at most 0.8 m/s, ~3cm hop) to avoid floor snagging without launching into air
-                const vertLift = Math.min(0.8, bounceSpeed * 0.08);
-
-                const impulseVec = horizPush.multiplyScalar(bounceSpeed).addScaledVector(gravityUp, vertLift);
-                this.game.vehicleSystem.applyImpulse(targetBike, impulseVec);
               }
 
               props.tronWallAccumulatedDamage = (props.tronWallAccumulatedDamage || 0) + finalDamage;

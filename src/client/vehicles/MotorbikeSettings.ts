@@ -86,11 +86,13 @@ export type MotorbikeSettings = Record<(typeof MOTORBIKE_FIELDS)[number]['key'],
   tronWallKnockbackForce: number;
   tronWallDamagePlayers: boolean;
   tronWallDamageVehicles: boolean;
+  twoSeatsEnabled: boolean;
 };
 
 export function normalizeMotorbikeSettings(props: any = {}): MotorbikeSettings {
   props = props ?? {};
   const result: any = { ...props, vehicleKind: 'motorbike' };
+  result.twoSeatsEnabled = props.twoSeatsEnabled !== false;
   result.gravityOrientation = props.gravityOrientation === undefined || props.gravityOrientation === 'inherit' ? 'inherit' : normalizeGravityOrientation(props.gravityOrientation);
   result.autoStabilize = props.autoStabilize !== false;
   result.landingAssistEnabled = props.landingAssistEnabled !== false;

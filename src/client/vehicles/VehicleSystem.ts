@@ -100,6 +100,8 @@ export class VehicleSystem {
     let nearest: MotorbikeVisual | null = null;
     let distance = 9;
     for (const bike of this.bikes) {
+      const bikeSettings = normalizeMotorbikeSettings(bike.userData?.logicProperties);
+      if (!bikeSettings.twoSeatsEnabled && (bike.userData.vehicleDriver || bike.userData.vehiclePassenger)) continue;
       if (!bike.visible || bike.userData.invisible || (bike.userData.vehicleDriver && bike.userData.vehiclePassenger)) continue;
       const candidate = position.distanceToSquared(bike.position);
       if (candidate >= distance || !bike.userData.rigidBody?.isValid()) continue;
@@ -148,10 +150,15 @@ export class VehicleSystem {
       this.show('Motocicleta averiada · Durabilidad 0');
       return false;
     }
+    const settings = normalizeMotorbikeSettings(bike.userData.logicProperties);
+    if (bike.userData.vehicleDriver && !settings.twoSeatsEnabled) {
+      this.show('Esta motocicleta tiene el modo de dos asientos desactivado.');
+      return false;
+    }
     this.mounted = bike;
     this.lastSeatSwitchTime = Date.now();
     this.seat = bike.userData.vehicleDriver ? 'passenger' : 'driver';
-    bike.userData.logicProperties = Object.assign(bike.userData.logicProperties ?? {}, normalizeMotorbikeSettings(bike.userData.logicProperties));
+    bike.userData.logicProperties = Object.assign(bike.userData.logicProperties ?? {}, settings);
     bike.userData[this.isDriver ? 'vehicleDriver' : 'vehiclePassenger'] = this.playerId;
     bike.userData.rigidBody.setBodyType(RAPIER.RigidBodyType.KinematicPositionBased, true);
     const motion = this.coasting.get(bike);
@@ -182,6 +189,11 @@ export class VehicleSystem {
     const now = Date.now();
     if (now - this.lastSeatSwitchTime < 250) return false;
     const bike = this.mounted;
+    const settings = normalizeMotorbikeSettings(bike.userData.logicProperties);
+    if (!settings.twoSeatsEnabled) {
+      this.show('Modo de dos asientos desactivado en esta motocicleta.');
+      return false;
+    }
     const target: VehicleSeat = this.isDriver ? 'passenger' : 'driver';
     if (bike.userData[target === 'driver' ? 'vehicleDriver' : 'vehiclePassenger']) {
       this.show('El otro asiento está ocupado. F: bajar');

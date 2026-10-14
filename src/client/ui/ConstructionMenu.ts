@@ -14,6 +14,7 @@ import { AdvancedWeaponConfigPanel } from "./AdvancedWeaponConfigPanel";
 import { getActiveFarmingGroups } from "./GameHUD";
 import { MOTORBIKE_SIZE, normalizeMotorbikeSettings } from "../vehicles/MotorbikeSettings";
 import { MotorbikeLogic } from "./logic_items/MotorbikeLogic";
+import { SectionedItemEditor, SECTION_ICONS } from "./components/SectionedItemEditor";
 import { JetpackItem } from "../items/JetpackItem";
 import { savePlatformMapForRoom } from "../platform/mapRuntime";
 import { listAssets, uploadAsset } from "../platform/api";
@@ -4751,7 +4752,22 @@ export class ConstructionMenu {
         // Add to panel
         this.panelEditor.appendChild(this.editorTitleContainer);
         this.panelEditor.appendChild(this.editorPreview);
-        this.panelEditor.appendChild(controlsContainer);
+
+        this.defaultEditorControlsSlot = document.createElement("div");
+        this.defaultEditorControlsSlot.style.cssText = `
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        `;
+
+        this.sectionedEditor = new SectionedItemEditor();
+        this.sectionedEditor.getElement().style.display = "none";
+
+        this.panelEditor.appendChild(this.sectionedEditor.getElement());
+        this.panelEditor.appendChild(this.defaultEditorControlsSlot);
+
+        this.defaultEditorControlsSlot.appendChild(controlsContainer);
 
         // 4. Texture Controls
         const textureContainer = document.createElement("div");
@@ -4962,7 +4978,7 @@ export class ConstructionMenu {
 
         textureContainer.appendChild(textureSettingsPanel);
 
-        this.panelEditor.appendChild(textureContainer);
+        this.defaultEditorControlsSlot.appendChild(textureContainer);
 
         // 5. Dimension Controls
         const dimContainer = document.createElement("div");
@@ -5238,7 +5254,7 @@ export class ConstructionMenu {
         this.rowSpikeSpacing = spikeSpacingRow;
         dimContainer.appendChild(spikeSpacingRow);
 
-        this.panelEditor.appendChild(dimContainer);
+        this.defaultEditorControlsSlot.appendChild(dimContainer);
 
         // --- NEW: Weapon Controls
         const weaponControlsContainer = document.createElement("div");
@@ -5905,7 +5921,7 @@ export class ConstructionMenu {
         weaponControlsContainer.appendChild(playerImpulseBackRow);
         weaponControlsContainer.appendChild(playerImpulseBackForceRow);
 
-        this.panelEditor.appendChild(weaponControlsContainer);
+        this.defaultEditorControlsSlot.appendChild(weaponControlsContainer);
 
         // --- NEW: Consumable Controls ---
         const consumableControlsContainer = document.createElement("div");
@@ -6225,7 +6241,7 @@ export class ConstructionMenu {
         consumableControlsContainer.appendChild(jetpackPointerFollowRow);
         consumableControlsContainer.appendChild(jetpackShiftFlightRow);
 
-        this.panelEditor.appendChild(consumableControlsContainer);
+        this.defaultEditorControlsSlot.appendChild(consumableControlsContainer);
         this.editorConsumableControlsContainer = consumableControlsContainer;
 
         // --- NEW: Logic Controls ---
@@ -6238,7 +6254,7 @@ export class ConstructionMenu {
             border-top: 1px solid #444;
             padding-top: 10px;
         `;
-        this.panelEditor.appendChild(logicControlsContainer);
+        this.defaultEditorControlsSlot.appendChild(logicControlsContainer);
         this.editorLogicControlsContainer = logicControlsContainer;
 
         // Save References for toggling
@@ -6518,21 +6534,156 @@ export class ConstructionMenu {
         }
     }
 
+    restoreDefaultEditorControls() {
+        if (!this.defaultEditorControlsSlot) return;
+        if (this.sectionedEditor) {
+            this.sectionedEditor.getElement().style.display = "none";
+        }
+        if (this.editorPreview) {
+            this.editorPreview.style.width = "128px";
+            this.editorPreview.style.height = "128px";
+        }
+        if (this.editorConstructionControls && this.editorConstructionControls.parentElement !== this.defaultEditorControlsSlot) {
+            this.defaultEditorControlsSlot.insertBefore(this.editorConstructionControls, this.defaultEditorControlsSlot.firstChild);
+        }
+        if (this.editorTextureContainer && this.editorTextureContainer.parentElement !== this.defaultEditorControlsSlot) {
+            this.defaultEditorControlsSlot.insertBefore(this.editorTextureContainer, this.editorDimContainer || null);
+            this.editorTextureContainer.style.borderTop = "1px solid #444";
+            this.editorTextureContainer.style.marginTop = "10px";
+        }
+        if (this.editorDimContainer && this.editorDimContainer.parentElement !== this.defaultEditorControlsSlot) {
+            this.defaultEditorControlsSlot.insertBefore(this.editorDimContainer, this.editorWeaponControlsContainer || null);
+            this.editorDimContainer.style.borderTop = "1px solid #444";
+            this.editorDimContainer.style.marginTop = "10px";
+        }
+        this.defaultEditorControlsSlot.style.display = "flex";
+    }
+
+    setupVehicleSectionedEditor(baseItem) {
+        if (!this.sectionedEditor || !this.currentDraftItem) return;
+
+        // Make preview compact for vehicle so editor has maximum height
+        if (this.editorPreview) {
+            this.editorPreview.style.width = "96px";
+            this.editorPreview.style.height = "96px";
+        }
+
+        // Hide default slot & logic controls standalone container
+        if (this.defaultEditorControlsSlot) {
+            this.defaultEditorControlsSlot.style.display = "none";
+        }
+        if (this.editorLogicControlsContainer) {
+            this.editorLogicControlsContainer.style.display = "none";
+        }
+
+        // Show sectioned editor
+        this.sectionedEditor.getElement().style.display = "flex";
+
+        // Build vehicle logic sections 2 to 8
+        const logic = new MotorbikeLogic();
+        const builtSections = logic.buildSections(this.currentDraftItem.logicProperties, (key, value) => {
+            this.currentDraftItem.logicProperties[key] = value;
+        });
+
+        // 1. Apariencia y texturas
+        const sec1 = document.createElement("div");
+        sec1.style.cssText = "display: flex; flex-direction: column; gap: 8px; width: 100%;";
+        this.editorConstructionControls.style.display = "flex";
+        this.editorTextureContainer.style.display = "flex";
+        this.editorTextureContainer.style.borderTop = "none";
+        this.editorTextureContainer.style.marginTop = "0";
+        sec1.appendChild(this.editorConstructionControls);
+        sec1.appendChild(this.editorTextureContainer);
+
+        // 2. Dimensiones y geometría
+        const sec2 = document.createElement("div");
+        sec2.style.cssText = "display: flex; flex-direction: column; gap: 8px; width: 100%;";
+        this.editorDimContainer.style.display = "flex";
+        this.editorDimContainer.style.borderTop = "none";
+        this.editorDimContainer.style.marginTop = "0";
+        sec2.appendChild(this.editorDimContainer);
+        sec2.appendChild(builtSections.section2Seats);
+
+        // 8 Clean Sections matching user specifications & icons
+        const sections = [
+            {
+                id: "appearance",
+                number: 1,
+                title: "Apariencia y texturas",
+                subtitle: "Personalización visual de la motocicleta.",
+                iconSvg: SECTION_ICONS.palette,
+                content: sec1
+            },
+            {
+                id: "dimensions",
+                number: 2,
+                title: "Dimensiones y geometría",
+                subtitle: "Tamaño y forma física del vehículo.",
+                iconSvg: SECTION_ICONS.dimensions,
+                content: sec2
+            },
+            {
+                id: "driving",
+                number: 3,
+                title: "Conducción y rendimiento",
+                subtitle: "Velocidad, aceleración y maniobrabilidad.",
+                iconSvg: SECTION_ICONS.speedometer,
+                content: builtSections.section3
+            },
+            {
+                id: "seats",
+                number: 4,
+                title: "Asientos y controles",
+                subtitle: "Ocupantes, animaciones y comportamiento al montar.",
+                iconSvg: SECTION_ICONS.seats,
+                content: builtSections.section4
+            },
+            {
+                id: "physics",
+                number: 5,
+                title: "Física, gravedad y estabilidad",
+                subtitle: "Equilibrio, saltos y comportamiento en el aire.",
+                iconSvg: SECTION_ICONS.physics,
+                content: builtSections.section5
+            },
+            {
+                id: "durability",
+                number: 6,
+                title: "Durabilidad y daños",
+                subtitle: "Resistencia del vehículo y consecuencias de los accidentes.",
+                iconSvg: SECTION_ICONS.durability,
+                content: builtSections.section6
+            },
+            {
+                id: "jetpack",
+                number: 7,
+                title: "Jetpack y combustible",
+                subtitle: "Propulsión adicional y gestión de energía.",
+                iconSvg: SECTION_ICONS.jetpack,
+                content: builtSections.section7
+            },
+            {
+                id: "effects",
+                number: 8,
+                title: "Efectos visuales y velocidad",
+                subtitle: "Efectos cinematográficos y estelas visibles en el mundo.",
+                iconSvg: SECTION_ICONS.effects,
+                content: builtSections.section8
+            }
+        ];
+
+        this.sectionedEditor.setSections(sections);
+    }
+
     updateLogicControls(baseItem) {
         this.editorLogicControlsContainer.innerHTML = "";
 
         const logicTypes = ["spawn_point", "movement_controller", "interaction_button", "interactive_collision", "target", "impulse_jump", "impulse_lateral", "impulse_neon", "gravity_pad", "fuel_zone", "farming_zone", "gravity_sphere", "logic_camera", "camera_panel", "damage_controller", "logic_light"];
-        if (!logicTypes.includes(baseItem.type) && !baseItem.logicProperties) {
+        if (!logicTypes.includes(baseItem.type) && !baseItem.logicProperties && baseItem.type !== "motorbike") {
             this.editorLogicControlsContainer.style.display = "none";
+            this.restoreDefaultEditorControls();
             return;
         }
-
-        this.editorLogicControlsContainer.style.display = "flex";
-
-        const header = document.createElement("div");
-        header.textContent = "Propiedades Lógicas";
-        header.style.cssText = "font-weight: bold; color: #ffaa00; border-bottom: 1px dashed #555; padding-bottom: 5px; margin-bottom: 10px; font-size: 14px; text-align: left; width: 100%;";
-        this.editorLogicControlsContainer.appendChild(header);
 
         if (!this.currentDraftItem.logicProperties) {
             this.currentDraftItem.logicProperties = baseItem.logicProperties ? { ...baseItem.logicProperties } : {};
@@ -6541,11 +6692,19 @@ export class ConstructionMenu {
         const type = baseItem.type;
 
         if (type === "motorbike") {
-            header.textContent = "Propiedades de la motocicleta";
-            new MotorbikeLogic().render(this.editorLogicControlsContainer, this.currentDraftItem.logicProperties, (key, value) => {
-                this.currentDraftItem.logicProperties[key] = value;
-            });
-        } else if (type === "spawn_point") {
+            this.setupVehicleSectionedEditor(baseItem);
+            return;
+        }
+
+        this.restoreDefaultEditorControls();
+        this.editorLogicControlsContainer.style.display = "flex";
+
+        const header = document.createElement("div");
+        header.textContent = "Propiedades Lógicas";
+        header.style.cssText = "font-weight: bold; color: #ffaa00; border-bottom: 1px dashed #555; padding-bottom: 5px; margin-bottom: 10px; font-size: 14px; text-align: left; width: 100%;";
+        this.editorLogicControlsContainer.appendChild(header);
+
+        if (type === "spawn_point") {
             this.createLogicDraftInput(this.editorLogicControlsContainer, "Equipo:", "team", "number", 1);
             this.createLogicDraftInput(this.editorLogicControlsContainer, "Capacidad:", "capacity", "number", 1);
             this.createLogicDraftInput(this.editorLogicControlsContainer, "Orden:", "order", "number", 1);

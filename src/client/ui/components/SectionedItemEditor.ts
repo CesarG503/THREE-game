@@ -57,12 +57,12 @@ export class SectionedItemEditor {
       display: flex;
       flex-direction: column;
       gap: 6px;
-      width: 46px;
+      width: 44px;
       flex-shrink: 0;
-      background: rgba(18, 18, 24, 0.75);
+      background: rgba(18, 18, 24, 0.85);
       border: 1px solid rgba(255, 255, 255, 0.08);
       border-radius: 12px;
-      padding: 6px 4px;
+      padding: 6px 3px;
       box-sizing: border-box;
       box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
       backdrop-filter: blur(8px);
@@ -71,24 +71,24 @@ export class SectionedItemEditor {
       max-height: 100%;
       overflow-y: auto;
       scrollbar-width: none;
+      -ms-overflow-style: none;
     `;
 
-    // Right Content Pane
+    // Right Content Pane (Renders directly into panel space without boxed card container)
     this.contentContainer = document.createElement('div');
     this.contentContainer.className = 'sectioned-editor-content';
     this.contentContainer.style.cssText = `
       display: flex;
       flex-direction: column;
-      flex: 1;
+      width: 100%;
       min-width: 0;
-      background: rgba(22, 22, 29, 0.85);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 12px;
-      padding: 12px 14px;
+      background: transparent;
+      border: none;
+      border-radius: 0;
+      padding: 0;
       box-sizing: border-box;
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.45);
-      backdrop-filter: blur(8px);
-      overflow: hidden;
+      box-shadow: none;
+      backdrop-filter: none;
     `;
 
     // Header Area
@@ -96,12 +96,12 @@ export class SectionedItemEditor {
     headerWrapper.style.cssText = `
       display: flex;
       flex-direction: column;
-      gap: 2px;
+      gap: 3px;
       padding-bottom: 8px;
-      margin-bottom: 10px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      margin-bottom: 12px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
       flex-shrink: 0;
-      position: relative;
+      width: 100%;
     `;
 
     const titleRow = document.createElement('div');
@@ -109,6 +109,7 @@ export class SectionedItemEditor {
       display: flex;
       align-items: center;
       gap: 8px;
+      width: 100%;
     `;
 
     this.headerIconBadge = document.createElement('span');
@@ -119,8 +120,9 @@ export class SectionedItemEditor {
       width: 24px;
       height: 24px;
       border-radius: 6px;
-      background: rgba(0, 240, 255, 0.15);
+      background: rgba(0, 240, 255, 0.12);
       color: #00f0ff;
+      border: 1px solid rgba(0, 240, 255, 0.25);
       flex-shrink: 0;
     `;
 
@@ -131,7 +133,6 @@ export class SectionedItemEditor {
       font-weight: 700;
       color: #f1f5f9;
       letter-spacing: 0.2px;
-      text-shadow: 0 1px 2px rgba(0,0,0,0.5);
     `;
 
     titleRow.append(this.headerIconBadge, this.headerTitle);
@@ -147,16 +148,11 @@ export class SectionedItemEditor {
 
     headerWrapper.append(titleRow, this.headerSubtitle);
 
-    // Body Area (scrollable active section content)
+    // Body Area (seamlessly blends into the panel)
     this.bodyContainer = document.createElement('div');
     this.bodyContainer.className = 'sectioned-editor-body';
     this.bodyContainer.style.cssText = `
-      flex: 1;
-      overflow-y: auto;
-      overflow-x: hidden;
-      padding-right: 4px;
-      scrollbar-width: thin;
-      scrollbar-color: #3b82f6 #18181b;
+      width: 100%;
       display: flex;
       flex-direction: column;
       gap: 10px;
@@ -164,10 +160,58 @@ export class SectionedItemEditor {
 
     this.contentContainer.append(headerWrapper, this.bodyContainer);
     this.container.append(this.railContainer, this.contentContainer);
+
+    if (typeof document !== 'undefined' && !document.getElementById('sectioned-item-editor-style')) {
+      const style = document.createElement('style');
+      style.id = 'sectioned-item-editor-style';
+      style.textContent = `
+        .sectioned-editor-rail::-webkit-scrollbar,
+        .construction-section-rail-wrapper::-webkit-scrollbar {
+          display: none !important;
+          width: 0 !important;
+          height: 0 !important;
+        }
+        @keyframes sectionFadeIn {
+          from {
+            opacity: 0;
+            transform: translateY(3px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+      `;
+      document.head.appendChild(style);
+    }
   }
 
   public getElement(): HTMLElement {
     return this.container;
+  }
+
+  public getRailElement(): HTMLElement {
+    return this.railContainer;
+  }
+
+  public getContentElement(): HTMLElement {
+    return this.contentContainer;
+  }
+
+  public setDetached(detached: boolean) {
+    if (detached) {
+      if (this.railContainer.parentElement === this.container) {
+        this.container.removeChild(this.railContainer);
+      }
+      this.container.style.display = 'contents';
+      this.contentContainer.style.width = '100%';
+    } else {
+      if (this.railContainer.parentElement !== this.container) {
+        this.container.insertBefore(this.railContainer, this.contentContainer);
+      }
+      this.container.style.display = 'flex';
+      this.contentContainer.style.width = '';
+    }
   }
 
   public setSections(sections: EditorSectionDef[], defaultSectionId?: string) {
@@ -219,7 +263,7 @@ export class SectionedItemEditor {
       indicator.className = 'rail-active-indicator';
       indicator.style.cssText = `
         position: absolute;
-        left: -3px;
+        right: -2px;
         top: 6px;
         bottom: 6px;
         width: 3px;

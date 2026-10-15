@@ -702,9 +702,27 @@ export class ConstructionMenu {
         `;
         this.container.appendChild(style);
 
+        this.sectionRailWrapper = document.createElement("div");
+        this.sectionRailWrapper.className = "construction-section-rail-wrapper";
+        this.sectionRailWrapper.style.cssText = `
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            flex-shrink: 0;
+            width: 44px;
+            max-height: 100%;
+            overflow-y: auto;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+            align-self: flex-start;
+            margin-top: 10px;
+        `;
+
         this.renderLibraryPanel(this.libraryPanel);
 
         this.contentLibrary.appendChild(this.libraryLeftCol);
+        this.contentLibrary.appendChild(this.sectionRailWrapper);
         this.contentLibrary.appendChild(this.libraryPanel);
 
         // Logic Content
@@ -4762,9 +4780,13 @@ export class ConstructionMenu {
         `;
 
         this.sectionedEditor = new SectionedItemEditor();
-        this.sectionedEditor.getElement().style.display = "none";
+        this.sectionedEditor.setDetached(true);
+        if (this.sectionRailWrapper) {
+            this.sectionRailWrapper.appendChild(this.sectionedEditor.getRailElement());
+        }
 
-        this.panelEditor.appendChild(this.sectionedEditor.getElement());
+        this.panelEditor.appendChild(this.sectionedEditor.getContentElement());
+        this.sectionedEditor.getContentElement().style.display = "none";
         this.panelEditor.appendChild(this.defaultEditorControlsSlot);
 
         this.defaultEditorControlsSlot.appendChild(controlsContainer);
@@ -6279,6 +6301,9 @@ export class ConstructionMenu {
     selectItem(baseItem) {
         this.selectedItem = baseItem;
 
+        // Restore default editor controls to original hierarchy before configuring item
+        this.restoreDefaultEditorControls();
+
         // Show Editor
         this.panelPlaceholder.style.display = "none";
         this.panelEditor.style.display = "flex";
@@ -6536,26 +6561,43 @@ export class ConstructionMenu {
 
     restoreDefaultEditorControls() {
         if (!this.defaultEditorControlsSlot) return;
+
+        // Hide detached section rail and sectioned content
+        if (this.sectionRailWrapper) {
+            this.sectionRailWrapper.style.display = "none";
+        }
         if (this.sectionedEditor) {
-            this.sectionedEditor.getElement().style.display = "none";
+            this.sectionedEditor.getContentElement().style.display = "none";
         }
         if (this.editorPreview) {
             this.editorPreview.style.width = "128px";
             this.editorPreview.style.height = "128px";
         }
-        if (this.editorConstructionControls && this.editorConstructionControls.parentElement !== this.defaultEditorControlsSlot) {
-            this.defaultEditorControlsSlot.insertBefore(this.editorConstructionControls, this.defaultEditorControlsSlot.firstChild);
+
+        // Safely re-attach all control groups to defaultEditorControlsSlot in deterministic order
+        if (this.editorConstructionControls) {
+            this.defaultEditorControlsSlot.appendChild(this.editorConstructionControls);
         }
-        if (this.editorTextureContainer && this.editorTextureContainer.parentElement !== this.defaultEditorControlsSlot) {
-            this.defaultEditorControlsSlot.insertBefore(this.editorTextureContainer, this.editorDimContainer || null);
+        if (this.editorTextureContainer) {
+            this.defaultEditorControlsSlot.appendChild(this.editorTextureContainer);
             this.editorTextureContainer.style.borderTop = "1px solid #444";
             this.editorTextureContainer.style.marginTop = "10px";
         }
-        if (this.editorDimContainer && this.editorDimContainer.parentElement !== this.defaultEditorControlsSlot) {
-            this.defaultEditorControlsSlot.insertBefore(this.editorDimContainer, this.editorWeaponControlsContainer || null);
+        if (this.editorDimContainer) {
+            this.defaultEditorControlsSlot.appendChild(this.editorDimContainer);
             this.editorDimContainer.style.borderTop = "1px solid #444";
             this.editorDimContainer.style.marginTop = "10px";
         }
+        if (this.editorWeaponControlsContainer) {
+            this.defaultEditorControlsSlot.appendChild(this.editorWeaponControlsContainer);
+        }
+        if (this.editorConsumableControlsContainer) {
+            this.defaultEditorControlsSlot.appendChild(this.editorConsumableControlsContainer);
+        }
+        if (this.editorLogicControlsContainer) {
+            this.defaultEditorControlsSlot.appendChild(this.editorLogicControlsContainer);
+        }
+
         this.defaultEditorControlsSlot.style.display = "flex";
     }
 
@@ -6576,8 +6618,14 @@ export class ConstructionMenu {
             this.editorLogicControlsContainer.style.display = "none";
         }
 
-        // Show sectioned editor
-        this.sectionedEditor.getElement().style.display = "flex";
+        // Show external side rail and sectioned content
+        if (this.sectionRailWrapper) {
+            if (this.sectionedEditor.getRailElement().parentElement !== this.sectionRailWrapper) {
+                this.sectionRailWrapper.appendChild(this.sectionedEditor.getRailElement());
+            }
+            this.sectionRailWrapper.style.display = "flex";
+        }
+        this.sectionedEditor.getContentElement().style.display = "flex";
 
         // Build vehicle logic sections 2 to 8
         const logic = new MotorbikeLogic();

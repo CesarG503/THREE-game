@@ -15,6 +15,7 @@ import { TireTrackManager } from './TireTrackManager';
 import { SpeedLinesEffect } from './SpeedLinesEffect';
 import { VehicleSpeedTrails } from './VehicleSpeedTrails';
 import { VehicleTronWall } from './VehicleTronWall';
+import { VehicleStuntTracker } from './VehicleStuntTracker';
 
 const FORWARD = new THREE.Vector3(0, 0, -1);
 
@@ -59,6 +60,7 @@ export class VehicleSystem {
   speedLines: SpeedLinesEffect;
   speedTrails: VehicleSpeedTrails;
   tronWalls: VehicleTronWall;
+  stunts: VehicleStuntTracker;
   isSkidding = false;
 
   constructor(private game: any) {
@@ -74,6 +76,7 @@ export class VehicleSystem {
     this.tireTracks = new TireTrackManager(scene);
     this.speedTrails = new VehicleSpeedTrails(scene);
     this.tronWalls = new VehicleTronWall(scene, game.world, game);
+    this.stunts = new VehicleStuntTracker();
     if (typeof document !== 'undefined') {
       this.hud = document.createElement('div');
       this.hud.id = 'motorbike-hud';
@@ -305,6 +308,7 @@ export class VehicleSystem {
     character.noPitchTilt = false;
     this.game.cameraController?.setYawConstraint?.(null);
     if (this.hud) this.hud.style.display = 'none';
+    this.stunts?.resetSession();
     return true;
   }
 
@@ -346,6 +350,7 @@ export class VehicleSystem {
     this.updateCoasting(dt);
     if (!this.mounted) {
       this.speedLines.update(dt, 0, null);
+      this.stunts.update(null as any, true, false, false, dt, false);
       this.game.hud?.updateVehicle?.(null);
       if (this.hud) this.hud.style.display = 'none';
       const nearby = this.nearest();
@@ -439,6 +444,14 @@ export class VehicleSystem {
     this.speed = motion.speed;
     this.verticalSpeed = motion.verticalSpeed;
     this.grounded = motion.grounded;
+    this.stunts.update(
+      bike,
+      this.grounded,
+      Boolean(motion.crashed),
+      Boolean(motion.toppled || bike.userData.vehicleToppled),
+      dt,
+      !this.isPassenger
+    );
     if (motion.toppled && !props.autoStabilize) {
       this.dismount(true, true);
       return false;
@@ -1149,5 +1162,6 @@ Durabilidad ${Math.ceil(props.durability)} / ${props.maxDurability}${isMotorbike
     this.game.world.removeCharacterController(this.controller);
     this.game.cameraController?.setYawConstraint?.(null);
     this.hud?.remove();
+    this.stunts?.dispose();
   }
 }

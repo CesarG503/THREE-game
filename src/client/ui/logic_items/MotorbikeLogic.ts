@@ -10,6 +10,7 @@ export interface MotorbikeBuiltSections {
   section6: HTMLElement;
   section7: HTMLElement;
   section8: HTMLElement;
+  section9Score: HTMLElement;
 }
 
 /** Used by both the library draft and the placed-object inspector. */
@@ -574,10 +575,78 @@ export class MotorbikeLogic {
       }
     };
 
+    // ==========================================
+    // SECCIÓN 9: Puntaje y acrobacias
+    // ==========================================
+    const section9Score = document.createElement('div');
+    section9Score.style.cssText = 'display:flex;flex-direction:column;gap:6px;';
+
+    const scoreTitle = document.createElement('div');
+    scoreTitle.textContent = 'Sistema de Puntuación de Saltos:';
+    scoreTitle.style.cssText = 'font-size:12px;font-weight:700;color:#38bdf8;margin-bottom:4px;';
+    section9Score.appendChild(scoreTitle);
+
+    const scoreSystemCb = makeCheckbox('Habilitar sistema de puntaje', settings.scoreSystemEnabled, val => {
+      update('scoreSystemEnabled', val);
+      refreshScoreSection();
+    });
+    section9Score.appendChild(scoreSystemCb.container);
+
+    const stuntHUDCb = makeCheckbox('Mostrar medidor de acrobacias en pantalla (HUD)', settings.showStuntHUD, val => update('showStuntHUD', val));
+    section9Score.appendChild(stuntHUDCb.container);
+
+    const scoreSettingsGroup = document.createElement('div');
+    scoreSettingsGroup.style.cssText = 'display:flex;flex-direction:column;gap:6px;border-top:1px solid rgba(255,255,255,0.08);padding-top:8px;margin-top:4px;';
+
+    scoreSettingsGroup.appendChild(makeHint('Puntaje en vivo por tiempo en el aire, mortales (flips), giros laterales y trompos 360°.'));
+
+    // Air time & Threshold
+    createField('airTimePointsPerSecond', scoreSettingsGroup);
+    createField('minAirTimeToScore', scoreSettingsGroup);
+
+    // Flips & Spins title
+    const tricksHeader = document.createElement('div');
+    tricksHeader.textContent = 'Puntajes por Acrobacias (Flips / Giros):';
+    tricksHeader.style.cssText = 'font-size:12px;font-weight:600;color:#fbbf24;margin:8px 0 2px 0;';
+    scoreSettingsGroup.appendChild(tricksHeader);
+
+    createField('frontflipPoints', scoreSettingsGroup);
+    createField('backflipPoints', scoreSettingsGroup);
+    createField('barrelRollPoints', scoreSettingsGroup);
+    createField('spin360Points', scoreSettingsGroup);
+
+    // Combos & Landing
+    const comboHeader = document.createElement('div');
+    comboHeader.textContent = 'Multiplicador y Aterrizaje:';
+    comboHeader.style.cssText = 'font-size:12px;font-weight:600;color:#34d399;margin:8px 0 2px 0;';
+    scoreSettingsGroup.appendChild(comboHeader);
+
+    const comboCb = makeCheckbox('Multiplicador de combo por encadenar trucos', settings.comboMultiplierEnabled, val => {
+      update('comboMultiplierEnabled', val);
+      const multInput = inputs.get('comboMultiplierStep');
+      if (multInput) multInput.disabled = !val;
+    });
+    scoreSettingsGroup.appendChild(comboCb.container);
+
+    createField('comboMultiplierStep', scoreSettingsGroup);
+    createField('perfectLandingBonus', scoreSettingsGroup);
+
+    const crashResetCb = makeCheckbox('Anular puntaje al chocar o volcar en aterrizaje', settings.crashResetsScore, val => update('crashResetsScore', val));
+    scoreSettingsGroup.appendChild(crashResetCb.container);
+
+    section9Score.appendChild(scoreSettingsGroup);
+
+    const refreshScoreSection = () => {
+      const active = scoreSystemCb.input.checked;
+      scoreSettingsGroup.style.display = active ? 'flex' : 'none';
+      stuntHUDCb.input.disabled = !active;
+    };
+
     refreshPenalty();
     refreshDurability();
     refreshSpeedEffect();
     refreshTronWall();
+    refreshScoreSection();
 
     return {
       section2Seats,
@@ -586,7 +655,8 @@ export class MotorbikeLogic {
       section5,
       section6,
       section7,
-      section8
+      section8,
+      section9Score
     };
   }
 
@@ -656,6 +726,14 @@ export class MotorbikeLogic {
         subtitle: 'Efectos cinematográficos y estelas visibles en el mundo.',
         iconSvg: SECTION_ICONS.effects,
         content: sections.section8
+      },
+      {
+        id: 'score',
+        number: 9,
+        title: 'Puntaje y acrobacias',
+        subtitle: 'Tiempo en el aire, giros, piruetas y recompensas.',
+        iconSvg: SECTION_ICONS.trophy,
+        content: sections.section9Score
       }
     ];
 

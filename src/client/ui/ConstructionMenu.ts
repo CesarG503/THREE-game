@@ -6717,6 +6717,14 @@ export class ConstructionMenu {
                 subtitle: "Efectos cinematográficos y estelas visibles en el mundo.",
                 iconSvg: SECTION_ICONS.effects,
                 content: builtSections.section8
+            },
+            {
+                id: "score",
+                number: 9,
+                title: "Puntaje y acrobacias",
+                subtitle: "Tiempo en el aire, giros, piruetas y recompensas.",
+                iconSvg: SECTION_ICONS.trophy,
+                content: builtSections.section9Score
             }
         ];
 

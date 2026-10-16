@@ -48,6 +48,14 @@ export const MOTORBIKE_FIELDS = [
   { key: 'tronWallDuration', label: 'Duración del muro Tron (s)', value: 5.0, min: 1.0, max: 30.0, step: 0.5 },
   { key: 'tronWallSinkDuration', label: 'Tiempo de descenso al suelo (s)', value: 1.2, min: 0.2, max: 5.0, step: 0.1 },
   { key: 'tronWallMinSpeed', label: 'Velocidad mínima para muro Tron (km/h)', value: 15, min: 1, max: 120, step: 1 },
+  { key: 'airTimePointsPerSecond', label: 'Puntos por segundo en el aire', value: 50, min: 0, max: 2000, step: 10 },
+  { key: 'minAirTimeToScore', label: 'Tiempo mínimo en aire para puntuar (s)', value: 0.3, min: 0.05, max: 3.0, step: 0.05 },
+  { key: 'frontflipPoints', label: 'Puntos por Frontflip (giro adelante)', value: 250, min: 0, max: 10000, step: 25 },
+  { key: 'backflipPoints', label: 'Puntos por Backflip (giro atrás)', value: 250, min: 0, max: 10000, step: 25 },
+  { key: 'barrelRollPoints', label: 'Puntos por Barrel Roll (giro lateral)', value: 200, min: 0, max: 10000, step: 25 },
+  { key: 'spin360Points', label: 'Puntos por Giro 360° (trompo)', value: 150, min: 0, max: 10000, step: 25 },
+  { key: 'comboMultiplierStep', label: 'Incremento de multiplicador por truco (+x)', value: 0.5, min: 0.1, max: 5.0, step: 0.1 },
+  { key: 'perfectLandingBonus', label: 'Bonificación por aterrizaje perfecto', value: 150, min: 0, max: 5000, step: 25 },
 ] as const;
 
 /** Ángulo máximo de giro relativo del torso y cámara del pasajero (85°). */
@@ -87,6 +95,10 @@ export type MotorbikeSettings = Record<(typeof MOTORBIKE_FIELDS)[number]['key'],
   tronWallDamagePlayers: boolean;
   tronWallDamageVehicles: boolean;
   twoSeatsEnabled: boolean;
+  scoreSystemEnabled: boolean;
+  showStuntHUD: boolean;
+  comboMultiplierEnabled: boolean;
+  crashResetsScore: boolean;
 };
 
 export function normalizeMotorbikeSettings(props: any = {}): MotorbikeSettings {
@@ -124,6 +136,10 @@ export function normalizeMotorbikeSettings(props: any = {}): MotorbikeSettings {
   result.tronWallKnockbackForce = Number.isFinite(Number(props.tronWallKnockbackForce)) ? Math.max(0, Number(props.tronWallKnockbackForce)) : 15;
   result.tronWallDamagePlayers = props.tronWallDamagePlayers !== false;
   result.tronWallDamageVehicles = props.tronWallDamageVehicles !== false;
+  result.scoreSystemEnabled = props.scoreSystemEnabled !== false;
+  result.showStuntHUD = props.showStuntHUD !== false;
+  result.comboMultiplierEnabled = props.comboMultiplierEnabled !== false;
+  result.crashResetsScore = props.crashResetsScore !== false;
   for (const field of MOTORBIKE_FIELDS) {
     const value = Number(props[field.key] ?? field.value);
     result[field.key] = Number.isFinite(value) ? Math.min(field.max, Math.max(field.min, value)) : field.value;

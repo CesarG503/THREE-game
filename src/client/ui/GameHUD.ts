@@ -178,6 +178,10 @@ export class GameHUD {
         for (let i = layerOrder.length - 1; i >= 0; i--) {
             const id = layerOrder[i];
             if (isVehicleHUDId(id) && (this.settings as any)[vehicleShowKey(id)]) {
+                if (id === 'vehicleStunts') {
+                    // Stunt HUD is dynamically controlled by VehicleStuntTracker during jumps and landings
+                    continue;
+                }
                 const widget = new VehicleHUDWidget(id, this.settings, this.container);
                 this.applyPosition(widget.element, (this.settings as any)[id + 'Pos']);
                 this.container.appendChild(widget.element);

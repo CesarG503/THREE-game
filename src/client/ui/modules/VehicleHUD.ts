@@ -6,6 +6,7 @@ export const VEHICLE_HUD_ITEMS = [
   { id: 'vehicleSpeed', label: 'Moto · Velocímetro', width: 260, height: 260, pos: { right: '112px', bottom: '110px' } },
   { id: 'vehicleFuel', label: 'Moto · Combustible', width: 74, height: 226, pos: { right: '28px', bottom: '117px' } },
   { id: 'vehicleDurability', label: 'Moto · Durabilidad', width: 326, height: 68, pos: { right: '28px', bottom: '36px' } },
+  { id: 'vehicleStunts', label: 'Moto · Medidor de Puntajes', width: 280, height: 110, pos: { left: '50%', top: '15%', transform: 'translateX(-50%)' } },
 ] as const;
 export type VehicleHUDId = typeof VEHICLE_HUD_ITEMS[number]['id'];
 export interface VehicleHUDData {
@@ -83,7 +84,7 @@ export class VehicleHUDWidget {
         <text x="53" y="62" fill="#c8eee4" font-size="11" font-style="italic">F</text><text x="53" y="201" fill="#c8eee4" font-size="11" font-style="italic">E</text>
         <text data-value x="33" y="218" text-anchor="middle" fill="#b1ffd8" font-size="11" font-weight="700">100%</text>
       </svg>`;
-    } else {
+    } else if (id === 'vehicleDurability') {
       this.inner.innerHTML = `<svg viewBox="0 0 326 68" width="100%" height="100%" ${font}>${defs}
         <text x="32" y="13" fill="#fff0cc" font-size="9" font-weight="800" letter-spacing="1">DURABILIDAD</text>
         <path d="M6 28 L21 43 M6 43 L21 28 M4 24 L5 31 L10 33 L13 30 L11 24 M18 39 L17 44 L22 47 L25 43 Z" fill="none" stroke="#ffd069" stroke-width="3" stroke-linecap="round"/>
@@ -93,6 +94,21 @@ export class VehicleHUDWidget {
         <text data-status x="32" y="63" fill="#d4cab6" font-size="8" letter-spacing="1">ESTADO ÓPTIMO</text>
         <text x="321" y="63" fill="#d4cab6" font-size="8" text-anchor="end">MAX</text>
       </svg>`;
+    } else {
+      this.inner.innerHTML = `
+        <div style="display:flex;flex-direction:column;align-items:center;gap:3px;width:100%;height:100%;pointer-events:none;justify-content:center;font-family:system-ui,sans-serif;background:rgba(15,23,42,0.85);border:1px solid rgba(0,240,255,0.45);border-radius:12px;padding:6px 10px;box-sizing:border-box;backdrop-filter:blur(6px);box-shadow:0 4px 18px rgba(0,0,0,0.5);">
+          <div style="display:flex;gap:6px;align-items:center;">
+            <span style="background:rgba(15,23,42,0.85);border:1px solid rgba(56,189,248,0.4);color:#38bdf8;padding:2px 7px;border-radius:9999px;font-size:10px;font-weight:700;">⏱️ 1.8s AIRE</span>
+            <span style="background:linear-gradient(135deg,#f59e0b,#ef4444);color:#fff;padding:2px 7px;border-radius:9999px;font-size:10px;font-weight:800;">🔥 x1.5 COMBO</span>
+          </div>
+          <div data-value style="font-size:24px;font-weight:900;color:#00f0ff;text-shadow:0 0 16px rgba(0,240,255,0.8);line-height:1.1;">+450 PTS</div>
+          <div style="font-size:8px;font-weight:700;color:rgba(226,232,240,0.7);letter-spacing:2px;text-transform:uppercase;">ACROBACIA EN CURSO</div>
+          <div style="display:flex;gap:4px;margin-top:2px;">
+            <div style="background:rgba(18,24,38,0.92);border:1px solid rgba(0,240,255,0.4);border-radius:6px;padding:2px 6px;color:#f8fafc;font-size:10px;font-weight:700;">🔄 Frontflip <span style="color:#38bdf8;">+250</span></div>
+            <div style="background:rgba(18,24,38,0.92);border:1px solid rgba(0,240,255,0.4);border-radius:6px;padding:2px 6px;color:#f8fafc;font-size:10px;font-weight:700;">🌀 Roll <span style="color:#38bdf8;">+200</span></div>
+          </div>
+        </div>
+      `;
     }
     if (s[id + 'ShowText'] === false) this.inner.querySelector('[data-value]')?.setAttribute('visibility', 'hidden');
   }
@@ -101,7 +117,8 @@ export class VehicleHUDWidget {
     this.data = data;
     const next = this.id === 'vehicleSpeed' ? Math.round(Math.abs(data.speed))
       : this.id === 'vehicleFuel' ? Math.round(Math.max(0, Math.min(1, data.fuel / Math.max(1, data.maxFuel))) * 100)
-      : data.durabilityEnabled ? Math.round(Math.max(0, Math.min(1, data.durability / Math.max(1, data.maxDurability))) * 100) : 100;
+      : this.id === 'vehicleDurability' ? (data.durabilityEnabled ? Math.round(Math.max(0, Math.min(1, data.durability / Math.max(1, data.maxDurability))) * 100) : 100)
+      : 450;
     if (next !== this.target) {
       this.target = next;
       this.transition?.pause();
@@ -125,13 +142,15 @@ export class VehicleHUDWidget {
       this.inner.querySelector('[data-fill]')!.setAttribute('transform', `translate(0 199) scale(1 ${value / 100}) translate(0 -199)`);
       text.textContent = `${Math.round(value)}%`;
       text.setAttribute('fill', value <= 20 ? '#ff986f' : '#b1ffd8');
-    } else {
+    } else if (this.id === 'vehicleDurability') {
       this.inner.querySelector('[data-fill]')!.setAttribute('transform', `translate(35 0) scale(${value / 100} 1) translate(-35 0)`);
       text.textContent = data.durabilityEnabled ? `${Math.ceil(data.durability)} / ${data.maxDurability}` : '∞';
       text.setAttribute('fill', value < 50 ? '#ffffff' : '#182139');
       this.inner.querySelector('[data-status]')!.textContent = !data.durabilityEnabled ? 'SIN DESGASTE' : broken ? 'AVERIADA' : value <= 25 ? 'ESTADO CRÍTICO' : value <= 60 ? 'DAÑADA' : 'ESTADO ÓPTIMO';
+    } else {
+      if (text) text.textContent = '+450 PTS';
     }
-    this.element.setAttribute('aria-label', this.id === 'vehicleSpeed' ? `${Math.round(value)} kilómetros por hora` : `${this.id === 'vehicleFuel' ? 'Combustible' : 'Durabilidad'}: ${text.textContent}`);
+    this.element.setAttribute('aria-label', this.id === 'vehicleSpeed' ? `${Math.round(value)} kilómetros por hora` : this.id === 'vehicleStunts' ? 'Medidor de Acrobacias y Puntaje' : `${this.id === 'vehicleFuel' ? 'Combustible' : 'Durabilidad'}: ${text?.textContent || ''}`);
   }
   show(visible: boolean, animated = true) {
     if (visible === this.shown) return;

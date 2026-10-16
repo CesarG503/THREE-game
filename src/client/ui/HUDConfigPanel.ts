@@ -514,10 +514,13 @@ export class HUDConfigPanel {
         title.style.cssText = 'color:#baf5ff;font-size:15px';
         parent.appendChild(title);
         const description = document.createElement('p');
-        description.textContent = 'Visible solo al conducir una moto. Arrastra y redimensiona esta pieza; el diseño se guarda para este rol. La vista previa usa valores de ejemplo.';
+        description.textContent = id === 'vehicleStunts'
+            ? 'Aparece al saltar y realizar piruetas en la moto. Arrastra y posiciona este medidor donde prefieras que aparezca en pantalla. El diseño y ubicación se guardan para este rol.'
+            : 'Visible solo al conducir una moto. Arrastra y redimensiona esta pieza; el diseño se guarda para este rol. La vista previa usa valores de ejemplo.';
         description.style.cssText = 'color:#aaa;font-size:12px;line-height:1.5';
         parent.appendChild(description);
-        for (const [key, label] of [[vehicleShowKey(id), 'Mostrar al conducir'], [id + 'ShowText', 'Mostrar valor numérico']]) {
+        const showLabel = id === 'vehicleStunts' ? 'Mostrar medidor de puntajes' : 'Mostrar al conducir';
+        for (const [key, label] of [[vehicleShowKey(id), showLabel], [id + 'ShowText', 'Mostrar valor numérico']]) {
             const row = document.createElement('label');
             row.style.cssText = 'display:flex;gap:8px;margin:12px 0;color:#ddd;font-size:12px';
             const input = document.createElement('input');

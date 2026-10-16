@@ -76,7 +76,7 @@ export class VehicleSystem {
     this.tireTracks = new TireTrackManager(scene);
     this.speedTrails = new VehicleSpeedTrails(scene);
     this.tronWalls = new VehicleTronWall(scene, game.world, game);
-    this.stunts = new VehicleStuntTracker();
+    this.stunts = new VehicleStuntTracker(this.game);
     if (typeof document !== 'undefined') {
       this.hud = document.createElement('div');
       this.hud.id = 'motorbike-hud';

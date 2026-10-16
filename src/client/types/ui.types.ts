@@ -43,6 +43,11 @@ export interface HUDConfig {
     vehicleDurabilityWidth?: number;
     vehicleDurabilityHeight?: number;
     vehicleDurabilityShowText?: boolean;
+    showVehicleStunts?: boolean;
+    vehicleStuntsPos?: UIPosition;
+    vehicleStuntsWidth?: number;
+    vehicleStuntsHeight?: number;
+    vehicleStuntsShowText?: boolean;
 
     showHealth?: boolean;
     healthStyle?: 'bar' | 'hearts' | 'simple';

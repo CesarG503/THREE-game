@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { normalizeMotorbikeSettings, type MotorbikeSettings } from './MotorbikeSettings';
 import { vehicleUp } from './VehicleGravity';
+import { applyResponsivePosition } from '../ui/modules/HUDResponsiveUtils';
 
 export interface StuntTrick {
   name: string;
@@ -56,8 +57,23 @@ export class VehicleStuntTracker {
   private hudLandingBanner: HTMLDivElement | null = null;
   private hudTotalSessionScore: HTMLDivElement | null = null;
 
-  constructor() {
+  constructor(private game?: any) {
     this.initHUD();
+  }
+
+  private applyCustomPosition() {
+    if (!this.hudContainer) return;
+    const profile = this.game?.playerConfigManager?.getCurrentProfile?.();
+    const hudSettings = profile?.hudSettings || this.game?.hud?.settings;
+    if (!hudSettings) return;
+
+    const pos = hudSettings.vehicleStuntsPos || { left: '50%', top: '15%', transform: 'translateX(-50%)' };
+    applyResponsivePosition(this.hudContainer, pos);
+
+    if (hudSettings.vehicleStuntsWidth) {
+      const w = hudSettings.vehicleStuntsWidth;
+      this.hudContainer.style.width = typeof w === 'number' ? `${w}px` : w;
+    }
   }
 
   private initHUD() {
@@ -245,6 +261,15 @@ export class VehicleStuntTracker {
 
     // If disabled via vehicle configuration, hide HUD and skip
     if (props.scoreSystemEnabled === false) {
+      if (this.hudContainer) this.hudContainer.style.display = 'none';
+      this.isAirborne = false;
+      return;
+    }
+
+    // If disabled via player role HUD settings, hide HUD and skip
+    const profile = this.game?.playerConfigManager?.getCurrentProfile?.();
+    const hudSettings = profile?.hudSettings || this.game?.hud?.settings;
+    if (hudSettings && hudSettings.showVehicleStunts === false) {
       if (this.hudContainer) this.hudContainer.style.display = 'none';
       this.isAirborne = false;
       return;
@@ -450,6 +475,7 @@ export class VehicleStuntTracker {
 
   private renderLiveHUD() {
     if (!this.hudContainer) return;
+    this.applyCustomPosition();
     this.hudContainer.style.display = 'flex';
 
     if (this.hudAirTimer) {
@@ -544,7 +570,15 @@ export class VehicleStuntTracker {
     this.currentFeedback = feedback;
     this.landingFeedbackTimer = 2.5;
 
+    const profile = this.game?.playerConfigManager?.getCurrentProfile?.();
+    const hudSettings = profile?.hudSettings || this.game?.hud?.settings;
+    if (hudSettings && hudSettings.showVehicleStunts === false) {
+      if (this.hudContainer) this.hudContainer.style.display = 'none';
+      return;
+    }
+
     if (!this.hudLandingBanner || !this.hudContainer) return;
+    this.applyCustomPosition();
     this.hudContainer.style.display = 'flex';
 
     if (this.hudTricksContainer) this.hudTricksContainer.innerHTML = '';

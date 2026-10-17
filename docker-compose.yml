@@ -1,24 +1,64 @@
 services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: threejs-game-app
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 8080
+      DATABASE_URL: ${DATABASE_URL:-postgresql://${POSTGRES_USER:-game_user}:${POSTGRES_PASSWORD:-game_password}@postgres:5432/${POSTGRES_DB:-threejs_game}?schema=public}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      S3_ENDPOINT: ${S3_ENDPOINT:-http://minio:9000}
+      S3_REGION: ${S3_REGION:-us-east-1}
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-minioadmin}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-minioadmin123}
+      S3_BUCKET: ${S3_BUCKET:-threejs-game-assets}
+      S3_FORCE_PATH_STYLE: ${S3_FORCE_PATH_STYLE:-true}
+      S3_STORAGE_PROVIDER: ${S3_STORAGE_PROVIDER:-minio}
+      AUTH_SESSION_DAYS: ${AUTH_SESSION_DAYS:-7}
+      LOG_STATS: ${LOG_STATS:-false}
+      ASSET_PUBLIC_BASE_URL: ${ASSET_PUBLIC_BASE_URL:-}
+      ASSET_MAX_UPLOAD_BYTES: ${ASSET_MAX_UPLOAD_BYTES:-52428800}
+    expose:
+      - "8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      minio:
+        condition: service_started
+      minio-init:
+        condition: service_completed_successfully
+
   postgres:
     image: postgres:16-alpine
     container_name: threejs-game-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: game_user
-      POSTGRES_PASSWORD: game_password
-      POSTGRES_DB: threejs_game
-    ports:
-      - "5433:5432"
+      POSTGRES_USER: ${POSTGRES_USER:-game_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-game_password}
+      POSTGRES_DB: ${POSTGRES_DB:-threejs_game}
+    expose:
+      - "5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-game_user} -d ${POSTGRES_DB:-threejs_game}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
   redis:
     image: redis:7-alpine
     container_name: threejs-game-redis
     restart: unless-stopped
     command: [ "redis-server", "--appendonly", "yes" ]
-    ports:
-      - "6379:6379"
+    expose:
+      - "6379"
     volumes:
       - redis_data:/data
 
@@ -31,9 +71,9 @@ services:
     environment:
       MINIO_ROOT_USER: ${S3_ACCESS_KEY_ID:-minioadmin}
       MINIO_ROOT_PASSWORD: ${S3_SECRET_ACCESS_KEY:-minioadmin123}
-    ports:
-      - "9000:9000"
-      - "9001:9001"
+    expose:
+      - "9000"
+      - "9001"
     volumes:
       - minio_data:/data
 

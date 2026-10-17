@@ -3,8 +3,12 @@ import { Projectile } from "../weapons/Projectile";
 
 export function setupMultiplayerUI(this: any) {
 	const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-	const hostname = window.location.hostname || "localhost";
-	const defaultWsUrl = `${protocol}//${hostname}:8080`;
+	const envWsUrl = (import.meta as any).env?.VITE_WS_URL;
+	const defaultWsUrl =
+		envWsUrl ||
+		(window.location.port === "5173"
+			? `${protocol}//${window.location.hostname || "localhost"}:8080`
+			: `${protocol}//${window.location.host}`);
 
 	setTimeout(() => {
 		if (!this.networkManager.isConnected) {

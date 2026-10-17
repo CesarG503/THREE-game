@@ -12,8 +12,16 @@ export default defineConfig({
       '@': clientRoot
     }
   },
+  server: {
+    proxy: {
+      '/api': {
+        target: 'http://localhost:8080',
+        changeOrigin: true
+      }
+    }
+  },
   build: {
-    outDir: 'dist',
+    outDir: 'dist/client',
     emptyOutDir: true,
     rollupOptions: {
       input: fileURLToPath(new URL('./index.html', import.meta.url))

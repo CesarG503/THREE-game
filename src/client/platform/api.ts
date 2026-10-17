@@ -175,9 +175,16 @@ export async function apiFetch<T>(
 }
 
 export function getApiBaseUrl() {
-	const protocol = window.location.protocol === "https:" ? "https:" : "http:";
-	const hostname = window.location.hostname || "localhost";
-	return `${protocol}//${hostname}:8080/api`;
+	const envApiUrl = (import.meta as any).env?.VITE_API_URL;
+	if (envApiUrl) return envApiUrl;
+
+	if (window.location.port === "5173") {
+		const protocol = window.location.protocol === "https:" ? "https:" : "http:";
+		const hostname = window.location.hostname || "localhost";
+		return `${protocol}//${hostname}:8080/api`;
+	}
+
+	return `${window.location.origin}/api`;
 }
 
 function normalizeAssetUrls<T extends { fileUrl: string; publicUrl?: string | null }>(asset: T): T {

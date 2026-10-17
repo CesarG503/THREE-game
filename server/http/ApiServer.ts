@@ -5,6 +5,7 @@ import { AuthError, getUserBySessionToken, loginUser, registerUser, requireUserB
 import { createAsset, getAsset, getAssetObject, listAssets, type UploadedAssetFile } from "../services/AssetService.js"
 import { createMap, deleteMap, getMap, listMaps, updateMap, type MapWriteInput } from "../services/MapService.js"
 import { logger } from "../utils/Logger.js"
+import { serveStatic } from "./StaticServer.js"
 
 const MAX_BODY_BYTES = 1024 * 1024 * 2
 
@@ -21,6 +22,11 @@ export async function handleHttpRequest(
   }
 
   const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`)
+
+  if (!url.pathname.startsWith("/api")) {
+    await serveStatic(req, res, url.pathname)
+    return
+  }
 
   if (req.method === "GET" && url.pathname === "/api/health") {
     sendJson(res, 200, { ok: true })

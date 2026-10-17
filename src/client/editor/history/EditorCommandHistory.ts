@@ -85,3 +85,28 @@ export class EditorCommandHistory {
 		this.redoStack = [];
 	}
 }
+
+export class ReparentCommand implements EditorCommand {
+	name = "Reparent Node";
+
+	constructor(
+		private hierarchy: any,
+		private nodeId: string,
+		private oldParentId: string | null,
+		private oldOrder: number,
+		private newParentId: string | null,
+		private newOrder?: number,
+		private onAfterExecute?: () => void
+	) {}
+
+	execute() {
+		this.hierarchy.reparent(this.nodeId, this.newParentId, this.newOrder);
+		if (this.onAfterExecute) this.onAfterExecute();
+	}
+
+	undo() {
+		this.hierarchy.reparent(this.nodeId, this.oldParentId, this.oldOrder);
+		if (this.onAfterExecute) this.onAfterExecute();
+	}
+}
+

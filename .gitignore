@@ -8,6 +8,7 @@ dist
 .agents
 .codex
 graphify-out
-.graphifyignore
+graphify-out/
+.graphify*
 tests/*
 tests/

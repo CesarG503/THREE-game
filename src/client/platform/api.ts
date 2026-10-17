@@ -177,7 +177,8 @@ export async function apiFetch<T>(
 export function getApiBaseUrl() {
 	const protocol = window.location.protocol === "https:" ? "https:" : "http:";
 	const hostname = window.location.hostname || "localhost";
-	return `${protocol}//${hostname}:8080/api`;
+	const port = (import.meta as any).env?.VITE_SERVER_PORT || "8085";
+	return `${protocol}//${hostname}:${port}/api`;
 }
 
 function normalizeAssetUrls<T extends { fileUrl: string; publicUrl?: string | null }>(asset: T): T {

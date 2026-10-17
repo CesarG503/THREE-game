@@ -41,6 +41,7 @@ model User {
   maps         GameMap[]
   assets       Asset[]
   matches      MatchPlayer[]
+  prefabs      Prefab[]
 }
 
 model UserSession {
@@ -148,4 +149,36 @@ model Asset {
   @@index([kind])
   @@index([visibility])
   @@index([createdAt])
+}
+
+model Prefab {
+  id               String          @id @default(cuid())
+  slug             String          @unique
+  name             String
+  description      String?
+  category         String          @default("general")
+  ownerId          String?
+  currentVersionId String?
+  isPublished      Boolean         @default(false)
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  owner            User?           @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  versions         PrefabVersion[]
+
+  @@index([ownerId])
+  @@index([category])
+  @@index([isPublished])
+}
+
+model PrefabVersion {
+  id        String   @id @default(cuid())
+  prefabId  String
+  version   Int
+  data      Json
+  notes     String?
+  createdAt DateTime @default(now())
+  prefab    Prefab   @relation(fields: [prefabId], references: [id], onDelete: Cascade)
+
+  @@unique([prefabId, version])
+  @@index([prefabId])
 }

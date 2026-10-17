@@ -42,6 +42,12 @@ import { ObjectInspector } from "./ui/ObjectInspector";
 import { createItemFromNetworkData, serializeItemForNetwork } from "./items/ItemNetworkSerializer";
 import { getMapData, loadPlatformMapForRoom, type PlatformMap } from "./platform/mapRuntime";
 import { DEFAULT_SKYBOX_TYPE } from "./platform/mapDefaults";
+import { EditorHierarchyModel } from "./editor/hierarchy/EditorHierarchyModel";
+import { EditorGroupManager } from "./editor/hierarchy/EditorGroupManager";
+import { EditorExplorer } from "./editor/explorer/EditorExplorer";
+import { EditorClipboard } from "./editor/clipboard/EditorClipboard";
+import { EditorCommandHistory } from "./editor/history/EditorCommandHistory";
+import { PrefabManager } from "./editor/prefabs/PrefabManager";
 
 export class Game {
 	sceneManager: any;
@@ -102,6 +108,12 @@ export class Game {
 	isDisposed: boolean;
 	animationFrameId: number | null;
 	editableMapObjects: any[];
+	editorHierarchy!: EditorHierarchyModel;
+	editorGroupManager!: EditorGroupManager;
+	editorExplorer!: EditorExplorer;
+	editorClipboard!: EditorClipboard;
+	editorHistory!: EditorCommandHistory;
+	prefabManager!: PrefabManager;
 
 	animate: any;
 	setupDebugRender: any;
@@ -182,6 +194,11 @@ export class Game {
 		if (this.isDisposed) return;
 		this.editableMapObjects = [];
 		this.sceneManager = new SceneManager("game-container");
+		this.editorHierarchy = new EditorHierarchyModel();
+		this.editorGroupManager = new EditorGroupManager(this.editorHierarchy, this.sceneManager.scene);
+		this.editorClipboard = new EditorClipboard();
+		this.editorHistory = new EditorCommandHistory();
+		this.prefabManager = new PrefabManager(this.editorHierarchy);
 		this.inputManager = new InputManager();
 		this.clock = new THREE.Clock();
 
@@ -543,6 +560,14 @@ export class Game {
 			});
 
 			this.objectInspector = new ObjectInspector(this);
+			this.editorExplorer = new EditorExplorer(
+				this,
+				this.editorHierarchy,
+				this.editorGroupManager,
+				this.editorClipboard,
+				this.editorHistory,
+				this.prefabManager
+			);
 		}
 
 		if (this.inventoryManager && this.character) {
@@ -813,6 +838,8 @@ export class Game {
 		this.character?.dispose?.();
 			this.hud?.destroy?.();
 			this.objectInspector?.destroy?.();
+			this.editorExplorer?.dispose?.();
+			this.editorGroupManager?.dispose?.();
 			this.constructionMenu?.logicSystem?.dispose?.();
 			this.logicCameraSystem?.closeCameraPanel?.();
 			this.logicCameraSystem?.closeCameraPreview?.();
@@ -825,6 +852,7 @@ export class Game {
 			"chat-container",
 			"construction-menu",
 			"object-inspector",
+			"editor-explorer",
 			"logic-toolbar",
 			"logic-sequence-editor",
 			"game-hud-layer",

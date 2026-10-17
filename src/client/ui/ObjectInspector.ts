@@ -1211,6 +1211,7 @@ export class ObjectInspector {
         }
 
         const isEnv = object.userData.mapObjectType?.startsWith("environment_");
+        const isGroupPivot = !!object.userData.isEditorGroupPivot;
         
         if (isEnv) {
             if (this.positionSection) this.positionSection.style.display = "none";
@@ -1222,6 +1223,15 @@ export class ObjectInspector {
             if (this.identificationSection) this.identificationSection.style.display = "none";
             if (this.actionsSection) this.actionsSection.style.display = "none";
             if (this.transformGizmo) this.transformGizmo.detach();
+        } else if (isGroupPivot) {
+            if (this.positionSection) this.positionSection.style.display = "block";
+            if (this.rotationSection) this.rotationSection.style.display = "block";
+            if (this.dimensionsSection) this.dimensionsSection.style.display = "none";
+            if (this.visibilitySection) this.visibilitySection.style.display = "none";
+            if (this.logicSectionWrapper) this.logicSectionWrapper.style.display = "none";
+            if (this.preferenceSection) this.preferenceSection.style.display = "none";
+            if (this.identificationSection) this.identificationSection.style.display = "block";
+            if (this.actionsSection) this.actionsSection.style.display = "block";
         } else {
             if (this.positionSection) this.positionSection.style.display = "block";
             if (this.rotationSection) this.rotationSection.style.display = "block";
@@ -1234,7 +1244,7 @@ export class ObjectInspector {
 
         // Populate Data
         const objName = object.userData.customName || object.userData.mapObjectType || "Objeto"
-        this.title.textContent = `Propiedades: ${objName}`
+        this.title.textContent = isGroupPivot ? `Grupo: ${objName}` : `Propiedades: ${objName}`
         if (this.inputCustomName) {
             this.inputCustomName.value = object.userData.customName || ""
         }
@@ -1837,6 +1847,27 @@ export class ObjectInspector {
 
     updatePosition(axis, value) {
         if (!this.selectedObject) return
+        if (this.selectedObject.userData.isEditorGroupPivot && this.game?.editorGroupManager) {
+            const groupId = this.selectedObject.userData.groupId;
+            const newPos = this.selectedObject.position.clone();
+            newPos[axis] = value;
+            this.selectedObject.position[axis] = value;
+            this.game.editorGroupManager.applyGroupTransform(
+                groupId,
+                newPos,
+                this.selectedObject.quaternion,
+                (id) => this.game.sceneManager.scene.children.find(c => c.userData?.uuid === id) || null,
+                (obj) => {
+                    if (obj.userData?.rigidBody) {
+                        obj.userData.rigidBody.setTranslation(obj.position, true);
+                        obj.userData.rigidBody.setRotation(obj.quaternion, true);
+                    }
+                    this.game?.broadcastObjectUpdate?.(obj);
+                }
+            );
+            this.transformGizmo.update();
+            return;
+        }
         if (this.selectedObject.userData.mapObjectType === "fuel_zone" && this.fuelActiveSubElement !== "zone") {
             const props = this.selectedObject.userData.logicProperties;
             const key = this.fuelActiveSubElement === "bar"
@@ -1857,6 +1888,13 @@ export class ObjectInspector {
     nudge(axisAxis, amount) {
         if (!this.selectedObject) return
         const axis = axisAxis.toLowerCase()
+        if (this.selectedObject.userData.isEditorGroupPivot && this.game?.editorGroupManager) {
+            this.updatePosition(axis, this.selectedObject.position[axis] + amount);
+            if (axis === 'x') this.inputPosX.input.value = this.selectedObject.position.x.toFixed(2);
+            if (axis === 'y') this.inputPosY.input.value = this.selectedObject.position.y.toFixed(2);
+            if (axis === 'z') this.inputPosZ.input.value = this.selectedObject.position.z.toFixed(2);
+            return;
+        }
         if (this.selectedObject.userData.mapObjectType === "fuel_zone" && this.fuelActiveSubElement !== "zone") {
             const props = this.selectedObject.userData.logicProperties;
             const key = this.fuelActiveSubElement === "bar"
@@ -1884,6 +1922,26 @@ export class ObjectInspector {
 
     updateRotation(axis, valueDegrees) {
         if (!this.selectedObject) return
+        if (this.selectedObject.userData.isEditorGroupPivot && this.game?.editorGroupManager) {
+            const groupId = this.selectedObject.userData.groupId;
+            const radians = valueDegrees * (Math.PI / 180);
+            this.selectedObject.rotation[axis] = radians;
+            this.game.editorGroupManager.applyGroupTransform(
+                groupId,
+                this.selectedObject.position,
+                this.selectedObject.quaternion,
+                (id) => this.game.sceneManager.scene.children.find(c => c.userData?.uuid === id) || null,
+                (obj) => {
+                    if (obj.userData?.rigidBody) {
+                        obj.userData.rigidBody.setTranslation(obj.position, true);
+                        obj.userData.rigidBody.setRotation(obj.quaternion, true);
+                    }
+                    this.game?.broadcastObjectUpdate?.(obj);
+                }
+            );
+            this.transformGizmo.update();
+            return;
+        }
         if (this.selectedObject.userData.mapObjectType === "fuel_zone" && (this.fuelActiveSubElement === "bar" || this.fuelActiveSubElement === "indicator")) {
             const props = this.selectedObject.userData.logicProperties;
             const key = this.fuelActiveSubElement === "bar"
@@ -2663,6 +2721,13 @@ export class ObjectInspector {
     refreshPhysicsAndVisuals() {
         if (!this.game || !this.selectedObject) return
 
+        if (this.selectedObject.userData.isEditorGroupPivot) {
+            if (this.game.editorGroupManager?.isCouplingMode()) {
+                this.game.editorGroupManager.updateCouplingVisuals((id) => this.game.sceneManager.scene.children.find(c => c.userData?.uuid === id) || null);
+            }
+            return;
+        }
+
         // If it's a tube or spiked_floor, regenerate visual meshes on drag end to ensure perfect alignment!
         if (this.selectedObject.userData.mapObjectType === "tube" || this.selectedObject.userData.mapObjectType === "spiked_floor") {
             this.updateDimensions('y', this.selectedObject.userData.originalScale.y, false);
@@ -2675,6 +2740,10 @@ export class ObjectInspector {
         
         if (this.game && this.game.broadcastObjectUpdate) {
             this.game.broadcastObjectUpdate(this.selectedObject);
+        }
+
+        if (this.game.editorGroupManager?.isCouplingMode()) {
+            this.game.editorGroupManager.updateCouplingVisuals((id) => this.game.sceneManager.scene.children.find(c => c.userData?.uuid === id) || null);
         }
     }
 
@@ -2744,6 +2813,15 @@ export class ObjectInspector {
 
     deleteSelected() {
         if (!this.selectedObject || !this.game) return
+
+        if (this.selectedObject.userData.isEditorGroupPivot) {
+            const groupId = this.selectedObject.userData.groupId;
+            this.game.editorHierarchy?.removeNode(groupId, false);
+            this.game.editorGroupManager?.removeGroupProxy(groupId);
+            this.hide();
+            this.game.editorExplorer?.renderTree();
+            return;
+        }
 
         const uuid = this.selectedObject.userData.uuid
         

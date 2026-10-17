@@ -370,6 +370,25 @@ export class TransformGizmo {
 			this.inspector.refreshPhysicsAndVisuals?.();
 		}
 
+		if (this.target.userData.isEditorGroupPivot) {
+			if (this.game.broadcastObjectUpdate && this.game.editorHierarchy) {
+				const descendants = this.game.editorHierarchy.getDescendants(this.target.userData.groupId);
+				descendants.forEach((d: any) => {
+					if (!d.isGroup) {
+						const obj = this.resolveObject3D(d.id);
+						if (obj) this.game.broadcastObjectUpdate(obj);
+					}
+				});
+			}
+			if (this.game.editorExplorer) {
+				this.game.editorExplorer.renderTree();
+			}
+		}
+
+		if (this.game.editorGroupManager?.isCouplingMode()) {
+			this.game.editorGroupManager.updateCouplingVisuals((id: string) => this.resolveObject3D(id));
+		}
+
 		this.dragState = null;
 		this.proxy.scale.set(1, 1, 1);
 		this.syncProxyFromTarget(true);
@@ -398,17 +417,56 @@ export class TransformGizmo {
 			const delta = this.proxy.position.clone().sub(this.dragState.proxyPositionStart);
 			const nextWorld = this.dragState.targetWorldPositionStart.clone().add(delta);
 			this.applyWorldPositionToTarget(nextWorld);
+
+			if (this.target.userData.isEditorGroupPivot && this.game.editorGroupManager) {
+				this.game.editorGroupManager.applyGroupTransform(
+					this.target.userData.groupId,
+					nextWorld,
+					this.target.quaternion,
+					(id: string) => this.resolveObject3D(id),
+					(obj: THREE.Object3D) => {
+						if (obj.userData?.rigidBody) {
+							obj.userData.rigidBody.setTranslation(obj.position, true);
+							obj.userData.rigidBody.setRotation(obj.quaternion, true);
+						}
+					}
+				);
+			} else if (this.game.editorGroupManager?.isCouplingMode()) {
+				this.game.editorGroupManager.updateCouplingVisuals((id: string) => this.resolveObject3D(id));
+			}
+
 			this.inspector.applyGizmoTransform?.(this.target, mode);
 			this.inspector.syncTransformInputs?.();
 		} else if (mode === "rotate") {
+			let nextQuat: THREE.Quaternion;
 			if (this.target.parent && this.target.parent.name !== "TransformGizmoProxy" && this.target.parent.constructor.name !== "Scene") {
 				const parentWorldQuat = this.target.parent.getWorldQuaternion(new THREE.Quaternion());
 				const localQuat = parentWorldQuat.clone().invert().multiply(this.proxy.quaternion);
 				this.target.quaternion.copy(localQuat);
+				nextQuat = localQuat;
 			} else {
 				const deltaQuat = this.proxy.quaternion.clone().multiply(this.dragState.proxyQuaternionStart.clone().invert());
-				this.target.quaternion.copy(deltaQuat.multiply(this.dragState.targetQuaternionStart));
+				nextQuat = deltaQuat.multiply(this.dragState.targetQuaternionStart);
+				this.target.quaternion.copy(nextQuat);
 			}
+
+			if (this.target.userData.isEditorGroupPivot && this.game.editorGroupManager) {
+				this.game.editorGroupManager.applyGroupTransform(
+					this.target.userData.groupId,
+					this.target.position,
+					nextQuat,
+					(id: string) => this.resolveObject3D(id),
+					(obj: THREE.Object3D) => {
+						if (obj.userData?.rigidBody) {
+							obj.userData.rigidBody.setTranslation(obj.position, true);
+							obj.userData.rigidBody.setRotation(obj.quaternion, true);
+						}
+					}
+				);
+			} else if (this.game.editorGroupManager?.isCouplingMode()) {
+				this.game.editorGroupManager.updateCouplingVisuals((id: string) => this.resolveObject3D(id));
+			}
+
 			this.inspector.applyGizmoTransform?.(this.target, mode);
 			this.inspector.syncTransformInputs?.();
 		} else if (mode === "scale") {
@@ -416,6 +474,15 @@ export class TransformGizmo {
 		}
 
 		this.updateSize();
+	};
+
+	private resolveObject3D(uuid: string): THREE.Object3D | null {
+		if (!this.game?.sceneManager?.scene) return null;
+		return (
+			this.game.sceneManager.scene.children.find(
+				(c: any) => c.userData && c.userData.uuid === uuid
+			) || null
+		);
 	};
 
 	private previewDimensionsFromProxy() {

@@ -117,6 +117,10 @@ export function loadMap(this: any, jsonData: any) {
 		}
 	}
 
+	if (this.editorGroupManager) {
+		this.editorGroupManager.clearProxies();
+	}
+
 	if (this.editorHierarchy) {
 		const objectUuids = jsonData.objects.map((o: any) => o.uuid);
 		if (jsonData.hierarchy && Array.isArray(jsonData.hierarchy)) {
@@ -389,6 +393,29 @@ export function useCurrentItem(this: any, isRightClickOrItem: any = false) {
 			if (!this.editableMapObjects.includes(newObject)) {
 				this.editableMapObjects.push(newObject);
 			}
+
+			// Corrección 2: Registro jerárquico automático en la creación real de objetos
+			if (this.editorHierarchy && newObject.userData.uuid) {
+				this.editorHierarchy.addNode({
+					id: newObject.userData.uuid,
+					name: newObject.userData.customName || newObject.userData.mapObjectType || "Objeto",
+					type: newObject.userData.mapObjectType || "object",
+					parentId: newObject.userData.parentId || null,
+					order: this.editorHierarchy.getChildren(newObject.userData.parentId || null).length,
+					isGroup: false,
+					customName: newObject.userData.customName,
+				});
+			}
+
+			if (this.editorGroupManager?.isCouplingMode()) {
+				this.editorGroupManager.updateCouplingVisuals((id: string) => {
+					return this.sceneManager.scene.children.find((c: any) => c.userData && c.userData.uuid === id) || null;
+				});
+			}
+
+			if (this.editorExplorer) {
+				this.editorExplorer.renderTree();
+			}
 		}
 	}
 
@@ -547,6 +574,11 @@ export function deleteObjectByUuid(this: any, uuid: string) {
 	}
 	if (this.editorGroupManager) {
 		this.editorGroupManager.removeGroupProxy(uuid);
+		if (this.editorGroupManager.isCouplingMode()) {
+			this.editorGroupManager.updateCouplingVisuals((id: string) => {
+				return this.sceneManager.scene.children.find((c: any) => c.userData && c.userData.uuid === id) || null;
+			});
+		}
 	}
 	if (this.editorExplorer) {
 		this.editorExplorer.renderTree();

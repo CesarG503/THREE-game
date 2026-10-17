@@ -1249,6 +1249,10 @@ export class ObjectInspector {
             this.inputCustomName.value = object.userData.customName || ""
         }
 
+        if (this.game?.editorExplorer && object.userData?.uuid) {
+            this.game.editorExplorer.selectNode(object.userData.uuid, false);
+        }
+
         if (this.chkDynamicSwitch) {
             this.chkDynamicSwitch.checked = this.allowDynamicSwitch
         }
@@ -1395,6 +1399,9 @@ export class ObjectInspector {
         this.game?.logicCameraSystem?.closeCameraPreview?.()
 
         this.selectedObject = null
+        if (this.game?.editorExplorer) {
+            this.game.editorExplorer.selectNode(null, false);
+        }
         if (this.game.cameraController) this.game.cameraController.setUIOpen(false)
 
         // Enable Game Input - REMOVED (never disabled)

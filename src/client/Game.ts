@@ -568,6 +568,16 @@ export class Game {
 				this.editorHistory,
 				this.prefabManager
 			);
+
+			this.editorGroupManager.attachCameraAndDom(
+				this.sceneManager.camera,
+				this.sceneManager.renderer.domElement
+			);
+			this.editorGroupManager.onHierarchyChanged = () => {
+				if (this.editorExplorer) {
+					this.editorExplorer.renderTree();
+				}
+			};
 		}
 
 		if (this.inventoryManager && this.character) {

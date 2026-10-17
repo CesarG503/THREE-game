@@ -344,6 +344,13 @@ export class TransformGizmo {
 			targetQuaternionStart: this.target.quaternion.clone(),
 		};
 
+		if (this.target.userData.isEditorGroupPivot && this.game.editorGroupManager) {
+			this.game.editorGroupManager.beginGroupTransform(
+				this.target.userData.groupId,
+				(id: string) => this.resolveObject3D(id)
+			);
+		}
+
 		if (this.game.inputManager) {
 			this.wasInputEnabled = this.game.inputManager.enabled;
 			this.game.inputManager.enabled = false;
@@ -371,6 +378,10 @@ export class TransformGizmo {
 		}
 
 		if (this.target.userData.isEditorGroupPivot) {
+			if (this.game.editorGroupManager) {
+				this.game.editorGroupManager.endGroupTransform(this.target.userData.groupId);
+			}
+
 			if (this.game.broadcastObjectUpdate && this.game.editorHierarchy) {
 				const descendants = this.game.editorHierarchy.getDescendants(this.target.userData.groupId);
 				descendants.forEach((d: any) => {
@@ -419,7 +430,7 @@ export class TransformGizmo {
 			this.applyWorldPositionToTarget(nextWorld);
 
 			if (this.target.userData.isEditorGroupPivot && this.game.editorGroupManager) {
-				this.game.editorGroupManager.applyGroupTransform(
+				this.game.editorGroupManager.updateGroupTransform(
 					this.target.userData.groupId,
 					nextWorld,
 					this.target.quaternion,
@@ -451,7 +462,7 @@ export class TransformGizmo {
 			}
 
 			if (this.target.userData.isEditorGroupPivot && this.game.editorGroupManager) {
-				this.game.editorGroupManager.applyGroupTransform(
+				this.game.editorGroupManager.updateGroupTransform(
 					this.target.userData.groupId,
 					this.target.position,
 					nextQuat,

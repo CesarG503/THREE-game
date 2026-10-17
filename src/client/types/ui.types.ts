@@ -48,6 +48,7 @@ export interface HUDConfig {
     vehicleStuntsWidth?: number;
     vehicleStuntsHeight?: number;
     vehicleStuntsShowText?: boolean;
+    vehicleStuntsShowTotal?: boolean;
 
     showHealth?: boolean;
     healthStyle?: 'bar' | 'hearts' | 'simple';

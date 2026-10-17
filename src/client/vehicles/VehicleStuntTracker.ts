@@ -12,8 +12,7 @@ export interface StuntTrick {
 
 export interface StuntLandingFeedback {
   status: 'perfect' | 'clean' | 'crash' | 'rough';
-  title: string;
-  subtitle: string;
+  bonusPoints?: number;
   points: number;
   totalSessionScore?: number;
 }
@@ -50,11 +49,12 @@ export class VehicleStuntTracker {
 
   // HUD DOM Elements
   private hudContainer: HTMLDivElement | null = null;
-  private hudScoreNumber: HTMLDivElement | null = null;
+  private hudTopRow: HTMLDivElement | null = null;
   private hudAirTimer: HTMLSpanElement | null = null;
   private hudComboBadge: HTMLSpanElement | null = null;
+  private hudLandingBadge: HTMLSpanElement | null = null;
+  private hudScoreNumber: HTMLDivElement | null = null;
   private hudTricksContainer: HTMLDivElement | null = null;
-  private hudLandingBanner: HTMLDivElement | null = null;
   private hudTotalSessionScore: HTMLDivElement | null = null;
 
   constructor(private game?: any) {
@@ -74,6 +74,10 @@ export class VehicleStuntTracker {
       const w = hudSettings.vehicleStuntsWidth;
       this.hudContainer.style.width = typeof w === 'number' ? `${w}px` : w;
     }
+
+    if (this.hudTotalSessionScore) {
+      this.hudTotalSessionScore.style.display = hudSettings.vehicleStuntsShowTotal ? 'block' : 'none';
+    }
   }
 
   private initHUD() {
@@ -89,19 +93,22 @@ export class VehicleStuntTracker {
       transform: translateX(-50%);
       flex-direction: column;
       align-items: center;
-      gap: 6px;
+      gap: 5px;
       pointer-events: none;
       z-index: 120;
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       user-select: none;
+      box-sizing: border-box;
+      transition: opacity 0.2s ease;
     `;
 
-    // Top status badges (Air time + Combo)
-    const topRow = document.createElement('div');
-    topRow.style.cssText = `
+    // Top status badges (Air time + Combo + Landing feedback badge)
+    this.hudTopRow = document.createElement('div');
+    this.hudTopRow.style.cssText = `
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 6px;
+      justify-content: center;
     `;
 
     this.hudAirTimer = document.createElement('span');
@@ -132,9 +139,23 @@ export class VehicleStuntTracker {
       animation: comboPulse 0.6s infinite alternate ease-in-out;
     `;
 
-    topRow.append(this.hudAirTimer, this.hudComboBadge);
+    // Small sleek landing badge (e.g. ✨ +150 Aterrizaje perfecto)
+    this.hudLandingBadge = document.createElement('span');
+    this.hudLandingBadge.style.cssText = `
+      display: none;
+      padding: 3px 10px;
+      border-radius: 9999px;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      backdrop-filter: blur(6px);
+      box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+      animation: badgePop 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
+    `;
 
-    // Main Score Display
+    this.hudTopRow.append(this.hudAirTimer, this.hudComboBadge, this.hudLandingBadge);
+
+    // Main Score Display (clean, no "ACROBACIA EN CURSO")
     const scoreBox = document.createElement('div');
     scoreBox.style.cssText = `
       display: flex;
@@ -151,58 +172,34 @@ export class VehicleStuntTracker {
       letter-spacing: 1px;
       text-shadow: 0 0 20px rgba(0, 240, 255, 0.8), 0 2px 6px rgba(0, 0, 0, 0.9);
       line-height: 1.1;
-      transition: transform 0.1s cubic-bezier(0.34, 1.56, 0.64, 1);
+      transition: color 0.15s ease, text-shadow 0.15s ease, transform 0.1s cubic-bezier(0.34, 1.56, 0.64, 1);
     `;
     this.hudScoreNumber.textContent = '+0 PTS';
 
-    const scoreLabel = document.createElement('div');
-    scoreLabel.textContent = 'ACROBACIA EN CURSO';
-    scoreLabel.style.cssText = `
-      font-size: 9.5px;
-      font-weight: 700;
-      color: rgba(226, 232, 240, 0.7);
-      letter-spacing: 2.5px;
-      text-transform: uppercase;
-      margin-top: 2px;
-    `;
+    scoreBox.append(this.hudScoreNumber);
 
-    scoreBox.append(this.hudScoreNumber, scoreLabel);
-
-    // Tricks Chips Container
+    // Tricks Chips Container (Disappearing swiftly)
     this.hudTricksContainer = document.createElement('div');
     this.hudTricksContainer.style.cssText = `
       display: flex;
       flex-direction: column;
       align-items: center;
       gap: 4px;
-      margin-top: 4px;
+      margin-top: 2px;
       max-width: 320px;
     `;
 
-    // Landing Feedback Banner (pops up on landing)
-    this.hudLandingBanner = document.createElement('div');
-    this.hudLandingBanner.style.cssText = `
-      display: none;
-      flex-direction: column;
-      align-items: center;
-      padding: 10px 18px;
-      border-radius: 12px;
-      backdrop-filter: blur(8px);
-      box-shadow: 0 4px 24px rgba(0,0,0,0.6);
-      text-align: center;
-      animation: bannerSlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-    `;
-
-    // Total Session Score (tiny subtle readout)
+    // Total Session Score (tiny subtle readout, configurable)
     this.hudTotalSessionScore = document.createElement('div');
     this.hudTotalSessionScore.style.cssText = `
+      display: none;
       font-size: 11px;
       color: #cbd5e1;
       margin-top: 3px;
       font-weight: 600;
     `;
 
-    this.hudContainer.append(topRow, scoreBox, this.hudTricksContainer, this.hudLandingBanner, this.hudTotalSessionScore);
+    this.hudContainer.append(this.hudTopRow, scoreBox, this.hudTricksContainer, this.hudTotalSessionScore);
     document.body.appendChild(this.hudContainer);
 
     this.injectStyles();
@@ -217,12 +214,12 @@ export class VehicleStuntTracker {
         from { transform: scale(1); filter: brightness(1); }
         to { transform: scale(1.08); filter: brightness(1.2); }
       }
-      @keyframes trickChipIn {
-        from { opacity: 0; transform: translateY(-8px) scale(0.92); }
-        to { opacity: 1; transform: translateY(0) scale(1); }
+      @keyframes badgePop {
+        from { opacity: 0; transform: scale(0.85); }
+        to { opacity: 1; transform: scale(1); }
       }
-      @keyframes bannerSlideUp {
-        from { opacity: 0; transform: translateY(12px) scale(0.94); }
+      @keyframes trickChipIn {
+        from { opacity: 0; transform: translateY(-6px) scale(0.92); }
         to { opacity: 1; transform: translateY(0) scale(1); }
       }
       .trick-chip {
@@ -237,7 +234,7 @@ export class VehicleStuntTracker {
         font-size: 12px;
         font-weight: 700;
         box-shadow: 0 2px 10px rgba(0, 240, 255, 0.2);
-        animation: trickChipIn 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+        animation: trickChipIn 0.15s cubic-bezier(0.34, 1.56, 0.64, 1);
       }
       .trick-chip-pts {
         color: #38bdf8;
@@ -284,12 +281,13 @@ export class VehicleStuntTracker {
       return;
     }
 
-    // Process landing banner countdown if active
+    // Process landing feedback countdown if active
     if (this.landingFeedbackTimer > 0) {
       this.landingFeedbackTimer -= dt;
       if (this.landingFeedbackTimer <= 0) {
-        if (this.hudLandingBanner) this.hudLandingBanner.style.display = 'none';
-        if (this.hudContainer && !this.isAirborne) this.hudContainer.style.display = 'none';
+        if (this.hudContainer && !this.isAirborne) {
+          this.hudContainer.style.display = 'none';
+        }
       }
     }
 
@@ -330,8 +328,13 @@ export class VehicleStuntTracker {
 
     this.tricksLog = [];
 
-    // Hide previous landing feedback banner
-    if (this.hudLandingBanner) this.hudLandingBanner.style.display = 'none';
+    // Reset styles back to active stunts mode
+    if (this.hudLandingBadge) this.hudLandingBadge.style.display = 'none';
+    if (this.hudScoreNumber) {
+      this.hudScoreNumber.style.color = '#00f0ff';
+      this.hudScoreNumber.style.textShadow = '0 0 20px rgba(0, 240, 255, 0.8), 0 2px 6px rgba(0, 0, 0, 0.9)';
+      this.hudScoreNumber.textContent = '+0 PTS';
+    }
     if (this.hudTricksContainer) this.hudTricksContainer.innerHTML = '';
   }
 
@@ -351,7 +354,7 @@ export class VehicleStuntTracker {
 
     // Normalize deltas to [-PI, PI] to handle any frame hitches cleanly
     while (dPitch > Math.PI) dPitch -= 2 * Math.PI;
-    while (dPitch < -Math.PI) dPitch += 2 * Math.PI;
+    while (dPitch < -Math.PI) dPitch -= 2 * Math.PI;
     while (dYaw > Math.PI) dYaw -= 2 * Math.PI;
     while (dYaw < -Math.PI) dYaw += 2 * Math.PI;
     while (dRoll > Math.PI) dRoll -= 2 * Math.PI;
@@ -453,21 +456,31 @@ export class VehicleStuntTracker {
 
     // Pop animation on score text
     if (this.hudScoreNumber) {
-      this.hudScoreNumber.style.transform = 'scale(1.35)';
+      this.hudScoreNumber.style.transform = 'scale(1.3)';
       setTimeout(() => {
         if (this.hudScoreNumber) this.hudScoreNumber.style.transform = 'scale(1)';
-      }, 140);
+      }, 120);
     }
 
-    // Add chip to HUD
+    // Add chip to HUD and make it disappear quickly!
     if (this.hudTricksContainer) {
       const chip = document.createElement('div');
       chip.className = 'trick-chip';
       chip.innerHTML = `<span>${trick.icon}</span> <span>${trick.name}</span> <span class="trick-chip-pts">+${trick.points}</span>`;
       this.hudTricksContainer.appendChild(chip);
 
-      // Keep maximum 4 chips visible
-      while (this.hudTricksContainer.children.length > 4) {
+      // Fast auto-dismiss: stays visible for only 0.9s, then fades out in 0.2s and gets removed
+      setTimeout(() => {
+        chip.style.transition = 'opacity 0.2s ease, transform 0.2s ease';
+        chip.style.opacity = '0';
+        chip.style.transform = 'translateY(-8px) scale(0.9)';
+        setTimeout(() => {
+          chip.remove();
+        }, 210);
+      }, 900);
+
+      // Keep maximum 3 chips visible simultaneously
+      while (this.hudTricksContainer.children.length > 3) {
         this.hudTricksContainer.removeChild(this.hudTricksContainer.firstChild!);
       }
     }
@@ -478,12 +491,21 @@ export class VehicleStuntTracker {
     this.applyCustomPosition();
     this.hudContainer.style.display = 'flex';
 
+    const profile = this.game?.playerConfigManager?.getCurrentProfile?.();
+    const hudSettings = profile?.hudSettings || this.game?.hud?.settings;
+    const showDetails = hudSettings ? hudSettings.vehicleStuntsShowText !== false : true;
+
     if (this.hudAirTimer) {
-      this.hudAirTimer.textContent = `⏱️ ${this.airTime.toFixed(1)}s AIRE`;
+      if (showDetails) {
+        this.hudAirTimer.style.display = 'inline-block';
+        this.hudAirTimer.textContent = `⏱️ ${this.airTime.toFixed(1)}s AIRE`;
+      } else {
+        this.hudAirTimer.style.display = 'none';
+      }
     }
 
     if (this.hudComboBadge) {
-      if (this.comboMultiplier > 1.0) {
+      if (showDetails && this.comboMultiplier > 1.0) {
         this.hudComboBadge.textContent = `🔥 x${this.comboMultiplier.toFixed(1)} COMBO`;
         this.hudComboBadge.style.display = 'inline-block';
       } else {
@@ -491,12 +513,22 @@ export class VehicleStuntTracker {
       }
     }
 
+    if (this.hudLandingBadge) {
+      this.hudLandingBadge.style.display = 'none';
+    }
+
     if (this.hudScoreNumber) {
       this.hudScoreNumber.textContent = `+${this.currentJumpScore.toLocaleString()} PTS`;
     }
 
     if (this.hudTotalSessionScore) {
-      this.hudTotalSessionScore.textContent = `🏆 Total acumulado: ${this.totalSessionScore.toLocaleString()}`;
+      const showTotal = hudSettings ? hudSettings.vehicleStuntsShowTotal === true : false;
+      if (showTotal) {
+        this.hudTotalSessionScore.style.display = 'block';
+        this.hudTotalSessionScore.textContent = `🏆 Total acumulado: ${this.totalSessionScore.toLocaleString()}`;
+      } else {
+        this.hudTotalSessionScore.style.display = 'none';
+      }
     }
   }
 
@@ -528,8 +560,6 @@ export class VehicleStuntTracker {
       if (props.crashResetsScore) {
         this.showLandingFeedback({
           status: 'crash',
-          title: '💥 ¡ACROBACIA FALLIDA!',
-          subtitle: 'Vehículo volcado o choque al aterrizar · Puntos perdidos',
           points: 0,
           totalSessionScore: this.totalSessionScore
         });
@@ -537,27 +567,24 @@ export class VehicleStuntTracker {
         this.totalSessionScore += this.currentJumpScore;
         this.showLandingFeedback({
           status: 'rough',
-          title: '⚠️ ATERRIZAJE FORZOSO',
-          subtitle: 'Puntos salvados a pesar del impacto',
           points: this.currentJumpScore,
           totalSessionScore: this.totalSessionScore
         });
       }
     } else {
       let finalPoints = this.currentJumpScore;
-      let bonusText = '';
+      let bonusPoints = 0;
 
       if (isPerfect && (this.airTime >= 0.4 || hasTricks)) {
-        finalPoints += props.perfectLandingBonus;
-        bonusText = ` (+${props.perfectLandingBonus} Bonificación perfecta)`;
+        bonusPoints = props.perfectLandingBonus;
+        finalPoints += bonusPoints;
       }
 
       this.totalSessionScore += finalPoints;
 
       this.showLandingFeedback({
         status: isPerfect ? 'perfect' : 'clean',
-        title: isPerfect ? '✨ ¡ATERRIZAJE PERFECTO! ✨' : '👍 ¡ATERRIZAJE LIMPIO!',
-        subtitle: isPerfect ? `Acrobacia impecable${bonusText}` : 'Puntos banqueados con éxito',
+        bonusPoints: bonusPoints,
         points: finalPoints,
         totalSessionScore: this.totalSessionScore
       });
@@ -568,7 +595,8 @@ export class VehicleStuntTracker {
 
   private showLandingFeedback(feedback: StuntLandingFeedback) {
     this.currentFeedback = feedback;
-    this.landingFeedbackTimer = 2.5;
+    // Fast disappearance: 1.1s total duration
+    this.landingFeedbackTimer = 1.1;
 
     const profile = this.game?.playerConfigManager?.getCurrentProfile?.();
     const hudSettings = profile?.hudSettings || this.game?.hud?.settings;
@@ -577,58 +605,88 @@ export class VehicleStuntTracker {
       return;
     }
 
-    if (!this.hudLandingBanner || !this.hudContainer) return;
+    if (!this.hudContainer) return;
     this.applyCustomPosition();
     this.hudContainer.style.display = 'flex';
 
     if (this.hudTricksContainer) this.hudTricksContainer.innerHTML = '';
+    if (this.hudAirTimer) this.hudAirTimer.style.display = 'none';
     if (this.hudComboBadge) this.hudComboBadge.style.display = 'none';
 
-    let bg = 'rgba(15, 23, 42, 0.94)';
-    let border = '1px solid #38bdf8';
-    let titleColor = '#00f0ff';
-    let pointsColor = '#38bdf8';
+    // Show small sleek landing badge
+    if (this.hudLandingBadge) {
+      let badgeText = '';
+      let badgeBg = '';
+      let badgeBorder = '';
+      let badgeColor = '';
+      let badgeShadow = '';
 
-    if (feedback.status === 'perfect') {
-      bg = 'linear-gradient(135deg, rgba(16, 185, 129, 0.92), rgba(6, 95, 70, 0.95))';
-      border = '1px solid #34d399';
-      titleColor = '#ffffff';
-      pointsColor = '#fbbf24';
-    } else if (feedback.status === 'clean') {
-      bg = 'linear-gradient(135deg, rgba(14, 116, 144, 0.92), rgba(15, 23, 42, 0.95))';
-      border = '1px solid #00f0ff';
-      titleColor = '#00f0ff';
-      pointsColor = '#ffffff';
-    } else if (feedback.status === 'crash') {
-      bg = 'linear-gradient(135deg, rgba(185, 28, 28, 0.94), rgba(69, 10, 10, 0.96))';
-      border = '1px solid #ef4444';
-      titleColor = '#fee2e2';
-      pointsColor = '#fca5a5';
-    } else if (feedback.status === 'rough') {
-      bg = 'linear-gradient(135deg, rgba(180, 83, 9, 0.92), rgba(69, 26, 3, 0.95))';
-      border = '1px solid #f59e0b';
-      titleColor = '#fef3c7';
-      pointsColor = '#fde68a';
+      if (feedback.status === 'perfect') {
+        const bonus = feedback.bonusPoints ? `+${feedback.bonusPoints} ` : '';
+        badgeText = `✨ ${bonus}Aterrizaje perfecto`;
+        badgeBg = 'rgba(16, 185, 129, 0.25)';
+        badgeBorder = '1px solid #34d399';
+        badgeColor = '#6ee7b7';
+        badgeShadow = '0 0 10px rgba(52, 211, 153, 0.4)';
+      } else if (feedback.status === 'clean') {
+        badgeText = '👍 Aterrizaje limpio';
+        badgeBg = 'rgba(14, 165, 233, 0.25)';
+        badgeBorder = '1px solid #38bdf8';
+        badgeColor = '#7dd3fc';
+        badgeShadow = '0 0 10px rgba(56, 189, 248, 0.4)';
+      } else if (feedback.status === 'rough') {
+        badgeText = '⚠️ Aterrizaje forzoso';
+        badgeBg = 'rgba(245, 158, 11, 0.25)';
+        badgeBorder = '1px solid #f59e0b';
+        badgeColor = '#fde68a';
+        badgeShadow = '0 0 10px rgba(245, 158, 11, 0.4)';
+      } else {
+        badgeText = '💥 Acrobacia fallida';
+        badgeBg = 'rgba(239, 68, 68, 0.25)';
+        badgeBorder = '1px solid #ef4444';
+        badgeColor = '#fca5a5';
+        badgeShadow = '0 0 10px rgba(239, 68, 68, 0.4)';
+      }
+
+      this.hudLandingBadge.textContent = badgeText;
+      this.hudLandingBadge.style.background = badgeBg;
+      this.hudLandingBadge.style.border = badgeBorder;
+      this.hudLandingBadge.style.color = badgeColor;
+      this.hudLandingBadge.style.boxShadow = badgeShadow;
+      this.hudLandingBadge.style.display = 'inline-block';
     }
 
-    this.hudLandingBanner.style.background = bg;
-    this.hudLandingBanner.style.border = border;
-    this.hudLandingBanner.style.display = 'flex';
-
-    this.hudLandingBanner.innerHTML = `
-      <div style="font-size: 15px; font-weight: 800; color: ${titleColor}; letter-spacing: 0.5px;">${feedback.title}</div>
-      <div style="font-size: 11px; color: rgba(255, 255, 255, 0.85); margin: 2px 0 6px 0;">${feedback.subtitle}</div>
-      <div style="font-size: 24px; font-weight: 900; color: ${pointsColor}; text-shadow: 0 0 14px rgba(0,0,0,0.8);">
-        ${feedback.points > 0 ? `+${feedback.points.toLocaleString()} PTS` : '0 PTS'}
-      </div>
-    `;
-
+    // Set original counter color and points according to landing quality
     if (this.hudScoreNumber) {
+      if (feedback.status === 'perfect') {
+        this.hudScoreNumber.style.color = '#34d399';
+        this.hudScoreNumber.style.textShadow = '0 0 24px rgba(52, 211, 153, 0.9), 0 2px 8px rgba(0, 0, 0, 0.9)';
+      } else if (feedback.status === 'clean') {
+        this.hudScoreNumber.style.color = '#38bdf8';
+        this.hudScoreNumber.style.textShadow = '0 0 20px rgba(56, 189, 248, 0.9), 0 2px 8px rgba(0, 0, 0, 0.9)';
+      } else if (feedback.status === 'rough') {
+        this.hudScoreNumber.style.color = '#f59e0b';
+        this.hudScoreNumber.style.textShadow = '0 0 20px rgba(245, 158, 11, 0.9), 0 2px 8px rgba(0, 0, 0, 0.9)';
+      } else {
+        this.hudScoreNumber.style.color = '#ef4444';
+        this.hudScoreNumber.style.textShadow = '0 0 20px rgba(239, 68, 68, 0.9), 0 2px 8px rgba(0, 0, 0, 0.9)';
+      }
+
       this.hudScoreNumber.textContent = feedback.points > 0 ? `+${feedback.points.toLocaleString()} PTS` : '0 PTS';
+      this.hudScoreNumber.style.transform = 'scale(1.2)';
+      setTimeout(() => {
+        if (this.hudScoreNumber) this.hudScoreNumber.style.transform = 'scale(1)';
+      }, 140);
     }
 
     if (this.hudTotalSessionScore && feedback.totalSessionScore !== undefined) {
-      this.hudTotalSessionScore.textContent = `🏆 Total acumulado: ${feedback.totalSessionScore.toLocaleString()}`;
+      const showTotal = hudSettings ? hudSettings.vehicleStuntsShowTotal === true : false;
+      if (showTotal) {
+        this.hudTotalSessionScore.style.display = 'block';
+        this.hudTotalSessionScore.textContent = `🏆 Total acumulado: ${feedback.totalSessionScore.toLocaleString()}`;
+      } else {
+        this.hudTotalSessionScore.style.display = 'none';
+      }
     }
   }
 

@@ -519,14 +519,29 @@ export class HUDConfigPanel {
             : 'Visible solo al conducir una moto. Arrastra y redimensiona esta pieza; el diseño se guarda para este rol. La vista previa usa valores de ejemplo.';
         description.style.cssText = 'color:#aaa;font-size:12px;line-height:1.5';
         parent.appendChild(description);
-        const showLabel = id === 'vehicleStunts' ? 'Mostrar medidor de puntajes' : 'Mostrar al conducir';
-        for (const [key, label] of [[vehicleShowKey(id), showLabel], [id + 'ShowText', 'Mostrar valor numérico']]) {
+        const checkboxes: [string, string][] = id === 'vehicleStunts'
+            ? [
+                [vehicleShowKey(id), 'Mostrar medidor de puntajes'],
+                [id + 'ShowText', 'Mostrar detalles (tiempo en aire / combo)'],
+                ['vehicleStuntsShowTotal', 'Mostrar total acumulado']
+            ]
+            : [
+                [vehicleShowKey(id), 'Mostrar al conducir'],
+                [id + 'ShowText', 'Mostrar valor numérico']
+            ];
+        for (const [key, label] of checkboxes) {
             const row = document.createElement('label');
-            row.style.cssText = 'display:flex;gap:8px;margin:12px 0;color:#ddd;font-size:12px';
+            row.style.cssText = 'display:flex;gap:8px;margin:12px 0;color:#ddd;font-size:12px;cursor:pointer;align-items:center;';
             const input = document.createElement('input');
-            input.type = 'checkbox'; input.checked = this.tempSettings[key];
-            input.onchange = () => { this.tempSettings[key] = input.checked; this.updatePreview(); this.renderSidebar(); };
-            row.append(input, label); parent.appendChild(row);
+            input.type = 'checkbox';
+            input.checked = this.tempSettings[key] ?? (key === 'vehicleStuntsShowTotal' ? false : true);
+            input.onchange = () => {
+                this.tempSettings[key] = input.checked;
+                this.updatePreview();
+                this.renderSidebar();
+            };
+            row.append(input, label);
+            parent.appendChild(row);
         }
         for (const [suffix, label] of [['Width', 'Ancho (px)'], ['Height', 'Alto (px)']]) {
             const row = document.createElement('label');

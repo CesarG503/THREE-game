@@ -67,7 +67,9 @@ export class VehicleHUDWidget {
       const labels = Array.from({ length: 13 }, (_, i) => `<text data-tick="${i}" x="${point(-135 + i * 22.5, 85).split(',')[0]}" y="${Number(point(-135 + i * 22.5, 85).split(',')[1]) + 4}" text-anchor="middle" fill="#cbd7eb" font-size="11" font-weight="700">${i * 20}</text>`).join('');
       this.inner.innerHTML = `<svg viewBox="0 0 256 256" width="100%" height="100%" ${font}>
         ${defs}<circle cx="128" cy="128" r="123" fill="url(#${uid}-face)" stroke="url(#${uid}-rim)" stroke-width="2"/>
-        <path d="M ${point(-135, 115)} A 115 115 0 1 1 ${point(135, 115)}" fill="none" stroke="url(#${uid}-rim)" stroke-width="7"/>
+        <path d="M ${point(-135, 115)} A 115 115 0 1 1 ${point(135, 115)}" fill="none" stroke="rgba(112, 216, 245, 0.12)" stroke-width="7" stroke-linecap="round"/>
+        <path data-speed-glow d="M ${point(-135, 115)} A 115 115 0 1 1 ${point(135, 115)}" fill="none" stroke="url(#${uid}-rim)" stroke-width="11" stroke-linecap="round" opacity="0" filter="url(#${uid}-glow)" stroke-dasharray="541.925 541.925" stroke-dashoffset="541.925"/>
+        <path data-speed-bar d="M ${point(-135, 115)} A 115 115 0 1 1 ${point(135, 115)}" fill="none" stroke="url(#${uid}-rim)" stroke-width="7" stroke-linecap="round" opacity="0" stroke-dasharray="541.925 541.925" stroke-dashoffset="541.925"/>
         ${ticks}${labels}<text x="128" y="95" fill="#8997b4" font-size="7" letter-spacing="3" text-anchor="middle">MOTORBIKE</text>
         <g data-needle transform="rotate(-135 128 128)"><path d="M124 143 L127 34 L132 143 Z" fill="#ffa840" filter="url(#${uid}-glow)"/><path d="M125 140 L128 35 L131 140 Z" fill="#ffb354"/></g>
         <circle cx="128" cy="128" r="6" fill="#ffb354"/>
@@ -112,6 +114,7 @@ export class VehicleHUDWidget {
       `;
     }
     if (s[id + 'ShowText'] === false) this.inner.querySelector('[data-value]')?.setAttribute('visibility', 'hidden');
+    this.paint();
   }
 
   update(data: VehicleHUDData, smooth = true) {
@@ -135,10 +138,24 @@ export class VehicleHUDWidget {
     const broken = data.durabilityEnabled && data.durability <= 0;
     if (this.id === 'vehicleSpeed') {
       const limit = Math.max(240, Math.ceil(data.maxSpeed / 40) * 40);
-      this.inner.querySelector('[data-needle]')!.setAttribute('transform', `rotate(${-135 + Math.min(value / limit, 1) * 270} 128 128)`);
+      const fraction = Math.min(Math.max(value / limit, 0), 1);
+      this.inner.querySelector('[data-needle]')!.setAttribute('transform', `rotate(${-135 + fraction * 270} 128 128)`);
       this.inner.querySelectorAll('[data-tick]').forEach((el, i) => { el.textContent = String(Math.round(i * limit / 12)); });
       text.textContent = String(Math.round(value));
       this.inner.querySelector('[data-status]')!.textContent = broken ? 'AVERIADA' : data.jetpack ? 'JETPACK ACTIVO' : value < 1 ? 'EN REPOSO' : 'EN MARCHA';
+
+      const arcLength = 541.925;
+      const offset = (1 - fraction) * arcLength;
+      const speedBar = this.inner.querySelector('[data-speed-bar]') as SVGPathElement | null;
+      const speedGlow = this.inner.querySelector('[data-speed-glow]') as SVGPathElement | null;
+      if (speedBar) {
+        speedBar.setAttribute('stroke-dashoffset', offset.toFixed(2));
+        speedBar.style.opacity = fraction <= 0.003 ? '0' : '1';
+      }
+      if (speedGlow) {
+        speedGlow.setAttribute('stroke-dashoffset', offset.toFixed(2));
+        speedGlow.style.opacity = fraction <= 0.003 ? '0' : String(0.35 + fraction * 0.45);
+      }
     } else if (this.id === 'vehicleFuel') {
       this.inner.querySelector('[data-fill]')!.setAttribute('transform', `translate(0 199) scale(1 ${value / 100}) translate(0 -199)`);
       text.textContent = `${Math.round(value)}%`;

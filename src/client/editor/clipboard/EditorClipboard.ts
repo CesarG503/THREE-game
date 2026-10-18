@@ -85,12 +85,26 @@ export class EditorClipboard {
 		const objectsData: SerializedMapObjectData[] = [];
 
 		let calculatedPivot = referencePivot;
+		if (!calculatedPivot && selectedIds.length === 1) {
+			const singleRoot = hierarchy.getNode(selectedIds[0]);
+			if (singleRoot?.pivot?.pos) {
+				calculatedPivot = { ...singleRoot.pivot.pos };
+			}
+		}
+
 		if (!calculatedPivot) {
 			const positions: { x: number; y: number; z: number }[] = [];
 			allSubtreeNodeIds.forEach((id) => {
-				const objData = objectDataFetcher(id);
-				if (objData && objData.pos) {
-					positions.push(objData.pos);
+				const node = hierarchy.getNode(id);
+				if (node?.isGroup && node.pivot) {
+					if (selectedIds.includes(id)) {
+						positions.push(node.pivot.pos);
+					}
+				} else {
+					const objData = objectDataFetcher(id);
+					if (objData && objData.pos && objData.type !== "group_pivot") {
+						positions.push(objData.pos);
+					}
 				}
 			});
 			if (positions.length > 0) {
@@ -112,10 +126,13 @@ export class EditorClipboard {
 			const node = hierarchy.getNode(id);
 			if (node) {
 				hierarchyNodes.push(node.toJSON());
-			}
-			const objData = objectDataFetcher(id);
-			if (objData) {
-				objectsData.push(JSON.parse(JSON.stringify(objData)));
+				// Los grupos son nodos lógicos puros. Solo los objetos físicos reales se serializan a objectsData.
+				if (!node.isGroup) {
+					const objData = objectDataFetcher(id);
+					if (objData && objData.type !== "group_pivot") {
+						objectsData.push(JSON.parse(JSON.stringify(objData)));
+					}
+				}
 			}
 		});
 
@@ -139,11 +156,12 @@ export class EditorClipboard {
 	 */
 	preparePaste(
 		targetPosition?: { x: number; y: number; z: number },
-		targetParentId: string | null = null
+		targetParentId?: string | null
 	): {
 		uuidMap: Map<string, string>;
 		newHierarchyNodes: SerializedHierarchyNode[];
 		newObjectsData: SerializedMapObjectData[];
+		rootNodeIds: string[];
 	} | null {
 		if (!this.payload) return null;
 
@@ -182,8 +200,10 @@ export class EditorClipboard {
 				// El padre era parte del subárbol copiado
 				newParentId = uuidMap.get(oldNode.parentId)!;
 			} else {
-				// El nodo era una raíz de la selección: se asigna al targetParentId especificado
-				newParentId = targetParentId;
+				// El nodo era una raíz de la selección:
+				// Si targetParentId está definido (incluso null), se asigna a ese padre.
+				// Si targetParentId es undefined, conserva su parentId original (modo hermano/duplicación).
+				newParentId = targetParentId !== undefined ? targetParentId : (oldNode.parentId ?? null);
 			}
 
 			const nodeCopy: SerializedHierarchyNode = {
@@ -214,7 +234,7 @@ export class EditorClipboard {
 			if (oldObj.parentId && uuidMap.has(oldObj.parentId)) {
 				newParentId = uuidMap.get(oldObj.parentId)!;
 			} else {
-				newParentId = targetParentId;
+				newParentId = targetParentId !== undefined ? targetParentId : (oldObj.parentId ?? null);
 			}
 
 			const objCopy: SerializedMapObjectData = {
@@ -236,10 +256,13 @@ export class EditorClipboard {
 			return objCopy;
 		});
 
+		const rootNodeIds = this.payload.rootNodeIds.map((oldId) => uuidMap.get(oldId)!).filter(Boolean);
+
 		return {
 			uuidMap,
 			newHierarchyNodes,
 			newObjectsData,
+			rootNodeIds,
 		};
 	}
 }

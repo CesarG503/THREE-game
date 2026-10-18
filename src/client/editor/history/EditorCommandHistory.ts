@@ -110,3 +110,77 @@ export class ReparentCommand implements EditorCommand {
 	}
 }
 
+export interface DuplicateCommandPayload {
+	hierarchyNodes: any[];
+	objectsData: any[];
+	rootNodeIds: string[];
+}
+
+export class DuplicateCommand implements EditorCommand {
+	name = "Duplicate Structure";
+
+	constructor(
+		private game: any,
+		private hierarchy: any,
+		private groupManager: any,
+		private payload: DuplicateCommandPayload,
+		private onAfterExecute?: (selectedNodeId?: string) => void
+	) {}
+
+	execute() {
+		const createdUuids: string[] = [];
+		try {
+			// 1. Añadir nodos jerárquicos al modelo
+			for (const nodeData of this.payload.hierarchyNodes) {
+				this.hierarchy.addNode(nodeData);
+				createdUuids.push(nodeData.id);
+			}
+
+			// 2. Instanciar objetos físicos reales mediante el flujo correspondiente de MapObjectItem
+			for (const objData of this.payload.objectsData) {
+				if (objData.type !== "group_pivot") {
+					this.game._loadSingleMapObject(objData);
+				}
+			}
+
+			// 3. Crear proxies de pivote para los nuevos grupos
+			for (const nodeData of this.payload.hierarchyNodes) {
+				if (nodeData.isGroup && this.groupManager) {
+					const proxy = this.groupManager.getOrCreatePivotProxy(nodeData.id);
+					if (nodeData.pivot?.pos) {
+						proxy.position.set(nodeData.pivot.pos.x, nodeData.pivot.pos.y, nodeData.pivot.pos.z);
+					}
+				}
+			}
+
+			if (this.onAfterExecute) {
+				this.onAfterExecute(this.payload.rootNodeIds[0]);
+			}
+		} catch (err) {
+			// Rollback atómico: limpiar cualquier objeto o nodo creado si la duplicación falla
+			for (const id of createdUuids) {
+				try { this.game.deleteObjectByUuid(id); } catch (_) {}
+				try { this.hierarchy.removeNode(id, false); } catch (_) {}
+				try { this.groupManager.removeGroupProxy(id); } catch (_) {}
+			}
+			throw err;
+		}
+	}
+
+	undo() {
+		for (const objData of this.payload.objectsData) {
+			try { this.game.deleteObjectByUuid(objData.uuid); } catch (_) {}
+		}
+		for (const nodeData of this.payload.hierarchyNodes) {
+			try { this.hierarchy.removeNode(nodeData.id, false); } catch (_) {}
+			if (nodeData.isGroup && this.groupManager) {
+				try { this.groupManager.removeGroupProxy(nodeData.id); } catch (_) {}
+			}
+		}
+		if (this.onAfterExecute) {
+			this.onAfterExecute(undefined);
+		}
+	}
+}
+
+

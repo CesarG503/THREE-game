@@ -130,7 +130,14 @@ export class EditorClipboard {
 				if (!node.isGroup) {
 					const objData = objectDataFetcher(id);
 					if (objData && objData.type !== "group_pivot") {
-						objectsData.push(JSON.parse(JSON.stringify(objData)));
+						const serializedObj = JSON.parse(JSON.stringify(objData));
+						if (!serializedObj.parentId && node.parentId) {
+							serializedObj.parentId = node.parentId;
+						}
+						if (serializedObj.order === undefined && node.order !== undefined) {
+							serializedObj.order = node.order;
+						}
+						objectsData.push(serializedObj);
 					}
 				}
 			}

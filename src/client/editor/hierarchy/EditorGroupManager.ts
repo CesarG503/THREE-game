@@ -12,7 +12,7 @@
 
 import * as THREE from "three";
 import { EditorHierarchyModel, type HierarchyNode } from "./EditorHierarchyModel";
-import { EditorCommandHistory, ReparentCommand } from "../history/EditorCommandHistory";
+import { EditorCommandHistory, ReparentCommand, MoveObjectCommand } from "../history/EditorCommandHistory";
 
 export interface GroupPivotTransform {
 	position: THREE.Vector3;
@@ -31,8 +31,14 @@ interface TransformSession {
 }
 
 interface ConnectorDragState {
+	mode: "move" | "reparent";
 	sourceNodeId: string;
 	sourceMarker: THREE.Object3D;
+	initialMarkerPos: THREE.Vector3;
+	targetObject: THREE.Object3D | null;
+	initialObjectPos: THREE.Vector3;
+	startIntersection: THREE.Vector3;
+	dragPlane: THREE.Plane;
 	currentPointerPos: THREE.Vector3;
 	hoveredTargetGroupId: string | null;
 	isValidTarget: boolean;
@@ -562,14 +568,14 @@ export class EditorGroupManager {
 
 			if (worldPos) {
 				const isConnected = !!node.parentId;
-				// Conector colocado ligeramente encima del objeto para máxima visibilidad y facilidad de clic
+				// Recuadro superior de acople colocado encima del objeto
 				const connectorPos = worldPos.clone().add(new THREE.Vector3(0, Math.max(0.6, boxHeight / 2 + 0.35), 0));
 
 				const connectorColor = isConnected ? 0x10b981 : 0x94a3b8;
 				const emissiveColor = isConnected ? 0x059669 : 0x475569;
 
 				const connectorMesh = new THREE.Mesh(
-					new THREE.CylinderGeometry(0.2, 0.2, 0.15, 16),
+					new THREE.BoxGeometry(0.35, 0.25, 0.35),
 					new THREE.MeshStandardMaterial({
 						color: connectorColor,
 						emissive: emissiveColor,
@@ -582,6 +588,10 @@ export class EditorGroupManager {
 				connectorMesh.userData.nodeId = node.id;
 				connectorMesh.userData.isConnected = isConnected;
 				connectorMesh.userData.parentId = node.parentId;
+				connectorMesh.userData.isGroup = node.isGroup;
+				connectorMesh.userData.helpText = isConnected
+					? "Recuadro de Acople (Arrastra para mover en 3D | Shift+Arrastra para acoplar | Clic derecho para desacoplar)"
+					: "Recuadro de Acople (Arrastra para mover en 3D | Shift+Arrastra para vincular a grupo)";
 				this.couplingConnectorsGroup.add(connectorMesh);
 			}
 		});
@@ -613,6 +623,7 @@ export class EditorGroupManager {
 		if (hitConnector) {
 			const sourceNodeId = hitConnector.object.userData.nodeId;
 			const isConnected = hitConnector.object.userData.isConnected;
+			const isGroupNode = !!hitConnector.object.userData.isGroup;
 
 			// Clic derecho sobre conector de objeto acoplado: Desacople directo a la raíz con Undo/Redo
 			if (event.button === 2 && isConnected) {
@@ -636,7 +647,7 @@ export class EditorGroupManager {
 				return;
 			}
 
-			// Clic izquierdo: Iniciar arrastre de conexión
+			// Clic izquierdo:
 			if (event.button === 0) {
 				if (this.interaction && !this.interaction.begin("connector-drag", this.cancelConnectorDrag)) return;
 				this.pointerId = event.pointerId;
@@ -644,35 +655,63 @@ export class EditorGroupManager {
 				event.preventDefault();
 				event.stopPropagation();
 
+				const isReparent = event.shiftKey;
+				const targetObject = !isGroupNode && this.lastResolver ? this.lastResolver(sourceNodeId) : null;
+
+				const planeNormal = this.camera.getWorldDirection(new THREE.Vector3()).negate();
+				const dragPlane = new THREE.Plane().setFromNormalAndCoplanarPoint(
+					planeNormal,
+					hitConnector.point || hitConnector.object.position
+				);
+
+				const intersectPoint = new THREE.Vector3();
+				raycaster.ray.intersectPlane(dragPlane, intersectPoint);
+
 				this.connectorDrag = {
+					mode: isReparent ? "reparent" : "move",
 					sourceNodeId,
 					sourceMarker: hitConnector.object,
-					currentPointerPos: hitConnector.point.clone(),
+					initialMarkerPos: hitConnector.object.position.clone(),
+					targetObject,
+					initialObjectPos: targetObject ? targetObject.position.clone() : (hitConnector.point ? hitConnector.point.clone() : new THREE.Vector3()),
+					startIntersection: intersectPoint.clone(),
+					dragPlane,
+					currentPointerPos: intersectPoint.clone(),
 					hoveredTargetGroupId: null,
 					isValidTarget: false,
 				};
 
-				// Resaltar conector de origen en amarillo brillante
-				(hitConnector.object as THREE.Mesh).material = new THREE.MeshStandardMaterial({
-					color: 0xf59e0b,
-					emissive: 0xd97706,
-					emissiveIntensity: 1.0,
-					depthTest: false,
-				});
+				if (isReparent) {
+					// Resaltar conector en amarillo brillante para reparenting
+					(hitConnector.object as THREE.Mesh).material = new THREE.MeshStandardMaterial({
+						color: 0xf59e0b,
+						emissive: 0xd97706,
+						emissiveIntensity: 1.0,
+						depthTest: false,
+					});
 
-				// Crear línea de arrastre elástica (rubberband)
-				const geom = new THREE.BufferGeometry().setFromPoints([
-					hitConnector.object.position.clone(),
-					hitConnector.point.clone(),
-				]);
-				const mat = new THREE.LineBasicMaterial({
-					color: 0xf59e0b,
-					linewidth: 2,
-					depthTest: false,
-				});
-				this.rubberBandLine = new THREE.Line(geom, mat);
-				this.rubberBandLine.renderOrder = 2000;
-				this.scene.add(this.rubberBandLine);
+					// Línea elástica rubberband
+					const geom = new THREE.BufferGeometry().setFromPoints([
+						hitConnector.object.position.clone(),
+						intersectPoint.clone(),
+					]);
+					const mat = new THREE.LineBasicMaterial({
+						color: 0xf59e0b,
+						linewidth: 2,
+						depthTest: false,
+					});
+					this.rubberBandLine = new THREE.Line(geom, mat);
+					this.rubberBandLine.renderOrder = 2000;
+					this.scene.add(this.rubberBandLine);
+				} else {
+					// Modo traslación espacial 3D: Resaltar en cian brillante
+					(hitConnector.object as THREE.Mesh).material = new THREE.MeshStandardMaterial({
+						color: 0x06b6d4,
+						emissive: 0x0891b2,
+						emissiveIntensity: 1.0,
+						depthTest: false,
+					});
+				}
 			}
 		}
 	}
@@ -683,18 +722,38 @@ export class EditorGroupManager {
 		const raycaster = this.getRaycaster(event);
 		if (!raycaster) return;
 
-		// Plano de proyección perpendicular a la cámara en la posición del conector
-		const planeNormal = this.camera.getWorldDirection(new THREE.Vector3()).negate();
-		const dragPlane = new THREE.Plane().setFromNormalAndCoplanarPoint(
-			planeNormal,
-			this.connectorDrag.sourceMarker.position
-		);
-
 		const intersectPoint = new THREE.Vector3();
-		raycaster.ray.intersectPlane(dragPlane, intersectPoint);
+		raycaster.ray.intersectPlane(this.connectorDrag.dragPlane, intersectPoint);
 		this.connectorDrag.currentPointerPos.copy(intersectPoint);
 
-		// Actualizar línea rubberband
+		if (this.connectorDrag.mode === "move") {
+			const delta = intersectPoint.clone().sub(this.connectorDrag.startIntersection);
+
+			if (this.connectorDrag.targetObject) {
+				const nextPos = this.connectorDrag.initialObjectPos.clone().add(delta);
+				this.connectorDrag.targetObject.position.copy(nextPos);
+				this.connectorDrag.targetObject.updateMatrixWorld(true);
+
+				if (this.connectorDrag.targetObject.userData?.rigidBody) {
+					if (typeof this.connectorDrag.targetObject.userData.rigidBody.setTranslation === "function") {
+						this.connectorDrag.targetObject.userData.rigidBody.setTranslation({
+							x: nextPos.x,
+							y: nextPos.y,
+							z: nextPos.z,
+						});
+					}
+				}
+
+				this.connectorDrag.sourceMarker.position.copy(
+					this.connectorDrag.initialMarkerPos.clone().add(delta)
+				);
+
+				this.updateCouplingVisuals(this.lastResolver || undefined);
+			}
+			return;
+		}
+
+		// Modo Reparenting: actualizar rubberband y detección de objetivos válidos
 		if (this.rubberBandLine) {
 			this.rubberBandLine.geometry.setFromPoints([
 				this.connectorDrag.sourceMarker.position.clone(),
@@ -702,11 +761,9 @@ export class EditorGroupManager {
 			]);
 		}
 
-		// Raycast para detectar si estamos sobre un pivote de grupo destino
 		const intersects = raycaster.intersectObjects(this.couplingConnectorsGroup.children, true);
 		const hitTarget = intersects.find((h) => h.object.userData?.isCouplingPivotTarget);
 
-		// Limpiar estados de los pivotes
 		this.couplingConnectorsGroup.children.forEach((c) => {
 			if (c.userData?.isCouplingPivotTarget) {
 				const mesh = c as THREE.Mesh;
@@ -723,7 +780,6 @@ export class EditorGroupManager {
 			const targetMat = targetMesh.material as THREE.MeshStandardMaterial;
 
 			if (validation.allowed) {
-				// Destino válido: Iluminar en verde
 				targetMat.color.setHex(0x22c55e);
 				targetMat.emissive.setHex(0x15803d);
 				if (this.rubberBandLine) {
@@ -732,7 +788,6 @@ export class EditorGroupManager {
 				this.connectorDrag.hoveredTargetGroupId = targetGroupId;
 				this.connectorDrag.isValidTarget = true;
 			} else {
-				// Destino inválido (ciclo o restricción): Iluminar en rojo
 				targetMat.color.setHex(0xef4444);
 				targetMat.emissive.setHex(0xb91c1c);
 				if (this.rubberBandLine) {
@@ -753,9 +808,8 @@ export class EditorGroupManager {
 	private handlePointerUp(event: PointerEvent) {
 		if (!this.connectorDrag || (this.pointerId != null && event.pointerId !== this.pointerId)) return;
 
-		const { sourceNodeId, hoveredTargetGroupId, isValidTarget } = this.connectorDrag;
+		const drag = this.connectorDrag;
 
-		// Eliminar línea elástica
 		if (this.rubberBandLine) {
 			this.scene.remove(this.rubberBandLine);
 			this.rubberBandLine.geometry.dispose();
@@ -766,7 +820,32 @@ export class EditorGroupManager {
 		this.connectorDrag = null;
 		this.releaseConnectorPointer();
 
-		// 1. Soltado sobre destino válido: Ejecutar acoplamiento con Undo/Redo
+		if (drag.mode === "move") {
+			if (drag.targetObject) {
+				const finalPos = drag.targetObject.position.clone();
+				const initPos = drag.initialObjectPos.clone();
+				if (finalPos.distanceTo(initPos) > 0.001) {
+					if (this.history) {
+						this.history.execute(
+							new MoveObjectCommand(
+								drag.targetObject,
+								{ x: initPos.x, y: initPos.y, z: initPos.z },
+								{ x: finalPos.x, y: finalPos.y, z: finalPos.z },
+								() => {
+									this.updateCouplingVisuals(this.lastResolver || undefined);
+									if (this.onHierarchyChanged) this.onHierarchyChanged();
+								}
+							)
+						);
+					}
+				}
+			}
+			this.updateCouplingVisuals(this.lastResolver || undefined);
+			return;
+		}
+
+		// Modo Reparenting
+		const { sourceNodeId, hoveredTargetGroupId, isValidTarget } = drag;
 		if (isValidTarget && hoveredTargetGroupId) {
 			const oldNode = this.hierarchy.getNode(sourceNodeId);
 			const oldParentId = oldNode?.parentId ?? null;
@@ -792,7 +871,6 @@ export class EditorGroupManager {
 			return;
 		}
 
-		// 2. Si se mantiene pulsada la tecla Alt al soltar fuera: Desacoplar a la raíz con Undo/Redo
 		if (event.altKey) {
 			const oldNode = this.hierarchy.getNode(sourceNodeId);
 			const oldParentId = oldNode?.parentId ?? null;
@@ -812,7 +890,6 @@ export class EditorGroupManager {
 			return;
 		}
 
-		// 3. Soltado en vacío sin destino: Cancelar sin cambios
 		this.updateCouplingVisuals(this.lastResolver || undefined);
 	}
 
@@ -825,7 +902,21 @@ export class EditorGroupManager {
 
 	cancelConnectorDrag = () => {
 		if (!this.connectorDrag) return;
+		const drag = this.connectorDrag;
 		this.connectorDrag = null;
+
+		if (drag.mode === "move" && drag.targetObject) {
+			drag.targetObject.position.copy(drag.initialObjectPos);
+			drag.targetObject.updateMatrixWorld(true);
+			if (drag.targetObject.userData?.rigidBody && typeof drag.targetObject.userData.rigidBody.setTranslation === "function") {
+				drag.targetObject.userData.rigidBody.setTranslation({
+					x: drag.initialObjectPos.x,
+					y: drag.initialObjectPos.y,
+					z: drag.initialObjectPos.z,
+				});
+			}
+		}
+
 		if (this.rubberBandLine) {
 			this.rubberBandLine.removeFromParent();
 			this.rubberBandLine.geometry.dispose();

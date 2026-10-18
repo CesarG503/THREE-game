@@ -110,6 +110,39 @@ export class ReparentCommand implements EditorCommand {
 	}
 }
 
+export class MoveObjectCommand implements EditorCommand {
+	name = "Move Object";
+
+	constructor(
+		private object: any,
+		private oldPosition: { x: number; y: number; z: number },
+		private newPosition: { x: number; y: number; z: number },
+		private onAfterExecute?: () => void
+	) {}
+
+	execute() {
+		if (this.object) {
+			this.object.position.set(this.newPosition.x, this.newPosition.y, this.newPosition.z);
+			this.object.updateMatrixWorld(true);
+			if (this.object.userData?.rigidBody && typeof this.object.userData.rigidBody.setTranslation === "function") {
+				this.object.userData.rigidBody.setTranslation({ ...this.newPosition });
+			}
+		}
+		if (this.onAfterExecute) this.onAfterExecute();
+	}
+
+	undo() {
+		if (this.object) {
+			this.object.position.set(this.oldPosition.x, this.oldPosition.y, this.oldPosition.z);
+			this.object.updateMatrixWorld(true);
+			if (this.object.userData?.rigidBody && typeof this.object.userData.rigidBody.setTranslation === "function") {
+				this.object.userData.rigidBody.setTranslation({ ...this.oldPosition });
+			}
+		}
+		if (this.onAfterExecute) this.onAfterExecute();
+	}
+}
+
 export interface DuplicateCommandPayload {
 	hierarchyNodes: any[];
 	objectsData: any[];

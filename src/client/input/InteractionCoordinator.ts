@@ -63,7 +63,18 @@ export class InteractionCoordinator {
   markHandled(event: Event) { this.handledEvents.add(event); }
   isHandled(event: Event) { return this.handledEvents.has(event); }
 
-  get blocksGameplay(): boolean { return this.state !== 'gameplay'; }
+  get blocksMovement(): boolean {
+    return ['text', 'menu', 'overlay', 'paused', 'suspended'].includes(this.state);
+  }
+
+  get blocksGameplayActions(): boolean {
+    return this.state !== 'gameplay';
+  }
+
+  get blocksGameplay(): boolean {
+    return this.blocksGameplayActions;
+  }
+
   get blocksScene(): boolean { return !['gameplay', 'editor'].includes(this.state); }
 
   begin(owner: string, cancel: () => void): boolean {
@@ -94,15 +105,24 @@ export class InteractionCoordinator {
   }
 
   sync() {
-    const blocked = this.blocksGameplay;
-    if (blocked) {
-      this.game.inputManager?.reset();
+    if (this.blocksMovement) {
+      if (typeof this.game.inputManager?.resetMovement === 'function') {
+        this.game.inputManager.resetMovement();
+      } else {
+        this.game.inputManager?.reset();
+      }
+    }
+    if (this.blocksGameplayActions) {
+      if (this.game.inputManager?.keys) {
+        this.game.inputManager.keys.attack = false;
+        this.game.inputManager.keys.aim = false;
+      }
       this.game.isMouseDown = false;
       this.game.isFKeyDown = false;
       this.game.fKeyHeldTime = 0;
       this.game.fuelZoneSystem?.interaction.release();
     }
-    this.game.cameraController?.setUIOpen(blocked);
+    this.game.cameraController?.setUIOpen(this.blocksGameplayActions);
     // Menus suppress tools without detaching the selected object.
     const controls = this.game.objectInspector?.transformGizmo?.controls;
     if (controls && !this.gesture) controls.enabled = !this.blocksScene && !this.game.constructionMenu?.logicSystem?.isEditingMap;
@@ -114,6 +134,11 @@ export class InteractionCoordinator {
     if (this.gesture?.owner === 'tree-drag') return;
     this.suspended = true;
     this.cancelGesture();
+    this.game.inputManager?.reset();
+    this.game.isMouseDown = false;
+    this.game.isFKeyDown = false;
+    this.game.fKeyHeldTime = 0;
+    this.game.fuelZoneSystem?.interaction.release();
   };
 
   private onKeyDown = (event: KeyboardEvent) => {

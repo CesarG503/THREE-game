@@ -238,7 +238,9 @@ export class Game {
 			this.cameraController.character = this.character;
 			this.cameraController.uiCheckCallback = () => this.isAnyEditorUIOpen();
 			if (this.inputManager) {
-				this.inputManager.uiCheckCallback = () => this.isAnyEditorUIOpen();
+				this.inputManager.movementCheckCallback = () => (this.interaction ? this.interaction.blocksMovement : this.isAnyEditorUIOpen());
+				this.inputManager.actionCheckCallback = () => (this.interaction ? this.interaction.blocksGameplayActions : this.isAnyEditorUIOpen());
+				this.inputManager.uiCheckCallback = () => (this.interaction ? this.interaction.blocksGameplayActions : this.isAnyEditorUIOpen());
 			}
 			this.logicCameraSystem = new LogicCameraSystem(this);
 			this.scopeController = new ScopeController(this.sceneManager.camera, this);
@@ -652,8 +654,10 @@ export class Game {
 
 		this.interaction = new InteractionCoordinator(this);
 		this.editorGroupManager.interaction = this.interaction;
-		this.cameraController.uiCheckCallback = () => this.interaction.blocksGameplay;
-		this.inputManager.uiCheckCallback = () => this.interaction.blocksGameplay;
+		this.cameraController.uiCheckCallback = () => this.interaction.blocksGameplayActions;
+		this.inputManager.movementCheckCallback = () => this.interaction.blocksMovement;
+		this.inputManager.actionCheckCallback = () => this.interaction.blocksGameplayActions;
+		this.inputManager.uiCheckCallback = () => this.interaction.blocksGameplayActions;
 		this.setupGameInput();
 
 		if (this.gameMode !== "editor") {

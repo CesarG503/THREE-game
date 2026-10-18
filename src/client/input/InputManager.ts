@@ -9,6 +9,8 @@ export class InputManager {
   enabled: boolean;
   options: Required<InputManagerOptions>;
   uiCheckCallback: (() => boolean) | null = null;
+  movementCheckCallback: (() => boolean) | null = null;
+  actionCheckCallback: (() => boolean) | null = null;
   lastShiftTime: number = 0;
   doubleShiftTapped: boolean = false;
 
@@ -47,7 +49,9 @@ export class InputManager {
     window.addEventListener("blur", () => this.reset(), { signal: this.events.signal });
     document.addEventListener("mousedown", (e) => {
       if (this.pointerTarget && e.target !== this.pointerTarget) return;
-      if (this.isPaused || !this.enabled || isTextInput(e.target) || (this.uiCheckCallback && this.uiCheckCallback())) return;
+      if (this.isPaused || !this.enabled || isTextInput(e.target) || isTextInput(document.activeElement)) return;
+      const isActionBlocked = this.actionCheckCallback ? this.actionCheckCallback() : this.uiCheckCallback?.();
+      if (isActionBlocked) return;
       if (e.button === 0) this.keys.attack = true;
       if (e.button === 2) this.keys.aim = true;
     }, { signal: this.events.signal });
@@ -60,21 +64,28 @@ export class InputManager {
 
   dispose() { this.events.abort(); this.reset(); }
 
-  reset() {
+  resetMovement() {
     this.keys.forward = false;
     this.keys.backward = false;
     this.keys.left = false;
     this.keys.right = false;
     this.keys.jump = false;
     this.keys.crouch = false;
-    this.keys.attack = false;
-    this.keys.aim = false;
     if (this.keys.run !== undefined) this.keys.run = false;
     this.doubleShiftTapped = false;
   }
 
+  reset() {
+    this.resetMovement();
+    this.keys.attack = false;
+    this.keys.aim = false;
+  }
+
   onKeyDown(event: KeyboardEvent) {
-    if (this.isPaused || !this.enabled || isTextInput(event.target) || this.uiCheckCallback?.()) return;
+    if (this.isPaused || !this.enabled || isTextInput(event.target) || isTextInput(document.activeElement)) return;
+
+    const isMovementBlocked = this.movementCheckCallback ? this.movementCheckCallback() : this.uiCheckCallback?.();
+    if (isMovementBlocked) return;
 
     switch (event.code) {
       case "KeyW":

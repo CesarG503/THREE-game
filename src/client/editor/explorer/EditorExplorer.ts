@@ -277,10 +277,14 @@ export class EditorExplorer {
 			this.handleDecouple();
 		});
 
-		// Botón Modo Acoples (Visualizar líneas y marcadores interactivos 3D)
-		this.btnToggleCoupling = createBtn("Acoples: OFF", "Alterna la visualización y conectores 3D de acoples (Atajo: tecla 'C')", () => {
-			this.toggleCouplingMode();
-		});
+		// Botón Modo Acoples (Visualizar líneas y recuadros conectores 3D)
+		this.btnToggleCoupling = createBtn(
+			"Acoples: OFF",
+			"Modo Acoples 3D: Muestra los recuadros superiores de acople.\n• Arrastrar recuadro: Mover objeto en 3D (conserva su grupo)\n• Shift + Arrastrar: Vincular / Acoplar a otro grupo\n• Clic derecho: Desacoplar a la raíz\n(Atajo: tecla 'C')",
+			() => {
+				this.toggleCouplingMode();
+			}
+		);
 
 		// Botón Modo Editar Pivote (Reubicar pivote sin mover objetos)
 		this.btnTogglePivotEdit = createBtn("Pivote: OFF", "Modo para reubicar el pivote de un grupo sin mover sus objetos", () => {
@@ -1170,6 +1174,66 @@ export class EditorExplorer {
 		}
 	}
 
+	/**
+	 * Calcula una posición espacial unificada frente al personaje o cámara para colocar
+	 * estructuras pegadas, duplicadas, insertadas o importadas sin alterar sus disposiciones relativas.
+	 */
+	public calculateSpawnPlacement(offsetDistance: number = 4.5): { x: number; y: number; z: number } {
+		const char = this.game.character;
+		let charPos: THREE.Vector3 | null = null;
+
+		if (char && typeof char.getPosition === "function") {
+			charPos = char.getPosition();
+		} else if (char?.body?.translation) {
+			const t = char.body.translation();
+			charPos = new THREE.Vector3(t.x, t.y, t.z);
+		}
+
+		const camera = this.game.sceneManager?.camera;
+		const lookDir = new THREE.Vector3(0, 0, 1);
+
+		if (camera && typeof camera.getWorldDirection === "function") {
+			camera.getWorldDirection(lookDir);
+			lookDir.y = 0;
+			if (lookDir.lengthSq() > 0.001) {
+				lookDir.normalize();
+			} else {
+				lookDir.set(0, 0, 1);
+			}
+		}
+
+		if (charPos) {
+			const targetX = charPos.x + lookDir.x * offsetDistance;
+			const targetZ = charPos.z + lookDir.z * offsetDistance;
+			let targetY = charPos.y;
+
+			if (this.game.sceneManager?.scene) {
+				const rayOrigin = new THREE.Vector3(targetX, charPos.y + 10, targetZ);
+				const rayDir = new THREE.Vector3(0, -1, 0);
+				const raycaster = new THREE.Raycaster(rayOrigin, rayDir, 0.1, 40);
+				const hits = raycaster.intersectObjects(this.game.sceneManager.scene.children, true);
+				const groundHit = hits.find((h: any) => {
+					let obj = h.object;
+					while (obj) {
+						if (obj.userData?.isEditableMapObject || obj.userData?.isTerrain || obj.userData?.mapObjectType === "wall" || obj.userData?.mapObjectType === "floor") {
+							return true;
+						}
+						obj = obj.parent;
+					}
+					return false;
+				});
+
+				if (groundHit) {
+					targetY = groundHit.point.y + 0.05;
+				}
+			}
+
+			return { x: targetX, y: targetY, z: targetZ };
+		}
+
+		return { x: 5, y: 0, z: 5 };
+	}
+
 	private handlePaste() {
 		if (!this.clipboard.hasContent()) return;
 
@@ -1177,14 +1241,7 @@ export class EditorExplorer {
 			? this.selectedNodeId
 			: null;
 
-		const spawnPos = this.game.character?.body
-			? {
-					x: this.game.character.body.translation().x + 2,
-					y: this.game.character.body.translation().y,
-					z: this.game.character.body.translation().z + 2,
-			  }
-			: undefined;
-
+		const spawnPos = this.calculateSpawnPlacement(4.5);
 		const prepared = this.clipboard.preparePaste(spawnPos, targetParent);
 		if (!prepared) return;
 
@@ -1223,7 +1280,8 @@ export class EditorExplorer {
 
 		// El duplicado debe crearse como hermano del original (targetParent = node.parentId)
 		const targetParent = node.parentId;
-		const prepared = this.clipboard.preparePaste(undefined, targetParent);
+		const spawnPos = this.calculateSpawnPlacement(3.0);
+		const prepared = this.clipboard.preparePaste(spawnPos, targetParent);
 		if (!prepared) return;
 
 		const cmd = new DuplicateCommand(
@@ -1283,13 +1341,7 @@ export class EditorExplorer {
 	}
 
 	private handleInsertPrefab(prefab: PlatformPrefabDto) {
-		const spawnPos = this.game.character?.body
-			? {
-					x: this.game.character.body.translation().x + 2,
-					y: this.game.character.body.translation().y,
-					z: this.game.character.body.translation().z + 2,
-			  }
-			: { x: 0, y: 0, z: 0 };
+		const spawnPos = this.calculateSpawnPlacement(5.0);
 
 		const targetParent = this.selectedNodeId && this.hierarchy.getNode(this.selectedNodeId)?.isGroup
 			? this.selectedNodeId
@@ -1596,13 +1648,7 @@ export class EditorExplorer {
 					return;
 				}
 
-				const spawnPos = this.game.character?.body
-					? {
-							x: this.game.character.body.translation().x + 2,
-							y: this.game.character.body.translation().y,
-							z: this.game.character.body.translation().z + 2,
-					  }
-					: { x: 0, y: 0, z: 0 };
+				const spawnPos = this.calculateSpawnPlacement(5.0);
 
 				const targetParent = this.selectedNodeId && this.hierarchy.getNode(this.selectedNodeId)?.isGroup
 					? this.selectedNodeId
@@ -1664,6 +1710,8 @@ export class EditorExplorer {
 		const obj = this.resolveObject3D(uuid);
 		if (!obj) return null;
 
+		const node = this.hierarchy.getNode(uuid);
+
 		return {
 			uuid: obj.userData.uuid,
 			type: obj.userData.mapObjectType || obj.userData.type || "wall",
@@ -1674,12 +1722,15 @@ export class EditorExplorer {
 			texturePath: obj.userData.texturePath,
 			textureAssetId: obj.userData.textureAssetId,
 			textureSettings: obj.userData.textureSettings,
-			logicProperties: obj.userData.logicProperties,
-			customName: obj.userData.customName,
+			logicProperties: obj.userData.logicProperties ? JSON.parse(JSON.stringify(obj.userData.logicProperties)) : undefined,
+			customName: obj.userData.customName || node?.customName || node?.name,
 			invisible: obj.userData.invisible,
 			opacity: obj.userData.opacity,
 			bodyType: obj.userData.bodyType,
 			collisionType: obj.userData.collisionType,
+			authorId: obj.userData.authorId,
+			parentId: node ? node.parentId : (obj.userData.parentId || null),
+			order: node ? node.order : (obj.userData.order ?? 0),
 		};
 	}
 

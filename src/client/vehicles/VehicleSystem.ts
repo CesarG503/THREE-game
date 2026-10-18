@@ -308,7 +308,7 @@ export class VehicleSystem {
     character.noPitchTilt = false;
     this.game.cameraController?.setYawConstraint?.(null);
     if (this.hud) this.hud.style.display = 'none';
-    this.stunts?.resetSession();
+    this.stunts?.handleDismount(crashed);
     return true;
   }
 

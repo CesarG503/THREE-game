@@ -244,15 +244,64 @@ export class VehicleStuntTracker {
     document.head.appendChild(style);
   }
 
+  public handleDismount(crashed = false) {
+    if (this.isAirborne || crashed) {
+      this.triggerCrash();
+    }
+    // If landed cleanly just before dismounting, keep landingFeedbackTimer active
+    // so the points don't cut off abruptly when getting off the vehicle!
+  }
+
+  public triggerCrash() {
+    const hadStunt = this.isAirborne && (this.currentJumpScore > 0 || this.tricksLog.length > 0 || this.airTime >= 0.15);
+    this.isAirborne = false;
+    this.currentJumpScore = 0;
+
+    if (!hadStunt) {
+      if (this.landingFeedbackTimer <= 0 && this.hudContainer) {
+        this.hudContainer.style.display = 'none';
+      }
+      return;
+    }
+
+    this.showLandingFeedback({
+      status: 'crash',
+      points: 0,
+      totalSessionScore: this.totalSessionScore
+    });
+    this.landingFeedbackTimer = 1.4;
+  }
+
   public update(
-    bike: THREE.Object3D,
+    bike: THREE.Object3D | null,
     grounded: boolean,
     crashed: boolean,
     toppled: boolean,
     dt: number,
     isRidden: boolean
   ) {
-    if (!bike || !bike.parent || dt <= 0) return;
+    if (dt <= 0) return;
+
+    // 1. Process landing feedback countdown if active (always ticks down, even if unmounted / dismounted)
+    if (this.landingFeedbackTimer > 0) {
+      this.landingFeedbackTimer -= dt;
+      if (this.landingFeedbackTimer <= 0.25 && this.hudContainer && !this.isAirborne) {
+        this.hudContainer.style.opacity = '0';
+      }
+      if (this.landingFeedbackTimer <= 0) {
+        if (this.hudContainer && !this.isAirborne) {
+          this.hudContainer.style.display = 'none';
+        }
+      }
+    }
+
+    // 2. If no bike, dismounted or dead
+    if (!bike || !bike.parent || !isRidden) {
+      if (this.isAirborne) {
+        this.triggerCrash();
+      }
+      return;
+    }
 
     const props: MotorbikeSettings = normalizeMotorbikeSettings(bike.userData.logicProperties);
 
@@ -272,23 +321,11 @@ export class VehicleStuntTracker {
       return;
     }
 
-    // If rider dismounted or dead, clear state
-    if (!isRidden) {
-      if (this.isAirborne) {
-        this.isAirborne = false;
-        if (this.hudContainer) this.hudContainer.style.display = 'none';
-      }
+    // Check crash or toppled while airborne
+    const isToppled = toppled || bike.userData.vehicleToppled === true;
+    if ((crashed || isToppled) && this.isAirborne) {
+      this.handleLanding(bike, true, true, props);
       return;
-    }
-
-    // Process landing feedback countdown if active
-    if (this.landingFeedbackTimer > 0) {
-      this.landingFeedbackTimer -= dt;
-      if (this.landingFeedbackTimer <= 0) {
-        if (this.hudContainer && !this.isAirborne) {
-          this.hudContainer.style.display = 'none';
-        }
-      }
     }
 
     // STATE TRANSITION: JUST LEFT THE GROUND -> AIRBORNE
@@ -302,7 +339,7 @@ export class VehicleStuntTracker {
         this.stepAirborne(bike, dt, props);
       } else {
         // LANDING TRIGGER
-        this.handleLanding(bike, crashed, toppled, props);
+        this.handleLanding(bike, crashed, isToppled, props);
       }
     }
   }
@@ -314,6 +351,7 @@ export class VehicleStuntTracker {
     this.trickPoints = 0;
     this.comboMultiplier = 1.0;
     this.currentJumpScore = 0;
+    this.landingFeedbackTimer = 0;
 
     this.lastQuaternion.copy(bike.quaternion);
     this.accumulatedPitch = 0;
@@ -490,6 +528,7 @@ export class VehicleStuntTracker {
     if (!this.hudContainer) return;
     this.applyCustomPosition();
     this.hudContainer.style.display = 'flex';
+    this.hudContainer.style.opacity = '1';
 
     const profile = this.game?.playerConfigManager?.getCurrentProfile?.();
     const hudSettings = profile?.hudSettings || this.game?.hud?.settings;
@@ -541,13 +580,6 @@ export class VehicleStuntTracker {
     const minTimeMet = this.airTime >= props.minAirTimeToScore;
     const hasTricks = this.tricksLog.length > 0;
 
-    // If it was just a tiny bump with no tricks, silently reset without banner spam
-    if (!minTimeMet && !hasTricks) {
-      this.isAirborne = false;
-      if (this.hudContainer) this.hudContainer.style.display = 'none';
-      return;
-    }
-
     // Evaluate orientation relative to gravity up normal
     const gravUp = vehicleUp(bike);
     const bikeUp = new THREE.Vector3(0, 1, 0).applyQuaternion(bike.quaternion);
@@ -556,21 +588,19 @@ export class VehicleStuntTracker {
     const isCrash = crashed || toppled || bike.userData.vehicleToppled === true || uprightDot < 0.38;
     const isPerfect = !isCrash && uprightDot >= 0.88;
 
+    // If it was just a tiny bump with no tricks, and didn't crash, silently reset
+    if (!minTimeMet && !hasTricks && !isCrash) {
+      this.isAirborne = false;
+      if (this.hudContainer) this.hudContainer.style.display = 'none';
+      return;
+    }
+
     if (isCrash) {
-      if (props.crashResetsScore) {
-        this.showLandingFeedback({
-          status: 'crash',
-          points: 0,
-          totalSessionScore: this.totalSessionScore
-        });
-      } else {
-        this.totalSessionScore += this.currentJumpScore;
-        this.showLandingFeedback({
-          status: 'rough',
-          points: this.currentJumpScore,
-          totalSessionScore: this.totalSessionScore
-        });
-      }
+      this.showLandingFeedback({
+        status: 'crash',
+        points: 0,
+        totalSessionScore: this.totalSessionScore
+      });
     } else {
       let finalPoints = this.currentJumpScore;
       let bonusPoints = 0;
@@ -595,8 +625,8 @@ export class VehicleStuntTracker {
 
   private showLandingFeedback(feedback: StuntLandingFeedback) {
     this.currentFeedback = feedback;
-    // Fast disappearance: 1.1s total duration
-    this.landingFeedbackTimer = 1.1;
+    // Feedback duration: 1.4s for crash (so player clearly sees 0 PTS in red), 1.2s for clean landing
+    this.landingFeedbackTimer = feedback.status === 'crash' ? 1.4 : 1.2;
 
     const profile = this.game?.playerConfigManager?.getCurrentProfile?.();
     const hudSettings = profile?.hudSettings || this.game?.hud?.settings;
@@ -608,6 +638,7 @@ export class VehicleStuntTracker {
     if (!this.hudContainer) return;
     this.applyCustomPosition();
     this.hudContainer.style.display = 'flex';
+    this.hudContainer.style.opacity = '1';
 
     if (this.hudTricksContainer) this.hudTricksContainer.innerHTML = '';
     if (this.hudAirTimer) this.hudAirTimer.style.display = 'none';

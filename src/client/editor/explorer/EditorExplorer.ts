@@ -1,3 +1,4 @@
+import * as THREE from "three";
 import { isTextInput } from "../../input/InteractionCoordinator";
 /**
  * EditorExplorer.ts

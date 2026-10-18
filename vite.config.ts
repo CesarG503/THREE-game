@@ -18,5 +18,10 @@ export default defineConfig({
     rollupOptions: {
       input: fileURLToPath(new URL('./index.html', import.meta.url))
     }
+  },
+  server: {
+    watch: {
+      ignored: ['**/playwright-report/**', '**/test-results/**', '**/graphify-out/**', '**/.git/**']
+    }
   }
 });

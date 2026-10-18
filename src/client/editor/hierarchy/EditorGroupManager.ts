@@ -12,6 +12,7 @@
 
 import * as THREE from "three";
 import { EditorHierarchyModel, type HierarchyNode } from "./EditorHierarchyModel";
+import { EditorCommandHistory, ReparentCommand } from "../history/EditorCommandHistory";
 
 export interface GroupPivotTransform {
 	position: THREE.Vector3;
@@ -40,6 +41,7 @@ interface ConnectorDragState {
 export class EditorGroupManager {
 	private hierarchy: EditorHierarchyModel;
 	private scene: THREE.Scene;
+	private history: EditorCommandHistory | null = null;
 	private pivotProxies: Map<string, THREE.Object3D> = new Map();
 	private couplingLinesGroup: THREE.Group;
 	private couplingConnectorsGroup: THREE.Group;
@@ -62,9 +64,10 @@ export class EditorGroupManager {
 	// Callback emitido ante cambios en la jerarquía
 	public onHierarchyChanged?: () => void;
 
-	constructor(hierarchy: EditorHierarchyModel, scene: THREE.Scene) {
+	constructor(hierarchy: EditorHierarchyModel, scene: THREE.Scene, history?: EditorCommandHistory) {
 		this.hierarchy = hierarchy;
 		this.scene = scene;
+		if (history) this.history = history;
 
 		this.couplingLinesGroup = new THREE.Group();
 		this.couplingLinesGroup.name = "EditorCouplingVisuals";
@@ -83,6 +86,10 @@ export class EditorGroupManager {
 
 	getHierarchy(): EditorHierarchyModel {
 		return this.hierarchy;
+	}
+
+	setCommandHistory(history: EditorCommandHistory) {
+		this.history = history;
 	}
 
 	/**
@@ -365,6 +372,16 @@ export class EditorGroupManager {
 					obj.quaternion.copy(nextQuat);
 					obj.updateMatrixWorld(true);
 
+					// Sincronizar cuerpo físico Rapier si existe
+					if (obj.userData?.rigidBody) {
+						if (typeof obj.userData.rigidBody.setTranslation === "function") {
+							obj.userData.rigidBody.setTranslation({ x: nextPos.x, y: nextPos.y, z: nextPos.z });
+						}
+						if (typeof obj.userData.rigidBody.setRotation === "function") {
+							obj.userData.rigidBody.setRotation({ x: nextQuat.x, y: nextQuat.y, z: nextQuat.z, w: nextQuat.w });
+						}
+					}
+
 					if (onObjectTransformed) {
 						onObjectTransformed(obj);
 					}
@@ -586,13 +603,25 @@ export class EditorGroupManager {
 			const sourceNodeId = hitConnector.object.userData.nodeId;
 			const isConnected = hitConnector.object.userData.isConnected;
 
-			// Clic derecho sobre conector de objeto acoplado: Desacople directo a la raíz
+			// Clic derecho sobre conector de objeto acoplado: Desacople directo a la raíz con Undo/Redo
 			if (event.button === 2 && isConnected) {
 				event.preventDefault();
 				event.stopPropagation();
-				this.hierarchy.reparent(sourceNodeId, null);
-				this.updateCouplingVisuals(this.lastResolver || undefined);
-				if (this.onHierarchyChanged) this.onHierarchyChanged();
+				const oldNode = this.hierarchy.getNode(sourceNodeId);
+				const oldParentId = oldNode?.parentId ?? null;
+				const oldOrder = oldNode?.order ?? 0;
+				if (this.history) {
+					this.history.execute(
+						new ReparentCommand(this.hierarchy, sourceNodeId, oldParentId, oldOrder, null, undefined, () => {
+							this.updateCouplingVisuals(this.lastResolver || undefined);
+							if (this.onHierarchyChanged) this.onHierarchyChanged();
+						})
+					);
+				} else {
+					this.hierarchy.reparent(sourceNodeId, null);
+					this.updateCouplingVisuals(this.lastResolver || undefined);
+					if (this.onHierarchyChanged) this.onHierarchyChanged();
+				}
 				return;
 			}
 
@@ -722,22 +751,49 @@ export class EditorGroupManager {
 
 		this.connectorDrag = null;
 
-		// 1. Soltado sobre destino válido: Ejecutar acoplamiento
+		// 1. Soltado sobre destino válido: Ejecutar acoplamiento con Undo/Redo
 		if (isValidTarget && hoveredTargetGroupId) {
-			this.hierarchy.reparent(sourceNodeId, hoveredTargetGroupId);
-			if (this.lastResolver) {
-				this.recenterGroupPivot(hoveredTargetGroupId, this.lastResolver);
+			const oldNode = this.hierarchy.getNode(sourceNodeId);
+			const oldParentId = oldNode?.parentId ?? null;
+			const oldOrder = oldNode?.order ?? 0;
+			if (this.history) {
+				this.history.execute(
+					new ReparentCommand(this.hierarchy, sourceNodeId, oldParentId, oldOrder, hoveredTargetGroupId, undefined, () => {
+						if (hoveredTargetGroupId && this.lastResolver) {
+							this.recenterGroupPivot(hoveredTargetGroupId, this.lastResolver);
+						}
+						this.updateCouplingVisuals(this.lastResolver || undefined);
+						if (this.onHierarchyChanged) this.onHierarchyChanged();
+					})
+				);
+			} else {
+				this.hierarchy.reparent(sourceNodeId, hoveredTargetGroupId);
+				if (this.lastResolver) {
+					this.recenterGroupPivot(hoveredTargetGroupId, this.lastResolver);
+				}
+				this.updateCouplingVisuals(this.lastResolver || undefined);
+				if (this.onHierarchyChanged) this.onHierarchyChanged();
 			}
-			this.updateCouplingVisuals(this.lastResolver || undefined);
-			if (this.onHierarchyChanged) this.onHierarchyChanged();
 			return;
 		}
 
-		// 2. Si se mantiene pulsada la tecla Alt al soltar fuera: Desacoplar a la raíz
+		// 2. Si se mantiene pulsada la tecla Alt al soltar fuera: Desacoplar a la raíz con Undo/Redo
 		if (event.altKey) {
-			this.hierarchy.reparent(sourceNodeId, null);
-			this.updateCouplingVisuals(this.lastResolver || undefined);
-			if (this.onHierarchyChanged) this.onHierarchyChanged();
+			const oldNode = this.hierarchy.getNode(sourceNodeId);
+			const oldParentId = oldNode?.parentId ?? null;
+			const oldOrder = oldNode?.order ?? 0;
+			if (this.history) {
+				this.history.execute(
+					new ReparentCommand(this.hierarchy, sourceNodeId, oldParentId, oldOrder, null, undefined, () => {
+						this.updateCouplingVisuals(this.lastResolver || undefined);
+						if (this.onHierarchyChanged) this.onHierarchyChanged();
+					})
+				);
+			} else {
+				this.hierarchy.reparent(sourceNodeId, null);
+				this.updateCouplingVisuals(this.lastResolver || undefined);
+				if (this.onHierarchyChanged) this.onHierarchyChanged();
+			}
 			return;
 		}
 

@@ -195,9 +195,9 @@ export class Game {
 		this.editableMapObjects = [];
 		this.sceneManager = new SceneManager("game-container");
 		this.editorHierarchy = new EditorHierarchyModel();
-		this.editorGroupManager = new EditorGroupManager(this.editorHierarchy, this.sceneManager.scene);
-		this.editorClipboard = new EditorClipboard();
 		this.editorHistory = new EditorCommandHistory();
+		this.editorGroupManager = new EditorGroupManager(this.editorHierarchy, this.sceneManager.scene, this.editorHistory);
+		this.editorClipboard = new EditorClipboard();
 		this.prefabManager = new PrefabManager(this.editorHierarchy);
 		this.inputManager = new InputManager();
 		this.clock = new THREE.Clock();

@@ -53,8 +53,8 @@ export function saveMap(this: any) {
 				opacity: obj.userData.opacity,
 				authorId: obj.userData.authorId,
 				customName: obj.userData.customName || "",
-				parentId: obj.userData.parentId || hierarchyNode?.parentId || null,
-				order: obj.userData.order ?? hierarchyNode?.order ?? 0,
+				parentId: hierarchyNode ? hierarchyNode.parentId : (obj.userData.parentId || null),
+				order: hierarchyNode ? hierarchyNode.order : (obj.userData.order ?? 0),
 			});
 		}
 	});
@@ -226,6 +226,10 @@ export function loadMap(this: any, jsonData: any) {
 				return this.sceneManager.scene.children.find((c: any) => c.userData && c.userData.uuid === id) || null;
 			});
 		}
+	}
+
+	if (this.prefabManager) {
+		this.prefabManager.restoreInstancesFromHierarchy();
 	}
 
 	if (this.editorExplorer) {
@@ -472,7 +476,7 @@ export function useCurrentItem(this: any, isRightClickOrItem: any = false) {
 }
 
 export function _loadSingleMapObject(this: any, data: any) {
-	if (!data || !data.type) return;
+	if (!data || !data.type || data.type === "group_pivot") return;
 
 	if (data.uuid) {
 		this.deleteObjectByUuid(data.uuid);
@@ -539,15 +543,22 @@ export function _loadSingleMapObject(this: any, data: any) {
 		if (data.order !== undefined) lastObj.userData.order = data.order;
 
 		if (this.editorHierarchy && data.uuid) {
-			this.editorHierarchy.addNode({
-				id: data.uuid,
-				name: data.customName || data.type || "Collab Obj",
-				type: data.type,
-				parentId: data.parentId || null,
-				order: data.order || 0,
-				isGroup: false,
-				customName: data.customName,
-			});
+			const existing = this.editorHierarchy.getNode(data.uuid);
+			if (!existing) {
+				this.editorHierarchy.addNode({
+					id: data.uuid,
+					name: data.customName || data.type || "Collab Obj",
+					type: data.type,
+					parentId: data.parentId || null,
+					order: data.order || 0,
+					isGroup: false,
+					customName: data.customName,
+				});
+			} else {
+				if (data.parentId !== undefined && existing.parentId !== data.parentId) {
+					try { this.editorHierarchy.reparent(data.uuid, data.parentId, data.order); } catch (_) {}
+				}
+			}
 		}
 		if (this.editorExplorer) {
 			this.editorExplorer.renderTree();

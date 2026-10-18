@@ -1858,11 +1858,10 @@ export class ObjectInspector {
             const groupId = this.selectedObject.userData.groupId;
             const newPos = this.selectedObject.position.clone();
             newPos[axis] = value;
-            this.selectedObject.position[axis] = value;
             this.game.editorGroupManager.applyGroupTransform(
                 groupId,
                 newPos,
-                this.selectedObject.quaternion,
+                this.selectedObject.quaternion.clone(),
                 (id) => this.game.sceneManager.scene.children.find(c => c.userData?.uuid === id) || null,
                 (obj) => {
                     if (obj.userData?.rigidBody) {
@@ -1872,6 +1871,7 @@ export class ObjectInspector {
                     this.game?.broadcastObjectUpdate?.(obj);
                 }
             );
+            this.selectedObject.position.copy(newPos);
             this.transformGizmo.update();
             return;
         }
@@ -1932,11 +1932,14 @@ export class ObjectInspector {
         if (this.selectedObject.userData.isEditorGroupPivot && this.game?.editorGroupManager) {
             const groupId = this.selectedObject.userData.groupId;
             const radians = valueDegrees * (Math.PI / 180);
-            this.selectedObject.rotation[axis] = radians;
+            const euler = new THREE.Euler().setFromQuaternion(this.selectedObject.quaternion, 'YXZ');
+            euler[axis] = radians;
+            const targetQuat = new THREE.Quaternion().setFromEuler(euler);
+
             this.game.editorGroupManager.applyGroupTransform(
                 groupId,
-                this.selectedObject.position,
-                this.selectedObject.quaternion,
+                this.selectedObject.position.clone(),
+                targetQuat,
                 (id) => this.game.sceneManager.scene.children.find(c => c.userData?.uuid === id) || null,
                 (obj) => {
                     if (obj.userData?.rigidBody) {
@@ -1946,6 +1949,8 @@ export class ObjectInspector {
                     this.game?.broadcastObjectUpdate?.(obj);
                 }
             );
+            this.selectedObject.quaternion.copy(targetQuat);
+            this.selectedObject.rotation.setFromQuaternion(targetQuat);
             this.transformGizmo.update();
             return;
         }

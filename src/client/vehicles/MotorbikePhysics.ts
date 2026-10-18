@@ -435,6 +435,7 @@ export class MotorbikePhysics {
     body.setNextKinematicTranslation(bike.position);
     body.setNextKinematicRotation(bike.quaternion);
     const reportedSpeed = state.grounded ? driveSpeed : Math.sign(speed || 1) * state.velocity.clone().projectOnPlane(gravityUp).length();
+    bike.userData.vehicleRecovering = Boolean(state.recovering || state.groundRecovery);
     return { speed: Math.abs(reportedSpeed) < 0.005 ? 0 : reportedSpeed, verticalSpeed: state.velocity.dot(gravityUp), travel, grounded: state.grounded, toppled: bike.userData.vehicleToppled === true, crashed };
   }
 }

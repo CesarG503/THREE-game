@@ -16,6 +16,7 @@ export interface StuntLandingFeedback {
   points: number;
   lostPoints?: number;
   totalSessionScore?: number;
+  stabilized?: boolean;
 }
 
 export class VehicleStuntTracker {
@@ -49,6 +50,7 @@ export class VehicleStuntTracker {
   private currentFeedback: StuntLandingFeedback | null = null;
   private crashAnimFrame: number | null = null;
   private crashAnimTimeout: any = null;
+  private landingDebounce = 0;
 
   // HUD DOM Elements
   private hudContainer: HTMLDivElement | null = null;
@@ -295,7 +297,9 @@ export class VehicleStuntTracker {
     dt: number,
     isRidden: boolean
   ) {
-    if (dt <= 0) return;
+    if (this.landingDebounce > 0) {
+      this.landingDebounce -= dt;
+    }
 
     // 1. Process landing feedback countdown if active (always ticks down, even if unmounted / dismounted)
     if (this.landingFeedbackTimer > 0) {
@@ -336,31 +340,43 @@ export class VehicleStuntTracker {
       return;
     }
 
-    // Check crash or toppled while airborne
+    const isRecovering = Boolean(bike.userData.vehicleRecovering);
     const isToppled = toppled || bike.userData.vehicleToppled === true;
-    if ((crashed || isToppled) && this.isAirborne) {
-      this.handleLanding(bike, true, true, props);
-      return;
+
+    // Check crash or toppled while airborne
+    if ((crashed || isToppled || isRecovering) && this.isAirborne) {
+      if (props.autoStabilize && !isToppled) {
+        // Auto-stabilizer on ground touch is active and righting the bike!
+        // This is a saved/stabilized landing, NOT a crash!
+        this.handleLanding(bike, false, false, props, true);
+        return;
+      } else {
+        this.handleLanding(bike, true, true, props, false);
+        return;
+      }
     }
 
     // STATE TRANSITION: JUST LEFT THE GROUND -> AIRBORNE
-    if (!this.isAirborne && !grounded) {
+    // Only launch airborne if not currently recovering/stabilizing and after landing debounce
+    if (!this.isAirborne && !grounded && !isRecovering && this.landingDebounce <= 0) {
       this.startAirborne(bike);
     }
 
     // ACTIVE AIRBORNE LOOP
     if (this.isAirborne) {
-      if (!grounded) {
+      if (!grounded && !isRecovering) {
         this.stepAirborne(bike, dt, props);
       } else {
         // LANDING TRIGGER
-        this.handleLanding(bike, crashed, isToppled, props);
+        const wasSavedByStabilizer = props.autoStabilize && (crashed || isRecovering);
+        this.handleLanding(bike, crashed && !props.autoStabilize, isToppled, props, wasSavedByStabilizer);
       }
     }
   }
 
   private startAirborne(bike: THREE.Object3D) {
     this.cancelCrashAnimation();
+    this.landingDebounce = 0;
     this.isAirborne = true;
     this.airTime = 0;
     this.airPoints = 0;
@@ -591,7 +607,8 @@ export class VehicleStuntTracker {
     bike: THREE.Object3D,
     crashed: boolean,
     toppled: boolean,
-    props: MotorbikeSettings
+    props: MotorbikeSettings,
+    stabilized = false
   ) {
     const minTimeMet = this.airTime >= props.minAirTimeToScore;
     const hasTricks = this.tricksLog.length > 0;
@@ -601,12 +618,17 @@ export class VehicleStuntTracker {
     const bikeUp = new THREE.Vector3(0, 1, 0).applyQuaternion(bike.quaternion);
     const uprightDot = bikeUp.dot(gravUp);
 
-    const isCrash = crashed || toppled || bike.userData.vehicleToppled === true || uprightDot < 0.38;
-    const isPerfect = !isCrash && uprightDot >= 0.88;
+    // If autoStabilize is enabled, or if it was saved by stabilizer, it is NOT a crash!
+    const bikeToppled = bike.userData.vehicleToppled === true || (toppled && !props.autoStabilize);
+    const isCrash = !props.autoStabilize && !stabilized && (crashed || toppled || bikeToppled || uprightDot < 0.38);
+    const isSaved = props.autoStabilize && (stabilized || crashed || uprightDot < 0.55 || Boolean(bike.userData.vehicleRecovering));
+    const isPerfect = !isCrash && !isSaved && uprightDot >= 0.88;
+    const isClean = !isCrash && !isSaved && uprightDot >= 0.55 && !crashed;
 
     // If it was just a tiny bump with no tricks, and didn't crash, silently reset
-    if (!minTimeMet && !hasTricks && !isCrash) {
+    if (!minTimeMet && !hasTricks && !isCrash && !isSaved) {
       this.isAirborne = false;
+      this.landingDebounce = 0.2;
       if (this.hudContainer) this.hudContainer.style.display = 'none';
       return;
     }
@@ -621,7 +643,7 @@ export class VehicleStuntTracker {
         totalSessionScore: this.totalSessionScore
       });
     } else {
-      let finalPoints = this.currentJumpScore;
+      let finalPoints = this.currentJumpScore || Math.round((this.airPoints + this.trickPoints) * this.comboMultiplier);
       let bonusPoints = 0;
 
       if (isPerfect && (this.airTime >= 0.4 || hasTricks)) {
@@ -631,8 +653,13 @@ export class VehicleStuntTracker {
 
       this.totalSessionScore += finalPoints;
 
+      let status: 'perfect' | 'clean' | 'rough' = 'clean';
+      if (isPerfect) status = 'perfect';
+      else if (isSaved || !isClean) status = 'rough';
+
       this.showLandingFeedback({
-        status: isPerfect ? 'perfect' : 'clean',
+        status: status,
+        stabilized: isSaved,
         bonusPoints: bonusPoints,
         points: finalPoints,
         totalSessionScore: this.totalSessionScore
@@ -640,6 +667,7 @@ export class VehicleStuntTracker {
     }
 
     this.isAirborne = false;
+    this.landingDebounce = 0.28;
   }
 
   private showLandingFeedback(feedback: StuntLandingFeedback) {
@@ -686,11 +714,11 @@ export class VehicleStuntTracker {
         badgeColor = '#7dd3fc';
         badgeShadow = '0 0 10px rgba(56, 189, 248, 0.4)';
       } else if (feedback.status === 'rough') {
-        badgeText = '⚠️ Aterrizaje forzoso';
-        badgeBg = 'rgba(245, 158, 11, 0.25)';
-        badgeBorder = '1px solid #f59e0b';
-        badgeColor = '#fde68a';
-        badgeShadow = '0 0 10px rgba(245, 158, 11, 0.4)';
+        badgeText = feedback.stabilized ? '🛡️ Estabilizado' : '⚠️ Aterrizaje forzoso';
+        badgeBg = feedback.stabilized ? 'rgba(56, 189, 248, 0.25)' : 'rgba(245, 158, 11, 0.25)';
+        badgeBorder = feedback.stabilized ? '1px solid #38bdf8' : '1px solid #f59e0b';
+        badgeColor = feedback.stabilized ? '#7dd3fc' : '#fde68a';
+        badgeShadow = feedback.stabilized ? '0 0 10px rgba(56, 189, 248, 0.4)' : '0 0 10px rgba(245, 158, 11, 0.4)';
       } else {
         badgeText = '💥 Acrobacia fallida';
         badgeBg = 'rgba(239, 68, 68, 0.25)';
@@ -758,6 +786,9 @@ export class VehicleStuntTracker {
         } else if (feedback.status === 'clean') {
           this.hudScoreNumber.style.color = '#38bdf8';
           this.hudScoreNumber.style.textShadow = '0 0 20px rgba(56, 189, 248, 0.9), 0 2px 8px rgba(0, 0, 0, 0.9)';
+        } else if (feedback.stabilized) {
+          this.hudScoreNumber.style.color = '#38bdf8';
+          this.hudScoreNumber.style.textShadow = '0 0 22px rgba(56, 189, 248, 0.95), 0 2px 8px rgba(0, 0, 0, 0.9)';
         } else {
           this.hudScoreNumber.style.color = '#f59e0b';
           this.hudScoreNumber.style.textShadow = '0 0 20px rgba(245, 158, 11, 0.9), 0 2px 8px rgba(0, 0, 0, 0.9)';
@@ -785,6 +816,7 @@ export class VehicleStuntTracker {
   public resetSession() {
     this.cancelCrashAnimation();
     this.isAirborne = false;
+    this.landingDebounce = 0;
     this.totalSessionScore = 0;
     this.currentJumpScore = 0;
     this.landingFeedbackTimer = 0;

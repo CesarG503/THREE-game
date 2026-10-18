@@ -21,6 +21,7 @@ import type { PlatformPrefabDto } from "../prefabs/PrefabTypes";
 
 export interface EditorExplorerOptions {
 	shortcutKey?: string; // Por defecto 'h'
+	initialVisible?: boolean; // Por defecto false
 }
 
 export class EditorExplorer {
@@ -49,7 +50,7 @@ export class EditorExplorer {
 	private cachedPrefabsList: PlatformPrefabDto[] = [];
 	private isLoadingLibrary: boolean = false;
 
-	private isVisible: boolean = false;
+	public isVisible: boolean = false;
 	private isCollapsed: boolean = false;
 	private collapsedGroups: Set<string> = new Set();
 	private selectedNodeId: string | null = null;
@@ -79,6 +80,11 @@ export class EditorExplorer {
 		this.buildUI();
 		this.setupKeyboardShortcuts();
 		this.renderTree();
+		if (options.initialVisible) {
+			this.show();
+		} else {
+			this.hide();
+		}
 	}
 
 	private buildUI() {
@@ -99,7 +105,7 @@ export class EditorExplorer {
 			color: #e2e8f0;
 			font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 			font-size: 13px;
-			display: flex;
+			display: none;
 			flex-direction: column;
 			z-index: 2500;
 			user-select: none;
@@ -438,7 +444,6 @@ export class EditorExplorer {
 		this.container.appendChild(this.libraryContainer);
 
 		document.body.appendChild(this.container);
-		this.show();
 	}
 
 	private setupKeyboardShortcuts() {
@@ -498,11 +503,26 @@ export class EditorExplorer {
 		this.isVisible = true;
 		this.container.style.display = "flex";
 		this.renderTree();
+		if (this.game?.updateEditorInteractionMode) {
+			this.game.updateEditorInteractionMode();
+		} else {
+			if (typeof document !== "undefined" && document.pointerLockElement) {
+				document.exitPointerLock();
+			}
+			if (this.game?.cameraController) {
+				this.game.cameraController.setUIOpen(true);
+			}
+		}
 	}
 
 	hide() {
 		this.isVisible = false;
 		this.container.style.display = "none";
+		if (this.game?.updateEditorInteractionMode) {
+			this.game.updateEditorInteractionMode();
+		} else if (this.game?.cameraController) {
+			this.game.cameraController.setUIOpen(false);
+		}
 	}
 
 	toggleVisibility() {
@@ -1258,12 +1278,8 @@ export class EditorExplorer {
 
 	private async handleSyncPrefab(prefab: PlatformPrefabDto) {
 		try {
-			const res = await PrefabService.syncPrefabToServer(prefab.id);
-			if (res.success) {
-				alert(`Prefab '${prefab.name}' sincronizado con éxito al servidor.`);
-			} else {
-				alert(`No se pudo sincronizar: ${res.error}`);
-			}
+			const synced = await PrefabService.syncPrefabToServer(prefab.id);
+			alert(`Prefab '${synced.name || prefab.name}' sincronizado con éxito al servidor.`);
 			await this.loadLibraryPrefabs();
 		} catch (err: any) {
 			alert(`Error sincronizando prefab: ${err.message}`);

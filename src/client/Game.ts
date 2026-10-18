@@ -232,6 +232,10 @@ export class Game {
 				this.sceneManager.renderer.domElement
 			);
 			this.cameraController.character = this.character;
+			this.cameraController.uiCheckCallback = () => this.isAnyEditorUIOpen();
+			if (this.inputManager) {
+				this.inputManager.uiCheckCallback = () => this.isAnyEditorUIOpen();
+			}
 			this.logicCameraSystem = new LogicCameraSystem(this);
 			this.scopeController = new ScopeController(this.sceneManager.camera, this);
 		this.sceneManager.renderer.autoClear = false;
@@ -723,8 +727,9 @@ export class Game {
 						mouse.x = 0;
 						mouse.y = 0;
 					} else {
-						mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
-						mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+						const rect = this.sceneManager.renderer.domElement.getBoundingClientRect();
+						mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+						mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
 					}
 
 					const raycaster = new THREE.Raycaster();
@@ -750,7 +755,14 @@ export class Game {
 					return target ? { target, hitPart: hit.object } : null;
 				};
 
-					if (this.objectInspector && e.button === 2) {
+				if (this.objectInspector && (e.button === 0 || e.button === 2)) {
+					const isGizmoInteracting = !!(
+						this.objectInspector?.transformGizmo?.dragState ||
+						this.objectInspector?.transformGizmo?.controls?.axis
+					);
+					const isConnectorInteracting = !!(this.editorGroupManager?.connectorDrag);
+
+					if (!isGizmoInteracting && !isConnectorInteracting) {
 						const selectResult = selectEditableObjectFromPointer();
 						if (selectResult) {
 							const target = selectResult.target;
@@ -760,8 +772,14 @@ export class Game {
 								}
 							}
 							this.objectInspector.show(target, selectResult.hitPart);
+							const nodeId = target.userData?.groupId || target.userData?.uuid;
+							if (this.editorExplorer && nodeId) {
+								this.editorExplorer.selectNode(nodeId, false);
+							}
+							this.updateEditorInteractionMode();
 						}
 					}
+				}
 				}
 			}, false);
 
@@ -805,6 +823,42 @@ export class Game {
 		const computedDisplay = getComputedStyle(inventoryContainer).display;
 		if (computedDisplay === "none" || inventoryContainer.style.display === "none") {
 			inventoryContainer.style.display = "flex";
+		}
+	}
+
+	isAnyEditorUIOpen(): boolean {
+		if (this.gameMode !== "editor") {
+			return !!(this.constructionMenu?.isVisible || this.cameraController?.isPaused);
+		}
+		const explorerOpen = !!this.editorExplorer?.isVisible;
+		const menuOpen = !!this.constructionMenu?.isVisible;
+		const inspectorOpen = !!this.objectInspector?.isVisible;
+		const couplingActive = !!this.editorGroupManager?.isCouplingMode?.();
+		const paused = !!this.cameraController?.isPaused;
+		return explorerOpen || menuOpen || inspectorOpen || couplingActive || paused;
+	}
+
+	updateEditorInteractionMode(): void {
+		const isUIActive = this.isAnyEditorUIOpen();
+
+		if (isUIActive) {
+			if (typeof document !== "undefined" && document.pointerLockElement) {
+				document.exitPointerLock();
+			}
+			if (this.cameraController) {
+				this.cameraController.setUIOpen(true);
+			}
+			if (this.inputManager) {
+				this.inputManager.keys.attack = false;
+				this.inputManager.keys.aim = false;
+			}
+		} else {
+			if (this.cameraController) {
+				this.cameraController.setUIOpen(false);
+				if (!this.cameraController.isPaused) {
+					this.cameraController.lock();
+				}
+			}
 		}
 	}
 

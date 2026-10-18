@@ -7315,7 +7315,9 @@ export class ConstructionMenu {
 
         // Pause Game Input / Pointer Lock
         if (this.isVisible) {
-            if (this.game.cameraController) {
+            if (this.game.updateEditorInteractionMode) {
+                this.game.updateEditorInteractionMode();
+            } else if (this.game.cameraController) {
                 this.game.cameraController.setUIOpen(true);
             }
             document.exitPointerLock();
@@ -7325,7 +7327,9 @@ export class ConstructionMenu {
                 this.game.isMouseDown = false;
             }
         } else {
-            if (this.game.cameraController) {
+            if (this.game.updateEditorInteractionMode) {
+                this.game.updateEditorInteractionMode();
+            } else if (this.game.cameraController) {
                 this.game.cameraController.setUIOpen(false);
             }
             // Resume
@@ -7334,8 +7338,11 @@ export class ConstructionMenu {
                 if (this.game.inputManager.reset) this.game.inputManager.reset();
             }
 
-            // Re-request pointer lock after a small delay to ensure browser handles it
+            // Re-request pointer lock after a small delay, pero SOLO si ninguna otra interfaz está abierta
             setTimeout(() => {
+                if (this.game.isAnyEditorUIOpen && this.game.isAnyEditorUIOpen()) {
+                    return;
+                }
                 if (this.game.cameraController) {
                     this.game.cameraController.lock();
                 } else {

@@ -236,6 +236,9 @@ export function setupGameInput(this: Game) {
 		if (this.inputManager && !this.inputManager.enabled) return;
 		if (e.target !== this.sceneManager.renderer.domElement) return;
 
+		// Si alguna interfaz de edición o panel de inspector/explorer está activa, no usar items
+		if (this.game?.isAnyEditorUIOpen?.()) return;
+
 		const logicSystem = this.constructionMenu?.logicSystem;
 		if (logicSystem?.isEditingMap) {
 			if (e.button === 2) return;

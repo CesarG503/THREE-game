@@ -5,6 +5,7 @@ export class InputManager {
   isPaused: boolean;
   enabled: boolean;
   options: Required<InputManagerOptions>;
+  uiCheckCallback: (() => boolean) | null = null;
   lastShiftTime: number = 0;
   doubleShiftTapped: boolean = false;
 
@@ -41,7 +42,7 @@ export class InputManager {
     });
 
     document.addEventListener("mousedown", (e) => {
-      if (this.isPaused || !this.enabled) return;
+      if (this.isPaused || !this.enabled || (this.uiCheckCallback && this.uiCheckCallback())) return;
       if (e.button === 0) this.keys.attack = true;
       if (e.button === 2) this.keys.aim = true;
     });

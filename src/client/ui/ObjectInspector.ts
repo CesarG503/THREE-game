@@ -1378,8 +1378,12 @@ export class ObjectInspector {
 
         // Disable Game Input - REMOVED to allow movement
         // if (this.game.inputManager) this.game.inputManager.enabled = false
-        document.exitPointerLock()
-        if (this.game.cameraController) this.game.cameraController.setUIOpen(true)
+        if (this.game?.updateEditorInteractionMode) {
+            this.game.updateEditorInteractionMode()
+        } else {
+            document.exitPointerLock()
+            if (this.game?.cameraController) this.game.cameraController.setUIOpen(true)
+        }
 
         this.updateGizmoAttachment()
         this.syncCurvatureInputs()
@@ -1402,7 +1406,11 @@ export class ObjectInspector {
         if (this.game?.editorExplorer) {
             this.game.editorExplorer.selectNode(null, false);
         }
-        if (this.game.cameraController) this.game.cameraController.setUIOpen(false)
+        if (this.game?.updateEditorInteractionMode) {
+            this.game.updateEditorInteractionMode()
+        } else if (this.game?.cameraController) {
+            this.game.cameraController.setUIOpen(false)
+        }
 
         // Enable Game Input - REMOVED (never disabled)
         // if (this.game.inputManager) this.game.inputManager.enabled = true

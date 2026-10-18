@@ -44,6 +44,7 @@ export class CameraController {
   tpInvertAxisY: boolean;
   isPaused: boolean;
   isUIOpen: boolean;
+  uiCheckCallback: (() => boolean) | null = null;
   wasAlwaysRotate: boolean;
   lastCharacterPos: THREE.Vector3 | null;
   dynamicOffset: number;
@@ -150,7 +151,7 @@ export class CameraController {
     this.domElement.addEventListener("mousedown", (e: MouseEvent) => {
       if (e.button === 2 && !this.isPaused) {
         this.isRightMouseDown = true;
-        if (!this.alwaysRotateThirdPerson && !this.isUIOpen) {
+        if (!this.alwaysRotateThirdPerson && !this.isUIOpen && (!this.uiCheckCallback || !this.uiCheckCallback())) {
           this.safeRequestPointerLock();
         }
       }
@@ -167,9 +168,10 @@ export class CameraController {
 
     document.addEventListener("mousemove", (e: MouseEvent) => {
       if (this.isPaused) return;
+      if (this.isUIOpen || (this.uiCheckCallback && this.uiCheckCallback())) return;
 
       const isLocked = document.pointerLockElement === this.domElement;
-      const canRotate = this.isFirstPerson || this.isRightMouseDown || (this.alwaysRotateThirdPerson && isLocked) || (this.mode === 'free-fly' && isLocked);
+      const canRotate = (this.isFirstPerson && isLocked) || (this.isRightMouseDown && !this.alwaysRotateThirdPerson) || (this.alwaysRotateThirdPerson && isLocked) || (this.mode === 'free-fly' && isLocked);
 
       if (canRotate) {
         if (this.isFirstPerson) {
@@ -215,7 +217,7 @@ export class CameraController {
     });
 
     this.domElement.addEventListener("click", () => {
-      if (!this.isPaused && !this.isUIOpen) {
+      if (!this.isPaused && !this.isUIOpen && (!this.uiCheckCallback || !this.uiCheckCallback())) {
         this.lock();
       }
     });
@@ -227,6 +229,7 @@ export class CameraController {
   }
 
   safeRequestPointerLock() {
+    if (this.isUIOpen || (this.uiCheckCallback && this.uiCheckCallback())) return;
     if (!this.domElement || typeof this.domElement.requestPointerLock !== "function") return;
     try {
       const promise = this.domElement.requestPointerLock();
@@ -243,7 +246,7 @@ export class CameraController {
   }
 
   lock() {
-    if (this.isUIOpen) return;
+    if (this.isUIOpen || (this.uiCheckCallback && this.uiCheckCallback())) return;
     if (this.isFirstPerson || this.alwaysRotateThirdPerson) {
       this.safeRequestPointerLock();
     }
@@ -305,6 +308,9 @@ export class CameraController {
   }
 
   setUIOpen(isOpen: boolean) {
+    if (!isOpen && this.uiCheckCallback && this.uiCheckCallback()) {
+      return;
+    }
     if (this.isUIOpen === isOpen) return;
     this.isUIOpen = isOpen;
 
@@ -312,6 +318,9 @@ export class CameraController {
       this.wasAlwaysRotate = this.alwaysRotateThirdPerson;
       if (this.wasAlwaysRotate) {
         this.setAlwaysRotateThirdPerson(false);
+      }
+      if (typeof document !== "undefined" && document.pointerLockElement) {
+        document.exitPointerLock();
       }
     } else {
       if (this.wasAlwaysRotate) {
@@ -330,7 +339,9 @@ export class CameraController {
   resume() {
     this.isPaused = false;
     if (this.isFirstPerson || this.alwaysRotateThirdPerson || this.mode === 'free-fly') {
-      this.safeRequestPointerLock();
+      if (!this.isUIOpen && (!this.uiCheckCallback || !this.uiCheckCallback())) {
+        this.safeRequestPointerLock();
+      }
     }
   }
 
@@ -343,11 +354,11 @@ export class CameraController {
 
     if (mode === 'free-fly') {
       this.freeFlyPosition.copy(this.camera.position);
-      if (requestLock && !this.isPaused && !this.isUIOpen) {
+      if (requestLock && !this.isPaused && !this.isUIOpen && (!this.uiCheckCallback || !this.uiCheckCallback())) {
         this.safeRequestPointerLock();
       }
     } else if (this.isFirstPerson) {
-      if (requestLock && !this.isPaused && !this.isUIOpen) {
+      if (requestLock && !this.isPaused && !this.isUIOpen && (!this.uiCheckCallback || !this.uiCheckCallback())) {
         this.safeRequestPointerLock();
       }
       this.fpYaw = this.theta;

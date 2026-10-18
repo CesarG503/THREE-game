@@ -291,6 +291,7 @@ export class PrefabService {
 			isPublished: options.isPublished || false,
 			ownerId: "local_user",
 			owner: { id: "local_user", username: "LocalUser", displayName: "Local User" },
+			storageStatus: "local",
 			createdAt: now,
 			updatedAt: now,
 			currentVersionId: `${id}_v1`,

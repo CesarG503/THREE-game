@@ -1,7 +1,11 @@
+import { isTextInput } from "../input/InteractionCoordinator";
 import * as THREE from "three";
 import type { CameraMode, CameraModeEventDetail, CameraPauseEventDetail } from "../types";
 
 export class CameraController {
+  private events = new AbortController();
+  private lockPending = false;
+  private lockInvalidated = false;
   camera: THREE.Camera;
   domElement: HTMLElement;
   mode: CameraMode;
@@ -45,7 +49,6 @@ export class CameraController {
   isPaused: boolean;
   isUIOpen: boolean;
   uiCheckCallback: (() => boolean) | null = null;
-  wasAlwaysRotate: boolean;
   lastCharacterPos: THREE.Vector3 | null;
   dynamicOffset: number;
   smoothedStrafe: number;
@@ -137,7 +140,9 @@ export class CameraController {
   }
 
   setupEventListeners() {
+    window.addEventListener("blur", () => { this.isRightMouseDown = false; this.unlock(); }, { signal: this.events.signal });
     document.addEventListener("keydown", (e: KeyboardEvent) => {
+      if (e.defaultPrevented || isTextInput(e.target) || e.repeat) return;
       if (e.code === "Tab" && !this.isPaused && !this.isUIOpen) {
         e.preventDefault();
         this.toggleCameraMode();
@@ -146,29 +151,29 @@ export class CameraController {
         e.preventDefault();
         this.togglePause();
       }
-    });
+    }, { signal: this.events.signal });
 
     this.domElement.addEventListener("mousedown", (e: MouseEvent) => {
-      if (e.button === 2 && !this.isPaused) {
+      if (e.button === 2 && !this.isPaused && !this.isUIOpen && !this.uiCheckCallback?.()) {
         this.isRightMouseDown = true;
         if (!this.alwaysRotateThirdPerson && !this.isUIOpen && (!this.uiCheckCallback || !this.uiCheckCallback())) {
           this.safeRequestPointerLock();
         }
       }
-    });
+    }, { signal: this.events.signal });
 
-    this.domElement.addEventListener("mouseup", (e: MouseEvent) => {
+    document.addEventListener("mouseup", (e: MouseEvent) => {
       if (e.button === 2) {
         this.isRightMouseDown = false;
         if (!this.isFirstPerson && !this.alwaysRotateThirdPerson && !this.isUIOpen) {
-          document.exitPointerLock();
+          this.unlock();
         }
       }
-    });
+    }, { signal: this.events.signal });
 
     document.addEventListener("mousemove", (e: MouseEvent) => {
       if (this.isPaused) return;
-      if (this.isUIOpen || (this.uiCheckCallback && this.uiCheckCallback())) return;
+      if (this.events.signal.aborted || this.isPaused || this.isUIOpen || (this.uiCheckCallback && this.uiCheckCallback())) return;
 
       const isLocked = document.pointerLockElement === this.domElement;
       const canRotate = (this.isFirstPerson && isLocked) || (this.isRightMouseDown && !this.alwaysRotateThirdPerson) || (this.alwaysRotateThirdPerson && isLocked) || (this.mode === 'free-fly' && isLocked);
@@ -194,10 +199,10 @@ export class CameraController {
           this.enforceYawConstraint();
         }
       }
-    });
+    }, { signal: this.events.signal });
 
     this.domElement.addEventListener("wheel", (e: WheelEvent) => {
-      if (!this.isFirstPerson && !this.isPaused && e.shiftKey) {
+      if (!this.isFirstPerson && !this.isPaused && !this.isUIOpen && !this.uiCheckCallback?.() && e.shiftKey) {
         e.preventDefault();
 
         let delta = Math.abs(e.deltaY) > 0 ? e.deltaY : e.deltaX;
@@ -210,49 +215,60 @@ export class CameraController {
         this.thirdPersonDistance += normalizedDelta * 0.0125;
         this.thirdPersonDistance = Math.max(this.minDistance, Math.min(this.maxDistance, this.thirdPersonDistance));
       }
-    }, { passive: false });
+    }, { passive: false, signal: this.events.signal });
 
     this.domElement.addEventListener("contextmenu", (e: MouseEvent) => {
       e.preventDefault();
-    });
+    }, { signal: this.events.signal });
 
     this.domElement.addEventListener("click", () => {
       if (!this.isPaused && !this.isUIOpen && (!this.uiCheckCallback || !this.uiCheckCallback())) {
         this.lock();
       }
-    });
+    }, { signal: this.events.signal });
 
+    document.addEventListener("pointerlockerror", () => { this.lockPending = false; }, { signal: this.events.signal });
     document.addEventListener("pointerlockchange", () => {
       const isLocked = document.pointerLockElement === this.domElement;
-      void isLocked;
-    });
+      this.lockPending = false;
+      if (isLocked && (this.lockInvalidated || this.isPaused || this.isUIOpen || this.uiCheckCallback?.())) document.exitPointerLock();
+      if (!isLocked) this.isRightMouseDown = false;
+    }, { signal: this.events.signal });
   }
 
   safeRequestPointerLock() {
-    if (this.isUIOpen || (this.uiCheckCallback && this.uiCheckCallback())) return;
+    if (this.events.signal.aborted || this.isPaused || this.isUIOpen || (this.uiCheckCallback && this.uiCheckCallback())) return;
     if (!this.domElement || typeof this.domElement.requestPointerLock !== "function") return;
+    if (this.lockPending || document.pointerLockElement === this.domElement) return;
+    this.lockPending = true;
+    this.lockInvalidated = false;
     try {
       const promise = this.domElement.requestPointerLock();
       if (promise && typeof promise.catch === "function") {
-        promise.catch((err) => {
+        promise.then(() => {
+          if (this.events.signal.aborted || this.lockInvalidated || this.isUIOpen || this.uiCheckCallback?.()) this.unlock();
+        }).catch((err) => {
+          this.lockPending = false;
           if (err.name !== "NotAllowedError" && err.name !== "SecurityError") {
             console.warn("[CameraController] requestPointerLock promise rejected:", err);
           }
         });
       }
     } catch (err) {
+      this.lockPending = false;
       console.warn("[CameraController] requestPointerLock threw error:", err);
     }
   }
 
   lock() {
-    if (this.isUIOpen || (this.uiCheckCallback && this.uiCheckCallback())) return;
+    if (this.events.signal.aborted || this.isPaused || this.isUIOpen || (this.uiCheckCallback && this.uiCheckCallback())) return;
     if (this.isFirstPerson || this.alwaysRotateThirdPerson) {
       this.safeRequestPointerLock();
     }
   }
 
   unlock() {
+    if (this.lockPending) this.lockInvalidated = true;
     document.exitPointerLock();
   }
 
@@ -261,8 +277,6 @@ export class CameraController {
 
     if (this.isPaused) {
       document.exitPointerLock();
-    } else if (this.isFirstPerson || this.alwaysRotateThirdPerson) {
-      this.safeRequestPointerLock();
     }
 
     const detail: CameraPauseEventDetail = {
@@ -308,29 +322,20 @@ export class CameraController {
   }
 
   setUIOpen(isOpen: boolean) {
+    if (isOpen && this.lockPending) this.lockInvalidated = true;
     if (!isOpen && this.uiCheckCallback && this.uiCheckCallback()) {
       return;
     }
     if (this.isUIOpen === isOpen) return;
     this.isUIOpen = isOpen;
 
-    if (isOpen) {
-      this.wasAlwaysRotate = this.alwaysRotateThirdPerson;
-      if (this.wasAlwaysRotate) {
-        this.setAlwaysRotateThirdPerson(false);
-      }
-      if (typeof document !== "undefined" && document.pointerLockElement) {
-        document.exitPointerLock();
-      }
-    } else {
-      if (this.wasAlwaysRotate) {
-        this.setAlwaysRotateThirdPerson(true);
-        if (!this.isPaused) {
-          this.safeRequestPointerLock();
-        }
-      }
+    this.isRightMouseDown = false;
+    if (isOpen && typeof document !== "undefined" && document.pointerLockElement) {
+      document.exitPointerLock();
     }
   }
+
+  dispose() { this.events.abort(); this.isRightMouseDown = false; this.unlock(); }
 
   setSmoothing(value: number) {
     this.smoothing = value;

@@ -1187,7 +1187,7 @@ export class AdvancedWeaponConfigPanel {
     show(weaponDraft) {
         this.weapon = weaponDraft;
         this.container.style.display = 'flex';
-        if (this.game?.cameraController) this.game.cameraController.setUIOpen(true);
+        this.game?.updateEditorInteractionMode?.();
 
         this.populateProperties();
         this.drawTrajectory();
@@ -1207,9 +1207,7 @@ export class AdvancedWeaponConfigPanel {
 
     hide() {
         this.container.style.display = 'none';
-        if (this.game?.cameraController && !this.getConstructionMenu()?.isVisible) {
-            this.game.cameraController.setUIOpen(false);
-        }
+        this.game?.updateEditorInteractionMode?.();
     }
 
     resizePreview() {

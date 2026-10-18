@@ -59,6 +59,8 @@ export class EditorGroupManager {
 
 	// Estado de arrastre de conectores 3D
 	private connectorDrag: ConnectorDragState | null = null;
+	interaction: any = null;
+	private pointerId: number | null = null;
 	private rubberBandLine: THREE.Line | null = null;
 
 	// Callback emitido ante cambios en la jerarquía
@@ -100,6 +102,9 @@ export class EditorGroupManager {
 			this.domElement.removeEventListener("pointerdown", this.handlePointerDown);
 			window.removeEventListener("pointermove", this.handlePointerMove);
 			window.removeEventListener("pointerup", this.handlePointerUp);
+			window.removeEventListener("pointercancel", this.cancelConnectorDrag);
+			window.removeEventListener("blur", this.cancelConnectorDrag);
+			this.domElement.removeEventListener("lostpointercapture", this.cancelConnectorDrag);
 		}
 
 		this.camera = camera;
@@ -108,12 +113,16 @@ export class EditorGroupManager {
 		this.domElement.addEventListener("pointerdown", this.handlePointerDown);
 		window.addEventListener("pointermove", this.handlePointerMove);
 		window.addEventListener("pointerup", this.handlePointerUp);
+		window.addEventListener("pointercancel", this.cancelConnectorDrag);
+		window.addEventListener("blur", this.cancelConnectorDrag);
+		this.domElement.addEventListener("lostpointercapture", this.cancelConnectorDrag);
 	}
 
 	/**
 	 * Activa o desactiva el modo de visualización y edición de acoples.
 	 */
 	setCouplingMode(active: boolean, objectResolver?: (uuid: string) => THREE.Object3D | null) {
+		if (!active) this.cancelConnectorDrag();
 		this.isCouplingModeActive = active;
 		this.couplingLinesGroup.visible = active;
 		this.couplingConnectorsGroup.visible = active;
@@ -128,6 +137,8 @@ export class EditorGroupManager {
 			this.clearCouplingVisuals();
 		}
 	}
+
+	isConnectorDragging(): boolean { return this.connectorDrag !== null; }
 
 	isCouplingMode(): boolean {
 		return this.isCouplingModeActive;
@@ -591,7 +602,7 @@ export class EditorGroupManager {
 	}
 
 	private handlePointerDown(event: PointerEvent) {
-		if (!this.isCouplingModeActive || !this.camera) return;
+		if (!this.isCouplingModeActive || !this.camera || this.interaction?.blocksScene) return;
 
 		const raycaster = this.getRaycaster(event);
 		if (!raycaster) return;
@@ -627,6 +638,9 @@ export class EditorGroupManager {
 
 			// Clic izquierdo: Iniciar arrastre de conexión
 			if (event.button === 0) {
+				if (this.interaction && !this.interaction.begin("connector-drag", this.cancelConnectorDrag)) return;
+				this.pointerId = event.pointerId;
+				this.domElement?.setPointerCapture?.(event.pointerId);
 				event.preventDefault();
 				event.stopPropagation();
 
@@ -664,7 +678,7 @@ export class EditorGroupManager {
 	}
 
 	private handlePointerMove(event: PointerEvent) {
-		if (!this.connectorDrag || !this.camera) return;
+		if (!this.connectorDrag || !this.camera || (this.pointerId != null && event.pointerId !== this.pointerId)) return;
 
 		const raycaster = this.getRaycaster(event);
 		if (!raycaster) return;
@@ -737,7 +751,7 @@ export class EditorGroupManager {
 	}
 
 	private handlePointerUp(event: PointerEvent) {
-		if (!this.connectorDrag) return;
+		if (!this.connectorDrag || (this.pointerId != null && event.pointerId !== this.pointerId)) return;
 
 		const { sourceNodeId, hoveredTargetGroupId, isValidTarget } = this.connectorDrag;
 
@@ -750,6 +764,7 @@ export class EditorGroupManager {
 		}
 
 		this.connectorDrag = null;
+		this.releaseConnectorPointer();
 
 		// 1. Soltado sobre destino válido: Ejecutar acoplamiento con Undo/Redo
 		if (isValidTarget && hoveredTargetGroupId) {
@@ -801,14 +816,38 @@ export class EditorGroupManager {
 		this.updateCouplingVisuals(this.lastResolver || undefined);
 	}
 
+	private releaseConnectorPointer() {
+		const id = this.pointerId;
+		this.pointerId = null;
+		if (id != null && this.domElement?.hasPointerCapture?.(id)) this.domElement.releasePointerCapture(id);
+		this.interaction?.end("connector-drag");
+	}
+
+	cancelConnectorDrag = () => {
+		if (!this.connectorDrag) return;
+		this.connectorDrag = null;
+		if (this.rubberBandLine) {
+			this.rubberBandLine.removeFromParent();
+			this.rubberBandLine.geometry.dispose();
+			(this.rubberBandLine.material as THREE.Material).dispose();
+			this.rubberBandLine = null;
+		}
+		this.releaseConnectorPointer();
+		this.updateCouplingVisuals(this.lastResolver || undefined);
+	};
+
 	/**
 	 * Limpieza general de proxies, eventos y visuales.
 	 */
 	dispose() {
+		this.cancelConnectorDrag();
 		if (this.domElement) {
 			this.domElement.removeEventListener("pointerdown", this.handlePointerDown);
 			window.removeEventListener("pointermove", this.handlePointerMove);
 			window.removeEventListener("pointerup", this.handlePointerUp);
+			window.removeEventListener("pointercancel", this.cancelConnectorDrag);
+			window.removeEventListener("blur", this.cancelConnectorDrag);
+			this.domElement.removeEventListener("lostpointercapture", this.cancelConnectorDrag);
 		}
 
 		this.clearProxies();

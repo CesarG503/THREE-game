@@ -106,12 +106,16 @@ export class TransformGizmo {
 		canvas.addEventListener("pointerup", this.handleOriginPointerUp, true);
 		canvas.addEventListener("pointercancel", this.handleOriginPointerUp, true);
 		canvas.addEventListener("lostpointercapture", this.handleOriginPointerUp, true);
+		canvas.addEventListener("pointercancel", this.finishInteraction);
+		canvas.addEventListener("lostpointercapture", this.finishInteraction);
+		window.addEventListener("blur", this.finishInteraction);
 		this.controls.addEventListener("mouseDown", this.handleMouseDown);
 		this.controls.addEventListener("mouseUp", this.handleMouseUp);
 		this.controls.addEventListener("objectChange", this.handleObjectChange);
 	}
 
 	attach(object: THREE.Object3D) {
+		if (this.dragState) this.finishInteraction();
 		this.curvatureActive = false;
 		this.curvatureOriginEditing = false;
 		this.section.visible = false;
@@ -160,11 +164,14 @@ export class TransformGizmo {
 	}
 
 	dispose() {
+		const canvas = this.game.sceneManager.renderer.domElement;
+		canvas.removeEventListener("pointercancel", this.finishInteraction);
+		canvas.removeEventListener("lostpointercapture", this.finishInteraction);
+		window.removeEventListener("blur", this.finishInteraction);
 		this.detach();
 		this.controls.removeEventListener("mouseDown", this.handleMouseDown);
 		this.controls.removeEventListener("mouseUp", this.handleMouseUp);
 		this.controls.removeEventListener("objectChange", this.handleObjectChange);
-		const canvas = this.game.sceneManager.renderer.domElement;
 		canvas.removeEventListener("pointerdown", this.handleOriginPointerDown, true);
 		canvas.removeEventListener("pointermove", this.handleOriginPointerMove, true);
 		canvas.removeEventListener("pointerup", this.handleOriginPointerUp, true);
@@ -326,7 +333,11 @@ export class TransformGizmo {
 	}
 
 	private handleMouseDown = () => {
-		if (!this.target) return;
+		if (!this.target || this.dragState) return;
+		if (this.game.interaction && !this.game.interaction.begin("gizmo-drag", this.finishInteraction)) {
+			this.controls.dragging = false;
+			return;
+		}
 
 		this.target.updateWorldMatrix(true, true);
 		this.target.userData.isGizmoDragging = true;
@@ -404,7 +415,16 @@ export class TransformGizmo {
 		this.proxy.scale.set(1, 1, 1);
 		this.syncProxyFromTarget(true);
 		this.restoreInput();
-		this.game.cameraController?.setUIOpen?.(true);
+		this.game.interaction?.end("gizmo-drag");
+		this.game.updateEditorInteractionMode?.();
+	};
+
+	// Finalize the current transform on interrupted drags; never lose physics/history synchronization.
+	finishInteraction = () => {
+		this.finishOriginDrag();
+		if (this.dragState) this.handleMouseUp();
+		this.controls.dragging = false;
+		this.controls.axis = null;
 	};
 
 	private handleObjectChange = () => {

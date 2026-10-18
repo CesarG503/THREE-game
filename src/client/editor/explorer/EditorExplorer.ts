@@ -1,3 +1,4 @@
+import { isTextInput } from "../../input/InteractionCoordinator";
 /**
  * EditorExplorer.ts
  * VIPER IO — Panel de Explorer jerárquico del editor.
@@ -26,6 +27,7 @@ export interface EditorExplorerOptions {
 
 export class EditorExplorer {
 	private game: any;
+	private events = new AbortController();
 	private hierarchy: EditorHierarchyModel;
 	private groupManager: EditorGroupManager;
 	private clipboard: EditorClipboard;
@@ -93,10 +95,12 @@ export class EditorExplorer {
 		this.container.id = "editor-hierarchy-explorer";
 		this.container.style.cssText = `
 			position: fixed;
-			top: 60px;
-			left: 20px;
-			width: 320px;
-			max-height: calc(100vh - 120px);
+			top: min(60px, 5dvh);
+			left: min(20px, 3vw);
+			width: min(340px, 94vw);
+			box-sizing: border-box;
+			overflow: hidden;
+			max-height: min(85dvh, calc(100vh - 80px));
 			background: rgba(15, 23, 42, 0.95);
 			backdrop-filter: blur(8px);
 			border: 1px solid #334155;
@@ -124,6 +128,7 @@ export class EditorExplorer {
 			border-top-left-radius: 8px;
 			border-top-right-radius: 8px;
 			cursor: grab;
+			flex-shrink: 0;
 		`;
 
 		const titleBox = document.createElement("div");
@@ -157,6 +162,7 @@ export class EditorExplorer {
 			display: flex;
 			background: #0f172a;
 			border-bottom: 1px solid #1e293b;
+			flex-shrink: 0;
 		`;
 
 		this.btnTabScene = document.createElement("button");
@@ -208,7 +214,9 @@ export class EditorExplorer {
 		this.sceneContentContainer.style.cssText = `
 			display: flex;
 			flex-direction: column;
-			flex: 1;
+			flex: 1 1 auto;
+			min-height: 0;
+			overflow: hidden;
 		`;
 
 		// ── Barra de herramientas ───────────────────────────────────────────────
@@ -220,6 +228,7 @@ export class EditorExplorer {
 			padding: 8px 12px;
 			background: #131922;
 			border-bottom: 1px solid #232c3b;
+			flex-shrink: 0;
 		`;
 
 		const createBtn = (label: string, title: string, onClick: () => void, accentColor?: string) => {
@@ -305,7 +314,7 @@ export class EditorExplorer {
 
 		// ── Buscador ───────────────────────────────────────────────────────────
 		const searchRow = document.createElement("div");
-		searchRow.style.cssText = `padding: 6px 12px; background: #131922; border-bottom: 1px solid #232c3b;`;
+		searchRow.style.cssText = `padding: 6px 12px; background: #131922; border-bottom: 1px solid #232c3b; flex-shrink: 0;`;
 		this.searchInput = document.createElement("input");
 		this.searchInput.type = "text";
 		this.searchInput.placeholder = "🔍 Buscar objeto o grupo...";
@@ -332,10 +341,14 @@ export class EditorExplorer {
 		this.treeContainer.style.cssText = `
 			padding: 8px 12px;
 			overflow-y: auto;
-			max-height: 480px;
+			overflow-x: hidden;
+			flex: 1 1 auto;
+			min-height: 80px;
+			overscroll-behavior: contain;
 			display: flex;
 			flex-direction: column;
 			gap: 2px;
+			box-sizing: border-box;
 		`;
 		this.sceneContentContainer.appendChild(this.treeContainer);
 		this.container.appendChild(this.sceneContentContainer);
@@ -345,7 +358,9 @@ export class EditorExplorer {
 		this.libraryContainer.style.cssText = `
 			display: none;
 			flex-direction: column;
-			flex: 1;
+			flex: 1 1 auto;
+			min-height: 0;
+			overflow: hidden;
 		`;
 
 		const libSearchRow = document.createElement("div");
@@ -356,6 +371,7 @@ export class EditorExplorer {
 			padding: 8px 12px;
 			background: #131922;
 			border-bottom: 1px solid #232c3b;
+			flex-shrink: 0;
 		`;
 
 		const searchInputAndRefresh = document.createElement("div");
@@ -434,23 +450,50 @@ export class EditorExplorer {
 		this.libraryListContainer.style.cssText = `
 			padding: 8px 12px;
 			overflow-y: auto;
-			max-height: 480px;
+			overflow-x: hidden;
+			flex: 1 1 auto;
+			min-height: 80px;
+			overscroll-behavior: contain;
 			display: flex;
 			flex-direction: column;
 			gap: 8px;
+			box-sizing: border-box;
 		`;
 		this.libraryContainer.appendChild(this.libraryListContainer);
 
 		this.container.appendChild(this.libraryContainer);
 
+		const style = document.createElement("style");
+		style.textContent = `
+			#editor-hierarchy-explorer > div:nth-child(-n+2) { flex-shrink: 0; }
+			#editor-hierarchy-explorer *::-webkit-scrollbar {
+				width: 6px;
+				height: 6px;
+			}
+			#editor-hierarchy-explorer *::-webkit-scrollbar-track {
+				background: rgba(15, 23, 42, 0.6);
+			}
+			#editor-hierarchy-explorer *::-webkit-scrollbar-thumb {
+				background: #334155;
+				border-radius: 3px;
+			}
+			#editor-hierarchy-explorer *::-webkit-scrollbar-thumb:hover {
+				background: #475569;
+			}
+			#editor-hierarchy-explorer [draggable="true"] {
+				width: 100%;
+				box-sizing: border-box;
+				min-width: 0;
+			}
+		`;
+		this.container.appendChild(style);
 		document.body.appendChild(this.container);
 	}
 
 	private setupKeyboardShortcuts() {
 		window.addEventListener("keydown", (e: KeyboardEvent) => {
 			// Ignorar si el foco está en un campo de texto
-			const activeTag = document.activeElement?.tagName.toLowerCase();
-			if (activeTag === "input" || activeTag === "textarea") return;
+			if (e.defaultPrevented || e.repeat || this.game.gameMode !== "editor" || isTextInput(document.activeElement)) return;
 
 			// Alternar visibilidad con atajo configurable (por defecto 'H')
 			if (e.key.toLowerCase() === this.shortcutKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
@@ -458,6 +501,8 @@ export class EditorExplorer {
 				this.toggleVisibility();
 				return;
 			}
+
+			if (this.game.interaction?.blocksScene) return;
 
 			// Alternar modo de acoples con tecla 'C' cuando el editor esté activo
 			if (e.key.toLowerCase() === "c" && !e.ctrlKey && !e.altKey && !e.metaKey) {
@@ -496,7 +541,7 @@ export class EditorExplorer {
 				e.preventDefault();
 				this.handleUngroup();
 			}
-		});
+		}, { signal: this.events.signal });
 	}
 
 	show() {
@@ -516,6 +561,7 @@ export class EditorExplorer {
 	}
 
 	hide() {
+		this.cancelDrag();
 		this.isVisible = false;
 		this.container.style.display = "none";
 		if (this.game?.updateEditorInteractionMode) {
@@ -572,6 +618,7 @@ export class EditorExplorer {
 		this.groupManager.setCouplingMode(active, (id) => this.resolveObject3D(id));
 		this.btnToggleCoupling.textContent = `Acoples: ${active ? "ON" : "OFF"}`;
 		this.btnToggleCoupling.style.background = active ? "#0284c7" : "#242e3d";
+		this.game.updateEditorInteractionMode?.();
 	}
 
 	private togglePivotEditMode() {
@@ -640,13 +687,16 @@ export class EditorExplorer {
 			font-size: 11px;
 			background: rgba(30, 41, 59, 0.4);
 			transition: all 0.2s ease;
+			flex-shrink: 0;
+			box-sizing: border-box;
 		`;
 		decoupleZone.textContent = "📥 Soltar aquí para desacoplar a la raíz";
 
 		decoupleZone.ondragover = (e) => {
-			if (!this.draggedNodeId) return;
+			const draggedId = this.draggedNodeId || (e.dataTransfer?.types.includes("text/plain") ? this.draggedNodeId : null);
+			if (!draggedId) return;
 			e.preventDefault();
-			e.dataTransfer!.dropEffect = "move";
+			if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
 			decoupleZone.style.borderColor = "#38bdf8";
 			decoupleZone.style.background = "rgba(56, 189, 248, 0.15)";
 			decoupleZone.style.color = "#38bdf8";
@@ -660,8 +710,8 @@ export class EditorExplorer {
 
 		decoupleZone.ondrop = (e) => {
 			e.preventDefault();
-			if (!this.draggedNodeId) return;
-			const draggedId = this.draggedNodeId;
+			const draggedId = this.draggedNodeId || e.dataTransfer?.getData("text/plain");
+			if (!draggedId) return;
 			const node = this.hierarchy.getNode(draggedId);
 			if (!node || !node.parentId) return;
 
@@ -703,7 +753,7 @@ export class EditorExplorer {
 			align-items: center;
 			justify-content: space-between;
 			padding: 4px 6px;
-			padding-left: ${depth * 18 + 6}px;
+			padding-left: ${depth * 16 + 6}px;
 			border-radius: 4px;
 			cursor: grab;
 			margin-bottom: 2px;
@@ -711,6 +761,10 @@ export class EditorExplorer {
 			color: ${isSelected ? "#93c5fd" : "#cbd5e1"};
 			transition: background 0.1s ease, border 0.1s ease;
 			border: 1px solid transparent;
+			box-sizing: border-box;
+			width: 100%;
+			min-width: 0;
+			flex-shrink: 0;
 			${isPrefabRoot ? "border-left: 3px solid #38bdf8;" : isPrefabMember ? "border-left: 2px solid #0284c7;" : ""}
 		`;
 
@@ -718,6 +772,12 @@ export class EditorExplorer {
 		itemRow.draggable = true;
 
 		itemRow.ondragstart = (e) => {
+			if (isTextInput(document.activeElement)) {
+				(document.activeElement as HTMLElement)?.blur?.();
+			}
+			if (this.game.interaction) {
+				this.game.interaction.begin("tree-drag", () => this.cancelDrag());
+			}
 			e.dataTransfer?.setData("text/plain", node.id);
 			if (e.dataTransfer) e.dataTransfer.effectAllowed = "move";
 			this.draggedNodeId = node.id;
@@ -725,13 +785,15 @@ export class EditorExplorer {
 		};
 
 		itemRow.ondragend = () => {
+			this.game.interaction?.end("tree-drag");
 			this.draggedNodeId = null;
 			itemRow.style.opacity = "1";
 			this.resetRowDropStyles(itemRow, isSelected, isPrefabRoot, isPrefabMember);
 		};
 
 		itemRow.ondragover = (e) => {
-			if (!this.draggedNodeId || this.draggedNodeId === node.id) return;
+			const draggedId = this.draggedNodeId || (e.dataTransfer?.types.includes("text/plain") ? this.draggedNodeId : null);
+			if (!draggedId || draggedId === node.id) return;
 			e.preventDefault();
 
 			const rect = itemRow.getBoundingClientRect();
@@ -749,7 +811,7 @@ export class EditorExplorer {
 
 			// Validar contra ciclos y restricciones jerárquicas
 			const targetParentId = dropPosition === "inside" ? node.id : node.parentId;
-			const check = this.hierarchy.canReparent(this.draggedNodeId, targetParentId);
+			const check = this.hierarchy.canReparent(draggedId, targetParentId);
 
 			if (!check.allowed) {
 				if (e.dataTransfer) e.dataTransfer.dropEffect = "none";
@@ -779,8 +841,8 @@ export class EditorExplorer {
 			e.stopPropagation();
 			this.resetRowDropStyles(itemRow, isSelected, isPrefabRoot, isPrefabMember);
 
-			if (!this.draggedNodeId || this.draggedNodeId === node.id) return;
-			const draggedId = this.draggedNodeId;
+			const draggedId = this.draggedNodeId || e.dataTransfer?.getData("text/plain");
+			if (!draggedId || draggedId === node.id) return;
 			const draggedNode = this.hierarchy.getNode(draggedId);
 			if (!draggedNode) return;
 
@@ -860,13 +922,13 @@ export class EditorExplorer {
 
 		// Contenido izquierdo: icono, fold, nombre
 		const leftBox = document.createElement("div");
-		leftBox.style.cssText = `display: flex; align-items: center; gap: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;`;
+		leftBox.style.cssText = `display: flex; align-items: center; gap: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1 1 auto;`;
 
 		if (node.isGroup) {
 			const isCollapsed = this.collapsedGroups.has(node.id);
 			const foldIcon = document.createElement("span");
 			foldIcon.textContent = isCollapsed ? "▶" : "▼";
-			foldIcon.style.cssText = `font-size: 9px; width: 12px; cursor: pointer; color: #94a3b8;`;
+			foldIcon.style.cssText = `font-size: 9px; width: 12px; cursor: pointer; color: #94a3b8; flex-shrink: 0;`;
 			foldIcon.onclick = (e) => {
 				e.stopPropagation();
 				if (isCollapsed) this.collapsedGroups.delete(node.id);
@@ -877,20 +939,22 @@ export class EditorExplorer {
 
 			const groupIcon = document.createElement("span");
 			groupIcon.textContent = isPrefabMember ? "📦" : (isCollapsed ? "📁" : "📂");
+			groupIcon.style.cssText = "flex-shrink: 0;";
 			leftBox.appendChild(groupIcon);
 		} else {
 			const spacer = document.createElement("span");
-			spacer.style.width = "12px";
+			spacer.style.cssText = "width: 12px; flex-shrink: 0;";
 			leftBox.appendChild(spacer);
 
 			const itemIcon = document.createElement("span");
 			itemIcon.textContent = this.getNodeIcon(node.type);
+			itemIcon.style.cssText = "flex-shrink: 0;";
 			leftBox.appendChild(itemIcon);
 		}
 
 		const nameLabel = document.createElement("span");
 		nameLabel.textContent = node.customName || node.name;
-		nameLabel.style.cssText = `overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: ${isPrefabRoot ? "110px" : "140px"};`;
+		nameLabel.style.cssText = `overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1 1 auto; min-width: 0;`;
 		leftBox.appendChild(nameLabel);
 
 		if (isPrefabRoot) {
@@ -906,13 +970,14 @@ export class EditorExplorer {
 				padding: 0 4px;
 				margin-left: 2px;
 				white-space: nowrap;
+				flex-shrink: 0;
 			`;
 			leftBox.appendChild(prefabTag);
 		}
 
 		// Contenido derecho: botones de orden y acciones rápidas
 		const actionBox = document.createElement("div");
-		actionBox.style.cssText = `display: flex; align-items: center; gap: 4px; opacity: 0.6;`;
+		actionBox.style.cssText = `display: flex; align-items: center; gap: 4px; opacity: 0.6; flex-shrink: 0;`;
 		itemRow.onmouseenter = () => {
 			if (!isSelected && !this.draggedNodeId) itemRow.style.background = "#1e293b";
 			actionBox.style.opacity = "1";
@@ -1618,7 +1683,14 @@ export class EditorExplorer {
 		};
 	}
 
+	public cancelDrag() {
+		this.draggedNodeId = null;
+		this.game.interaction?.end("tree-drag");
+	}
+
 	dispose() {
+		this.cancelDrag();
+		this.events.abort();
 		this.container.remove();
 	}
 }

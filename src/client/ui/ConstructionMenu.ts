@@ -7313,54 +7313,7 @@ export class ConstructionMenu {
             }
         }
 
-        // Pause Game Input / Pointer Lock
-        if (this.isVisible) {
-            if (this.game.updateEditorInteractionMode) {
-                this.game.updateEditorInteractionMode();
-            } else if (this.game.cameraController) {
-                this.game.cameraController.setUIOpen(true);
-            }
-            document.exitPointerLock();
-            if (this.game.inputManager) {
-                this.game.inputManager.enabled = false;
-                if (this.game.inputManager.reset) this.game.inputManager.reset();
-                this.game.isMouseDown = false;
-            }
-        } else {
-            if (this.game.updateEditorInteractionMode) {
-                this.game.updateEditorInteractionMode();
-            } else if (this.game.cameraController) {
-                this.game.cameraController.setUIOpen(false);
-            }
-            // Resume
-            if (this.game.inputManager) {
-                this.game.inputManager.enabled = true;
-                if (this.game.inputManager.reset) this.game.inputManager.reset();
-            }
-
-            // Re-request pointer lock after a small delay, pero SOLO si ninguna otra interfaz está abierta
-            setTimeout(() => {
-                if (this.game.isAnyEditorUIOpen && this.game.isAnyEditorUIOpen()) {
-                    return;
-                }
-                if (this.game.cameraController) {
-                    this.game.cameraController.lock();
-                } else {
-                    try {
-                        const promise = document.body.requestPointerLock();
-                        if (promise && typeof promise.catch === "function") {
-                            promise.catch((err) => {
-                                if (err.name !== "NotAllowedError" && err.name !== "SecurityError") {
-                                    console.warn("[ConstructionMenu] requestPointerLock failed:", err);
-                                }
-                            });
-                        }
-                    } catch (err) {
-                        console.warn("[ConstructionMenu] requestPointerLock threw error:", err);
-                    }
-                }
-            }, 100);
-        }
+        this.game.updateEditorInteractionMode?.();
     }
 
     refreshLogicList() {

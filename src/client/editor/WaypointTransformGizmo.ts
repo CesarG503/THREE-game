@@ -56,6 +56,9 @@ export class WaypointTransformGizmo {
 		this.controls.getRaycaster().layers.set(GIZMO_LAYER);
 		game.sceneManager.scene.add(this.helper);
 
+		game.sceneManager.renderer.domElement.addEventListener("pointercancel", this.finishInteraction);
+		game.sceneManager.renderer.domElement.addEventListener("lostpointercapture", this.finishInteraction);
+		window.addEventListener("blur", this.finishInteraction);
 		this.controls.addEventListener("mouseDown", this.handleMouseDown);
 		this.controls.addEventListener("mouseUp", this.handleMouseUp);
 		this.controls.addEventListener("objectChange", this.handleObjectChange);
@@ -71,6 +74,7 @@ export class WaypointTransformGizmo {
 	}
 
 	detach() {
+		this.finishInteraction();
 		this.targetObject = null;
 		this.waypoint = null;
 		this.isDragging = false;
@@ -111,6 +115,9 @@ export class WaypointTransformGizmo {
 	}
 
 	dispose() {
+		this.game.sceneManager.renderer.domElement.removeEventListener("pointercancel", this.finishInteraction);
+		this.game.sceneManager.renderer.domElement.removeEventListener("lostpointercapture", this.finishInteraction);
+		window.removeEventListener("blur", this.finishInteraction);
 		this.detach();
 		this.controls.removeEventListener("mouseDown", this.handleMouseDown);
 		this.controls.removeEventListener("mouseUp", this.handleMouseUp);
@@ -163,6 +170,11 @@ export class WaypointTransformGizmo {
 	}
 
 	private handleMouseDown = () => {
+		if (this.isDragging) return;
+		if (this.game.interaction && !this.game.interaction.begin("waypoint-drag", this.finishInteraction)) {
+			this.controls.dragging = false;
+			return;
+		}
 		this.isDragging = true;
 		if (this.game.inputManager) {
 			this.wasInputEnabled = this.game.inputManager.enabled;
@@ -174,6 +186,7 @@ export class WaypointTransformGizmo {
 	};
 
 	private handleMouseUp = () => {
+		if (!this.isDragging) return;
 		if (this.waypoint) {
 			this.writeProxyToWaypoint();
 			this.syncProxyFromWaypoint();
@@ -181,7 +194,14 @@ export class WaypointTransformGizmo {
 		}
 		this.isDragging = false;
 		this.restoreInput();
-		this.game.cameraController?.setUIOpen?.(true);
+		this.game.interaction?.end("waypoint-drag");
+		this.game.updateEditorInteractionMode?.();
+	};
+
+	finishInteraction = () => {
+		this.handleMouseUp();
+		this.controls.dragging = false;
+		this.controls.axis = null;
 	};
 
 	private handleObjectChange = () => {

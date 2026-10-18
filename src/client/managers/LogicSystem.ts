@@ -1796,7 +1796,7 @@ export class LogicSystem {
 			if (this.game.inputManager) {
 				this.game.inputManager.enabled = true;
 				this.game.isMouseDown = false; // Reset
-				if (this.game.cameraController) this.game.cameraController.lock();
+				this.game.updateEditorInteractionMode?.();
 			}
 		}
 
@@ -1861,7 +1861,7 @@ export class LogicSystem {
 		if (this.game.constructionMenu) {
 			this.game.constructionMenu.container.style.display = "flex";
 			document.exitPointerLock();
-			if (this.game.inputManager) this.game.inputManager.enabled = false;
+			this.game.updateEditorInteractionMode?.();
 		}
 
 		this.clearVisualization();

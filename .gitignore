@@ -12,3 +12,6 @@ graphify-out/
 .graphify*
 tests/*
 tests/
+# Browser regression artifacts
+/test-results/
+/playwright-report/

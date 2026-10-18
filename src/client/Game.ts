@@ -1,3 +1,4 @@
+import { InteractionCoordinator } from "./input/InteractionCoordinator";
 import { FuelZoneSystem } from './fuel/FuelZoneSystem';
 import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
@@ -111,6 +112,8 @@ export class Game {
 	editorHierarchy!: EditorHierarchyModel;
 	editorGroupManager!: EditorGroupManager;
 	editorExplorer!: EditorExplorer;
+	interaction!: InteractionCoordinator;
+	inputEvents = new AbortController();
 	editorClipboard!: EditorClipboard;
 	editorHistory!: EditorCommandHistory;
 	prefabManager!: PrefabManager;
@@ -200,6 +203,7 @@ export class Game {
 		this.editorClipboard = new EditorClipboard();
 		this.prefabManager = new PrefabManager(this.editorHierarchy);
 		this.inputManager = new InputManager();
+		this.inputManager.pointerTarget = this.sceneManager.renderer.domElement;
 		this.clock = new THREE.Clock();
 
 		const gravity = { x: 0.0, y: -20.0, z: 0.0 };
@@ -646,6 +650,10 @@ export class Game {
 			});
 		}
 
+		this.interaction = new InteractionCoordinator(this);
+		this.editorGroupManager.interaction = this.interaction;
+		this.cameraController.uiCheckCallback = () => this.interaction.blocksGameplay;
+		this.inputManager.uiCheckCallback = () => this.interaction.blocksGameplay;
 		this.setupGameInput();
 
 		if (this.gameMode !== "editor") {
@@ -663,6 +671,7 @@ export class Game {
 
 		document.addEventListener("mousedown", (e) => {
 			if (e.target !== this.sceneManager.renderer.domElement) return;
+			if (this.interaction?.blocksScene || this.interaction?.isHandled(e)) return;
 
 			if (this.gameMode === "editor") {
 				if (this.constructionMenu && this.constructionMenu.logicSystem && this.constructionMenu.logicSystem.isEditingMap) {
@@ -760,7 +769,7 @@ export class Game {
 						this.objectInspector?.transformGizmo?.dragState ||
 						this.objectInspector?.transformGizmo?.controls?.axis
 					);
-					const isConnectorInteracting = !!(this.editorGroupManager?.connectorDrag);
+					const isConnectorInteracting = !!(this.editorGroupManager?.isConnectorDragging());
 
 					if (!isGizmoInteracting && !isConnectorInteracting) {
 						const selectResult = selectEditableObjectFromPointer();
@@ -781,9 +790,9 @@ export class Game {
 					}
 				}
 				}
-			}, false);
+			}, { signal: this.inputEvents.signal });
 
-		document.addEventListener("contextmenu", (e) => e.preventDefault(), false);
+		document.addEventListener("contextmenu", (e) => e.preventDefault(), { signal: this.inputEvents.signal });
 
 	}
 
@@ -831,35 +840,18 @@ export class Game {
 			return !!(this.constructionMenu?.isVisible || this.cameraController?.isPaused);
 		}
 		const explorerOpen = !!this.editorExplorer?.isVisible;
-		const menuOpen = !!this.constructionMenu?.isVisible;
+		const menuOpen = !!(this.constructionMenu?.isVisible && this.constructionMenu.container?.style.display !== "none");
 		const inspectorOpen = !!this.objectInspector?.isVisible;
 		const couplingActive = !!this.editorGroupManager?.isCouplingMode?.();
 		const paused = !!this.cameraController?.isPaused;
-		return explorerOpen || menuOpen || inspectorOpen || couplingActive || paused;
+		return explorerOpen || menuOpen || inspectorOpen || couplingActive || paused || !!this.constructionMenu?.logicSystem?.isEditingMap;
 	}
 
 	updateEditorInteractionMode(): void {
-		const isUIActive = this.isAnyEditorUIOpen();
-
-		if (isUIActive) {
-			if (typeof document !== "undefined" && document.pointerLockElement) {
-				document.exitPointerLock();
-			}
-			if (this.cameraController) {
-				this.cameraController.setUIOpen(true);
-			}
-			if (this.inputManager) {
-				this.inputManager.keys.attack = false;
-				this.inputManager.keys.aim = false;
-			}
-		} else {
-			if (this.cameraController) {
-				this.cameraController.setUIOpen(false);
-				if (!this.cameraController.isPaused) {
-					this.cameraController.lock();
-				}
-			}
-		}
+		if (this.interaction) { this.interaction.sync(); return; }
+		const active = this.isAnyEditorUIOpen();
+		this.cameraController?.setUIOpen(active);
+		if (active) this.inputManager?.reset();
 	}
 
 	ensureEditorInventoryVisible() {
@@ -878,6 +870,11 @@ export class Game {
 	dispose() {
 		if (this.isDisposed) return;
 		this.isDisposed = true;
+		this.interaction?.dispose();
+		this.inputEvents.abort();
+		this.inputManager?.dispose();
+		this.cameraController?.dispose();
+		this.objectInspector?.transformGizmo?.dispose();
 
 		if (this.animationFrameId !== null) {
 			cancelAnimationFrame(this.animationFrameId);

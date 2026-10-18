@@ -14,6 +14,7 @@ export interface StuntLandingFeedback {
   status: 'perfect' | 'clean' | 'crash' | 'rough';
   bonusPoints?: number;
   points: number;
+  lostPoints?: number;
   totalSessionScore?: number;
 }
 
@@ -46,6 +47,8 @@ export class VehicleStuntTracker {
   // Landing feedback state
   private landingFeedbackTimer = 0;
   private currentFeedback: StuntLandingFeedback | null = null;
+  private crashAnimFrame: number | null = null;
+  private crashAnimTimeout: any = null;
 
   // HUD DOM Elements
   private hudContainer: HTMLDivElement | null = null;
@@ -244,20 +247,32 @@ export class VehicleStuntTracker {
     document.head.appendChild(style);
   }
 
+  private cancelCrashAnimation() {
+    if (this.crashAnimFrame !== null) {
+      cancelAnimationFrame(this.crashAnimFrame);
+      this.crashAnimFrame = null;
+    }
+    if (this.crashAnimTimeout !== null) {
+      clearTimeout(this.crashAnimTimeout);
+      this.crashAnimTimeout = null;
+    }
+  }
+
   public handleDismount(crashed = false) {
-    if (this.isAirborne || crashed) {
+    // Only trigger crash if the rider was actively airborne when falling/dismounting.
+    // If landing feedback is already playing, do not stomp it.
+    if (this.isAirborne) {
       this.triggerCrash();
     }
-    // If landed cleanly just before dismounting, keep landingFeedbackTimer active
-    // so the points don't cut off abruptly when getting off the vehicle!
   }
 
   public triggerCrash() {
-    const hadStunt = this.isAirborne && (this.currentJumpScore > 0 || this.tricksLog.length > 0 || this.airTime >= 0.15);
+    const lostPoints = this.currentJumpScore || Math.round((this.airPoints + this.trickPoints) * this.comboMultiplier);
+    const hadStunt = this.isAirborne && (lostPoints > 0 || this.tricksLog.length > 0 || this.airTime >= 0.15);
     this.isAirborne = false;
     this.currentJumpScore = 0;
 
-    if (!hadStunt) {
+    if (!hadStunt && lostPoints <= 0) {
       if (this.landingFeedbackTimer <= 0 && this.hudContainer) {
         this.hudContainer.style.display = 'none';
       }
@@ -266,10 +281,10 @@ export class VehicleStuntTracker {
 
     this.showLandingFeedback({
       status: 'crash',
+      lostPoints: lostPoints,
       points: 0,
       totalSessionScore: this.totalSessionScore
     });
-    this.landingFeedbackTimer = 1.4;
   }
 
   public update(
@@ -345,6 +360,7 @@ export class VehicleStuntTracker {
   }
 
   private startAirborne(bike: THREE.Object3D) {
+    this.cancelCrashAnimation();
     this.isAirborne = true;
     this.airTime = 0;
     this.airPoints = 0;
@@ -596,8 +612,11 @@ export class VehicleStuntTracker {
     }
 
     if (isCrash) {
+      const lostPoints = this.currentJumpScore || Math.round((this.airPoints + this.trickPoints) * this.comboMultiplier);
+      this.currentJumpScore = 0;
       this.showLandingFeedback({
         status: 'crash',
+        lostPoints: lostPoints,
         points: 0,
         totalSessionScore: this.totalSessionScore
       });
@@ -624,9 +643,10 @@ export class VehicleStuntTracker {
   }
 
   private showLandingFeedback(feedback: StuntLandingFeedback) {
+    this.cancelCrashAnimation();
     this.currentFeedback = feedback;
-    // Feedback duration: 1.4s for crash (so player clearly sees 0 PTS in red), 1.2s for clean landing
-    this.landingFeedbackTimer = feedback.status === 'crash' ? 1.4 : 1.2;
+    // Feedback duration: 1.8s for crash (allows player to see score drain to 0 and settle), 1.2s for clean landing
+    this.landingFeedbackTimer = feedback.status === 'crash' ? 1.8 : 1.2;
 
     const profile = this.game?.playerConfigManager?.getCurrentProfile?.();
     const hudSettings = profile?.hudSettings || this.game?.hud?.settings;
@@ -689,25 +709,66 @@ export class VehicleStuntTracker {
 
     // Set original counter color and points according to landing quality
     if (this.hudScoreNumber) {
-      if (feedback.status === 'perfect') {
-        this.hudScoreNumber.style.color = '#34d399';
-        this.hudScoreNumber.style.textShadow = '0 0 24px rgba(52, 211, 153, 0.9), 0 2px 8px rgba(0, 0, 0, 0.9)';
-      } else if (feedback.status === 'clean') {
-        this.hudScoreNumber.style.color = '#38bdf8';
-        this.hudScoreNumber.style.textShadow = '0 0 20px rgba(56, 189, 248, 0.9), 0 2px 8px rgba(0, 0, 0, 0.9)';
-      } else if (feedback.status === 'rough') {
-        this.hudScoreNumber.style.color = '#f59e0b';
-        this.hudScoreNumber.style.textShadow = '0 0 20px rgba(245, 158, 11, 0.9), 0 2px 8px rgba(0, 0, 0, 0.9)';
-      } else {
+      if (feedback.status === 'crash') {
         this.hudScoreNumber.style.color = '#ef4444';
-        this.hudScoreNumber.style.textShadow = '0 0 20px rgba(239, 68, 68, 0.9), 0 2px 8px rgba(0, 0, 0, 0.9)';
-      }
+        this.hudScoreNumber.style.textShadow = '0 0 24px rgba(239, 68, 68, 0.95), 0 2px 8px rgba(0, 0, 0, 0.9)';
 
-      this.hudScoreNumber.textContent = feedback.points > 0 ? `+${feedback.points.toLocaleString()} PTS` : '0 PTS';
-      this.hudScoreNumber.style.transform = 'scale(1.2)';
-      setTimeout(() => {
-        if (this.hudScoreNumber) this.hudScoreNumber.style.transform = 'scale(1)';
-      }, 140);
+        const lost = feedback.lostPoints || 0;
+        if (lost > 0) {
+          // Display the score the player had in RED with an initial punch
+          this.hudScoreNumber.textContent = `+${lost.toLocaleString()} PTS`;
+          this.hudScoreNumber.style.transform = 'scale(1.25)';
+
+          // After a short 300ms pause, visibly drain / convert the score into 0 PTS
+          this.crashAnimTimeout = setTimeout(() => {
+            const startVal = lost;
+            const startTime = performance.now();
+            const duration = 400; // ms countdown
+            const step = (now: number) => {
+              const elapsed = now - startTime;
+              const progress = Math.min(1, elapsed / duration);
+              const ease = 1 - (1 - progress) * (1 - progress);
+              const val = Math.round(startVal * (1 - ease));
+              if (this.hudScoreNumber) {
+                if (val > 0) {
+                  this.hudScoreNumber.textContent = `+${val.toLocaleString()} PTS`;
+                  this.crashAnimFrame = requestAnimationFrame(step);
+                } else {
+                  this.hudScoreNumber.textContent = '0 PTS';
+                  this.hudScoreNumber.style.transform = 'scale(1.15)';
+                  setTimeout(() => {
+                    if (this.hudScoreNumber) this.hudScoreNumber.style.transform = 'scale(1)';
+                  }, 120);
+                }
+              }
+            };
+            this.crashAnimFrame = requestAnimationFrame(step);
+          }, 300);
+        } else {
+          this.hudScoreNumber.textContent = '0 PTS';
+          this.hudScoreNumber.style.transform = 'scale(1.15)';
+          setTimeout(() => {
+            if (this.hudScoreNumber) this.hudScoreNumber.style.transform = 'scale(1)';
+          }, 120);
+        }
+      } else {
+        if (feedback.status === 'perfect') {
+          this.hudScoreNumber.style.color = '#34d399';
+          this.hudScoreNumber.style.textShadow = '0 0 24px rgba(52, 211, 153, 0.9), 0 2px 8px rgba(0, 0, 0, 0.9)';
+        } else if (feedback.status === 'clean') {
+          this.hudScoreNumber.style.color = '#38bdf8';
+          this.hudScoreNumber.style.textShadow = '0 0 20px rgba(56, 189, 248, 0.9), 0 2px 8px rgba(0, 0, 0, 0.9)';
+        } else {
+          this.hudScoreNumber.style.color = '#f59e0b';
+          this.hudScoreNumber.style.textShadow = '0 0 20px rgba(245, 158, 11, 0.9), 0 2px 8px rgba(0, 0, 0, 0.9)';
+        }
+
+        this.hudScoreNumber.textContent = feedback.points > 0 ? `+${feedback.points.toLocaleString()} PTS` : '0 PTS';
+        this.hudScoreNumber.style.transform = 'scale(1.2)';
+        setTimeout(() => {
+          if (this.hudScoreNumber) this.hudScoreNumber.style.transform = 'scale(1)';
+        }, 140);
+      }
     }
 
     if (this.hudTotalSessionScore && feedback.totalSessionScore !== undefined) {
@@ -722,6 +783,7 @@ export class VehicleStuntTracker {
   }
 
   public resetSession() {
+    this.cancelCrashAnimation();
     this.isAirborne = false;
     this.totalSessionScore = 0;
     this.currentJumpScore = 0;
@@ -734,6 +796,7 @@ export class VehicleStuntTracker {
   }
 
   public dispose() {
+    this.cancelCrashAnimation();
     this.hudContainer?.remove();
     this.hudContainer = null;
   }

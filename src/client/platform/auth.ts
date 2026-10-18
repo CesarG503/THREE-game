@@ -15,6 +15,7 @@ export interface StoredAuthSession {
 export const AUTH_STORAGE_KEY = "veta.auth";
 
 export function getStoredAuth(): StoredAuthSession | null {
+	if (typeof localStorage === "undefined") return null;
 	const raw = localStorage.getItem(AUTH_STORAGE_KEY);
 	if (!raw) return null;
 
@@ -32,11 +33,13 @@ export function getStoredAuth(): StoredAuthSession | null {
 }
 
 export function setStoredAuth(auth: StoredAuthSession) {
+	if (typeof localStorage === "undefined") return;
 	localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(auth));
 	localStorage.setItem("playerName", auth.user.displayName || auth.user.username);
 }
 
 export function clearStoredAuth() {
+	if (typeof localStorage === "undefined") return;
 	localStorage.removeItem(AUTH_STORAGE_KEY);
 }
 

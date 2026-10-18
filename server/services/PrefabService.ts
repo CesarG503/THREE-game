@@ -282,11 +282,71 @@ function normalizeBoolean(value: unknown, defaultValue: boolean): boolean {
   throw new AuthError(400, "Valor booleano inválido")
 }
 
-function normalizePrefabData(value: unknown): any {
-  if (!value || typeof value !== "object") {
-    throw new AuthError(400, "Datos del prefab inválidos")
+export function normalizePrefabData(value: unknown): any {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new AuthError(400, "Datos del prefab inválidos");
   }
-  return value
+  const payload: any = value;
+  if (payload.format !== "viper-prefab") {
+    throw new AuthError(400, "Formato de prefab no reconocido (se requiere 'viper-prefab')");
+  }
+  if (typeof payload.schemaVersion !== "string" || !payload.schemaVersion.startsWith("1.")) {
+    throw new AuthError(400, "Versión de esquema incompatible");
+  }
+  if (!Array.isArray(payload.objects) || !Array.isArray(payload.hierarchy)) {
+    throw new AuthError(400, "Estructura inválida: faltan 'objects' o 'hierarchy'");
+  }
+  if (JSON.stringify(payload).length > 10 * 1024 * 1024) {
+    throw new AuthError(400, "Tamaño de datos del prefab excede el límite permitido (10MB)");
+  }
+
+  // Comprobar prototype pollution en payload, objects y hierarchy
+  if (Object.prototype.hasOwnProperty.call(payload, "__proto__") || Object.prototype.hasOwnProperty.call(payload, "constructor")) {
+    throw new AuthError(400, "Inyección de propiedades inseguras detectada en prefab");
+  }
+
+  for (const obj of payload.objects) {
+    if (!obj || typeof obj !== "object") {
+      throw new AuthError(400, "Objeto corrupto en datos del prefab");
+    }
+    if (Object.prototype.hasOwnProperty.call(obj, "__proto__") || Object.prototype.hasOwnProperty.call(obj, "constructor")) {
+      throw new AuthError(400, "Inyección de propiedades inseguras detectada en prefab");
+    }
+    if (typeof obj.type !== "string" || typeof obj.uuid !== "string") {
+      throw new AuthError(400, "Objetos deben contener 'type' y 'uuid' válidos");
+    }
+  }
+
+  // Comprobar jerarquía y ciclos
+  const nodeIds = new Set<string>();
+  const parentMap = new Map<string, string | null>();
+  for (const node of payload.hierarchy) {
+    if (!node || typeof node !== "object" || typeof node.id !== "string") {
+      throw new AuthError(400, "Nodo corrupto en la jerarquía del prefab");
+    }
+    if (Object.prototype.hasOwnProperty.call(node, "__proto__") || Object.prototype.hasOwnProperty.call(node, "constructor")) {
+      throw new AuthError(400, "Inyección de propiedades inseguras detectada en prefab");
+    }
+    nodeIds.add(node.id);
+    parentMap.set(node.id, node.parentId || null);
+  }
+
+  // Detección de ciclos
+  for (const [id, parentId] of parentMap.entries()) {
+    if (parentId) {
+      let curr: string | null = parentId;
+      const visited = new Set<string>([id]);
+      while (curr) {
+        if (visited.has(curr)) {
+          throw new AuthError(400, "Ciclo jerárquico detectado en datos del prefab");
+        }
+        visited.add(curr);
+        curr = parentMap.get(curr) || null;
+      }
+    }
+  }
+
+  return payload;
 }
 
 async function createUniqueSlug(name: string): Promise<string> {

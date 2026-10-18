@@ -49,6 +49,9 @@ export interface PlatformPrefabDto {
 	version: number;
 	versionCount: number;
 	currentVersion?: PrefabVersionDto | null;
+	data?: PrefabDataPayload;
+	storageStatus?: "server" | "local" | "pending_sync" | "auth_error" | "validation_error" | "connection_error";
+	syncError?: string;
 }
 
 export interface PrefabExportPackage {

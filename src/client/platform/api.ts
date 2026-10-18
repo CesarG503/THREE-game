@@ -175,6 +175,10 @@ export async function apiFetch<T>(
 }
 
 export function getApiBaseUrl() {
+	if (typeof window === "undefined") {
+		const port = (import.meta as any).env?.VITE_SERVER_PORT || (typeof process !== "undefined" ? process.env?.VITE_SERVER_PORT : null) || "8085";
+		return `http://localhost:${port}/api`;
+	}
 	const protocol = window.location.protocol === "https:" ? "https:" : "http:";
 	const hostname = window.location.hostname || "localhost";
 	const port = (import.meta as any).env?.VITE_SERVER_PORT || "8085";
@@ -199,6 +203,8 @@ function normalizeMapUrls<T extends PlatformMap>(map: T): T {
 function normalizeAssetUrl(url: string) {
 	if (/^https?:\/\//i.test(url)) return url;
 	if (url.startsWith("/api/")) return `${getApiBaseUrl().replace(/\/api$/, "")}${url}`;
-	if (url.startsWith("/")) return `${window.location.origin}${url}`;
+	if (url.startsWith("/")) {
+		return typeof window !== "undefined" ? `${window.location.origin}${url}` : `http://localhost:8085${url}`;
+	}
 	return url;
 }

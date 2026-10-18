@@ -13,10 +13,11 @@
 import { EditorHierarchyModel, type HierarchyNode } from "../hierarchy/EditorHierarchyModel";
 import { EditorGroupManager } from "../hierarchy/EditorGroupManager";
 import { EditorClipboard } from "../clipboard/EditorClipboard";
-import { EditorCommandHistory, ReparentCommand } from "../history/EditorCommandHistory";
+import { EditorCommandHistory, ReparentCommand, DuplicateCommand } from "../history/EditorCommandHistory";
 import { PrefabManager } from "../prefabs/PrefabManager";
 import { PrefabSerializer } from "../prefabs/PrefabSerializer";
 import { PrefabService } from "../prefabs/PrefabService";
+import type { PlatformPrefabDto } from "../prefabs/PrefabTypes";
 
 export interface EditorExplorerOptions {
 	shortcutKey?: string; // Por defecto 'h'
@@ -31,10 +32,22 @@ export class EditorExplorer {
 	private prefabManager: PrefabManager;
 
 	public container!: HTMLElement;
+	private currentTab: "scene" | "library" = "scene";
+	private btnTabScene!: HTMLButtonElement;
+	private btnTabLibrary!: HTMLButtonElement;
+	private sceneContentContainer!: HTMLElement;
+	private libraryContainer!: HTMLElement;
+
 	private treeContainer!: HTMLElement;
 	private searchInput!: HTMLInputElement;
 	private btnToggleCoupling!: HTMLButtonElement;
 	private btnTogglePivotEdit!: HTMLButtonElement;
+
+	private librarySearchInput!: HTMLInputElement;
+	private libraryCategorySelect!: HTMLSelectElement;
+	private libraryListContainer!: HTMLElement;
+	private cachedPrefabsList: PlatformPrefabDto[] = [];
+	private isLoadingLibrary: boolean = false;
 
 	private isVisible: boolean = false;
 	private isCollapsed: boolean = false;
@@ -132,6 +145,66 @@ export class EditorExplorer {
 		header.appendChild(headerControls);
 		this.container.appendChild(header);
 
+		// ── Barra de Pestañas (Escena / Biblioteca) ──────────────────────────────
+		const tabBar = document.createElement("div");
+		tabBar.style.cssText = `
+			display: flex;
+			background: #0f172a;
+			border-bottom: 1px solid #1e293b;
+		`;
+
+		this.btnTabScene = document.createElement("button");
+		this.btnTabScene.innerHTML = `<span>🗂️</span><span>Escena</span>`;
+		this.btnTabScene.style.cssText = `
+			flex: 1;
+			padding: 8px 10px;
+			background: #1e293b;
+			color: #38bdf8;
+			border: none;
+			border-bottom: 2px solid #38bdf8;
+			font-size: 12px;
+			font-weight: 600;
+			cursor: pointer;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			gap: 6px;
+			transition: all 0.15s ease;
+		`;
+		this.btnTabScene.onclick = () => this.switchTab("scene");
+
+		this.btnTabLibrary = document.createElement("button");
+		this.btnTabLibrary.innerHTML = `<span>📦</span><span>Biblioteca</span>`;
+		this.btnTabLibrary.style.cssText = `
+			flex: 1;
+			padding: 8px 10px;
+			background: transparent;
+			color: #94a3b8;
+			border: none;
+			border-bottom: 2px solid transparent;
+			font-size: 12px;
+			font-weight: 600;
+			cursor: pointer;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			gap: 6px;
+			transition: all 0.15s ease;
+		`;
+		this.btnTabLibrary.onclick = () => this.switchTab("library");
+
+		tabBar.appendChild(this.btnTabScene);
+		tabBar.appendChild(this.btnTabLibrary);
+		this.container.appendChild(tabBar);
+
+		// ── Contenedor de la pestaña Escena ──────────────────────────────────────
+		this.sceneContentContainer = document.createElement("div");
+		this.sceneContentContainer.style.cssText = `
+			display: flex;
+			flex-direction: column;
+			flex: 1;
+		`;
+
 		// ── Barra de herramientas ───────────────────────────────────────────────
 		const toolbar = document.createElement("div");
 		toolbar.style.cssText = `
@@ -222,7 +295,7 @@ export class EditorExplorer {
 		toolbar.appendChild(btnSavePrefab);
 		toolbar.appendChild(btnExport);
 		toolbar.appendChild(btnImport);
-		this.container.appendChild(toolbar);
+		this.sceneContentContainer.appendChild(toolbar);
 
 		// ── Buscador ───────────────────────────────────────────────────────────
 		const searchRow = document.createElement("div");
@@ -246,7 +319,7 @@ export class EditorExplorer {
 			this.renderTree();
 		};
 		searchRow.appendChild(this.searchInput);
-		this.container.appendChild(searchRow);
+		this.sceneContentContainer.appendChild(searchRow);
 
 		// ── Contenedor del árbol ────────────────────────────────────────────────
 		this.treeContainer = document.createElement("div");
@@ -258,7 +331,111 @@ export class EditorExplorer {
 			flex-direction: column;
 			gap: 2px;
 		`;
-		this.container.appendChild(this.treeContainer);
+		this.sceneContentContainer.appendChild(this.treeContainer);
+		this.container.appendChild(this.sceneContentContainer);
+
+		// ── Contenedor de la pestaña Biblioteca ──────────────────────────────────
+		this.libraryContainer = document.createElement("div");
+		this.libraryContainer.style.cssText = `
+			display: none;
+			flex-direction: column;
+			flex: 1;
+		`;
+
+		const libSearchRow = document.createElement("div");
+		libSearchRow.style.cssText = `
+			display: flex;
+			flex-direction: column;
+			gap: 6px;
+			padding: 8px 12px;
+			background: #131922;
+			border-bottom: 1px solid #232c3b;
+		`;
+
+		const searchInputAndRefresh = document.createElement("div");
+		searchInputAndRefresh.style.cssText = `display: flex; gap: 6px; align-items: center;`;
+
+		this.librarySearchInput = document.createElement("input");
+		this.librarySearchInput.type = "text";
+		this.librarySearchInput.placeholder = "🔍 Buscar prefab o etiqueta...";
+		this.librarySearchInput.style.cssText = `
+			flex: 1;
+			box-sizing: border-box;
+			background: #1e2837;
+			border: 1px solid #334155;
+			border-radius: 4px;
+			color: #fff;
+			padding: 5px 8px;
+			font-size: 12px;
+			outline: none;
+		`;
+		this.librarySearchInput.oninput = () => this.renderLibrary();
+
+		const btnRefreshLib = document.createElement("button");
+		btnRefreshLib.textContent = "🔄";
+		btnRefreshLib.title = "Recargar biblioteca";
+		btnRefreshLib.style.cssText = `
+			background: #242e3d;
+			color: #f1f5f9;
+			border: 1px solid #3b4759;
+			border-radius: 4px;
+			padding: 5px 8px;
+			font-size: 12px;
+			cursor: pointer;
+		`;
+		btnRefreshLib.onclick = () => this.loadLibraryPrefabs();
+
+		searchInputAndRefresh.appendChild(this.librarySearchInput);
+		searchInputAndRefresh.appendChild(btnRefreshLib);
+
+		const filterRow = document.createElement("div");
+		filterRow.style.cssText = `display: flex; align-items: center; justify-content: space-between; gap: 6px;`;
+
+		const filterLabel = document.createElement("span");
+		filterLabel.textContent = "Categoría:";
+		filterLabel.style.cssText = `font-size: 11px; color: #94a3b8;`;
+
+		this.libraryCategorySelect = document.createElement("select");
+		this.libraryCategorySelect.style.cssText = `
+			flex: 1;
+			background: #1e2837;
+			border: 1px solid #334155;
+			border-radius: 4px;
+			color: #e2e8f0;
+			padding: 3px 6px;
+			font-size: 11px;
+			outline: none;
+			cursor: pointer;
+		`;
+		this.libraryCategorySelect.innerHTML = `
+			<option value="all">Todas las categorías</option>
+			<option value="general">General</option>
+			<option value="defensas">Defensas</option>
+			<option value="edificios">Edificios</option>
+			<option value="vehiculos">Vehículos</option>
+			<option value="decoracion">Decoración</option>
+		`;
+		this.libraryCategorySelect.onchange = () => this.renderLibrary();
+
+		filterRow.appendChild(filterLabel);
+		filterRow.appendChild(this.libraryCategorySelect);
+
+		libSearchRow.appendChild(searchInputAndRefresh);
+		libSearchRow.appendChild(filterRow);
+		this.libraryContainer.appendChild(libSearchRow);
+
+		this.libraryListContainer = document.createElement("div");
+		this.libraryListContainer.style.cssText = `
+			padding: 8px 12px;
+			overflow-y: auto;
+			max-height: 480px;
+			display: flex;
+			flex-direction: column;
+			gap: 8px;
+		`;
+		this.libraryContainer.appendChild(this.libraryListContainer);
+
+		this.container.appendChild(this.libraryContainer);
 
 		document.body.appendChild(this.container);
 		this.show();
@@ -333,12 +510,41 @@ export class EditorExplorer {
 		else this.show();
 	}
 
+	public switchTab(tab: "scene" | "library") {
+		this.currentTab = tab;
+		if (tab === "scene") {
+			this.sceneContentContainer.style.display = "flex";
+			this.libraryContainer.style.display = "none";
+			this.btnTabScene.style.background = "#1e293b";
+			this.btnTabScene.style.color = "#38bdf8";
+			this.btnTabScene.style.borderBottom = "2px solid #38bdf8";
+			this.btnTabLibrary.style.background = "transparent";
+			this.btnTabLibrary.style.color = "#94a3b8";
+			this.btnTabLibrary.style.borderBottom = "2px solid transparent";
+			this.renderTree();
+		} else {
+			this.sceneContentContainer.style.display = "none";
+			this.libraryContainer.style.display = "flex";
+			this.btnTabLibrary.style.background = "#1e293b";
+			this.btnTabLibrary.style.color = "#38bdf8";
+			this.btnTabLibrary.style.borderBottom = "2px solid #38bdf8";
+			this.btnTabScene.style.background = "transparent";
+			this.btnTabScene.style.color = "#94a3b8";
+			this.btnTabScene.style.borderBottom = "2px solid transparent";
+			this.loadLibraryPrefabs();
+		}
+	}
+
 	private toggleCollapse() {
 		this.isCollapsed = !this.isCollapsed;
-		const elementsToToggle = [this.container.children[1], this.container.children[2], this.treeContainer];
+		const tabBar = this.btnTabScene?.parentElement;
+		const elementsToToggle = [tabBar, this.sceneContentContainer, this.libraryContainer];
 		elementsToToggle.forEach((el) => {
 			if (el) (el as HTMLElement).style.display = this.isCollapsed ? "none" : "";
 		});
+		if (!this.isCollapsed) {
+			this.switchTab(this.currentTab);
+		}
 	}
 
 	private toggleCouplingMode() {
@@ -467,6 +673,9 @@ export class EditorExplorer {
 			if (!matchSelf && !matchDescendant) return;
 		}
 
+		const isPrefabMember = !!node.metadata?.prefabInstanceId;
+		const isPrefabRoot = !!node.metadata?.isPrefabRoot;
+
 		const itemRow = document.createElement("div");
 		const isSelected = this.selectedNodeId === node.id;
 		itemRow.style.cssText = `
@@ -482,6 +691,7 @@ export class EditorExplorer {
 			color: ${isSelected ? "#93c5fd" : "#cbd5e1"};
 			transition: background 0.1s ease, border 0.1s ease;
 			border: 1px solid transparent;
+			${isPrefabRoot ? "border-left: 3px solid #38bdf8;" : isPrefabMember ? "border-left: 2px solid #0284c7;" : ""}
 		`;
 
 		// ── Drag & Drop de Explorer (Corrección 3) ───────────────────────────────
@@ -497,7 +707,7 @@ export class EditorExplorer {
 		itemRow.ondragend = () => {
 			this.draggedNodeId = null;
 			itemRow.style.opacity = "1";
-			this.resetRowDropStyles(itemRow, isSelected);
+			this.resetRowDropStyles(itemRow, isSelected, isPrefabRoot, isPrefabMember);
 		};
 
 		itemRow.ondragover = (e) => {
@@ -527,7 +737,7 @@ export class EditorExplorer {
 				itemRow.style.background = "rgba(239, 68, 68, 0.2)";
 			} else {
 				if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
-				this.resetRowDropStyles(itemRow, isSelected);
+				this.resetRowDropStyles(itemRow, isSelected, isPrefabRoot, isPrefabMember);
 
 				if (dropPosition === "before") {
 					itemRow.style.borderTop = "2px solid #38bdf8";
@@ -541,13 +751,13 @@ export class EditorExplorer {
 		};
 
 		itemRow.ondragleave = () => {
-			this.resetRowDropStyles(itemRow, isSelected);
+			this.resetRowDropStyles(itemRow, isSelected, isPrefabRoot, isPrefabMember);
 		};
 
 		itemRow.ondrop = (e) => {
 			e.preventDefault();
 			e.stopPropagation();
-			this.resetRowDropStyles(itemRow, isSelected);
+			this.resetRowDropStyles(itemRow, isSelected, isPrefabRoot, isPrefabMember);
 
 			if (!this.draggedNodeId || this.draggedNodeId === node.id) return;
 			const draggedId = this.draggedNodeId;
@@ -646,7 +856,7 @@ export class EditorExplorer {
 			leftBox.appendChild(foldIcon);
 
 			const groupIcon = document.createElement("span");
-			groupIcon.textContent = isCollapsed ? "📁" : "📂";
+			groupIcon.textContent = isPrefabMember ? "📦" : (isCollapsed ? "📁" : "📂");
 			leftBox.appendChild(groupIcon);
 		} else {
 			const spacer = document.createElement("span");
@@ -660,8 +870,25 @@ export class EditorExplorer {
 
 		const nameLabel = document.createElement("span");
 		nameLabel.textContent = node.customName || node.name;
-		nameLabel.style.cssText = `overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 140px;`;
+		nameLabel.style.cssText = `overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: ${isPrefabRoot ? "110px" : "140px"};`;
 		leftBox.appendChild(nameLabel);
+
+		if (isPrefabRoot) {
+			const prefabTag = document.createElement("span");
+			prefabTag.textContent = `[v${node.metadata?.prefabVersion || 1}]`;
+			prefabTag.title = `Instancia de prefab: ${node.metadata?.prefabName || ""}`;
+			prefabTag.style.cssText = `
+				font-size: 9px;
+				color: #38bdf8;
+				background: rgba(56, 189, 248, 0.15);
+				border: 1px solid #0284c7;
+				border-radius: 3px;
+				padding: 0 4px;
+				margin-left: 2px;
+				white-space: nowrap;
+			`;
+			leftBox.appendChild(prefabTag);
+		}
 
 		// Contenido derecho: botones de orden y acciones rápidas
 		const actionBox = document.createElement("div");
@@ -718,10 +945,11 @@ export class EditorExplorer {
 		}
 	}
 
-	private resetRowDropStyles(itemRow: HTMLElement, isSelected: boolean) {
+	private resetRowDropStyles(itemRow: HTMLElement, isSelected: boolean, isPrefabRoot: boolean = false, isPrefabMember: boolean = false) {
 		itemRow.style.borderTop = "";
 		itemRow.style.borderBottom = "";
 		itemRow.style.borderColor = "transparent";
+		itemRow.style.borderLeft = isPrefabRoot ? "3px solid #38bdf8" : isPrefabMember ? "2px solid #0284c7" : "transparent";
 		itemRow.style.outline = "";
 		itemRow.style.background = isSelected ? "#1e3a8a" : "transparent";
 	}
@@ -875,21 +1103,62 @@ export class EditorExplorer {
 		const prepared = this.clipboard.preparePaste(spawnPos, targetParent);
 		if (!prepared) return;
 
-		prepared.newHierarchyNodes.forEach((node) => {
-			this.hierarchy.addNode(node);
-		});
+		const cmd = new DuplicateCommand(
+			this.game,
+			this.hierarchy,
+			this.groupManager,
+			{
+				hierarchyNodes: prepared.newHierarchyNodes,
+				objectsData: prepared.newObjectsData,
+				rootNodeIds: prepared.rootNodeIds,
+			},
+			(newSelectedId) => {
+				this.renderTree();
+				if (newSelectedId) {
+					this.selectNode(newSelectedId);
+				}
+			}
+		);
 
-		prepared.newObjectsData.forEach((objData) => {
-			this.game._loadSingleMapObject(objData);
-		});
-
-		this.renderTree();
+		this.history.execute(cmd);
 	}
 
 	private handleDuplicate() {
 		if (!this.selectedNodeId) return;
-		this.handleCopy();
-		this.handlePaste();
+		const node = this.hierarchy.getNode(this.selectedNodeId);
+		if (!node) return;
+
+		// Copiar la selección actual
+		const copied = this.clipboard.copy(
+			[this.selectedNodeId],
+			this.hierarchy,
+			(id) => this.fetchObjectData(id)
+		);
+		if (!copied) return;
+
+		// El duplicado debe crearse como hermano del original (targetParent = node.parentId)
+		const targetParent = node.parentId;
+		const prepared = this.clipboard.preparePaste(undefined, targetParent);
+		if (!prepared) return;
+
+		const cmd = new DuplicateCommand(
+			this.game,
+			this.hierarchy,
+			this.groupManager,
+			{
+				hierarchyNodes: prepared.newHierarchyNodes,
+				objectsData: prepared.newObjectsData,
+				rootNodeIds: prepared.rootNodeIds,
+			},
+			(newSelectedId) => {
+				this.renderTree();
+				if (newSelectedId) {
+					this.selectNode(newSelectedId);
+				}
+			}
+		);
+
+		this.history.execute(cmd);
 	}
 
 	private async handleSavePrefab() {
@@ -921,10 +1190,282 @@ export class EditorExplorer {
 		try {
 			const saved = await PrefabService.createPrefab(name.trim(), payload, { category });
 			alert(`Prefab '${saved.name}' v${saved.version} guardado exitosamente.`);
+			await this.loadLibraryPrefabs();
 		} catch (err: any) {
 			console.error("[Explorer] Error guardando prefab:", err);
 			alert(`Error guardando prefab: ${err.message}`);
 		}
+	}
+
+	private handleInsertPrefab(prefab: PlatformPrefabDto) {
+		const spawnPos = this.game.character?.body
+			? {
+					x: this.game.character.body.translation().x + 2,
+					y: this.game.character.body.translation().y,
+					z: this.game.character.body.translation().z + 2,
+			  }
+			: { x: 0, y: 0, z: 0 };
+
+		const targetParent = this.selectedNodeId && this.hierarchy.getNode(this.selectedNodeId)?.isGroup
+			? this.selectedNodeId
+			: null;
+
+		const result = this.prefabManager.instantiatePrefab(
+			prefab.data,
+			prefab.id,
+			prefab.version,
+			spawnPos,
+			targetParent,
+			(data) => {
+				this.game._loadSingleMapObject(data);
+			},
+			(groupId, pos) => {
+				const proxy = this.groupManager.getOrCreatePivotProxy(groupId);
+				if (pos) {
+					proxy.position.set(pos.x, pos.y, pos.z);
+				}
+			}
+		);
+
+		this.switchTab("scene");
+		if (result && result.rootNodeId) {
+			this.selectNode(result.rootNodeId);
+		}
+	}
+
+	private handleExportPrefabDtoJson(prefab: PlatformPrefabDto) {
+		const json = PrefabSerializer.exportToPackageJson(prefab.data, prefab.ownerId || "VIPER IO User");
+		const blob = new Blob([json], { type: "application/json" });
+		const url = URL.createObjectURL(blob);
+		const a = document.createElement("a");
+		a.href = url;
+		a.download = `${prefab.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}.prefab.json`;
+		a.click();
+		URL.revokeObjectURL(url);
+	}
+
+	private async handleDeletePrefab(prefab: PlatformPrefabDto) {
+		const confirmed = confirm(`¿Estás seguro de que deseas eliminar el prefab '${prefab.name}' (v${prefab.version})?`);
+		if (!confirmed) return;
+
+		try {
+			await PrefabService.deletePrefab(prefab.id);
+			await this.loadLibraryPrefabs();
+		} catch (err: any) {
+			alert(`Error al eliminar prefab: ${err.message}`);
+		}
+	}
+
+	private async handleSyncPrefab(prefab: PlatformPrefabDto) {
+		try {
+			const res = await PrefabService.syncPrefabToServer(prefab.id);
+			if (res.success) {
+				alert(`Prefab '${prefab.name}' sincronizado con éxito al servidor.`);
+			} else {
+				alert(`No se pudo sincronizar: ${res.error}`);
+			}
+			await this.loadLibraryPrefabs();
+		} catch (err: any) {
+			alert(`Error sincronizando prefab: ${err.message}`);
+		}
+	}
+
+	public async loadLibraryPrefabs() {
+		this.isLoadingLibrary = true;
+		this.renderLibrary();
+		try {
+			this.cachedPrefabsList = await PrefabService.listPrefabs();
+		} catch (err) {
+			console.error("[Explorer] Error cargando biblioteca de prefabs:", err);
+			this.cachedPrefabsList = [];
+		} finally {
+			this.isLoadingLibrary = false;
+			this.renderLibrary();
+		}
+	}
+
+	private renderLibrary() {
+		if (!this.libraryListContainer) return;
+		this.libraryListContainer.innerHTML = "";
+
+		if (this.isLoadingLibrary) {
+			const loading = document.createElement("div");
+			loading.style.cssText = `color: #94a3b8; text-align: center; padding: 24px 0; font-style: italic; font-size: 12px;`;
+			loading.textContent = "⏳ Cargando biblioteca de prefabs...";
+			this.libraryListContainer.appendChild(loading);
+			return;
+		}
+
+		const searchQuery = this.librarySearchInput?.value.toLowerCase().trim() || "";
+		const selectedCategory = this.libraryCategorySelect?.value || "all";
+
+		const filtered = this.cachedPrefabsList.filter((p) => {
+			if (selectedCategory !== "all" && p.category && p.category.toLowerCase() !== selectedCategory.toLowerCase()) {
+				return false;
+			}
+			if (searchQuery) {
+				const matchesName = p.name.toLowerCase().includes(searchQuery);
+				const matchesDesc = p.description?.toLowerCase().includes(searchQuery);
+				const matchesCat = p.category?.toLowerCase().includes(searchQuery);
+				const matchesTags = p.tags?.some((t) => t.toLowerCase().includes(searchQuery));
+				return matchesName || matchesDesc || matchesCat || matchesTags;
+			}
+			return true;
+		});
+
+		if (filtered.length === 0) {
+			const empty = document.createElement("div");
+			empty.style.cssText = `color: #64748b; text-align: center; padding: 20px 10px; font-size: 12px;`;
+			empty.innerHTML = `
+				<div style="font-size: 20px; margin-bottom: 6px;">📦</div>
+				<div>No hay prefabs disponibles</div>
+				<div style="font-size: 11px; margin-top: 4px; color: #475569;">
+					Guarda un grupo como prefab usando el botón <b>⭐ Prefab</b> en la pestaña Escena.
+				</div>
+			`;
+			this.libraryListContainer.appendChild(empty);
+			return;
+		}
+
+		filtered.forEach((prefab) => {
+			const card = document.createElement("div");
+			card.style.cssText = `
+				background: #182234;
+				border: 1px solid #2e3e56;
+				border-radius: 6px;
+				padding: 10px;
+				display: flex;
+				flex-direction: column;
+				gap: 6px;
+				transition: border-color 0.15s ease;
+			`;
+			card.onmouseenter = () => (card.style.borderColor = "#38bdf8");
+			card.onmouseleave = () => (card.style.borderColor = "#2e3e56");
+
+			// Header del card: Nombre, categoría y versión
+			const cardHeader = document.createElement("div");
+			cardHeader.style.cssText = `display: flex; align-items: center; justify-content: space-between;`;
+
+			const titleRow = document.createElement("div");
+			titleRow.style.cssText = `display: flex; align-items: center; gap: 6px; font-weight: 600; color: #f1f5f9;`;
+			titleRow.innerHTML = `<span>📦</span><span>${prefab.name}</span>`;
+
+			const versionBadge = document.createElement("span");
+			versionBadge.textContent = `v${prefab.version}`;
+			versionBadge.style.cssText = `
+				background: #1e293b;
+				color: #94a3b8;
+				border-radius: 3px;
+				padding: 1px 5px;
+				font-size: 10px;
+				border: 1px solid #334155;
+			`;
+			titleRow.appendChild(versionBadge);
+
+			const categoryBadge = document.createElement("span");
+			categoryBadge.textContent = prefab.category || "general";
+			categoryBadge.style.cssText = `
+				background: rgba(56, 189, 248, 0.15);
+				color: #38bdf8;
+				border-radius: 3px;
+				padding: 1px 5px;
+				font-size: 10px;
+			`;
+
+			cardHeader.appendChild(titleRow);
+			cardHeader.appendChild(categoryBadge);
+			card.appendChild(cardHeader);
+
+			// Detalles: descripción, conteo de objetos y almacenamiento
+			const detailsRow = document.createElement("div");
+			detailsRow.style.cssText = `display: flex; flex-direction: column; gap: 3px; font-size: 11px; color: #94a3b8;`;
+
+			if (prefab.description) {
+				const desc = document.createElement("div");
+				desc.textContent = prefab.description;
+				desc.style.cssText = `color: #cbd5e1; font-style: italic; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;`;
+				detailsRow.appendChild(desc);
+			}
+
+			const metaInfo = document.createElement("div");
+			metaInfo.style.cssText = `display: flex; align-items: center; justify-content: space-between; margin-top: 2px;`;
+
+			const objectCount = prefab.data?.objects?.length ?? 0;
+			const groupCount = prefab.data?.hierarchy?.filter((n: any) => n.isGroup).length ?? 0;
+			const objCountSpan = document.createElement("span");
+			objCountSpan.textContent = `🧱 ${objectCount} objeto${objectCount === 1 ? "" : "s"}${groupCount > 0 ? ` (${groupCount} grupo${groupCount === 1 ? "" : "s"})` : ""}`;
+			metaInfo.appendChild(objCountSpan);
+
+			const storageBadge = document.createElement("span");
+			const status = prefab.storageStatus || "server";
+			if (status === "server") {
+				storageBadge.innerHTML = `☁️ Servidor`;
+				storageBadge.style.cssText = `background: rgba(34, 197, 94, 0.15); color: #4ade80; border: 1px solid #22c55e; border-radius: 3px; padding: 1px 4px; font-size: 10px;`;
+			} else if (status === "local") {
+				storageBadge.innerHTML = `💾 Local`;
+				storageBadge.style.cssText = `background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid #0284c7; border-radius: 3px; padding: 1px 4px; font-size: 10px;`;
+			} else if (status === "pending_sync") {
+				storageBadge.innerHTML = `⏳ Pendiente Sync`;
+				storageBadge.style.cssText = `background: rgba(234, 179, 8, 0.15); color: #facc15; border: 1px solid #ca8a04; border-radius: 3px; padding: 1px 4px; font-size: 10px;`;
+			} else if (status === "auth_error") {
+				storageBadge.innerHTML = `🔒 Sin login`;
+				storageBadge.style.cssText = `background: rgba(249, 115, 22, 0.15); color: #fb923c; border: 1px solid #ea580c; border-radius: 3px; padding: 1px 4px; font-size: 10px;`;
+			} else {
+				storageBadge.innerHTML = `⚠️ ${status}`;
+				storageBadge.style.cssText = `background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid #dc2626; border-radius: 3px; padding: 1px 4px; font-size: 10px;`;
+			}
+			metaInfo.appendChild(storageBadge);
+			detailsRow.appendChild(metaInfo);
+			card.appendChild(detailsRow);
+
+			// Fila de acciones
+			const actionsRow = document.createElement("div");
+			actionsRow.style.cssText = `display: flex; align-items: center; gap: 4px; margin-top: 4px;`;
+
+			const createActionBtn = (label: string, title: string, onClick: () => void, bg: string, color: string = "#f1f5f9") => {
+				const btn = document.createElement("button");
+				btn.innerHTML = label;
+				btn.title = title;
+				btn.style.cssText = `
+					flex: 1;
+					background: ${bg};
+					color: ${color};
+					border: 1px solid #3b4759;
+					border-radius: 4px;
+					padding: 4px 6px;
+					font-size: 11px;
+					font-weight: 500;
+					cursor: pointer;
+					transition: all 0.15s ease;
+					text-align: center;
+				`;
+				btn.onmouseenter = () => (btn.style.filter = "brightness(1.2)");
+				btn.onmouseleave = () => (btn.style.filter = "none");
+				btn.onclick = (e) => {
+					e.stopPropagation();
+					onClick();
+				};
+				return btn;
+			};
+
+			const btnInsert = createActionBtn("➕ Insertar", "Insertar una instancia independiente en la escena", () => this.handleInsertPrefab(prefab), "#0284c7");
+			const btnExport = createActionBtn("📤 JSON", "Exportar como archivo JSON descargable", () => this.handleExportPrefabDtoJson(prefab), "#334155");
+
+			actionsRow.appendChild(btnInsert);
+			actionsRow.appendChild(btnExport);
+
+			if (status !== "server") {
+				const btnSync = createActionBtn("🔄 Sync", "Sincronizar este prefab al servidor", () => this.handleSyncPrefab(prefab), "#ca8a04");
+				actionsRow.appendChild(btnSync);
+			}
+
+			const btnDelete = createActionBtn("🗑️", "Eliminar este prefab", () => this.handleDeletePrefab(prefab), "#991b1b");
+			btnDelete.style.flex = "0 0 28px";
+			actionsRow.appendChild(btnDelete);
+
+			card.appendChild(actionsRow);
+			this.libraryListContainer.appendChild(card);
+		});
 	}
 
 	private handleExportJson() {
@@ -994,6 +1535,12 @@ export class EditorExplorer {
 					targetParent,
 					(data) => {
 						this.game._loadSingleMapObject(data);
+					},
+					(groupId, pos) => {
+						const proxy = this.groupManager.getOrCreatePivotProxy(groupId);
+						if (pos) {
+							proxy.position.set(pos.x, pos.y, pos.z);
+						}
 					}
 				);
 
@@ -1010,12 +1557,26 @@ export class EditorExplorer {
 	// ── Ayudantes de resolución de objetos ──────────────────────────────────────
 
 	private resolveObject3D(uuid: string): any {
-		if (!this.game?.sceneManager?.scene) return null;
-		return (
-			this.game.sceneManager.scene.children.find(
+		if (this.game?.editableMapObjects) {
+			const found = this.game.editableMapObjects.find(
+				(obj: any) => obj.userData && obj.userData.uuid === uuid
+			);
+			if (found) return found;
+		}
+		if (this.game?.sceneManager?.scene) {
+			const direct = this.game.sceneManager.scene.children.find(
 				(child: any) => child.userData && child.userData.uuid === uuid
-			) || null
-		);
+			);
+			if (direct) return direct;
+			let foundTraverse: any = null;
+			this.game.sceneManager.scene.traverse((child: any) => {
+				if (!foundTraverse && child.userData && child.userData.uuid === uuid) {
+					foundTraverse = child;
+				}
+			});
+			return foundTraverse;
+		}
+		return null;
 	}
 
 	private fetchObjectData(uuid: string): any {
@@ -1024,7 +1585,7 @@ export class EditorExplorer {
 
 		return {
 			uuid: obj.userData.uuid,
-			type: obj.userData.mapObjectType,
+			type: obj.userData.mapObjectType || obj.userData.type || "wall",
 			color: obj.userData.color,
 			originalScale: obj.userData.originalScale,
 			pos: { x: obj.position.x, y: obj.position.y, z: obj.position.z },
@@ -1036,6 +1597,8 @@ export class EditorExplorer {
 			customName: obj.userData.customName,
 			invisible: obj.userData.invisible,
 			opacity: obj.userData.opacity,
+			bodyType: obj.userData.bodyType,
+			collisionType: obj.userData.collisionType,
 		};
 	}
 

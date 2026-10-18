@@ -11,12 +11,13 @@ const LOCAL_STORAGE_KEY = "viper_prefabs_offline_store";
 
 export class PrefabService {
 	/**
-	 * Lista los prefabs disponibles según el alcance (public, mine, all) y categoría.
+	 * Lista unificada de prefabs (servidor + local) diferenciando procedencia y evitando duplicados.
 	 */
 	static async listPrefabs(
 		scope: "public" | "mine" | "all" = "all",
 		category?: string
 	): Promise<PlatformPrefabDto[]> {
+		const localList = this.getLocalPrefabs(scope, category);
 		try {
 			const params = new URLSearchParams();
 			if (scope !== "all") params.set("scope", scope);
@@ -24,10 +25,27 @@ export class PrefabService {
 			const qs = params.toString() ? `?${params.toString()}` : "";
 
 			const response = await apiFetch<{ prefabs: PlatformPrefabDto[] }>(`/prefabs${qs}`);
-			return response.prefabs;
+			const serverPrefabs = response.prefabs.map((p) => ({
+				...p,
+				data: p.data || p.currentVersion?.data,
+				storageStatus: "server" as const,
+			}));
+
+			// Actualizar caché local de los prefabs remotos
+			serverPrefabs.forEach((sp) => this.saveLocalPrefab(sp));
+
+			// Combinar con los prefabs locales que no están en el servidor
+			const serverIds = new Set(serverPrefabs.map((p) => p.id));
+			const serverSlugs = new Set(serverPrefabs.map((p) => p.slug));
+
+			const uniqueLocals = localList.filter(
+				(lp) => !serverIds.has(lp.id) && !serverSlugs.has(lp.slug)
+			);
+
+			return [...serverPrefabs, ...uniqueLocals];
 		} catch (err) {
-			console.warn("[PrefabService] Servidor inaccesible. Usando almacenamiento local:", err);
-			return this.getLocalPrefabs(scope, category);
+			console.warn("[PrefabService] Servidor inaccesible. Usando biblioteca local offline:", err);
+			return localList;
 		}
 	}
 
@@ -37,9 +55,11 @@ export class PrefabService {
 	static async getPrefab(identifier: string, version?: number): Promise<PlatformPrefabDto> {
 		try {
 			const qs = version ? `?version=${version}` : "";
-			return await apiFetch<PlatformPrefabDto>(`/prefabs/${encodeURIComponent(identifier)}${qs}`);
+			const prefab = await apiFetch<PlatformPrefabDto>(`/prefabs/${encodeURIComponent(identifier)}${qs}`);
+			prefab.storageStatus = "server";
+			return prefab;
 		} catch (err) {
-			console.warn(`[PrefabService] Error obteniendo prefab '${identifier}' del servidor. Buscando local:`, err);
+			console.warn(`[PrefabService] Buscando prefab '${identifier}' en almacenamiento local:`, err);
 			const local = this.getLocalPrefab(identifier);
 			if (local) return local;
 			throw err;
@@ -47,35 +67,94 @@ export class PrefabService {
 	}
 
 	/**
-	 * Crea un nuevo prefab persistente en la base de datos (con versión inicial inmutable v1).
+	 * Crea un nuevo prefab persistente en PostgreSQL con versión inicial inmutable v1.
+	 * Diferencia estrictamente errores de autenticación, validación y conexión.
 	 */
 	static async createPrefab(
 		name: string,
 		data: PrefabDataPayload,
 		options: { description?: string; category?: string; isPublished?: boolean; notes?: string } = {}
 	): Promise<PlatformPrefabDto> {
-		try {
-			const payload = {
-				name,
-				description: options.description ?? null,
-				category: options.category ?? data.category ?? "general",
-				isPublished: options.isPublished ?? false,
-				data,
-				notes: options.notes ?? "Versión inicial",
-			};
+		if (!data || data.format !== "viper-prefab") {
+			throw new Error("Formato de datos no reconocido (se requiere 'viper-prefab')");
+		}
 
+		const payload = {
+			name,
+			description: options.description ?? null,
+			category: options.category ?? data.category ?? "general",
+			isPublished: options.isPublished ?? false,
+			data,
+			notes: options.notes ?? "Versión inicial",
+		};
+
+		try {
 			const created = await apiFetch<PlatformPrefabDto>("/prefabs", {
 				method: "POST",
 				body: JSON.stringify(payload),
 			});
 
+			created.storageStatus = "server";
 			this.saveLocalPrefab(created);
 			return created;
-		} catch (err) {
-			console.warn("[PrefabService] Servidor no disponible. Guardando prefab localmente:", err);
+		} catch (err: any) {
+			const errMsg = err?.message || String(err);
+			const normErr = errMsg.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+			const isAuth = normErr.includes("sesion no autenticada") || normErr.includes("sesion requerida") || normErr.includes("permiso") || normErr.includes("401") || normErr.includes("403");
+			const isValidation = normErr.includes("invalid") || normErr.includes("esquema") || normErr.includes("formato no reconocido") || normErr.includes("400");
+
+			if (isValidation) {
+				// Errores de validación se lanzan directamente para no engañar al usuario
+				throw new Error(`Validación rechazada por el servidor: ${errMsg}`);
+			}
+
+			if (isAuth) {
+				const local = this.createLocalPrefab(name, data, options);
+				local.storageStatus = "auth_error";
+				local.syncError = "No autenticado en el servidor. Guardado solo en este navegador.";
+				this.saveLocalPrefab(local);
+				return local;
+			}
+
+			// Error de conexión o servidor no disponible
+			console.warn("[PrefabService] Servidor inaccesible. Guardando prefab localmente como pendiente:", err);
 			const localPrefab = this.createLocalPrefab(name, data, options);
+			localPrefab.storageStatus = "pending_sync";
+			localPrefab.syncError = "Pendiente de sincronización con el servidor.";
+			this.saveLocalPrefab(localPrefab);
 			return localPrefab;
 		}
+	}
+
+	/**
+	 * Sincroniza explícitamente un prefab local con el servidor PostgreSQL.
+	 */
+	static async syncPrefabToServer(identifier: string): Promise<PlatformPrefabDto> {
+		const local = this.getLocalPrefab(identifier);
+		if (!local) throw new Error("Prefab no encontrado en el almacenamiento local");
+		const data = local.currentVersion?.data;
+		if (!data) throw new Error("El prefab local no contiene datos de objetos válidos");
+
+		const payload = {
+			name: local.name,
+			description: local.description,
+			category: local.category,
+			isPublished: local.isPublished,
+			data,
+			notes: local.currentVersion?.notes || "Sincronizado desde navegador",
+		};
+
+		const created = await apiFetch<PlatformPrefabDto>("/prefabs", {
+			method: "POST",
+			body: JSON.stringify(payload),
+		});
+
+		created.storageStatus = "server";
+		if (created.id !== local.id) {
+			this.removeLocalPrefab(local.id);
+		}
+		this.saveLocalPrefab(created);
+		return created;
 	}
 
 	/**
@@ -98,16 +177,17 @@ export class PrefabService {
 				body: JSON.stringify(options),
 			});
 
+			updated.storageStatus = "server";
 			this.saveLocalPrefab(updated);
 			return updated;
-		} catch (err) {
+		} catch (err: any) {
 			console.warn("[PrefabService] Servidor no disponible. Actualizando prefab localmente:", err);
 			return this.updateLocalPrefab(identifier, options);
 		}
 	}
 
 	/**
-	 * Elimina un prefab.
+	 * Elimina un prefab tanto del servidor como del almacenamiento local.
 	 */
 	static async deletePrefab(identifier: string): Promise<{ ok: boolean; id: string }> {
 		try {
@@ -115,7 +195,7 @@ export class PrefabService {
 				method: "DELETE",
 			});
 		} catch (err) {
-			console.warn("[PrefabService] Eliminando prefab solo localmente:", err);
+			console.warn("[PrefabService] Servidor no disponible o prefab solo local:", err);
 		}
 		this.removeLocalPrefab(identifier);
 		return { ok: true, id: identifier };
@@ -123,12 +203,17 @@ export class PrefabService {
 
 	// ── Almacenamiento local (Fallback Offline / Standalone) ──────────────────────
 
+	private static inMemoryStore: Record<string, PlatformPrefabDto> = {};
+
 	private static getRawLocalStore(): Record<string, PlatformPrefabDto> {
 		try {
-			const raw = typeof localStorage !== "undefined" ? localStorage.getItem(LOCAL_STORAGE_KEY) : null;
-			return raw ? JSON.parse(raw) : {};
+			if (typeof localStorage !== "undefined") {
+				const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
+				return raw ? JSON.parse(raw) : {};
+			}
+			return this.inMemoryStore;
 		} catch {
-			return {};
+			return this.inMemoryStore;
 		}
 	}
 
@@ -136,6 +221,8 @@ export class PrefabService {
 		try {
 			if (typeof localStorage !== "undefined") {
 				localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(store));
+			} else {
+				this.inMemoryStore = store;
 			}
 		} catch (e) {
 			console.error("[PrefabService] Error escribiendo localStorage:", e);
@@ -144,7 +231,10 @@ export class PrefabService {
 
 	private static getLocalPrefabs(scope: string, category?: string): PlatformPrefabDto[] {
 		const store = this.getRawLocalStore();
-		let list = Object.values(store);
+		let list = Object.values(store).map((p) => ({
+			...p,
+			data: p.data || p.currentVersion?.data,
+		}));
 		if (category) {
 			list = list.filter((p) => p.category === category);
 		}
@@ -153,9 +243,17 @@ export class PrefabService {
 
 	private static getLocalPrefab(identifier: string): PlatformPrefabDto | null {
 		const store = this.getRawLocalStore();
-		if (store[identifier]) return store[identifier];
-		const bySlug = Object.values(store).find((p) => p.slug === identifier);
-		return bySlug || null;
+		let prefab = store[identifier];
+		if (!prefab) {
+			prefab = Object.values(store).find((p) => p.slug === identifier) || null as any;
+		}
+		if (prefab) {
+			return {
+				...prefab,
+				data: prefab.data || prefab.currentVersion?.data,
+			};
+		}
+		return null;
 	}
 
 	private static saveLocalPrefab(prefab: PlatformPrefabDto) {
@@ -205,6 +303,7 @@ export class PrefabService {
 				createdAt: now,
 				data,
 			},
+			data,
 		};
 
 		this.saveLocalPrefab(prefabDto);

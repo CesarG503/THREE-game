@@ -11,7 +11,7 @@
 import * as THREE from "three";
 import { EditorHierarchyModel } from "../hierarchy/EditorHierarchyModel";
 import type { SerializedHierarchyNode } from "../hierarchy/EditorHierarchyModel";
-import { EditorClipboard } from "../clipboard/EditorClipboard";
+import { EditorClipboard, remapLogicReferences } from "../clipboard/EditorClipboard";
 import type { SerializedMapObjectData } from "../clipboard/EditorClipboard";
 import type { PrefabDataPayload, PlatformPrefabDto, PrefabInstanceRecord } from "./PrefabTypes";
 import { PrefabService } from "./PrefabService";
@@ -65,7 +65,8 @@ export class PrefabManager {
 		prefabVersion: number,
 		targetPosition: { x: number; y: number; z: number } = { x: 0, y: 0, z: 0 },
 		targetParentId: string | null = null,
-		objectSpawner: (data: SerializedMapObjectData) => void
+		objectSpawner: (data: SerializedMapObjectData) => void,
+		groupProxyCreator?: (groupId: string, pos?: { x: number; y: number; z: number }) => void
 	): { instanceId: string; rootNodeId: string; createdUuids: string[] } {
 		const instanceId = `inst_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
 		const uuidMap = new Map<string, string>();
@@ -116,6 +117,8 @@ export class PrefabManager {
 					prefabInstanceId: instanceId,
 					prefabId,
 					prefabVersion,
+					prefabName: prefabData.name,
+					isPrefabRoot: isRoot,
 				},
 			};
 
@@ -131,11 +134,17 @@ export class PrefabManager {
 			}
 
 			this.hierarchy.addNode(newNodeData);
+
+			if (oldNode.isGroup && groupProxyCreator) {
+				groupProxyCreator(newId, newNodeData.pivot?.pos);
+			}
 		});
 
 		// 4. Instanciar objetos físicos en la escena
 		const createdUuids: string[] = [];
 		prefabData.objects.forEach((oldObj) => {
+			if (oldObj.type === "group_pivot") return;
+
 			const newId = uuidMap.get(oldObj.uuid)!;
 			const isRoot = !oldObj.parentId || !uuidMap.has(oldObj.parentId);
 			const newParentId = isRoot ? targetParentId : uuidMap.get(oldObj.parentId)!;
@@ -151,6 +160,11 @@ export class PrefabManager {
 				},
 			};
 
+			// Remapeo de lógica
+			if (newObjData.logicProperties) {
+				newObjData.logicProperties = remapLogicReferences(newObjData.logicProperties, uuidMap);
+			}
+
 			createdUuids.push(newId);
 			objectSpawner(newObjData);
 		});
@@ -165,6 +179,44 @@ export class PrefabManager {
 		this.instances.set(instanceId, instanceRecord);
 
 		return { instanceId, rootNodeId, createdUuids };
+	}
+
+	/**
+	 * Reconstruye el registro de instancias a partir de los metadatos de los nodos al cargar mapas.
+	 */
+	restoreInstancesFromHierarchy() {
+		const allNodes = this.hierarchy.getAllNodes();
+		const instanceGroups = new Map<string, any[]>();
+		for (const node of allNodes) {
+			const instId = node.metadata?.prefabInstanceId;
+			if (typeof instId === "string" && instId) {
+				if (!instanceGroups.has(instId)) instanceGroups.set(instId, []);
+				instanceGroups.get(instId)!.push(node);
+			}
+		}
+
+		for (const [instId, nodes] of instanceGroups.entries()) {
+			const firstNode = nodes[0];
+			const prefabId = (firstNode.metadata?.prefabId as string) || "unknown";
+			const prefabVersion = Number(firstNode.metadata?.prefabVersion) || 1;
+			const instNodeIds = new Set(nodes.map((n) => n.id));
+			const rootNode = nodes.find((n) => !n.parentId || !instNodeIds.has(n.parentId)) || firstNode;
+
+			const record: PrefabInstanceRecord = {
+				instanceId: instId,
+				prefabId,
+				prefabVersion,
+				rootNodeId: rootNode.id,
+				overrides: (firstNode.metadata?.overrides as any) || {},
+			};
+			this.instances.set(instId, record);
+		}
+
+		return this.instances.size;
+	}
+
+	removeInstance(instanceId: string) {
+		this.instances.delete(instanceId);
 	}
 
 	/**
@@ -186,5 +238,9 @@ export class PrefabManager {
 
 	getAllInstances(): PrefabInstanceRecord[] {
 		return Array.from(this.instances.values());
+	}
+
+	getActiveInstances(): PrefabInstanceRecord[] {
+		return this.getAllInstances();
 	}
 }

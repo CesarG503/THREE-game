@@ -77,6 +77,7 @@ export class EditorExplorer {
 
 	// Estado de arrastre en el árbol
 	private draggedNodeId: string | null = null;
+	private isSyncingSelection: boolean = false;
 
 	constructor(
 		game: any,
@@ -612,6 +613,9 @@ export class EditorExplorer {
 		`;
 		this.propertiesContentContainer.appendChild(this.propertiesEmptyPlaceholder);
 		this.mainPanel.appendChild(this.propertiesContentContainer);
+		if (this.game?.objectInspector?.container) {
+			this.ensureInspectorDocked();
+		}
 
 		const style = document.createElement("style");
 		style.textContent = `
@@ -774,6 +778,7 @@ export class EditorExplorer {
 		this.isVisible = true;
 		this.container.style.display = "flex";
 		this.container.style.flexDirection = "row";
+		this.ensureInspectorDocked();
 		this.switchTab(this.currentTab);
 
 		if (typeof requestAnimationFrame !== "undefined") {
@@ -806,7 +811,6 @@ export class EditorExplorer {
 	hide(immediate: boolean = false) {
 		this.cancelDrag();
 		this.isVisible = false;
-		this.undockInspector();
 
 		if (this.hideTimeoutId) {
 			clearTimeout(this.hideTimeoutId);
@@ -888,8 +892,36 @@ export class EditorExplorer {
 		}
 	}
 
-	public updatePropertiesView() {
+	private ensureInspectorDocked() {
+		if (!this.game?.objectInspector?.container || !this.propertiesContentContainer) return;
+		const c = this.game.objectInspector.container;
+		if (c.parentElement === this.propertiesContentContainer) return;
+
+		c.style.position = "static";
+		c.style.top = "auto";
+		c.style.right = "auto";
+		c.style.width = "100%";
+		c.style.maxHeight = "none";
+		c.style.height = "auto";
+		c.style.border = "none";
+		c.style.borderRadius = "0";
+		c.style.boxShadow = "none";
+		c.style.background = "transparent";
+		c.style.padding = "10px 14px";
+		c.style.boxSizing = "border-box";
+		if (c.firstElementChild) {
+			(c.firstElementChild as HTMLElement).style.display = "none";
+		}
+		if (c.parentElement && typeof c.parentElement.removeChild === "function") {
+			c.parentElement.removeChild(c);
+		}
+		this.propertiesContentContainer.appendChild(c);
+	}
+
+	public updatePropertiesView(syncInspector: boolean = true) {
 		if (!this.propertiesContentContainer) return;
+
+		this.ensureInspectorDocked();
 
 		// Si no hay nodo seleccionado
 		if (!this.selectedNodeId) {
@@ -904,61 +936,24 @@ export class EditorExplorer {
 
 		if (this.game?.objectInspector && this.game.objectInspector.container) {
 			const inspectorContainer = this.game.objectInspector.container;
-			if (inspectorContainer.parentElement !== this.propertiesContentContainer) {
-				inspectorContainer.dataset.docked = "true";
-				inspectorContainer.style.position = "static";
-				inspectorContainer.style.top = "auto";
-				inspectorContainer.style.right = "auto";
-				inspectorContainer.style.width = "100%";
-				inspectorContainer.style.maxHeight = "none";
-				inspectorContainer.style.height = "auto";
-				inspectorContainer.style.border = "none";
-				inspectorContainer.style.borderRadius = "0";
-				inspectorContainer.style.boxShadow = "none";
-				inspectorContainer.style.background = "transparent";
-				inspectorContainer.style.padding = "10px 14px";
-				inspectorContainer.style.boxSizing = "border-box";
-				if (inspectorContainer.firstElementChild) {
-					(inspectorContainer.firstElementChild as HTMLElement).style.display = "none";
-				}
-				this.propertiesContentContainer.appendChild(inspectorContainer);
-			}
 
-			const node = this.hierarchy.getNode(this.selectedNodeId);
-			if (node) {
-				if (node.isGroup) {
-					const proxy = this.groupManager.getOrCreatePivotProxy(node.id);
-					this.game.objectInspector.show(proxy);
-				} else {
-					const obj = this.resolveObject3D(node.id);
-					if (obj) this.game.objectInspector.show(obj);
+			if (syncInspector) {
+				const node = this.hierarchy.getNode(this.selectedNodeId);
+				if (node) {
+					if (node.isGroup) {
+						const proxy = this.groupManager.getOrCreatePivotProxy(node.id);
+						if (this.game.objectInspector.selectedObject !== proxy) {
+							this.game.objectInspector.show(proxy);
+						}
+					} else {
+						const obj = this.resolveObject3D(node.id);
+						if (obj && this.game.objectInspector.selectedObject !== obj) {
+							this.game.objectInspector.show(obj);
+						}
+					}
 				}
 			}
 			inspectorContainer.style.display = "flex";
-		}
-	}
-
-	private undockInspector() {
-		if (this.game?.objectInspector?.container?.dataset?.docked === "true") {
-			const c = this.game.objectInspector.container;
-			delete c.dataset.docked;
-			c.style.position = "absolute";
-			c.style.top = "20px";
-			c.style.right = "20px";
-			c.style.width = "300px";
-			c.style.maxHeight = "90vh";
-			c.style.height = "";
-			c.style.background = "rgba(0, 0, 0, 0.9)";
-			c.style.border = "2px solid #444";
-			c.style.borderRadius = "12px";
-			c.style.boxShadow = "0 0 20px rgba(0, 0, 0, 0.8)";
-			c.style.padding = "15px";
-			if (c.firstElementChild) {
-				(c.firstElementChild as HTMLElement).style.display = "flex";
-			}
-			if (typeof document !== "undefined" && document.body) {
-				document.body.appendChild(c);
-			}
 		}
 	}
 
@@ -997,37 +992,45 @@ export class EditorExplorer {
 	}
 
 	selectNode(nodeId: string | null, syncInspector: boolean = true) {
-		this.selectedNodeId = nodeId;
-		this.renderTree();
+		if (this.isSyncingSelection) return;
+		if (this.selectedNodeId === nodeId && !syncInspector) return;
 
-		if (this.currentTab === "properties") {
-			this.updatePropertiesView();
-		}
+		this.isSyncingSelection = true;
+		try {
+			this.selectedNodeId = nodeId;
+			this.renderTree();
 
-		if (!syncInspector) return;
-
-		if (!nodeId) {
-			if (this.game.objectInspector && this.game.objectInspector.isVisible) {
-				this.game.objectInspector.hide();
+			if (this.currentTab === "properties") {
+				this.updatePropertiesView(false);
 			}
-			return;
-		}
 
-		const node = this.hierarchy.getNode(nodeId);
-		if (!node) return;
+			if (!syncInspector) return;
 
-		if (node.isGroup) {
-			// Seleccionar proxy de pivote central de grupo
-			const proxy = this.groupManager.getOrCreatePivotProxy(node.id);
-			if (this.game.objectInspector) {
-				this.game.objectInspector.show(proxy);
+			if (!nodeId) {
+				if (this.game?.objectInspector && this.game.objectInspector.isVisible) {
+					this.game.objectInspector.hide();
+				}
+				return;
 			}
-		} else {
-			// Seleccionar objeto físico individual
-			const obj = this.resolveObject3D(node.id);
-			if (obj && this.game.objectInspector) {
-				this.game.objectInspector.show(obj);
+
+			const node = this.hierarchy.getNode(nodeId);
+			if (!node) return;
+
+			if (node.isGroup) {
+				// Seleccionar proxy de pivote central de grupo
+				const proxy = this.groupManager.getOrCreatePivotProxy(node.id);
+				if (this.game?.objectInspector && this.game.objectInspector.selectedObject !== proxy) {
+					this.game.objectInspector.show(proxy);
+				}
+			} else {
+				// Seleccionar objeto físico individual
+				const obj = this.resolveObject3D(node.id);
+				if (obj && this.game?.objectInspector && this.game.objectInspector.selectedObject !== obj) {
+					this.game.objectInspector.show(obj);
+				}
 			}
+		} finally {
+			this.isSyncingSelection = false;
 		}
 	}
 
@@ -2122,7 +2125,6 @@ export class EditorExplorer {
 
 	dispose() {
 		this.cancelDrag();
-		this.undockInspector();
 		if (this.hideTimeoutId) {
 			clearTimeout(this.hideTimeoutId);
 			this.hideTimeoutId = null;

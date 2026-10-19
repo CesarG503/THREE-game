@@ -35,37 +35,25 @@ export class ObjectInspector {
         this.container = document.createElement('div')
         this.container.id = 'object-inspector'
         this.container.style.cssText = `
-            position: absolute;
-            top: 20px; 
-            right: 20px;
-            width: 300px;
-            max-height: 90vh;
-            background: rgba(0,0,0,0.9);
-            border: 2px solid #444; 
-            border-radius: 12px;
+            position: relative;
+            width: 100%;
+            height: auto;
+            background: transparent;
+            border: none;
+            border-radius: 0;
             display: none;
             flex-direction: column;
             color: white;
             font-family: sans-serif;
-            z-index: 2000;
-            padding: 15px;
+            padding: 10px 14px;
             box-sizing: border-box;
-            box-shadow: 0 0 20px rgba(0,0,0,0.8);
-            overflow-y: auto;
-            scrollbar-width: thin;
-            scrollbar-color: #444 #222;
+            box-shadow: none;
+            overflow-y: visible;
         `
 
-        // Header
+        // Header interno ocultado ya que EditorExplorer provee el encabezado y botones
         const header = document.createElement('div')
-        header.style.cssText = `
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-bottom: 1px solid #555;
-            padding-bottom: 10px;
-            margin-bottom: 15px;
-        `
+        header.style.display = 'none'
         this.title = document.createElement('h3')
         this.title.style.margin = "0"
         this.title.textContent = "Inspector"
@@ -1038,7 +1026,11 @@ export class ObjectInspector {
                 })
             })
 
-        document.body.appendChild(this.container)
+        if (this.game?.editorExplorer?.propertiesContentContainer) {
+            this.game.editorExplorer.propertiesContentContainer.appendChild(this.container);
+        } else if (typeof document !== 'undefined' && document.body && !this.game) {
+            document.body.appendChild(this.container);
+        }
     }
 
     createSection(title, contentBuilder) {
@@ -1193,6 +1185,14 @@ export class ObjectInspector {
 
     show(object, hitPart = null) {
         if (!object) return
+        if (this.game?.editorExplorer?.propertiesContentContainer) {
+            if (this.container.parentElement !== this.game.editorExplorer.propertiesContentContainer) {
+                if (this.container.parentElement && typeof this.container.parentElement.removeChild === 'function') {
+                    this.container.parentElement.removeChild(this.container);
+                }
+                this.game.editorExplorer.propertiesContentContainer.appendChild(this.container);
+            }
+        }
         if (this.transformGizmo?.target && this.selectedObject !== object) this.transformGizmo.detach()
         this.selectedObject = object
         this.isVisible = true
@@ -1249,8 +1249,11 @@ export class ObjectInspector {
             this.inputCustomName.value = object.userData.customName || ""
         }
 
-        if (this.game?.editorExplorer && object.userData?.uuid) {
-            this.game.editorExplorer.selectNode(object.userData.uuid, false);
+        if (this.game?.editorExplorer) {
+            const explorerNodeId = object.userData?.groupId || object.userData?.uuid;
+            if (explorerNodeId && this.game.editorExplorer.selectedNodeId !== explorerNodeId) {
+                this.game.editorExplorer.selectNode(explorerNodeId, false);
+            }
         }
 
         if (this.chkDynamicSwitch) {
@@ -1259,10 +1262,8 @@ export class ObjectInspector {
 
         if (this.isCollapsed) {
             this.content.style.display = "none"
-            this.container.style.maxHeight = "50px"
         } else {
             this.content.style.display = "flex"
-            this.container.style.maxHeight = "90vh"
         }
 
         if (!isEnv) {

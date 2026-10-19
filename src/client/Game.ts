@@ -785,10 +785,26 @@ export class Game {
 									return;
 								}
 							}
-							this.objectInspector.show(target, selectResult.hitPart);
 							const nodeId = target.userData?.groupId || target.userData?.uuid;
-							if (this.editorExplorer && nodeId) {
-								this.editorExplorer.selectNode(nodeId, false);
+
+							if (e.button === 2) {
+								// Click derecho: abre panel H si está cerrado, va a 'properties', selecciona y muestra gizmo
+								if (this.editorExplorer) {
+									if (!this.editorExplorer.isVisible) {
+										this.editorExplorer.show();
+									}
+									this.editorExplorer.switchTab("properties");
+									if (nodeId) {
+										this.editorExplorer.selectNode(nodeId, false);
+									}
+								}
+								this.objectInspector.show(target, selectResult.hitPart);
+							} else {
+								// Click izquierdo: selecciona en jerarquía si está disponible y muestra gizmo
+								if (this.editorExplorer && nodeId) {
+									this.editorExplorer.selectNode(nodeId, false);
+								}
+								this.objectInspector.show(target, selectResult.hitPart);
 							}
 							this.updateEditorInteractionMode();
 						}

@@ -416,3 +416,47 @@ test("Escenario E5: Corrección de contrato en PrefabService.syncPrefabToServer 
 		PrefabService.syncPrefabToServer = originalSync;
 	}
 });
+
+test("Escenario E6: Control de cámara manteniendo click derecho presionado con paneles abiertos (H / Inspector) y Seguimiento Automático activo", () => {
+	const camera = new THREE.PerspectiveCamera();
+	const cameraController = new CameraController(camera, domElement);
+
+	// Por defecto alwaysRotateThirdPerson está activo ("Seguimiento Automatico del puntero")
+	assert.equal(cameraController.alwaysRotateThirdPerson, true);
+
+	// Simular que Explorer o Inspector está abierto
+	let isUIActive = true;
+	cameraController.uiCheckCallback = () => isUIActive;
+	cameraController.setUIOpen(true);
+	assert.equal(cameraController.isUIOpen, true);
+
+	const initialTheta = cameraController.theta;
+	const initialPhi = cameraController.phi;
+
+	// 1. Mover el mouse sin click derecho no debe rotar la cámara (cursor libre para UI)
+	document.dispatchEvent(new MouseEvent("mousemove", { movementX: 50, movementY: 20 }));
+	assert.equal(cameraController.theta, initialTheta, "Theta no debe cambiar sin click derecho");
+	assert.equal(cameraController.phi, initialPhi, "Phi no debe cambiar sin click derecho");
+
+	// 2. Presionar click derecho en el canvas (domElement)
+	domElement.dispatchEvent(new MouseEvent("mousedown", { button: 2, clientX: 300, clientY: 200 }));
+	assert.equal(cameraController.isRightMouseDown, true, "isRightMouseDown debe ser true");
+
+	// 3. Mover el mouse con click derecho presionado debe rotar la cámara incluso con UI abierta
+	document.dispatchEvent(new MouseEvent("mousemove", { movementX: 50, movementY: 25, clientX: 350, clientY: 225 }));
+	assert.notEqual(cameraController.theta, initialTheta, "Theta debe cambiar al arrastrar con click derecho");
+	assert.notEqual(cameraController.phi, initialPhi, "Phi debe cambiar al arrastrar con click derecho");
+
+	const rotatedTheta = cameraController.theta;
+	const rotatedPhi = cameraController.phi;
+
+	// 4. Soltar click derecho
+	document.dispatchEvent(new MouseEvent("mouseup", { button: 2 }));
+	assert.equal(cameraController.isRightMouseDown, false, "isRightMouseDown debe volver a false");
+
+	// 5. Mover el mouse nuevamente no debe alterar los ángulos de la cámara
+	document.dispatchEvent(new MouseEvent("mousemove", { movementX: 30, movementY: 15 }));
+	assert.equal(cameraController.theta, rotatedTheta, "Theta no debe cambiar una vez soltado el click derecho");
+	assert.equal(cameraController.phi, rotatedPhi, "Phi no debe cambiar una vez soltado el click derecho");
+});
+

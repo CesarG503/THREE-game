@@ -30,6 +30,8 @@ export class CameraController {
   minPhi: number;
   maxPhi: number;
   isRightMouseDown: boolean;
+  lastMouseX: number | null = null;
+  lastMouseY: number | null = null;
   rotationSpeed: number;
   smoothing: number;
   target: THREE.Vector3;
@@ -140,7 +142,12 @@ export class CameraController {
   }
 
   setupEventListeners() {
-    window.addEventListener("blur", () => { this.isRightMouseDown = false; this.unlock(); }, { signal: this.events.signal });
+    window.addEventListener("blur", () => {
+      this.isRightMouseDown = false;
+      this.lastMouseX = null;
+      this.lastMouseY = null;
+      this.unlock();
+    }, { signal: this.events.signal });
     document.addEventListener("keydown", (e: KeyboardEvent) => {
       if (e.defaultPrevented || isTextInput(e.target) || e.repeat) return;
       if (e.code === "Tab" && !this.isPaused && !this.isUIOpen) {
@@ -154,9 +161,12 @@ export class CameraController {
     }, { signal: this.events.signal });
 
     this.domElement.addEventListener("mousedown", (e: MouseEvent) => {
-      if (e.button === 2 && !this.isPaused && !this.isUIOpen && !this.uiCheckCallback?.()) {
+      if (e.button === 2 && !this.isPaused) {
         this.isRightMouseDown = true;
-        if (!this.alwaysRotateThirdPerson && !this.isUIOpen && (!this.uiCheckCallback || !this.uiCheckCallback())) {
+        this.lastMouseX = e.clientX;
+        this.lastMouseY = e.clientY;
+        const isUIActive = this.isUIOpen || !!this.uiCheckCallback?.();
+        if (!this.alwaysRotateThirdPerson && !isUIActive) {
           this.safeRequestPointerLock();
         }
       }
@@ -165,31 +175,61 @@ export class CameraController {
     document.addEventListener("mouseup", (e: MouseEvent) => {
       if (e.button === 2) {
         this.isRightMouseDown = false;
-        if (!this.isFirstPerson && !this.alwaysRotateThirdPerson && !this.isUIOpen) {
+        this.lastMouseX = null;
+        this.lastMouseY = null;
+        const isUIActive = this.isUIOpen || !!this.uiCheckCallback?.();
+        if (!this.isFirstPerson && !this.alwaysRotateThirdPerson && !isUIActive) {
           this.unlock();
         }
       }
     }, { signal: this.events.signal });
 
     document.addEventListener("mousemove", (e: MouseEvent) => {
-      if (this.isPaused) return;
-      if (this.events.signal.aborted || this.isPaused || this.isUIOpen || (this.uiCheckCallback && this.uiCheckCallback())) return;
+      if (this.events.signal.aborted || this.isPaused) return;
+
+      const isUIActive = this.isUIOpen || !!this.uiCheckCallback?.();
+      if (isUIActive && !this.isRightMouseDown) return;
+      if (isTextInput(document.activeElement)) return;
 
       const isLocked = document.pointerLockElement === this.domElement;
-      const canRotate = (this.isFirstPerson && isLocked) || (this.isRightMouseDown && !this.alwaysRotateThirdPerson) || (this.alwaysRotateThirdPerson && isLocked) || (this.mode === 'free-fly' && isLocked);
+      const canRotate = this.isRightMouseDown || (!isUIActive && isLocked && (
+        this.isFirstPerson ||
+        this.alwaysRotateThirdPerson ||
+        this.mode === 'free-fly'
+      ));
 
       if (canRotate) {
+        let movementX = e.movementX;
+        let movementY = e.movementY;
+
+        if (
+          movementX === undefined ||
+          movementY === undefined ||
+          (movementX === 0 && movementY === 0 && this.lastMouseX !== null && this.lastMouseY !== null && (e.clientX !== this.lastMouseX || e.clientY !== this.lastMouseY))
+        ) {
+          if (this.lastMouseX !== null && this.lastMouseY !== null && e.clientX !== undefined && e.clientY !== undefined) {
+            movementX = e.clientX - this.lastMouseX;
+            movementY = e.clientY - this.lastMouseY;
+          }
+        }
+        if (e.clientX !== undefined && e.clientY !== undefined) {
+          this.lastMouseX = e.clientX;
+          this.lastMouseY = e.clientY;
+        }
+
+        if (!movementX && !movementY) return;
+
         if (this.isFirstPerson) {
           const oldPitch = this.fpPitch;
-          this.fpYaw -= e.movementX * this.rotationSpeed * (this.fpInvertAxisX ? -1 : 1);
-          this.fpPitch -= e.movementY * this.rotationSpeed * (this.fpInvertAxisY ? -1 : 1);
+          this.fpYaw -= movementX * this.rotationSpeed * (this.fpInvertAxisX ? -1 : 1);
+          this.fpPitch -= movementY * this.rotationSpeed * (this.fpInvertAxisY ? -1 : 1);
           this.fpPitch = Math.max(-this.maxPitch, Math.min(this.maxPitch, this.fpPitch));
           this.manualPitchDelta += this.fpPitch - oldPitch;
           this.enforceYawConstraint();
         } else {
           const oldPhi = this.phi;
-          this.theta -= e.movementX * this.rotationSpeed * (this.tpInvertAxisX ? -1 : 1);
-          this.phi += e.movementY * this.rotationSpeed * (this.tpInvertAxisY ? -1 : 1);
+          this.theta -= movementX * this.rotationSpeed * (this.tpInvertAxisX ? -1 : 1);
+          this.phi += movementY * this.rotationSpeed * (this.tpInvertAxisY ? -1 : 1);
 
           const minP = this.mode === 'free-fly' ? (-Math.PI / 2 + 0.01) : this.minPhi;
           const maxP = this.mode === 'free-fly' ? (Math.PI / 2 - 0.01) : this.maxPhi;
@@ -231,8 +271,13 @@ export class CameraController {
     document.addEventListener("pointerlockchange", () => {
       const isLocked = document.pointerLockElement === this.domElement;
       this.lockPending = false;
-      if (isLocked && (this.lockInvalidated || this.isPaused || this.isUIOpen || this.uiCheckCallback?.())) document.exitPointerLock();
-      if (!isLocked) this.isRightMouseDown = false;
+      const isUIActive = this.isUIOpen || !!this.uiCheckCallback?.();
+      if (isLocked && (this.lockInvalidated || this.isPaused || isUIActive)) document.exitPointerLock();
+      if (!isLocked && !isUIActive) {
+        this.isRightMouseDown = false;
+        this.lastMouseX = null;
+        this.lastMouseY = null;
+      }
     }, { signal: this.events.signal });
   }
 
@@ -329,13 +374,23 @@ export class CameraController {
     if (this.isUIOpen === isOpen) return;
     this.isUIOpen = isOpen;
 
-    this.isRightMouseDown = false;
+    if (!isOpen) {
+      this.isRightMouseDown = false;
+      this.lastMouseX = null;
+      this.lastMouseY = null;
+    }
     if (isOpen && typeof document !== "undefined" && document.pointerLockElement) {
       document.exitPointerLock();
     }
   }
 
-  dispose() { this.events.abort(); this.isRightMouseDown = false; this.unlock(); }
+  dispose() {
+    this.events.abort();
+    this.isRightMouseDown = false;
+    this.lastMouseX = null;
+    this.lastMouseY = null;
+    this.unlock();
+  }
 
   setSmoothing(value: number) {
     this.smoothing = value;

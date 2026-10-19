@@ -127,12 +127,17 @@ export class EditorExplorer {
 			height: 100dvh;
 			box-sizing: border-box;
 			overflow: hidden;
-			background: rgba(15, 23, 42, 0.96);
+			background: rgba(0, 0, 0, 0.9);
 			backdrop-filter: blur(12px);
-			border-right: 1px solid #334155;
-			box-shadow: 6px 0 24px -4px rgba(0, 0, 0, 0.6);
-			color: #e2e8f0;
-			font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+			border-right: 2px solid #444;
+			border-top: 2px solid #444;
+			border-bottom: 2px solid #444;
+			border-left: none;
+			border-top-right-radius: 12px;
+			border-bottom-right-radius: 12px;
+			box-shadow: 0 0 25px rgba(0, 0, 0, 0.85);
+			color: white;
+			font-family: sans-serif;
 			font-size: 13px;
 			display: none;
 			flex-direction: column;
@@ -144,35 +149,38 @@ export class EditorExplorer {
 			transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.22s ease;
 		`;
 
-		// ── Encabezado ──────────────────────────────────────────────────────────
+		// ── Encabezado (mismo estilo que ObjectInspector) ───────────────────────
 		const header = document.createElement("div");
 		header.style.cssText = `
 			display: flex;
 			align-items: center;
 			justify-content: space-between;
-			padding: 10px 14px;
-			background: #0f172a;
-			border-bottom: 1px solid #1e293b;
+			padding: 12px 16px;
+			border-bottom: 1px solid #555;
 			flex-shrink: 0;
 		`;
 
 		const titleBox = document.createElement("div");
-		titleBox.style.cssText = `display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 13px; color: #38bdf8;`;
-		titleBox.innerHTML = `<span>🗂️</span><span>Jerarquía / Explorer</span><span style="font-size: 10px; background: #1e293b; color: #94a3b8; padding: 2px 5px; border-radius: 4px; border: 1px solid #334155;">[${this.shortcutKey.toUpperCase()}]</span>`;
+		titleBox.style.cssText = `display: flex; align-items: center; gap: 8px; font-weight: bold; font-size: 14px; color: white;`;
+		titleBox.innerHTML = `<span>🗂️</span><span>Jerarquía / Explorer</span><span style="font-size: 10px; background: #222; color: #aaa; padding: 2px 5px; border-radius: 4px; border: 1px solid #444; font-weight: normal;">[${this.shortcutKey.toUpperCase()}]</span>`;
 
 		const headerControls = document.createElement("div");
-		headerControls.style.cssText = `display: flex; align-items: center; gap: 8px;`;
+		headerControls.style.cssText = `display: flex; align-items: center; gap: 12px;`;
 
-		const btnCollapse = document.createElement("button");
-		btnCollapse.textContent = "─";
-		btnCollapse.title = "Minimizar panel";
-		btnCollapse.style.cssText = `background: transparent; border: none; color: #94a3b8; cursor: pointer; font-size: 14px; padding: 0 4px;`;
+		const btnCollapse = document.createElement("span");
+		btnCollapse.textContent = "▲";
+		btnCollapse.title = "Minimizar / Maximizar";
+		btnCollapse.style.cssText = `color: #aaa; cursor: pointer; font-size: 16px; transition: color 0.15s ease; user-select: none;`;
+		btnCollapse.onmouseenter = () => (btnCollapse.style.color = "#fff");
+		btnCollapse.onmouseleave = () => (btnCollapse.style.color = "#aaa");
 		btnCollapse.onclick = () => this.toggleCollapse();
 
-		const btnClose = document.createElement("button");
+		const btnClose = document.createElement("span");
 		btnClose.textContent = "✕";
 		btnClose.title = `Ocultar (Atajo: tecla '${this.shortcutKey.toUpperCase()}')`;
-		btnClose.style.cssText = `background: transparent; border: none; color: #94a3b8; cursor: pointer; font-size: 14px; padding: 0 4px;`;
+		btnClose.style.cssText = `color: #aaa; cursor: pointer; font-size: 20px; transition: color 0.15s ease; user-select: none;`;
+		btnClose.onmouseenter = () => (btnClose.style.color = "#fff");
+		btnClose.onmouseleave = () => (btnClose.style.color = "#aaa");
 		btnClose.onclick = () => this.hide();
 
 		headerControls.appendChild(btnCollapse);
@@ -199,53 +207,66 @@ export class EditorExplorer {
 		this.container.appendChild(this.resizerElement);
 		this.setupResizer();
 
-		// ── Barra de Pestañas (Escena / Biblioteca) ──────────────────────────────
+		// ── Barra de Pestañas (Mismo estilo que ConstructionMenu) ───────────────
 		const tabBar = document.createElement("div");
 		tabBar.style.cssText = `
 			display: flex;
-			background: #0f172a;
-			border-bottom: 1px solid #1e293b;
+			border-bottom: 1px solid #555;
 			flex-shrink: 0;
+			padding: 0 16px;
+			gap: 16px;
 		`;
 
-		this.btnTabScene = document.createElement("button");
+		this.btnTabScene = document.createElement("div");
 		this.btnTabScene.innerHTML = `<span>🗂️</span><span>Escena</span>`;
 		this.btnTabScene.style.cssText = `
-			flex: 1;
-			padding: 8px 10px;
-			background: #1e293b;
-			color: #38bdf8;
+			padding: 10px 4px;
+			background: transparent;
+			color: white;
 			border: none;
-			border-bottom: 2px solid #38bdf8;
-			font-size: 12px;
-			font-weight: 600;
+			border-bottom: 2px solid white;
+			font-size: 13px;
+			font-weight: bold;
 			cursor: pointer;
 			display: flex;
 			align-items: center;
 			justify-content: center;
 			gap: 6px;
 			transition: all 0.15s ease;
+			user-select: none;
 		`;
 		this.btnTabScene.onclick = () => this.switchTab("scene");
 
-		this.btnTabLibrary = document.createElement("button");
+		this.btnTabLibrary = document.createElement("div");
 		this.btnTabLibrary.innerHTML = `<span>📦</span><span>Biblioteca</span>`;
 		this.btnTabLibrary.style.cssText = `
-			flex: 1;
-			padding: 8px 10px;
+			padding: 10px 4px;
 			background: transparent;
-			color: #94a3b8;
+			color: #888;
 			border: none;
 			border-bottom: 2px solid transparent;
-			font-size: 12px;
-			font-weight: 600;
+			font-size: 13px;
+			font-weight: normal;
 			cursor: pointer;
 			display: flex;
 			align-items: center;
 			justify-content: center;
 			gap: 6px;
 			transition: all 0.15s ease;
+			user-select: none;
 		`;
+		this.btnTabLibrary.onmouseenter = () => {
+			if (this.currentTab !== "library") this.btnTabLibrary.style.color = "#ccc";
+		};
+		this.btnTabLibrary.onmouseleave = () => {
+			if (this.currentTab !== "library") this.btnTabLibrary.style.color = "#888";
+		};
+		this.btnTabScene.onmouseenter = () => {
+			if (this.currentTab !== "scene") this.btnTabScene.style.color = "#ccc";
+		};
+		this.btnTabScene.onmouseleave = () => {
+			if (this.currentTab !== "scene") this.btnTabScene.style.color = "#888";
+		};
 		this.btnTabLibrary.onclick = () => this.switchTab("library");
 
 		tabBar.appendChild(this.btnTabScene);
@@ -269,8 +290,8 @@ export class EditorExplorer {
 			flex-wrap: wrap;
 			gap: 6px;
 			padding: 8px 12px;
-			background: #131922;
-			border-bottom: 1px solid #232c3b;
+			background: rgba(255, 255, 255, 0.04);
+			border-bottom: 1px solid #444;
 			flex-shrink: 0;
 		`;
 
@@ -279,14 +300,15 @@ export class EditorExplorer {
 			btn.textContent = label;
 			btn.title = title;
 			btn.style.cssText = `
-				background: ${accentColor ? accentColor : "#242e3d"};
-				color: #f1f5f9;
-				border: 1px solid #3b4759;
-				border-radius: 5px;
-				padding: 4px 8px;
+				background: ${accentColor ? accentColor : "#444"};
+				color: white;
+				border: 1px solid #555;
+				border-radius: 4px;
+				padding: 5px 8px;
 				font-size: 11px;
 				font-weight: 500;
 				cursor: pointer;
+				font-family: sans-serif;
 				transition: all 0.15s ease;
 			`;
 			btn.onmouseenter = () => (btn.style.filter = "brightness(1.2)");
@@ -361,19 +383,20 @@ export class EditorExplorer {
 
 		// ── Buscador ───────────────────────────────────────────────────────────
 		const searchRow = document.createElement("div");
-		searchRow.style.cssText = `padding: 6px 12px; background: #131922; border-bottom: 1px solid #232c3b; flex-shrink: 0;`;
+		searchRow.style.cssText = `padding: 8px 12px; background: rgba(0, 0, 0, 0.25); border-bottom: 1px solid #444; flex-shrink: 0;`;
 		this.searchInput = document.createElement("input");
 		this.searchInput.type = "text";
 		this.searchInput.placeholder = "🔍 Buscar objeto o grupo...";
 		this.searchInput.style.cssText = `
 			width: 100%;
 			box-sizing: border-box;
-			background: #1e2837;
-			border: 1px solid #334155;
+			background: #222;
+			border: 1px solid #444;
 			border-radius: 4px;
-			color: #fff;
-			padding: 4px 8px;
-			font-size: 12px;
+			color: white;
+			padding: 6px 10px;
+			font-size: 11px;
+			font-family: sans-serif;
 			outline: none;
 		`;
 		this.searchInput.oninput = (e) => {
@@ -416,8 +439,8 @@ export class EditorExplorer {
 			flex-direction: column;
 			gap: 6px;
 			padding: 8px 12px;
-			background: #131922;
-			border-bottom: 1px solid #232c3b;
+			background: rgba(0, 0, 0, 0.25);
+			border-bottom: 1px solid #444;
 			flex-shrink: 0;
 		`;
 
@@ -430,12 +453,13 @@ export class EditorExplorer {
 		this.librarySearchInput.style.cssText = `
 			flex: 1;
 			box-sizing: border-box;
-			background: #1e2837;
-			border: 1px solid #334155;
+			background: #222;
+			border: 1px solid #444;
 			border-radius: 4px;
-			color: #fff;
-			padding: 5px 8px;
-			font-size: 12px;
+			color: white;
+			padding: 6px 10px;
+			font-size: 11px;
+			font-family: sans-serif;
 			outline: none;
 		`;
 		this.librarySearchInput.oninput = () => this.renderLibrary();
@@ -444,14 +468,17 @@ export class EditorExplorer {
 		btnRefreshLib.textContent = "🔄";
 		btnRefreshLib.title = "Recargar biblioteca";
 		btnRefreshLib.style.cssText = `
-			background: #242e3d;
-			color: #f1f5f9;
-			border: 1px solid #3b4759;
+			background: #444;
+			color: white;
+			border: 1px solid #555;
 			border-radius: 4px;
 			padding: 5px 8px;
-			font-size: 12px;
+			font-size: 11px;
 			cursor: pointer;
+			transition: all 0.15s ease;
 		`;
+		btnRefreshLib.onmouseenter = () => (btnRefreshLib.style.filter = "brightness(1.2)");
+		btnRefreshLib.onmouseleave = () => (btnRefreshLib.style.filter = "none");
 		btnRefreshLib.onclick = () => this.loadLibraryPrefabs();
 
 		searchInputAndRefresh.appendChild(this.librarySearchInput);
@@ -462,17 +489,18 @@ export class EditorExplorer {
 
 		const filterLabel = document.createElement("span");
 		filterLabel.textContent = "Categoría:";
-		filterLabel.style.cssText = `font-size: 11px; color: #94a3b8;`;
+		filterLabel.style.cssText = `font-size: 11px; color: #aaa; font-family: sans-serif;`;
 
 		this.libraryCategorySelect = document.createElement("select");
 		this.libraryCategorySelect.style.cssText = `
 			flex: 1;
-			background: #1e2837;
-			border: 1px solid #334155;
+			background: #222;
+			border: 1px solid #444;
 			border-radius: 4px;
-			color: #e2e8f0;
-			padding: 3px 6px;
+			color: white;
+			padding: 4px 6px;
 			font-size: 11px;
+			font-family: sans-serif;
 			outline: none;
 			cursor: pointer;
 		`;
@@ -523,8 +551,8 @@ export class EditorExplorer {
 			}
 			#editor-explorer-resizer:hover,
 			#editor-explorer-resizer.active {
-				background: #38bdf8 !important;
-				box-shadow: 0 0 8px rgba(56, 189, 248, 0.8) !important;
+				background: #777 !important;
+				box-shadow: 0 0 10px rgba(255, 255, 255, 0.4) !important;
 			}
 			#editor-hierarchy-explorer > div:nth-child(-n+2) { flex-shrink: 0; }
 			#editor-hierarchy-explorer *::-webkit-scrollbar {
@@ -532,19 +560,24 @@ export class EditorExplorer {
 				height: 6px;
 			}
 			#editor-hierarchy-explorer *::-webkit-scrollbar-track {
-				background: rgba(15, 23, 42, 0.6);
+				background: #222;
 			}
 			#editor-hierarchy-explorer *::-webkit-scrollbar-thumb {
-				background: #334155;
-				border-radius: 3px;
+				background: #444;
+				border-radius: 4px;
 			}
 			#editor-hierarchy-explorer *::-webkit-scrollbar-thumb:hover {
-				background: #475569;
+				background: #666;
 			}
 			#editor-hierarchy-explorer [draggable="true"] {
 				width: 100%;
 				box-sizing: border-box;
 				min-width: 0;
+			}
+			#editor-hierarchy-explorer input:focus,
+			#editor-hierarchy-explorer select:focus {
+				border-color: #777 !important;
+				background: #282828 !important;
 			}
 		`;
 		this.container.appendChild(style);
@@ -732,21 +765,25 @@ export class EditorExplorer {
 		if (tab === "scene") {
 			this.sceneContentContainer.style.display = "flex";
 			this.libraryContainer.style.display = "none";
-			this.btnTabScene.style.background = "#1e293b";
-			this.btnTabScene.style.color = "#38bdf8";
-			this.btnTabScene.style.borderBottom = "2px solid #38bdf8";
+			this.btnTabScene.style.background = "transparent";
+			this.btnTabScene.style.color = "white";
+			this.btnTabScene.style.fontWeight = "bold";
+			this.btnTabScene.style.borderBottom = "2px solid white";
 			this.btnTabLibrary.style.background = "transparent";
-			this.btnTabLibrary.style.color = "#94a3b8";
+			this.btnTabLibrary.style.color = "#888";
+			this.btnTabLibrary.style.fontWeight = "normal";
 			this.btnTabLibrary.style.borderBottom = "2px solid transparent";
 			this.renderTree();
 		} else {
 			this.sceneContentContainer.style.display = "none";
 			this.libraryContainer.style.display = "flex";
-			this.btnTabLibrary.style.background = "#1e293b";
-			this.btnTabLibrary.style.color = "#38bdf8";
-			this.btnTabLibrary.style.borderBottom = "2px solid #38bdf8";
+			this.btnTabLibrary.style.background = "transparent";
+			this.btnTabLibrary.style.color = "white";
+			this.btnTabLibrary.style.fontWeight = "bold";
+			this.btnTabLibrary.style.borderBottom = "2px solid white";
 			this.btnTabScene.style.background = "transparent";
-			this.btnTabScene.style.color = "#94a3b8";
+			this.btnTabScene.style.color = "#888";
+			this.btnTabScene.style.fontWeight = "normal";
 			this.btnTabScene.style.borderBottom = "2px solid transparent";
 			this.loadLibraryPrefabs();
 		}
@@ -761,11 +798,11 @@ export class EditorExplorer {
 		});
 		if (this.isCollapsed) {
 			this.container.style.height = "auto";
-			this.container.style.borderBottom = "1px solid #334155";
+			this.container.style.borderBottom = "2px solid #444";
 		} else {
 			this.container.style.height = "100vh";
 			this.container.style.height = "100dvh";
-			this.container.style.borderBottom = "none";
+			this.container.style.borderBottom = "2px solid #444";
 			this.switchTab(this.currentTab);
 		}
 	}
@@ -774,7 +811,8 @@ export class EditorExplorer {
 		const active = !this.groupManager.isCouplingMode();
 		this.groupManager.setCouplingMode(active, (id) => this.resolveObject3D(id));
 		this.btnToggleCoupling.textContent = `Acoples: ${active ? "ON" : "OFF"}`;
-		this.btnToggleCoupling.style.background = active ? "#0284c7" : "#242e3d";
+		this.btnToggleCoupling.style.background = active ? "#0088cc" : "#444";
+		this.btnToggleCoupling.style.borderColor = active ? "#38bdf8" : "#555";
 		this.game.updateEditorInteractionMode?.();
 	}
 
@@ -782,7 +820,8 @@ export class EditorExplorer {
 		const active = !this.groupManager.isPivotEditMode();
 		this.groupManager.setPivotEditMode(active);
 		this.btnTogglePivotEdit.textContent = `Pivote: ${active ? "ON" : "OFF"}`;
-		this.btnTogglePivotEdit.style.background = active ? "#f59e0b" : "#242e3d";
+		this.btnTogglePivotEdit.style.background = active ? "#0088cc" : "#444";
+		this.btnTogglePivotEdit.style.borderColor = active ? "#38bdf8" : "#555";
 	}
 
 	selectNode(nodeId: string | null, syncInspector: boolean = true) {
@@ -822,7 +861,7 @@ export class EditorExplorer {
 
 		if (rootNodes.length === 0) {
 			const emptyMsg = document.createElement("div");
-			emptyMsg.style.cssText = `color: #64748b; text-align: center; padding: 20px 0; font-style: italic;`;
+			emptyMsg.style.cssText = `color: #888; text-align: center; padding: 20px 0; font-style: italic;`;
 			emptyMsg.textContent = "No hay objetos en la escena";
 			this.treeContainer.appendChild(emptyMsg);
 			return;
@@ -837,12 +876,12 @@ export class EditorExplorer {
 		decoupleZone.style.cssText = `
 			margin-top: 14px;
 			padding: 8px 10px;
-			border: 1px dashed #475569;
+			border: 1px dashed #555;
 			border-radius: 6px;
 			text-align: center;
-			color: #94a3b8;
+			color: #aaa;
 			font-size: 11px;
-			background: rgba(30, 41, 59, 0.4);
+			background: rgba(255, 255, 255, 0.03);
 			transition: all 0.2s ease;
 			flex-shrink: 0;
 			box-sizing: border-box;
@@ -854,15 +893,15 @@ export class EditorExplorer {
 			if (!draggedId) return;
 			e.preventDefault();
 			if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
-			decoupleZone.style.borderColor = "#38bdf8";
-			decoupleZone.style.background = "rgba(56, 189, 248, 0.15)";
-			decoupleZone.style.color = "#38bdf8";
+			decoupleZone.style.borderColor = "#fff";
+			decoupleZone.style.background = "rgba(255, 255, 255, 0.1)";
+			decoupleZone.style.color = "#fff";
 		};
 
 		decoupleZone.ondragleave = () => {
-			decoupleZone.style.borderColor = "#475569";
-			decoupleZone.style.background = "rgba(30, 41, 59, 0.4)";
-			decoupleZone.style.color = "#94a3b8";
+			decoupleZone.style.borderColor = "#555";
+			decoupleZone.style.background = "rgba(255, 255, 255, 0.03)";
+			decoupleZone.style.color = "#aaa";
 		};
 
 		decoupleZone.ondrop = (e) => {
@@ -909,20 +948,21 @@ export class EditorExplorer {
 			display: flex;
 			align-items: center;
 			justify-content: space-between;
-			padding: 4px 6px;
-			padding-left: ${depth * 16 + 6}px;
+			padding: 5px 8px;
+			padding-left: ${depth * 16 + 8}px;
 			border-radius: 4px;
 			cursor: grab;
 			margin-bottom: 2px;
-			background: ${isSelected ? "#1e3a8a" : "transparent"};
-			color: ${isSelected ? "#93c5fd" : "#cbd5e1"};
+			background: ${isSelected ? "rgba(255, 255, 255, 0.15)" : "transparent"};
+			color: ${isSelected ? "#ffffff" : "#cccccc"};
+			font-weight: ${isSelected ? "bold" : "normal"};
 			transition: background 0.1s ease, border 0.1s ease;
-			border: 1px solid transparent;
+			border: 1px solid ${isSelected ? "#666" : "transparent"};
 			box-sizing: border-box;
 			width: 100%;
 			min-width: 0;
 			flex-shrink: 0;
-			${isPrefabRoot ? "border-left: 3px solid #38bdf8;" : isPrefabMember ? "border-left: 2px solid #0284c7;" : ""}
+			${isPrefabRoot ? "border-left: 3px solid #ffc107;" : isPrefabMember ? "border-left: 2px solid #ca8a04;" : (isSelected ? "border-left: 3px solid #fff;" : "")}
 		`;
 
 		// ── Drag & Drop de Explorer (Corrección 3) ───────────────────────────────
@@ -972,19 +1012,19 @@ export class EditorExplorer {
 
 			if (!check.allowed) {
 				if (e.dataTransfer) e.dataTransfer.dropEffect = "none";
-				itemRow.style.borderColor = "#ef4444";
-				itemRow.style.background = "rgba(239, 68, 68, 0.2)";
+				itemRow.style.borderColor = "#cc3333";
+				itemRow.style.background = "rgba(204, 51, 51, 0.2)";
 			} else {
 				if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
 				this.resetRowDropStyles(itemRow, isSelected, isPrefabRoot, isPrefabMember);
 
 				if (dropPosition === "before") {
-					itemRow.style.borderTop = "2px solid #38bdf8";
+					itemRow.style.borderTop = "2px solid #fff";
 				} else if (dropPosition === "after") {
-					itemRow.style.borderBottom = "2px solid #38bdf8";
+					itemRow.style.borderBottom = "2px solid #fff";
 				} else {
-					itemRow.style.outline = "2px dashed #22c55e";
-					itemRow.style.background = "rgba(34, 197, 94, 0.2)";
+					itemRow.style.outline = "2px dashed #44ff44";
+					itemRow.style.background = "rgba(68, 255, 68, 0.15)";
 				}
 			}
 		};
@@ -1071,7 +1111,7 @@ export class EditorExplorer {
 		};
 
 		itemRow.onmouseenter = () => {
-			if (!isSelected && !this.draggedNodeId) itemRow.style.background = "#1e293b";
+			if (!isSelected && !this.draggedNodeId) itemRow.style.background = "rgba(255, 255, 255, 0.08)";
 		};
 		itemRow.onmouseleave = () => {
 			if (!isSelected && !this.draggedNodeId) itemRow.style.background = "transparent";
@@ -1085,7 +1125,7 @@ export class EditorExplorer {
 			const isCollapsed = this.collapsedGroups.has(node.id);
 			const foldIcon = document.createElement("span");
 			foldIcon.textContent = isCollapsed ? "▶" : "▼";
-			foldIcon.style.cssText = `font-size: 9px; width: 12px; cursor: pointer; color: #94a3b8; flex-shrink: 0;`;
+			foldIcon.style.cssText = `font-size: 9px; width: 12px; cursor: pointer; color: #aaa; flex-shrink: 0;`;
 			foldIcon.onclick = (e) => {
 				e.stopPropagation();
 				if (isCollapsed) this.collapsedGroups.delete(node.id);
@@ -1120,9 +1160,9 @@ export class EditorExplorer {
 			prefabTag.title = `Instancia de prefab: ${node.metadata?.prefabName || ""}`;
 			prefabTag.style.cssText = `
 				font-size: 9px;
-				color: #38bdf8;
-				background: rgba(56, 189, 248, 0.15);
-				border: 1px solid #0284c7;
+				color: #ffc107;
+				background: rgba(255, 193, 7, 0.15);
+				border: 1px solid #ca8a04;
 				border-radius: 3px;
 				padding: 0 4px;
 				margin-left: 2px;
@@ -1136,7 +1176,7 @@ export class EditorExplorer {
 		const actionBox = document.createElement("div");
 		actionBox.style.cssText = `display: flex; align-items: center; gap: 4px; opacity: 0.6; flex-shrink: 0;`;
 		itemRow.onmouseenter = () => {
-			if (!isSelected && !this.draggedNodeId) itemRow.style.background = "#1e293b";
+			if (!isSelected && !this.draggedNodeId) itemRow.style.background = "rgba(255, 255, 255, 0.08)";
 			actionBox.style.opacity = "1";
 		};
 		itemRow.onmouseleave = () => {
@@ -1148,7 +1188,9 @@ export class EditorExplorer {
 		const btnUp = document.createElement("span");
 		btnUp.textContent = "▲";
 		btnUp.title = "Subir orden de hermano";
-		btnUp.style.cssText = `font-size: 9px; cursor: pointer; padding: 1px 3px; border-radius: 2px;`;
+		btnUp.style.cssText = `font-size: 9px; cursor: pointer; padding: 2px 4px; border-radius: 2px; color: #aaa; transition: color 0.1s ease;`;
+		btnUp.onmouseenter = () => (btnUp.style.color = "#fff");
+		btnUp.onmouseleave = () => (btnUp.style.color = "#aaa");
 		btnUp.onclick = (e) => {
 			e.stopPropagation();
 			this.hierarchy.reorderChild(node.id, Math.max(0, node.order - 1));
@@ -1159,7 +1201,9 @@ export class EditorExplorer {
 		const btnDown = document.createElement("span");
 		btnDown.textContent = "▼";
 		btnDown.title = "Bajar orden de hermano";
-		btnDown.style.cssText = `font-size: 9px; cursor: pointer; padding: 1px 3px; border-radius: 2px;`;
+		btnDown.style.cssText = `font-size: 9px; cursor: pointer; padding: 2px 4px; border-radius: 2px; color: #aaa; transition: color 0.1s ease;`;
+		btnDown.onmouseenter = () => (btnDown.style.color = "#fff");
+		btnDown.onmouseleave = () => (btnDown.style.color = "#aaa");
 		btnDown.onclick = (e) => {
 			e.stopPropagation();
 			this.hierarchy.reorderChild(node.id, node.order + 1);
@@ -1190,10 +1234,11 @@ export class EditorExplorer {
 	private resetRowDropStyles(itemRow: HTMLElement, isSelected: boolean, isPrefabRoot: boolean = false, isPrefabMember: boolean = false) {
 		itemRow.style.borderTop = "";
 		itemRow.style.borderBottom = "";
-		itemRow.style.borderColor = "transparent";
-		itemRow.style.borderLeft = isPrefabRoot ? "3px solid #38bdf8" : isPrefabMember ? "2px solid #0284c7" : "transparent";
+		itemRow.style.borderColor = isSelected ? "#666" : "transparent";
+		itemRow.style.borderLeft = isPrefabRoot ? "3px solid #ffc107" : isPrefabMember ? "2px solid #ca8a04" : (isSelected ? "3px solid #fff" : "transparent");
 		itemRow.style.outline = "";
-		itemRow.style.background = isSelected ? "#1e3a8a" : "transparent";
+		itemRow.style.background = isSelected ? "rgba(255, 255, 255, 0.15)" : "transparent";
+		itemRow.style.color = isSelected ? "#ffffff" : "#cccccc";
 	}
 
 	private getNodeIcon(type: string): string {
@@ -1616,46 +1661,53 @@ export class EditorExplorer {
 		filtered.forEach((prefab) => {
 			const card = document.createElement("div");
 			card.style.cssText = `
-				background: #182234;
-				border: 1px solid #2e3e56;
-				border-radius: 6px;
+				background: rgba(255, 255, 255, 0.05);
+				border: 1px solid #444;
+				border-radius: 8px;
 				padding: 10px;
 				display: flex;
 				flex-direction: column;
 				gap: 6px;
-				transition: border-color 0.15s ease;
+				transition: border-color 0.15s ease, background 0.15s ease;
 			`;
-			card.onmouseenter = () => (card.style.borderColor = "#38bdf8");
-			card.onmouseleave = () => (card.style.borderColor = "#2e3e56");
+			card.onmouseenter = () => {
+				card.style.borderColor = "#666";
+				card.style.background = "rgba(255, 255, 255, 0.08)";
+			};
+			card.onmouseleave = () => {
+				card.style.borderColor = "#444";
+				card.style.background = "rgba(255, 255, 255, 0.05)";
+			};
 
 			// Header del card: Nombre, categoría y versión
 			const cardHeader = document.createElement("div");
 			cardHeader.style.cssText = `display: flex; align-items: center; justify-content: space-between;`;
 
 			const titleRow = document.createElement("div");
-			titleRow.style.cssText = `display: flex; align-items: center; gap: 6px; font-weight: 600; color: #f1f5f9;`;
+			titleRow.style.cssText = `display: flex; align-items: center; gap: 6px; font-weight: bold; color: white; font-size: 13px;`;
 			titleRow.innerHTML = `<span>📦</span><span>${prefab.name}</span>`;
 
 			const versionBadge = document.createElement("span");
 			versionBadge.textContent = `v${prefab.version}`;
 			versionBadge.style.cssText = `
-				background: #1e293b;
-				color: #94a3b8;
+				background: #222;
+				color: #aaa;
 				border-radius: 3px;
 				padding: 1px 5px;
 				font-size: 10px;
-				border: 1px solid #334155;
+				border: 1px solid #444;
 			`;
 			titleRow.appendChild(versionBadge);
 
 			const categoryBadge = document.createElement("span");
 			categoryBadge.textContent = prefab.category || "general";
 			categoryBadge.style.cssText = `
-				background: rgba(56, 189, 248, 0.15);
-				color: #38bdf8;
+				background: #333;
+				color: #ddd;
 				border-radius: 3px;
 				padding: 1px 5px;
 				font-size: 10px;
+				border: 1px solid #555;
 			`;
 
 			cardHeader.appendChild(titleRow);
@@ -1664,12 +1716,12 @@ export class EditorExplorer {
 
 			// Detalles: descripción, conteo de objetos y almacenamiento
 			const detailsRow = document.createElement("div");
-			detailsRow.style.cssText = `display: flex; flex-direction: column; gap: 3px; font-size: 11px; color: #94a3b8;`;
+			detailsRow.style.cssText = `display: flex; flex-direction: column; gap: 3px; font-size: 11px; color: #aaa;`;
 
 			if (prefab.description) {
 				const desc = document.createElement("div");
 				desc.textContent = prefab.description;
-				desc.style.cssText = `color: #cbd5e1; font-style: italic; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;`;
+				desc.style.cssText = `color: #ddd; font-style: italic; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;`;
 				detailsRow.appendChild(desc);
 			}
 
@@ -1708,7 +1760,7 @@ export class EditorExplorer {
 			const actionsRow = document.createElement("div");
 			actionsRow.style.cssText = `display: flex; align-items: center; gap: 4px; margin-top: 4px;`;
 
-			const createActionBtn = (label: string, title: string, onClick: () => void, bg: string, color: string = "#f1f5f9") => {
+			const createActionBtn = (label: string, title: string, onClick: () => void, bg: string, color: string = "white") => {
 				const btn = document.createElement("button");
 				btn.innerHTML = label;
 				btn.title = title;
@@ -1716,9 +1768,9 @@ export class EditorExplorer {
 					flex: 1;
 					background: ${bg};
 					color: ${color};
-					border: 1px solid #3b4759;
+					border: 1px solid #555;
 					border-radius: 4px;
-					padding: 4px 6px;
+					padding: 5px 8px;
 					font-size: 11px;
 					font-weight: 500;
 					cursor: pointer;
@@ -1734,8 +1786,8 @@ export class EditorExplorer {
 				return btn;
 			};
 
-			const btnInsert = createActionBtn("➕ Insertar", "Insertar una instancia independiente en la escena", () => this.handleInsertPrefab(prefab), "#0284c7");
-			const btnExport = createActionBtn("📤 JSON", "Exportar como archivo JSON descargable", () => this.handleExportPrefabDtoJson(prefab), "#334155");
+			const btnInsert = createActionBtn("➕ Insertar", "Insertar una instancia independiente en la escena", () => this.handleInsertPrefab(prefab), "#28a745");
+			const btnExport = createActionBtn("📤 JSON", "Exportar como archivo JSON descargable", () => this.handleExportPrefabDtoJson(prefab), "#444");
 
 			actionsRow.appendChild(btnInsert);
 			actionsRow.appendChild(btnExport);
@@ -1745,7 +1797,7 @@ export class EditorExplorer {
 				actionsRow.appendChild(btnSync);
 			}
 
-			const btnDelete = createActionBtn("🗑️", "Eliminar este prefab", () => this.handleDeletePrefab(prefab), "#991b1b");
+			const btnDelete = createActionBtn("🗑️", "Eliminar este prefab", () => this.handleDeletePrefab(prefab), "#cc3333");
 			btnDelete.style.flex = "0 0 28px";
 			actionsRow.appendChild(btnDelete);
 

@@ -812,6 +812,11 @@ export class EditorExplorer {
 		this.cancelDrag();
 		this.isVisible = false;
 
+		if (this.game?.objectInspector && this.game.objectInspector.isVisible) {
+			this.game.objectInspector.hide();
+		}
+		this.selectNode(null, false);
+
 		if (this.hideTimeoutId) {
 			clearTimeout(this.hideTimeoutId);
 			this.hideTimeoutId = null;

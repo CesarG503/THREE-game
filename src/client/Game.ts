@@ -777,18 +777,53 @@ export class Game {
 					const isConnectorInteracting = !!(this.editorGroupManager?.isConnectorDragging());
 
 					if (!isGizmoInteracting && !isConnectorInteracting) {
-						const selectResult = selectEditableObjectFromPointer();
-						if (selectResult) {
-							const target = selectResult.target;
-							if (this.objectInspector.isVisible && this.objectInspector.selectedObject && this.objectInspector.selectedObject !== target) {
-								if (!this.objectInspector.allowDynamicSwitch) {
-									return;
-								}
-							}
-							const nodeId = target.userData?.groupId || target.userData?.uuid;
+						const isPanelOpen = !!(this.editorExplorer && this.editorExplorer.isVisible);
 
-							if (e.button === 2) {
-								// Click derecho: abre panel H si está cerrado, va a 'properties', selecciona y muestra gizmo
+						if (e.button === 0) {
+							// Click izquierdo
+							if (!isPanelOpen) {
+								// Si el panel está cerrado, cualquier clic izquierdo (en cualquier parte, objeto o al construir)
+								// deselecciona el objeto y devuelve al modo normal sin nada seleccionado.
+								if (this.objectInspector.selectedObject || this.objectInspector.isVisible) {
+									this.objectInspector.hide();
+								}
+								if (this.editorExplorer?.selectedNodeId) {
+									this.editorExplorer.selectNode(null, false);
+								}
+								this.updateEditorInteractionMode();
+							} else {
+								// Si el panel está abierto:
+								const selectResult = selectEditableObjectFromPointer();
+								if (selectResult) {
+									const target = selectResult.target;
+									if (this.objectInspector.isVisible && this.objectInspector.selectedObject && this.objectInspector.selectedObject !== target) {
+										if (!this.objectInspector.allowDynamicSwitch) {
+											return;
+										}
+									}
+									const nodeId = target.userData?.groupId || target.userData?.uuid;
+									if (this.editorExplorer && nodeId) {
+										this.editorExplorer.selectNode(nodeId, false);
+									}
+									this.objectInspector.show(target, selectResult.hitPart);
+								} else {
+									// Clic en el vacío con panel abierto: deseleccionar objeto actual
+									this.objectInspector.hide();
+									this.editorExplorer?.selectNode(null, false);
+								}
+								this.updateEditorInteractionMode();
+							}
+						} else if (e.button === 2) {
+							// Click derecho: abre panel H si está cerrado, va a 'properties', selecciona y muestra gizmo
+							const selectResult = selectEditableObjectFromPointer();
+							if (selectResult) {
+								const target = selectResult.target;
+								if (this.objectInspector.isVisible && this.objectInspector.selectedObject && this.objectInspector.selectedObject !== target) {
+									if (!this.objectInspector.allowDynamicSwitch) {
+										return;
+									}
+								}
+								const nodeId = target.userData?.groupId || target.userData?.uuid;
 								if (this.editorExplorer) {
 									if (!this.editorExplorer.isVisible) {
 										this.editorExplorer.show();
@@ -799,14 +834,8 @@ export class Game {
 									}
 								}
 								this.objectInspector.show(target, selectResult.hitPart);
-							} else {
-								// Click izquierdo: selecciona en jerarquía si está disponible y muestra gizmo
-								if (this.editorExplorer && nodeId) {
-									this.editorExplorer.selectNode(nodeId, false);
-								}
-								this.objectInspector.show(target, selectResult.hitPart);
+								this.updateEditorInteractionMode();
 							}
-							this.updateEditorInteractionMode();
 						}
 					}
 				}

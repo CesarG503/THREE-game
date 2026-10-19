@@ -660,6 +660,10 @@ export class Game {
 		this.inputManager.uiCheckCallback = () => this.interaction.blocksGameplayActions;
 		this.setupGameInput();
 
+		if (this.gameMode === "editor") {
+			this.setupEditorToolSelector();
+		}
+
 		if (this.gameMode !== "editor") {
 			void this.loadInitialPlatformMap();
 		}
@@ -672,6 +676,43 @@ export class Game {
 
 		this.animate = this.animate.bind(this);
 		this.animationFrameId = requestAnimationFrame(this.animate);
+
+		let rightMouseDownPos: { x: number; y: number } | null = null;
+		let isRightDragActive = false;
+
+		const selectEditableObjectFromPointer = (e: MouseEvent) => {
+			const mouse = new THREE.Vector2();
+			if (document.pointerLockElement) {
+				mouse.x = 0;
+				mouse.y = 0;
+			} else {
+				const rect = this.sceneManager.renderer.domElement.getBoundingClientRect();
+				mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+				mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+			}
+
+			const raycaster = new THREE.Raycaster();
+			raycaster.setFromCamera(mouse, this.sceneManager.camera);
+
+			const intersects = raycaster.intersectObjects(this.sceneManager.scene.children, true);
+
+			const hit = intersects.find((h: any) => {
+				let obj = h.object;
+				while (obj) {
+					if (obj.userData && obj.userData.isEditableMapObject) return true;
+					obj = obj.parent;
+				}
+				return false;
+			});
+
+			if (!hit) return null;
+
+			let target = hit.object;
+			while (target && (!target.userData || !target.userData.isEditableMapObject)) {
+				target = target.parent;
+			}
+			return target ? { target, hitPart: hit.object } : null;
+		};
 
 		document.addEventListener("mousedown", (e) => {
 			if (e.target !== this.sceneManager.renderer.domElement) return;
@@ -735,87 +776,83 @@ export class Game {
 					return;
 				}
 
-				const selectEditableObjectFromPointer = () => {
-					const mouse = new THREE.Vector2();
-					if (document.pointerLockElement) {
-						mouse.x = 0;
-						mouse.y = 0;
-					} else {
-						const rect = this.sceneManager.renderer.domElement.getBoundingClientRect();
-						mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-						mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+				// Clic derecho: iniciar seguimiento de desplazamiento para diferenciar arrastre vs tap corto
+				if (e.button === 2) {
+					rightMouseDownPos = { x: e.clientX, y: e.clientY };
+					isRightDragActive = false;
+					return;
+				}
+
+				// Clic izquierdo (e.button === 0):
+				if (e.button === 0) {
+					// Modo 'build': La colocación se maneja en GameInput.
+					// No cerramos el Inspector ni deseleccionamos objetos.
+					if (this.interaction?.activeTool === "build") {
+						return;
 					}
 
-					const raycaster = new THREE.Raycaster();
-					raycaster.setFromCamera(mouse, this.sceneManager.camera);
+					// Modo 'edit': Selección o deselección de objetos
+					if (this.interaction?.activeTool === "edit" && this.objectInspector) {
+						const isGizmoInteracting = !!(
+							this.objectInspector?.transformGizmo?.dragState ||
+							this.objectInspector?.transformGizmo?.controls?.axis
+						);
+						const isConnectorInteracting = !!(this.editorGroupManager?.isConnectorDragging());
 
-					const intersects = raycaster.intersectObjects(this.sceneManager.scene.children, true);
-
-					const hit = intersects.find((h: any) => {
-						let obj = h.object;
-						while (obj) {
-							if (obj.userData && obj.userData.isEditableMapObject) return true;
-							obj = obj.parent;
-						}
-						return false;
-					});
-
-					if (!hit) return null;
-
-					let target = hit.object;
-					while (target && (!target.userData || !target.userData.isEditableMapObject)) {
-						target = target.parent;
-					}
-					return target ? { target, hitPart: hit.object } : null;
-				};
-
-				if (this.objectInspector && (e.button === 0 || e.button === 2)) {
-					const isGizmoInteracting = !!(
-						this.objectInspector?.transformGizmo?.dragState ||
-						this.objectInspector?.transformGizmo?.controls?.axis
-					);
-					const isConnectorInteracting = !!(this.editorGroupManager?.isConnectorDragging());
-
-					if (!isGizmoInteracting && !isConnectorInteracting) {
-						const isPanelOpen = !!(this.editorExplorer && this.editorExplorer.isVisible);
-
-						if (e.button === 0) {
-							// Click izquierdo
-							if (!isPanelOpen) {
-								// Si el panel está cerrado, cualquier clic izquierdo (en cualquier parte, objeto o al construir)
-								// deselecciona el objeto y devuelve al modo normal sin nada seleccionado.
-								if (this.objectInspector.selectedObject || this.objectInspector.isVisible) {
-									this.objectInspector.hide();
+						if (!isGizmoInteracting && !isConnectorInteracting) {
+							const selectResult = selectEditableObjectFromPointer(e);
+							if (selectResult) {
+								const target = selectResult.target;
+								if (this.objectInspector.isVisible && this.objectInspector.selectedObject && this.objectInspector.selectedObject !== target) {
+									if (!this.objectInspector.allowDynamicSwitch) {
+										return;
+									}
 								}
+								const nodeId = target.userData?.groupId || target.userData?.uuid;
+								if (this.editorExplorer && nodeId) {
+									this.editorExplorer.selectNode(nodeId, false);
+								}
+								this.objectInspector.show(target, selectResult.hitPart);
+							} else {
+								// Clic en el vacío: deseleccionar objeto actual
+								this.objectInspector.hide();
 								if (this.editorExplorer?.selectedNodeId) {
 									this.editorExplorer.selectNode(null, false);
 								}
-								this.updateEditorInteractionMode();
-							} else {
-								// Si el panel está abierto:
-								const selectResult = selectEditableObjectFromPointer();
-								if (selectResult) {
-									const target = selectResult.target;
-									if (this.objectInspector.isVisible && this.objectInspector.selectedObject && this.objectInspector.selectedObject !== target) {
-										if (!this.objectInspector.allowDynamicSwitch) {
-											return;
-										}
-									}
-									const nodeId = target.userData?.groupId || target.userData?.uuid;
-									if (this.editorExplorer && nodeId) {
-										this.editorExplorer.selectNode(nodeId, false);
-									}
-									this.objectInspector.show(target, selectResult.hitPart);
-								} else {
-									// Clic en el vacío con panel abierto: deseleccionar objeto actual
-									this.objectInspector.hide();
-									this.editorExplorer?.selectNode(null, false);
-								}
-								this.updateEditorInteractionMode();
 							}
-						} else if (e.button === 2) {
-							// Click derecho: abre panel H si está cerrado, va a 'properties', selecciona y muestra gizmo
-							const selectResult = selectEditableObjectFromPointer();
+							this.updateEditorInteractionMode();
+						}
+					}
+				}
+			}
+		}, { signal: this.inputEvents.signal });
+
+		document.addEventListener("mousemove", (e) => {
+			if (rightMouseDownPos && !isRightDragActive) {
+				const dist = Math.hypot(e.clientX - rightMouseDownPos.x, e.clientY - rightMouseDownPos.y);
+				if (dist > (this.interaction?.rightClickDragThreshold ?? 6)) {
+					isRightDragActive = true;
+					this.interaction?.begin("camera-orbit", () => {
+						isRightDragActive = false;
+						rightMouseDownPos = null;
+					});
+				}
+			}
+		}, { signal: this.inputEvents.signal });
+
+		document.addEventListener("mouseup", (e) => {
+			if (e.button === 2) {
+				if (rightMouseDownPos) {
+					if (isRightDragActive) {
+						// Arrastre terminado (> 6px): finalizar gesto de navegación y suprimir selección
+						this.interaction?.end("camera-orbit");
+						isRightDragActive = false;
+						rightMouseDownPos = null;
+					} else {
+						// Tap corto (<= 6px): inspeccionar y seleccionar objeto bajo el cursor
+						rightMouseDownPos = null;
+						if (this.gameMode === "editor" && this.objectInspector) {
+							const selectResult = selectEditableObjectFromPointer(e);
 							if (selectResult) {
 								const target = selectResult.target;
 								if (this.objectInspector.isVisible && this.objectInspector.selectedObject && this.objectInspector.selectedObject !== target) {
@@ -839,8 +876,13 @@ export class Game {
 						}
 					}
 				}
-				}
-			}, { signal: this.inputEvents.signal });
+			}
+		}, { signal: this.inputEvents.signal });
+
+		window.addEventListener("blur", () => {
+			rightMouseDownPos = null;
+			isRightDragActive = false;
+		}, { signal: this.inputEvents.signal });
 
 		document.addEventListener("contextmenu", (e) => e.preventDefault(), { signal: this.inputEvents.signal });
 
@@ -917,6 +959,160 @@ export class Game {
 		this.inventoryManager?.updateUI?.();
 	}
 
+	setupEditorToolSelector() {
+		if (this.gameMode !== "editor") return;
+
+		let container = document.getElementById("viper-editor-tool-selector");
+		if (container) return;
+
+		container = document.createElement("div");
+		container.id = "viper-editor-tool-selector";
+		container.style.cssText = `
+			position: fixed;
+			top: 18px;
+			left: 50%;
+			transform: translateX(-50%);
+			display: flex;
+			align-items: center;
+			gap: 4px;
+			padding: 4px;
+			background: rgba(15, 23, 42, 0.85);
+			backdrop-filter: blur(12px);
+			-webkit-backdrop-filter: blur(12px);
+			border: 1px solid rgba(255, 255, 255, 0.15);
+			border-radius: 9999px;
+			box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+			z-index: 9999;
+			font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+			font-size: 13px;
+			font-weight: 600;
+			user-select: none;
+		`;
+
+		const createBtn = (id: string, text: string, icon: string) => {
+			const btn = document.createElement("button");
+			btn.id = id;
+			btn.innerHTML = `<span style="margin-right: 6px;">${icon}</span>${text}`;
+			btn.style.cssText = `
+				display: flex;
+				align-items: center;
+				padding: 6px 14px;
+				border-radius: 9999px;
+				border: 1px solid transparent;
+				background: transparent;
+				color: #94a3b8;
+				cursor: pointer;
+				font-size: 12px;
+				font-weight: 600;
+				font-family: inherit;
+				transition: all 0.18s ease;
+				outline: none;
+			`;
+			return btn;
+		};
+
+		const btnBuild = createBtn("vp-tool-build", "Construir", "🔨");
+		const btnEdit = createBtn("vp-tool-edit", "Editar", "✏️");
+
+		const updateVisuals = (tool: "build" | "edit") => {
+			if (tool === "build") {
+				btnBuild.style.background = "#0284c7";
+				btnBuild.style.color = "#ffffff";
+				btnBuild.style.borderColor = "#38bdf8";
+				btnBuild.style.boxShadow = "0 0 12px rgba(56, 189, 248, 0.4)";
+
+				btnEdit.style.background = "transparent";
+				btnEdit.style.color = "#94a3b8";
+				btnEdit.style.borderColor = "transparent";
+				btnEdit.style.boxShadow = "none";
+			} else {
+				btnEdit.style.background = "#0284c7";
+				btnEdit.style.color = "#ffffff";
+				btnEdit.style.borderColor = "#38bdf8";
+				btnEdit.style.boxShadow = "0 0 12px rgba(56, 189, 248, 0.4)";
+
+				btnBuild.style.background = "transparent";
+				btnBuild.style.color = "#94a3b8";
+				btnBuild.style.borderColor = "transparent";
+				btnBuild.style.boxShadow = "none";
+			}
+		};
+
+		btnBuild.addEventListener("click", () => {
+			this.interaction?.setTool("build");
+		});
+
+		btnEdit.addEventListener("click", () => {
+			this.interaction?.setTool("edit");
+		});
+
+		container.appendChild(btnBuild);
+		container.appendChild(btnEdit);
+		document.body.appendChild(container);
+
+		if (this.interaction) {
+			this.interaction.onToolChanged = (tool: "build" | "edit") => {
+				updateVisuals(tool);
+			};
+			updateVisuals(this.interaction.activeTool);
+		}
+	}
+
+	showToast(message: string, type: "info" | "warning" | "success" = "info") {
+		let toast = document.getElementById("viper-editor-toast") as HTMLDivElement | null;
+		if (!toast) {
+			toast = document.createElement("div");
+			toast.id = "viper-editor-toast";
+			toast.style.cssText = `
+				position: fixed;
+				bottom: 80px;
+				left: 50%;
+				transform: translateX(-50%) translateY(0);
+				padding: 8px 16px;
+				border-radius: 8px;
+				backdrop-filter: blur(8px);
+				-webkit-backdrop-filter: blur(8px);
+				font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+				font-size: 13px;
+				font-weight: 600;
+				z-index: 10000;
+				pointer-events: none;
+				transition: opacity 0.25s ease, transform 0.25s ease;
+				opacity: 0;
+			`;
+			document.body.appendChild(toast);
+		}
+		if (type === "warning") {
+			toast.style.background = "rgba(245, 158, 11, 0.9)";
+			toast.style.color = "#ffffff";
+			toast.style.border = "1px solid #fbbf24";
+			toast.style.boxShadow = "0 4px 16px rgba(245, 158, 11, 0.4)";
+		} else if (type === "success") {
+			toast.style.background = "rgba(16, 185, 129, 0.9)";
+			toast.style.color = "#ffffff";
+			toast.style.border = "1px solid #34d399";
+			toast.style.boxShadow = "0 4px 16px rgba(16, 185, 129, 0.4)";
+		} else {
+			toast.style.background = "rgba(15, 23, 42, 0.9)";
+			toast.style.color = "#e2e8f0";
+			toast.style.border = "1px solid rgba(255, 255, 255, 0.15)";
+			toast.style.boxShadow = "0 4px 16px rgba(0, 0, 0, 0.4)";
+		}
+		toast.textContent = message;
+		toast.style.opacity = "1";
+		toast.style.transform = "translateX(-50%) translateY(0)";
+
+		if ((this as any)._toastTimeout) {
+			clearTimeout((this as any)._toastTimeout);
+		}
+		(this as any)._toastTimeout = setTimeout(() => {
+			if (toast) {
+				toast.style.opacity = "0";
+				toast.style.transform = "translateX(-50%) translateY(8px)";
+			}
+		}, 2600);
+	}
+
 	dispose() {
 		if (this.isDisposed) return;
 		this.isDisposed = true;
@@ -970,6 +1166,8 @@ export class Game {
 			"aerial-grid-status",
 			"placement-logic-toolbar",
 			"game-timer-display",
+			"viper-editor-tool-selector",
+			"viper-editor-toast",
 		].forEach((id) => document.getElementById(id)?.remove());
 
 		document.querySelectorAll("[id^='fz-counter-']").forEach((element) => element.remove());

@@ -235,25 +235,15 @@ export function setupGameInput(this: Game) {
 		const profile = this.playerConfigManager?.getCurrentProfile?.();
 		if (profile?.disableInteraction) return;
 
-		if (this.interaction?.blocksGameplay || (this.inputManager && !this.inputManager.enabled)) return;
+		if (this.inputManager && !this.inputManager.enabled) return;
 		if (e.target !== this.sceneManager.renderer.domElement) return;
 
-		// Si alguna interfaz de edición o panel de inspector/explorer está activa, no usar items
-		if (this.isAnyEditorUIOpen()) return;
-
-		// Outside H/Inspector, left click keeps placement; right click inspects existing objects.
-		if (this.gameMode === "editor" && this.objectInspector && e.button === 2) {
-			const rect = this.sceneManager.renderer.domElement.getBoundingClientRect();
-			const mouse = document.pointerLockElement ? new THREE.Vector2() :
-				new THREE.Vector2((e.clientX - rect.left) / rect.width * 2 - 1, -(e.clientY - rect.top) / rect.height * 2 + 1);
-			const ray = new THREE.Raycaster();
-			ray.setFromCamera(mouse, this.sceneManager.camera);
-			if (ray.intersectObjects(this.sceneManager.scene.children, true).some(hit => {
-				for (let object = hit.object; object; object = object.parent) {
-					if (object.userData?.isEditableMapObject) return true;
-				}
-				return false;
-			})) return;
+		if (this.gameMode === "editor") {
+			if (!this.interaction?.canBuild) return;
+			if (e.button === 2) return;
+		} else {
+			if (this.interaction?.blocksGameplay) return;
+			if (this.isAnyEditorUIOpen()) return;
 		}
 
 		const logicSystem = this.constructionMenu?.logicSystem;

@@ -72,6 +72,75 @@ export class EditorGroupManager {
 	// Callback emitido ante cambios en la jerarquía
 	public onHierarchyChanged?: () => void;
 
+	// Geometrías y materiales compartidos para rendimiento zero-allocation en modo acoples
+	private sharedBoxGeom = new THREE.BoxGeometry(0.35, 0.25, 0.35);
+	private sharedSphereGeom = new THREE.SphereGeometry(0.55, 16, 16);
+
+	private matPivotTargetNormal = new THREE.MeshStandardMaterial({
+		color: 0x38bdf8,
+		emissive: 0x0284c7,
+		emissiveIntensity: 0.6,
+		transparent: true,
+		opacity: 0.85,
+		depthTest: false,
+	});
+	private matPivotTargetValid = new THREE.MeshStandardMaterial({
+		color: 0x22c55e,
+		emissive: 0x15803d,
+		emissiveIntensity: 1.0,
+		transparent: true,
+		opacity: 0.95,
+		depthTest: false,
+	});
+	private matPivotTargetInvalid = new THREE.MeshStandardMaterial({
+		color: 0xef4444,
+		emissive: 0xb91c1c,
+		emissiveIntensity: 1.0,
+		transparent: true,
+		opacity: 0.95,
+		depthTest: false,
+	});
+	private matConnectorConnected = new THREE.MeshStandardMaterial({
+		color: 0x10b981,
+		emissive: 0x059669,
+		emissiveIntensity: 0.8,
+		depthTest: false,
+	});
+	private matConnectorDisconnected = new THREE.MeshStandardMaterial({
+		color: 0x94a3b8,
+		emissive: 0x475569,
+		emissiveIntensity: 0.8,
+		depthTest: false,
+	});
+	private matConnectorMove = new THREE.MeshStandardMaterial({
+		color: 0x06b6d4,
+		emissive: 0x0891b2,
+		emissiveIntensity: 1.0,
+		depthTest: false,
+	});
+	private matConnectorReparent = new THREE.MeshStandardMaterial({
+		color: 0xf59e0b,
+		emissive: 0xd97706,
+		emissiveIntensity: 1.0,
+		depthTest: false,
+	});
+	private matLine = new THREE.LineBasicMaterial({
+		color: 0x00ffcc,
+		transparent: true,
+		opacity: 0.8,
+		depthTest: false,
+	});
+	private matRubberBand = new THREE.LineBasicMaterial({
+		color: 0xf59e0b,
+		linewidth: 2,
+		depthTest: false,
+	});
+
+	private connectorMeshes = new Map<string, THREE.Mesh>();
+	private pivotTargetMeshes = new Map<string, THREE.Mesh>();
+	private couplingLines = new Map<string, THREE.Line>();
+	private lastHoveredTargetMesh: THREE.Mesh | null = null;
+
 	constructor(hierarchy: EditorHierarchyModel, scene: THREE.Scene, history?: EditorCommandHistory) {
 		this.hierarchy = hierarchy;
 		this.scene = scene;
@@ -392,10 +461,10 @@ export class EditorGroupManager {
 					// Sincronizar cuerpo físico Rapier si existe
 					if (obj.userData?.rigidBody) {
 						if (typeof obj.userData.rigidBody.setTranslation === "function") {
-							obj.userData.rigidBody.setTranslation({ x: nextPos.x, y: nextPos.y, z: nextPos.z });
+							obj.userData.rigidBody.setTranslation({ x: nextPos.x, y: nextPos.y, z: nextPos.z }, true);
 						}
 						if (typeof obj.userData.rigidBody.setRotation === "function") {
-							obj.userData.rigidBody.setRotation({ x: nextQuat.x, y: nextQuat.y, z: nextQuat.z, w: nextQuat.w });
+							obj.userData.rigidBody.setRotation({ x: nextQuat.x, y: nextQuat.y, z: nextQuat.z, w: nextQuat.w }, true);
 						}
 					}
 
@@ -420,6 +489,11 @@ export class EditorGroupManager {
 						x: nextPos.x,
 						y: nextPos.y,
 						z: nextPos.z,
+					}, {
+						x: nextQuat.x,
+						y: nextQuat.y,
+						z: nextQuat.z,
+						w: nextQuat.w,
 					});
 				}
 			}
@@ -466,25 +540,28 @@ export class EditorGroupManager {
 	// ── Conectores 3D Interactivos y Líneas de Acople ───────────────────────────
 
 	private clearCouplingVisuals() {
-		while (this.couplingLinesGroup.children.length > 0) {
-			const child = this.couplingLinesGroup.children.pop();
-			if (child && (child as THREE.Line).geometry) {
-				(child as THREE.Line).geometry.dispose();
-				((child as THREE.Line).material as THREE.Material).dispose();
-			}
+		for (const line of this.couplingLines.values()) {
+			this.couplingLinesGroup.remove(line);
+			line.geometry.dispose();
 		}
+		this.couplingLines.clear();
 
-		while (this.couplingConnectorsGroup.children.length > 0) {
-			const child = this.couplingConnectorsGroup.children.pop();
-			if (child && (child as THREE.Mesh).geometry) {
-				(child as THREE.Mesh).geometry.dispose();
-				((child as THREE.Mesh).material as THREE.Material).dispose();
-			}
+		for (const mesh of this.pivotTargetMeshes.values()) {
+			this.couplingConnectorsGroup.remove(mesh);
 		}
+		this.pivotTargetMeshes.clear();
+
+		for (const mesh of this.connectorMeshes.values()) {
+			this.couplingConnectorsGroup.remove(mesh);
+		}
+		this.connectorMeshes.clear();
+
+		this.lastHoveredTargetMesh = null;
 	}
 
 	/**
-	 * Actualiza las líneas y los marcadores interactivos en la escena 3D.
+	 * Actualiza de forma incremental las líneas y los marcadores interactivos en la escena 3D.
+	 * Reutiliza geometrías, materiales y mallas sin destrucciones masivas por fotograma.
 	 */
 	updateCouplingVisuals(objectResolver?: (uuid: string) => THREE.Object3D | null) {
 		if (!this.isCouplingModeActive) return;
@@ -492,25 +569,34 @@ export class EditorGroupManager {
 		const resolver = this.lastResolver;
 		if (!resolver) return;
 
-		this.clearCouplingVisuals();
-
 		const allNodes = this.hierarchy.getAllNodes();
 		const groups = allNodes.filter((n) => n.isGroup);
 
-		// 1. Líneas de conexión entre pivotes y miembros
-		const lineMaterial = new THREE.LineBasicMaterial({
-			color: 0x00ffcc,
-			transparent: true,
-			opacity: 0.8,
-			depthTest: false,
-		});
+		const activeLineKeys = new Set<string>();
+		const activePivotTargetKeys = new Set<string>();
+		const activeConnectorKeys = new Set<string>();
 
-		groups.forEach((groupNode) => {
+		// 1. Líneas de conexión entre pivotes y miembros, y marcadores de pivote
+		for (let g = 0; g < groups.length; g++) {
+			const groupNode = groups[g];
 			const proxy = this.pivotProxies.get(groupNode.id);
-			if (!proxy) return;
+			if (!proxy) continue;
+
+			// Marcador de pivote del grupo (destino de acople)
+			activePivotTargetKeys.add(groupNode.id);
+			let pivotTargetMesh = this.pivotTargetMeshes.get(groupNode.id);
+			if (!pivotTargetMesh) {
+				pivotTargetMesh = new THREE.Mesh(this.sharedSphereGeom, this.matPivotTargetNormal);
+				pivotTargetMesh.userData.isCouplingPivotTarget = true;
+				pivotTargetMesh.userData.groupId = groupNode.id;
+				this.couplingConnectorsGroup.add(pivotTargetMesh);
+				this.pivotTargetMeshes.set(groupNode.id, pivotTargetMesh);
+			}
+			pivotTargetMesh.position.copy(proxy.position);
 
 			const children = this.hierarchy.getChildren(groupNode.id);
-			children.forEach((childNode) => {
+			for (let c = 0; c < children.length; c++) {
+				const childNode = children[c];
 				let targetPosition: THREE.Vector3 | null = null;
 
 				if (childNode.isGroup) {
@@ -522,44 +608,43 @@ export class EditorGroupManager {
 				}
 
 				if (targetPosition) {
-					const points = [proxy.position.clone(), targetPosition.clone()];
-					const geom = new THREE.BufferGeometry().setFromPoints(points);
-					const line = new THREE.Line(geom, lineMaterial.clone());
-					line.renderOrder = 1000;
-					this.couplingLinesGroup.add(line);
+					const lineKey = `${groupNode.id}->${childNode.id}`;
+					activeLineKeys.add(lineKey);
+					let line = this.couplingLines.get(lineKey);
+					if (!line) {
+						const positions = new Float32Array([
+							proxy.position.x, proxy.position.y, proxy.position.z,
+							targetPosition.x, targetPosition.y, targetPosition.z,
+						]);
+						const geom = new THREE.BufferGeometry();
+						geom.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+						line = new THREE.Line(geom, this.matLine);
+						line.renderOrder = 1000;
+						this.couplingLinesGroup.add(line);
+						this.couplingLines.set(lineKey, line);
+					} else {
+						const posAttr = line.geometry.attributes.position as THREE.BufferAttribute;
+						posAttr.setXYZ(0, proxy.position.x, proxy.position.y, proxy.position.z);
+						posAttr.setXYZ(1, targetPosition.x, targetPosition.y, targetPosition.z);
+						posAttr.needsUpdate = true;
+					}
 				}
-			});
+			}
+		}
 
-			// 2. Marcador 3D interactivo en el pivote del grupo (Destino válido / inválido de acople)
-			const pivotTargetMesh = new THREE.Mesh(
-				new THREE.SphereGeometry(0.55, 16, 16),
-				new THREE.MeshStandardMaterial({
-					color: 0x38bdf8,
-					emissive: 0x0284c7,
-					emissiveIntensity: 0.6,
-					transparent: true,
-					opacity: 0.85,
-					depthTest: false,
-				})
-			);
-			pivotTargetMesh.position.copy(proxy.position);
-			pivotTargetMesh.userData.isCouplingPivotTarget = true;
-			pivotTargetMesh.userData.groupId = groupNode.id;
-			this.couplingConnectorsGroup.add(pivotTargetMesh);
-		});
-
-		// 3. Marcadores 3D interactivos en cada objeto y subgrupo (Origen de acople)
-		allNodes.forEach((node) => {
+		// 2. Marcadores 3D interactivos en cada objeto y subgrupo (Origen de acople)
+		for (let n = 0; n < allNodes.length; n++) {
+			const node = allNodes[n];
 			let worldPos: THREE.Vector3 | null = null;
 			let boxHeight = 1.0;
 
 			if (node.isGroup) {
 				const proxy = this.pivotProxies.get(node.id);
-				if (proxy) worldPos = proxy.position.clone();
+				if (proxy) worldPos = proxy.position;
 			} else {
 				const obj = resolver(node.id);
 				if (obj) {
-					worldPos = obj.position.clone();
+					worldPos = obj.position;
 					if (obj.userData?.originalScale?.y) {
 						boxHeight = obj.userData.originalScale.y;
 					}
@@ -567,34 +652,60 @@ export class EditorGroupManager {
 			}
 
 			if (worldPos) {
+				activeConnectorKeys.add(node.id);
 				const isConnected = !!node.parentId;
-				// Recuadro superior de acople colocado encima del objeto
-				const connectorPos = worldPos.clone().add(new THREE.Vector3(0, Math.max(0.6, boxHeight / 2 + 0.35), 0));
+				const offsetY = Math.max(0.6, boxHeight / 2 + 0.35);
 
-				const connectorColor = isConnected ? 0x10b981 : 0x94a3b8;
-				const emissiveColor = isConnected ? 0x059669 : 0x475569;
+				let connectorMesh = this.connectorMeshes.get(node.id);
+				const targetMat = isConnected ? this.matConnectorConnected : this.matConnectorDisconnected;
 
-				const connectorMesh = new THREE.Mesh(
-					new THREE.BoxGeometry(0.35, 0.25, 0.35),
-					new THREE.MeshStandardMaterial({
-						color: connectorColor,
-						emissive: emissiveColor,
-						emissiveIntensity: 0.8,
-						depthTest: false,
-					})
-				);
-				connectorMesh.position.copy(connectorPos);
-				connectorMesh.userData.isCouplingConnectorSource = true;
-				connectorMesh.userData.nodeId = node.id;
+				if (!connectorMesh) {
+					connectorMesh = new THREE.Mesh(this.sharedBoxGeom, targetMat);
+					connectorMesh.userData.isCouplingConnectorSource = true;
+					connectorMesh.userData.nodeId = node.id;
+					this.couplingConnectorsGroup.add(connectorMesh);
+					this.connectorMeshes.set(node.id, connectorMesh);
+				} else if (
+					!this.connectorDrag ||
+					this.connectorDrag.sourceNodeId !== node.id
+				) {
+					if (connectorMesh.material !== targetMat) {
+						connectorMesh.material = targetMat;
+					}
+				}
+
+				connectorMesh.position.set(worldPos.x, worldPos.y + offsetY, worldPos.z);
 				connectorMesh.userData.isConnected = isConnected;
 				connectorMesh.userData.parentId = node.parentId;
 				connectorMesh.userData.isGroup = node.isGroup;
 				connectorMesh.userData.helpText = isConnected
 					? "Recuadro de Acople (Arrastra para mover en 3D | Shift+Arrastra para acoplar | Clic derecho para desacoplar)"
 					: "Recuadro de Acople (Arrastra para mover en 3D | Shift+Arrastra para vincular a grupo)";
-				this.couplingConnectorsGroup.add(connectorMesh);
 			}
-		});
+		}
+
+		// 3. Limpiar elementos eliminados
+		for (const [key, line] of this.couplingLines.entries()) {
+			if (!activeLineKeys.has(key)) {
+				this.couplingLinesGroup.remove(line);
+				line.geometry.dispose();
+				this.couplingLines.delete(key);
+			}
+		}
+
+		for (const [key, mesh] of this.pivotTargetMeshes.entries()) {
+			if (!activePivotTargetKeys.has(key)) {
+				this.couplingConnectorsGroup.remove(mesh);
+				this.pivotTargetMeshes.delete(key);
+			}
+		}
+
+		for (const [key, mesh] of this.connectorMeshes.entries()) {
+			if (!activeConnectorKeys.has(key)) {
+				this.couplingConnectorsGroup.remove(mesh);
+				this.connectorMeshes.delete(key);
+			}
+		}
 	}
 
 	// ── Manejadores de eventos de puntero para arrastre 3D de conectores ─────────
@@ -683,34 +794,21 @@ export class EditorGroupManager {
 
 				if (isReparent) {
 					// Resaltar conector en amarillo brillante para reparenting
-					(hitConnector.object as THREE.Mesh).material = new THREE.MeshStandardMaterial({
-						color: 0xf59e0b,
-						emissive: 0xd97706,
-						emissiveIntensity: 1.0,
-						depthTest: false,
-					});
+					(hitConnector.object as THREE.Mesh).material = this.matConnectorReparent;
 
-					// Línea elástica rubberband
-					const geom = new THREE.BufferGeometry().setFromPoints([
-						hitConnector.object.position.clone(),
-						intersectPoint.clone(),
+					// Línea elástica rubberband con BufferAttribute
+					const positions = new Float32Array([
+						hitConnector.object.position.x, hitConnector.object.position.y, hitConnector.object.position.z,
+						intersectPoint.x, intersectPoint.y, intersectPoint.z,
 					]);
-					const mat = new THREE.LineBasicMaterial({
-						color: 0xf59e0b,
-						linewidth: 2,
-						depthTest: false,
-					});
-					this.rubberBandLine = new THREE.Line(geom, mat);
+					const geom = new THREE.BufferGeometry();
+					geom.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+					this.rubberBandLine = new THREE.Line(geom, this.matRubberBand.clone());
 					this.rubberBandLine.renderOrder = 2000;
 					this.scene.add(this.rubberBandLine);
 				} else {
 					// Modo traslación espacial 3D: Resaltar en cian brillante
-					(hitConnector.object as THREE.Mesh).material = new THREE.MeshStandardMaterial({
-						color: 0x06b6d4,
-						emissive: 0x0891b2,
-						emissiveIntensity: 1.0,
-						depthTest: false,
-					});
+					(hitConnector.object as THREE.Mesh).material = this.matConnectorMove;
 				}
 			}
 		}
@@ -740,7 +838,7 @@ export class EditorGroupManager {
 							x: nextPos.x,
 							y: nextPos.y,
 							z: nextPos.z,
-						});
+						}, true);
 					}
 				}
 
@@ -755,41 +853,34 @@ export class EditorGroupManager {
 
 		// Modo Reparenting: actualizar rubberband y detección de objetivos válidos
 		if (this.rubberBandLine) {
-			this.rubberBandLine.geometry.setFromPoints([
-				this.connectorDrag.sourceMarker.position.clone(),
-				intersectPoint.clone(),
-			]);
+			const posAttr = this.rubberBandLine.geometry.attributes.position as THREE.BufferAttribute;
+			posAttr.setXYZ(0, this.connectorDrag.sourceMarker.position.x, this.connectorDrag.sourceMarker.position.y, this.connectorDrag.sourceMarker.position.z);
+			posAttr.setXYZ(1, intersectPoint.x, intersectPoint.y, intersectPoint.z);
+			posAttr.needsUpdate = true;
 		}
 
 		const intersects = raycaster.intersectObjects(this.couplingConnectorsGroup.children, true);
 		const hitTarget = intersects.find((h) => h.object.userData?.isCouplingPivotTarget);
 
-		this.couplingConnectorsGroup.children.forEach((c) => {
-			if (c.userData?.isCouplingPivotTarget) {
-				const mesh = c as THREE.Mesh;
-				(mesh.material as THREE.MeshStandardMaterial).color.setHex(0x38bdf8);
-				(mesh.material as THREE.MeshStandardMaterial).emissive.setHex(0x0284c7);
-			}
-		});
-
 		if (hitTarget) {
-			const targetGroupId = hitTarget.object.userData.groupId;
+			const targetMesh = hitTarget.object as THREE.Mesh;
+			const targetGroupId = targetMesh.userData.groupId;
 			const validation = this.hierarchy.canReparent(this.connectorDrag.sourceNodeId, targetGroupId);
 
-			const targetMesh = hitTarget.object as THREE.Mesh;
-			const targetMat = targetMesh.material as THREE.MeshStandardMaterial;
+			if (this.lastHoveredTargetMesh && this.lastHoveredTargetMesh !== targetMesh) {
+				this.lastHoveredTargetMesh.material = this.matPivotTargetNormal;
+			}
+			this.lastHoveredTargetMesh = targetMesh;
 
 			if (validation.allowed) {
-				targetMat.color.setHex(0x22c55e);
-				targetMat.emissive.setHex(0x15803d);
+				targetMesh.material = this.matPivotTargetValid;
 				if (this.rubberBandLine) {
 					(this.rubberBandLine.material as THREE.LineBasicMaterial).color.setHex(0x22c55e);
 				}
 				this.connectorDrag.hoveredTargetGroupId = targetGroupId;
 				this.connectorDrag.isValidTarget = true;
 			} else {
-				targetMat.color.setHex(0xef4444);
-				targetMat.emissive.setHex(0xb91c1c);
+				targetMesh.material = this.matPivotTargetInvalid;
 				if (this.rubberBandLine) {
 					(this.rubberBandLine.material as THREE.LineBasicMaterial).color.setHex(0xef4444);
 				}
@@ -797,6 +888,10 @@ export class EditorGroupManager {
 				this.connectorDrag.isValidTarget = false;
 			}
 		} else {
+			if (this.lastHoveredTargetMesh) {
+				this.lastHoveredTargetMesh.material = this.matPivotTargetNormal;
+				this.lastHoveredTargetMesh = null;
+			}
 			if (this.rubberBandLine) {
 				(this.rubberBandLine.material as THREE.LineBasicMaterial).color.setHex(0xf59e0b);
 			}
@@ -809,6 +904,11 @@ export class EditorGroupManager {
 		if (!this.connectorDrag || (this.pointerId != null && event.pointerId !== this.pointerId)) return;
 
 		const drag = this.connectorDrag;
+
+		if (this.lastHoveredTargetMesh) {
+			this.lastHoveredTargetMesh.material = this.matPivotTargetNormal;
+			this.lastHoveredTargetMesh = null;
+		}
 
 		if (this.rubberBandLine) {
 			this.scene.remove(this.rubberBandLine);
@@ -905,6 +1005,11 @@ export class EditorGroupManager {
 		const drag = this.connectorDrag;
 		this.connectorDrag = null;
 
+		if (this.lastHoveredTargetMesh) {
+			this.lastHoveredTargetMesh.material = this.matPivotTargetNormal;
+			this.lastHoveredTargetMesh = null;
+		}
+
 		if (drag.mode === "move" && drag.targetObject) {
 			drag.targetObject.position.copy(drag.initialObjectPos);
 			drag.targetObject.updateMatrixWorld(true);
@@ -913,7 +1018,7 @@ export class EditorGroupManager {
 					x: drag.initialObjectPos.x,
 					y: drag.initialObjectPos.y,
 					z: drag.initialObjectPos.z,
-				});
+				}, true);
 			}
 		}
 
@@ -932,6 +1037,19 @@ export class EditorGroupManager {
 	 */
 	dispose() {
 		this.cancelConnectorDrag();
+		this.clearCouplingVisuals();
+		this.sharedBoxGeom.dispose();
+		this.sharedSphereGeom.dispose();
+		this.matPivotTargetNormal.dispose();
+		this.matPivotTargetValid.dispose();
+		this.matPivotTargetInvalid.dispose();
+		this.matConnectorConnected.dispose();
+		this.matConnectorDisconnected.dispose();
+		this.matConnectorMove.dispose();
+		this.matConnectorReparent.dispose();
+		this.matLine.dispose();
+		this.matRubberBand.dispose();
+
 		if (this.domElement) {
 			this.domElement.removeEventListener("pointerdown", this.handlePointerDown);
 			window.removeEventListener("pointermove", this.handlePointerMove);

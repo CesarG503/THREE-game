@@ -3,12 +3,17 @@ export function isTextInput(target: any): boolean {
   return !!target && (/^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName) || target.isContentEditable);
 }
 
+export type EditorTool = 'build' | 'edit';
+
 export class InteractionCoordinator {
   private abort = new AbortController();
   private gesture: { owner: string; cancel: () => void } | null = null;
   private handledEvents = new WeakSet<Event>();
   private suspended = false;
   private suppressClick = false;
+  private _activeTool: EditorTool = 'build';
+  public onToolChanged?: (tool: EditorTool) => void;
+  public rightClickDragThreshold = 6;
 
   constructor(private game: any) {
     const options = { capture: true, signal: this.abort.signal };
@@ -24,7 +29,7 @@ export class InteractionCoordinator {
       if (!this.abort.signal.aborted) this.sync();
     }), options);
     window.addEventListener('click', (event) => {
-      if (this.suppressClick && event.target === this.game.sceneManager.renderer.domElement) {
+      if (this.suppressClick && event.target === this.game?.sceneManager?.renderer?.domElement) {
         this.suppressClick = false;
         event.preventDefault();
         event.stopImmediatePropagation();
@@ -37,6 +42,22 @@ export class InteractionCoordinator {
     window.addEventListener('mousedown', () => {
       if (this.suspended) { this.suspended = false; this.sync(); }
     }, options);
+  }
+
+  get activeTool(): EditorTool {
+    return this._activeTool;
+  }
+
+  setTool(tool: EditorTool) {
+    if (this._activeTool === tool) return;
+    if (this.gesture) {
+      this.cancelGesture();
+    }
+    this._activeTool = tool;
+    this.sync();
+    if (this.onToolChanged) {
+      this.onToolChanged(tool);
+    }
   }
 
   private get overlay() {
@@ -76,6 +97,31 @@ export class InteractionCoordinator {
   }
 
   get blocksScene(): boolean { return !['gameplay', 'editor'].includes(this.state); }
+
+  /**
+   * Permite colocar objetos en la escena si la herramienta activa es 'build'
+   * incluso si el Inspector de objetos está abierto, siempre que no haya un gesto exclusivo
+   * ni se esté escribiendo en un input de texto o interactuando con modales.
+   */
+  get canBuild(): boolean {
+    if (this.game.gameMode !== 'editor') return false;
+    if (this._activeTool !== 'build') return false;
+    if (this.gesture) return false;
+    if (isTextInput(document.activeElement)) return false;
+    if (this.overlay || this.menuOpen || this.game.cameraController?.isPaused || this.suspended) return false;
+    return true;
+  }
+
+  /**
+   * Permite seleccionar y manipular objetos con gizmo o conectores si la herramienta activa es 'edit'.
+   */
+  get canEdit(): boolean {
+    if (this.game.gameMode !== 'editor') return false;
+    if (this._activeTool !== 'edit') return false;
+    if (isTextInput(document.activeElement)) return false;
+    if (this.overlay || this.menuOpen || this.game.cameraController?.isPaused || this.suspended) return false;
+    return true;
+  }
 
   begin(owner: string, cancel: () => void): boolean {
     if (this.gesture) return false;
@@ -124,8 +170,14 @@ export class InteractionCoordinator {
     }
     this.game.cameraController?.setUIOpen(this.blocksGameplayActions);
     // Menus suppress tools without detaching the selected object.
+    const isEditingMap = !!this.game.constructionMenu?.logicSystem?.isEditingMap;
+    const canUseGizmo = (this.game.gameMode !== 'editor' || this._activeTool === 'edit') && !this.blocksScene && !isEditingMap;
     const controls = this.game.objectInspector?.transformGizmo?.controls;
-    if (controls && !this.gesture) controls.enabled = !this.blocksScene && !this.game.constructionMenu?.logicSystem?.isEditingMap;
+    if (controls && !this.gesture) controls.enabled = canUseGizmo;
+    const helper = this.game.objectInspector?.transformGizmo?.helper;
+    if (helper && this.game.gameMode === 'editor') {
+      helper.visible = canUseGizmo && !!this.game.objectInspector?.transformGizmo?.target;
+    }
     const waypointControls = this.game.constructionMenu?.logicSystem?.waypointGizmo?.controls;
     if (waypointControls && !this.gesture) waypointControls.enabled = !this.blocksScene;
   }
@@ -160,6 +212,25 @@ export class InteractionCoordinator {
       else this.game.cameraController?.togglePause();
       consume();
       this.sync();
+      return;
+    }
+    if (this.game.gameMode === 'editor' && key === 'c' && !event.ctrlKey && !event.metaKey && !event.altKey) {
+      consume();
+      if (event.repeat || this.overlay || this.game.cameraController?.isPaused) return;
+      if (this._activeTool === 'edit') {
+        if (this.game.editorExplorer?.toggleCouplingMode) {
+          this.game.editorExplorer.toggleCouplingMode();
+        } else if (this.game.editorGroupManager) {
+          const next = !this.game.editorGroupManager.isCouplingMode();
+          this.game.editorGroupManager.setCouplingMode(next);
+        }
+      } else {
+        if (typeof this.game.showToast === 'function') {
+          this.game.showToast("Cambia a modo Editar para usar Acoples (C)", "warning");
+        } else {
+          console.warn("[InteractionCoordinator] Cambia a modo Editar para usar Acoples (C)");
+        }
+      }
       return;
     }
     if (this.game.gameMode === 'editor' && (key === 'h' || key === 'e') && !event.ctrlKey && !event.metaKey && !event.altKey) {

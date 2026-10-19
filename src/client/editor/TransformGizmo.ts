@@ -124,7 +124,9 @@ export class TransformGizmo {
 		this.syncProxyFromTarget(true);
 		this.controls.attach(this.proxy);
 		this.setMode("translate");
-		this.helper.visible = true;
+		const canShowGizmo = this.game.gameMode !== "editor" || this.game.interaction?.activeTool === "edit";
+		this.helper.visible = canShowGizmo;
+		this.game.interaction?.sync?.();
 	}
 
 	detach() {

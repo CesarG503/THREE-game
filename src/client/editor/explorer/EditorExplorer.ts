@@ -979,12 +979,14 @@ export class EditorExplorer {
 		}
 	}
 
-	private toggleCouplingMode() {
+	public toggleCouplingMode() {
 		const active = !this.groupManager.isCouplingMode();
 		this.groupManager.setCouplingMode(active, (id) => this.resolveObject3D(id));
-		this.btnToggleCoupling.textContent = `Acoples: ${active ? "ON" : "OFF"}`;
-		this.btnToggleCoupling.style.background = active ? "#0088cc" : "#444";
-		this.btnToggleCoupling.style.borderColor = active ? "#38bdf8" : "#555";
+		if (this.btnToggleCoupling) {
+			this.btnToggleCoupling.textContent = `Acoples: ${active ? "ON" : "OFF"}`;
+			this.btnToggleCoupling.style.background = active ? "#0088cc" : "#444";
+			this.btnToggleCoupling.style.borderColor = active ? "#38bdf8" : "#555";
+		}
 		this.game.updateEditorInteractionMode?.();
 	}
 

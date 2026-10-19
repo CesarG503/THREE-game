@@ -60,6 +60,14 @@ export class EditorExplorer {
 	private searchQuery: string = "";
 	private shortcutKey: string = "h";
 
+	// Ancho configurable, límites y resizer
+	public readonly minWidth: number = 260;
+	public readonly maxWidth: number = 600;
+	public currentWidth: number = 340;
+	private isResizing: boolean = false;
+	private resizerElement!: HTMLElement;
+	private hideTimeoutId: any = null;
+
 	// Estado de arrastre en el árbol
 	private draggedNodeId: string | null = null;
 
@@ -80,33 +88,49 @@ export class EditorExplorer {
 		this.prefabManager = prefabManager;
 		if (options.shortcutKey) this.shortcutKey = options.shortcutKey.toLowerCase();
 
+		// Restaurar ancho previo si existe en localStorage
+		if (typeof localStorage !== "undefined") {
+			try {
+				const savedWidth = localStorage.getItem("viper_editor_explorer_width");
+				if (savedWidth) {
+					const parsed = parseInt(savedWidth, 10);
+					if (!isNaN(parsed) && parsed >= this.minWidth && parsed <= this.maxWidth) {
+						this.currentWidth = parsed;
+					}
+				}
+			} catch {}
+		}
+
 		this.buildUI();
 		this.setupKeyboardShortcuts();
 		this.renderTree();
 		if (options.initialVisible) {
 			this.show();
 		} else {
-			this.hide();
+			this.hide(true);
 		}
 	}
 
 	private buildUI() {
-		// Contenedor flotante lateral del Explorer
+		// Contenedor lateral acoplado (dock) del Explorer con animación desde el costado
 		this.container = document.createElement("div");
 		this.container.id = "editor-hierarchy-explorer";
 		this.container.style.cssText = `
 			position: fixed;
-			top: min(60px, 5dvh);
-			left: min(20px, 3vw);
-			width: min(340px, 94vw);
+			top: 0;
+			left: 0;
+			bottom: 0;
+			width: ${this.currentWidth}px;
+			min-width: ${this.minWidth}px;
+			max-width: min(${this.maxWidth}px, 60vw);
+			height: 100vh;
+			height: 100dvh;
 			box-sizing: border-box;
 			overflow: hidden;
-			max-height: min(85dvh, calc(100vh - 80px));
-			background: rgba(15, 23, 42, 0.95);
-			backdrop-filter: blur(8px);
-			border: 1px solid #334155;
-			border-radius: 8px;
-			box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5);
+			background: rgba(15, 23, 42, 0.96);
+			backdrop-filter: blur(12px);
+			border-right: 1px solid #334155;
+			box-shadow: 6px 0 24px -4px rgba(0, 0, 0, 0.6);
 			color: #e2e8f0;
 			font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 			font-size: 13px;
@@ -114,7 +138,10 @@ export class EditorExplorer {
 			flex-direction: column;
 			z-index: 2500;
 			user-select: none;
-			transition: opacity 0.2s ease, transform 0.2s ease;
+			transform: translateX(-100%);
+			opacity: 0;
+			pointer-events: none;
+			transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.22s ease;
 		`;
 
 		// ── Encabezado ──────────────────────────────────────────────────────────
@@ -126,15 +153,12 @@ export class EditorExplorer {
 			padding: 10px 14px;
 			background: #0f172a;
 			border-bottom: 1px solid #1e293b;
-			border-top-left-radius: 8px;
-			border-top-right-radius: 8px;
-			cursor: grab;
 			flex-shrink: 0;
 		`;
 
 		const titleBox = document.createElement("div");
 		titleBox.style.cssText = `display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 13px; color: #38bdf8;`;
-		titleBox.innerHTML = `<span>🗂️</span><span>Jerarquía / Explorer</span>`;
+		titleBox.innerHTML = `<span>🗂️</span><span>Jerarquía / Explorer</span><span style="font-size: 10px; background: #1e293b; color: #94a3b8; padding: 2px 5px; border-radius: 4px; border: 1px solid #334155;">[${this.shortcutKey.toUpperCase()}]</span>`;
 
 		const headerControls = document.createElement("div");
 		headerControls.style.cssText = `display: flex; align-items: center; gap: 8px;`;
@@ -156,6 +180,24 @@ export class EditorExplorer {
 		header.appendChild(titleBox);
 		header.appendChild(headerControls);
 		this.container.appendChild(header);
+
+		// ── Tirador de Resize lateral (Borde derecho) ───────────────────────────
+		this.resizerElement = document.createElement("div");
+		this.resizerElement.id = "editor-explorer-resizer";
+		this.resizerElement.title = `Arrastra para ajustar el ancho (${this.minWidth}px - ${this.maxWidth}px)`;
+		this.resizerElement.style.cssText = `
+			position: absolute;
+			top: 0;
+			right: 0;
+			width: 6px;
+			height: 100%;
+			cursor: col-resize;
+			z-index: 2510;
+			background: transparent;
+			transition: background 0.15s ease;
+		`;
+		this.container.appendChild(this.resizerElement);
+		this.setupResizer();
 
 		// ── Barra de Pestañas (Escena / Biblioteca) ──────────────────────────────
 		const tabBar = document.createElement("div");
@@ -470,6 +512,20 @@ export class EditorExplorer {
 
 		const style = document.createElement("style");
 		style.textContent = `
+			#editor-hierarchy-explorer.open {
+				transform: translateX(0) !important;
+				opacity: 1 !important;
+				pointer-events: auto !important;
+			}
+			#editor-hierarchy-explorer.resizing {
+				transition: none !important;
+				user-select: none !important;
+			}
+			#editor-explorer-resizer:hover,
+			#editor-explorer-resizer.active {
+				background: #38bdf8 !important;
+				box-shadow: 0 0 8px rgba(56, 189, 248, 0.8) !important;
+			}
 			#editor-hierarchy-explorer > div:nth-child(-n+2) { flex-shrink: 0; }
 			#editor-hierarchy-explorer *::-webkit-scrollbar {
 				width: 6px;
@@ -493,6 +549,56 @@ export class EditorExplorer {
 		`;
 		this.container.appendChild(style);
 		document.body.appendChild(this.container);
+	}
+
+	private setupResizer() {
+		if (!this.resizerElement || typeof window === "undefined") return;
+
+		this.resizerElement.addEventListener("pointerdown", (e: PointerEvent) => {
+			e.preventDefault();
+			e.stopPropagation();
+			this.isResizing = true;
+			this.resizerElement.classList?.add?.("active");
+			this.container.classList?.add?.("resizing");
+			if (document.body) {
+				document.body.style.cursor = "col-resize";
+				document.body.style.userSelect = "none";
+			}
+
+			const onPointerMove = (moveEvent: PointerEvent) => {
+				if (!this.isResizing) return;
+				const maxW = Math.min(this.maxWidth, window.innerWidth * 0.6);
+				const newWidth = Math.round(Math.max(this.minWidth, Math.min(maxW, moveEvent.clientX)));
+				this.setWidth(newWidth);
+			};
+
+			const onPointerUp = () => {
+				this.isResizing = false;
+				this.resizerElement.classList?.remove?.("active");
+				this.container.classList?.remove?.("resizing");
+				if (document.body) {
+					document.body.style.cursor = "";
+					document.body.style.userSelect = "";
+				}
+				window.removeEventListener("pointermove", onPointerMove);
+				window.removeEventListener("pointerup", onPointerUp);
+				if (typeof localStorage !== "undefined") {
+					try {
+						localStorage.setItem("viper_editor_explorer_width", String(this.currentWidth));
+					} catch {}
+				}
+			};
+
+			window.addEventListener("pointermove", onPointerMove);
+			window.addEventListener("pointerup", onPointerUp);
+		}, { signal: this.events.signal });
+	}
+
+	public setWidth(width: number) {
+		const maxW = typeof window !== "undefined" ? Math.min(this.maxWidth, window.innerWidth * 0.6) : this.maxWidth;
+		const clamped = Math.round(Math.max(this.minWidth, Math.min(maxW, width)));
+		this.currentWidth = clamped;
+		this.container.style.width = `${clamped}px`;
 	}
 
 	private setupKeyboardShortcuts() {
@@ -550,8 +656,27 @@ export class EditorExplorer {
 	}
 
 	show() {
+		if (this.hideTimeoutId) {
+			clearTimeout(this.hideTimeoutId);
+			this.hideTimeoutId = null;
+		}
 		this.isVisible = true;
 		this.container.style.display = "flex";
+
+		if (typeof requestAnimationFrame !== "undefined") {
+			requestAnimationFrame(() => {
+				this.container.classList?.add?.("open");
+				this.container.style.transform = "translateX(0)";
+				this.container.style.opacity = "1";
+				this.container.style.pointerEvents = "auto";
+			});
+		} else {
+			this.container.classList?.add?.("open");
+			this.container.style.transform = "translateX(0)";
+			this.container.style.opacity = "1";
+			this.container.style.pointerEvents = "auto";
+		}
+
 		this.renderTree();
 		if (this.game?.updateEditorInteractionMode) {
 			this.game.updateEditorInteractionMode();
@@ -565,10 +690,31 @@ export class EditorExplorer {
 		}
 	}
 
-	hide() {
+	hide(immediate: boolean = false) {
 		this.cancelDrag();
 		this.isVisible = false;
-		this.container.style.display = "none";
+
+		if (this.hideTimeoutId) {
+			clearTimeout(this.hideTimeoutId);
+			this.hideTimeoutId = null;
+		}
+
+		this.container.classList?.remove?.("open");
+		this.container.style.transform = "translateX(-100%)";
+		this.container.style.opacity = "0";
+		this.container.style.pointerEvents = "none";
+
+		if (immediate || typeof setTimeout === "undefined") {
+			this.container.style.display = "none";
+		} else {
+			this.hideTimeoutId = setTimeout(() => {
+				if (!this.isVisible) {
+					this.container.style.display = "none";
+				}
+				this.hideTimeoutId = null;
+			}, 300);
+		}
+
 		if (this.game?.updateEditorInteractionMode) {
 			this.game.updateEditorInteractionMode();
 		} else if (this.game?.cameraController) {
@@ -613,7 +759,13 @@ export class EditorExplorer {
 		elementsToToggle.forEach((el) => {
 			if (el) (el as HTMLElement).style.display = this.isCollapsed ? "none" : "";
 		});
-		if (!this.isCollapsed) {
+		if (this.isCollapsed) {
+			this.container.style.height = "auto";
+			this.container.style.borderBottom = "1px solid #334155";
+		} else {
+			this.container.style.height = "100vh";
+			this.container.style.height = "100dvh";
+			this.container.style.borderBottom = "none";
 			this.switchTab(this.currentTab);
 		}
 	}
@@ -1742,6 +1894,10 @@ export class EditorExplorer {
 
 	dispose() {
 		this.cancelDrag();
+		if (this.hideTimeoutId) {
+			clearTimeout(this.hideTimeoutId);
+			this.hideTimeoutId = null;
+		}
 		this.events.abort();
 		this.container.remove();
 	}

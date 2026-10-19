@@ -680,8 +680,9 @@ export function updateButtonInteraction(this: any, dt: number) {
 		} else btnPos.y += 0.5;
 		btnPos.project(this.sceneManager.camera);
 
-		const x = (btnPos.x * 0.5 + 0.5) * window.innerWidth;
-		const y = (-(btnPos.y * 0.5) + 0.5) * window.innerHeight;
+		const rect = this.sceneManager.renderer.domElement.getBoundingClientRect();
+		const x = rect.left + (btnPos.x * 0.5 + 0.5) * rect.width;
+		const y = rect.top + (-(btnPos.y * 0.5) + 0.5) * rect.height;
 
 		if (btnPos.z < 1) {
 			promptEl.style.left = `${x}px`;

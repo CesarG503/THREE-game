@@ -302,6 +302,14 @@ export class LogicSystem {
 
 	private getPointerNdc(event: MouseEvent) {
 		if (document.pointerLockElement) return new THREE.Vector2(0, 0);
+		const domElement = (this.game as any)?.sceneManager?.renderer?.domElement;
+		if (domElement) {
+			const rect = domElement.getBoundingClientRect();
+			return new THREE.Vector2(
+				((event.clientX - rect.left) / rect.width) * 2 - 1,
+				-((event.clientY - rect.top) / rect.height) * 2 + 1
+			);
+		}
 		return new THREE.Vector2(
 			(event.clientX / window.innerWidth) * 2 - 1,
 			-(event.clientY / window.innerHeight) * 2 + 1

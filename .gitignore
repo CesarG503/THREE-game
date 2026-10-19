@@ -10,6 +10,9 @@ dist
 graphify-out
 graphify-out/
 .graphify*
+.graphifyignore
+tests/*
+tests/
 # Browser regression artifacts
 /test-results/
 /playwright-report/

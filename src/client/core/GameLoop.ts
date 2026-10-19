@@ -825,8 +825,9 @@ export function animate(this: any) {
 				const vec = new THREE.Vector3(itemPos.x, itemPos.y + 0.5, itemPos.z);
 				vec.project(this.sceneManager.camera);
 
-				const x = (vec.x * 0.5 + 0.5) * window.innerWidth;
-				const y = (-(vec.y * 0.5) + 0.5) * window.innerHeight;
+				const rect = this.sceneManager.renderer.domElement.getBoundingClientRect();
+				const x = rect.left + (vec.x * 0.5 + 0.5) * rect.width;
+				const y = rect.top + (-(vec.y * 0.5) + 0.5) * rect.height;
 
 				if (vec.z < 1) {
 					promptEl.style.left = `${x}px`;

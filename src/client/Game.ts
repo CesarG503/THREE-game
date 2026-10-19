@@ -700,8 +700,9 @@ export class Game {
 					if (document.pointerLockElement) {
 						mouse.x = 0; mouse.y = 0;
 					} else {
-						mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
-						mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+						const rect = this.sceneManager.renderer.domElement.getBoundingClientRect();
+						mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+						mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
 					}
 					const raycaster = new THREE.Raycaster();
 					raycaster.setFromCamera(mouse, this.sceneManager.camera);

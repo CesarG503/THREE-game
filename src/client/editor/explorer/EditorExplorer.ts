@@ -36,11 +36,18 @@ export class EditorExplorer {
 	private prefabManager: PrefabManager;
 
 	public container!: HTMLElement;
-	private currentTab: "scene" | "library" = "scene";
-	private btnTabScene!: HTMLButtonElement;
-	private btnTabLibrary!: HTMLButtonElement;
+	private currentTab: "scene" | "library" | "properties" = "scene";
+	private activityBar!: HTMLElement;
+	private mainPanel!: HTMLElement;
+	private headerTitleIcon!: HTMLElement;
+	private headerTitleText!: HTMLElement;
+	private btnTabScene!: HTMLElement;
+	private btnTabLibrary!: HTMLElement;
+	private btnTabProperties!: HTMLElement;
 	private sceneContentContainer!: HTMLElement;
 	private libraryContainer!: HTMLElement;
+	private propertiesContentContainer!: HTMLElement;
+	private propertiesEmptyPlaceholder!: HTMLElement;
 
 	private treeContainer!: HTMLElement;
 	private searchInput!: HTMLInputElement;
@@ -127,20 +134,21 @@ export class EditorExplorer {
 			height: 100dvh;
 			box-sizing: border-box;
 			overflow: hidden;
-			background: rgba(0, 0, 0, 0.9);
-			backdrop-filter: blur(12px);
-			border-right: 2px solid #444;
-			border-top: 2px solid #444;
-			border-bottom: 2px solid #444;
+			background: rgba(15, 15, 15, 0.78);
+			backdrop-filter: blur(14px);
+			-webkit-backdrop-filter: blur(14px);
+			border-right: 2px solid rgba(255, 255, 255, 0.2);
+			border-top: 2px solid rgba(255, 255, 255, 0.15);
+			border-bottom: 2px solid rgba(255, 255, 255, 0.15);
 			border-left: none;
 			border-top-right-radius: 12px;
 			border-bottom-right-radius: 12px;
-			box-shadow: 0 0 25px rgba(0, 0, 0, 0.85);
+			box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.08);
 			color: white;
 			font-family: sans-serif;
 			font-size: 13px;
 			display: none;
-			flex-direction: column;
+			flex-direction: row;
 			z-index: 2500;
 			user-select: none;
 			transform: translateX(-100%);
@@ -149,20 +157,118 @@ export class EditorExplorer {
 			transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.22s ease;
 		`;
 
-		// ── Encabezado (mismo estilo que ObjectInspector) ───────────────────────
+		// ── Barra de Actividad vertical (Menú de Iconos a un costado como VSCode) ──
+		this.activityBar = document.createElement("div");
+		this.activityBar.id = "editor-explorer-activity-bar";
+		this.activityBar.style.cssText = `
+			width: 48px;
+			flex-shrink: 0;
+			height: 100%;
+			background: rgba(0, 0, 0, 0.42);
+			border-right: 1px solid rgba(255, 255, 255, 0.12);
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+			padding: 12px 0;
+			gap: 8px;
+			box-sizing: border-box;
+			z-index: 5;
+		`;
+
+		const createIconButton = (svgHtml: string, title: string, onClick: () => void) => {
+			const btn = document.createElement("div");
+			btn.title = title;
+			btn.innerHTML = svgHtml;
+			btn.style.cssText = `
+				width: 38px;
+				height: 38px;
+				border-radius: 8px;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				cursor: pointer;
+				color: #888;
+				background: transparent;
+				border: 1px solid transparent;
+				border-left: 2px solid transparent;
+				box-sizing: border-box;
+				transition: all 0.15s ease;
+				user-select: none;
+			`;
+			btn.onmouseenter = () => {
+				if (btn.dataset.active !== "true") {
+					btn.style.color = "#ddd";
+					btn.style.background = "rgba(255, 255, 255, 0.08)";
+				}
+			};
+			btn.onmouseleave = () => {
+				if (btn.dataset.active !== "true") {
+					btn.style.color = "#888";
+					btn.style.background = "transparent";
+				}
+			};
+			btn.onclick = onClick;
+			return btn;
+		};
+
+		// 1. Icono Escena (Explorador / Jerarquía estilo VSCode)
+		const iconSceneSvg = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4H8a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z"/><path d="M8 8H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2v-2"/></svg>`;
+		this.btnTabScene = createIconButton(iconSceneSvg, "Escena (Jerarquía y objetos)", () => this.switchTab("scene"));
+
+		// 2. Icono Biblioteca (Prefabs / Extensiones)
+		const iconLibSvg = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>`;
+		this.btnTabLibrary = createIconButton(iconLibSvg, "Biblioteca (Prefabs)", () => this.switchTab("library"));
+
+		// 3. Icono Propiedades (Inspector)
+		const iconPropSvg = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>`;
+		this.btnTabProperties = createIconButton(iconPropSvg, "Propiedades (Inspector del objeto)", () => this.switchTab("properties"));
+
+		this.activityBar.appendChild(this.btnTabScene);
+		this.activityBar.appendChild(this.btnTabLibrary);
+		this.activityBar.appendChild(this.btnTabProperties);
+		this.container.appendChild(this.activityBar);
+
+		// ── Panel Principal a la derecha de la barra de actividad ───────────────
+		this.mainPanel = document.createElement("div");
+		this.mainPanel.id = "editor-explorer-main";
+		this.mainPanel.style.cssText = `
+			flex: 1 1 auto;
+			min-width: 0;
+			height: 100%;
+			display: flex;
+			flex-direction: column;
+			overflow: hidden;
+			background: transparent;
+		`;
+		this.container.appendChild(this.mainPanel);
+
+		// ── Encabezado ──────────────────────────────────────────────────────────
 		const header = document.createElement("div");
 		header.style.cssText = `
 			display: flex;
 			align-items: center;
 			justify-content: space-between;
 			padding: 12px 16px;
-			border-bottom: 1px solid #555;
+			border-bottom: 1px solid rgba(255, 255, 255, 0.12);
 			flex-shrink: 0;
 		`;
 
 		const titleBox = document.createElement("div");
 		titleBox.style.cssText = `display: flex; align-items: center; gap: 8px; font-weight: bold; font-size: 14px; color: white;`;
-		titleBox.innerHTML = `<span>🗂️</span><span>Jerarquía / Explorer</span><span style="font-size: 10px; background: #222; color: #aaa; padding: 2px 5px; border-radius: 4px; border: 1px solid #444; font-weight: normal;">[${this.shortcutKey.toUpperCase()}]</span>`;
+
+		this.headerTitleIcon = document.createElement("span");
+		this.headerTitleIcon.textContent = "🗂️";
+
+		this.headerTitleText = document.createElement("span");
+		this.headerTitleText.textContent = "Jerarquía / Escena";
+
+		const headerBadge = document.createElement("span");
+		headerBadge.textContent = `[${this.shortcutKey.toUpperCase()}]`;
+		headerBadge.style.cssText = `font-size: 10px; background: #222; color: #aaa; padding: 2px 5px; border-radius: 4px; border: 1px solid #444; font-weight: normal;`;
+
+		titleBox.appendChild(this.headerTitleIcon);
+		titleBox.appendChild(this.headerTitleText);
+		titleBox.appendChild(headerBadge);
 
 		const headerControls = document.createElement("div");
 		headerControls.style.cssText = `display: flex; align-items: center; gap: 12px;`;
@@ -187,7 +293,7 @@ export class EditorExplorer {
 		headerControls.appendChild(btnClose);
 		header.appendChild(titleBox);
 		header.appendChild(headerControls);
-		this.container.appendChild(header);
+		this.mainPanel.appendChild(header);
 
 		// ── Tirador de Resize lateral (Borde derecho) ───────────────────────────
 		this.resizerElement = document.createElement("div");
@@ -206,72 +312,6 @@ export class EditorExplorer {
 		`;
 		this.container.appendChild(this.resizerElement);
 		this.setupResizer();
-
-		// ── Barra de Pestañas (Mismo estilo que ConstructionMenu) ───────────────
-		const tabBar = document.createElement("div");
-		tabBar.style.cssText = `
-			display: flex;
-			border-bottom: 1px solid #555;
-			flex-shrink: 0;
-			padding: 0 16px;
-			gap: 16px;
-		`;
-
-		this.btnTabScene = document.createElement("div");
-		this.btnTabScene.innerHTML = `<span>🗂️</span><span>Escena</span>`;
-		this.btnTabScene.style.cssText = `
-			padding: 10px 4px;
-			background: transparent;
-			color: white;
-			border: none;
-			border-bottom: 2px solid white;
-			font-size: 13px;
-			font-weight: bold;
-			cursor: pointer;
-			display: flex;
-			align-items: center;
-			justify-content: center;
-			gap: 6px;
-			transition: all 0.15s ease;
-			user-select: none;
-		`;
-		this.btnTabScene.onclick = () => this.switchTab("scene");
-
-		this.btnTabLibrary = document.createElement("div");
-		this.btnTabLibrary.innerHTML = `<span>📦</span><span>Biblioteca</span>`;
-		this.btnTabLibrary.style.cssText = `
-			padding: 10px 4px;
-			background: transparent;
-			color: #888;
-			border: none;
-			border-bottom: 2px solid transparent;
-			font-size: 13px;
-			font-weight: normal;
-			cursor: pointer;
-			display: flex;
-			align-items: center;
-			justify-content: center;
-			gap: 6px;
-			transition: all 0.15s ease;
-			user-select: none;
-		`;
-		this.btnTabLibrary.onmouseenter = () => {
-			if (this.currentTab !== "library") this.btnTabLibrary.style.color = "#ccc";
-		};
-		this.btnTabLibrary.onmouseleave = () => {
-			if (this.currentTab !== "library") this.btnTabLibrary.style.color = "#888";
-		};
-		this.btnTabScene.onmouseenter = () => {
-			if (this.currentTab !== "scene") this.btnTabScene.style.color = "#ccc";
-		};
-		this.btnTabScene.onmouseleave = () => {
-			if (this.currentTab !== "scene") this.btnTabScene.style.color = "#888";
-		};
-		this.btnTabLibrary.onclick = () => this.switchTab("library");
-
-		tabBar.appendChild(this.btnTabScene);
-		tabBar.appendChild(this.btnTabLibrary);
-		this.container.appendChild(tabBar);
 
 		// ── Contenedor de la pestaña Escena ──────────────────────────────────────
 		this.sceneContentContainer = document.createElement("div");
@@ -421,7 +461,7 @@ export class EditorExplorer {
 			box-sizing: border-box;
 		`;
 		this.sceneContentContainer.appendChild(this.treeContainer);
-		this.container.appendChild(this.sceneContentContainer);
+		this.mainPanel.appendChild(this.sceneContentContainer);
 
 		// ── Contenedor de la pestaña Biblioteca ──────────────────────────────────
 		this.libraryContainer = document.createElement("div");
@@ -535,8 +575,43 @@ export class EditorExplorer {
 			box-sizing: border-box;
 		`;
 		this.libraryContainer.appendChild(this.libraryListContainer);
+		this.mainPanel.appendChild(this.libraryContainer);
 
-		this.container.appendChild(this.libraryContainer);
+		// ── Contenedor de la pestaña Propiedades (Inspector) ────────────────────
+		this.propertiesContentContainer = document.createElement("div");
+		this.propertiesContentContainer.style.cssText = `
+			display: none;
+			flex-direction: column;
+			flex: 1 1 auto;
+			min-height: 0;
+			overflow-y: auto;
+			scrollbar-width: thin;
+			scrollbar-color: #444 #222;
+			box-sizing: border-box;
+		`;
+
+		this.propertiesEmptyPlaceholder = document.createElement("div");
+		this.propertiesEmptyPlaceholder.style.cssText = `
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+			justify-content: center;
+			height: 100%;
+			min-height: 250px;
+			color: #888;
+			text-align: center;
+			padding: 40px 20px;
+			gap: 12px;
+			box-sizing: border-box;
+			user-select: none;
+		`;
+		this.propertiesEmptyPlaceholder.innerHTML = `
+			<div style="font-size: 36px; opacity: 0.5;">🎛️</div>
+			<div style="font-size: 14px; font-weight: bold; color: #ddd;">Propiedades del Objeto</div>
+			<div style="font-size: 12px; color: #999; max-width: 220px; line-height: 1.5;">Selecciona un objeto o grupo en la escena o en la lista de jerarquía para ver y modificar sus propiedades.</div>
+		`;
+		this.propertiesContentContainer.appendChild(this.propertiesEmptyPlaceholder);
+		this.mainPanel.appendChild(this.propertiesContentContainer);
 
 		const style = document.createElement("style");
 		style.textContent = `
@@ -554,7 +629,10 @@ export class EditorExplorer {
 				background: #777 !important;
 				box-shadow: 0 0 10px rgba(255, 255, 255, 0.4) !important;
 			}
-			#editor-hierarchy-explorer > div:nth-child(-n+2) { flex-shrink: 0; }
+			#editor-explorer-activity-bar div:hover {
+				background: rgba(255, 255, 255, 0.08);
+				color: #ddd;
+			}
 			#editor-hierarchy-explorer *::-webkit-scrollbar {
 				width: 6px;
 				height: 6px;
@@ -695,6 +773,8 @@ export class EditorExplorer {
 		}
 		this.isVisible = true;
 		this.container.style.display = "flex";
+		this.container.style.flexDirection = "row";
+		this.switchTab(this.currentTab);
 
 		if (typeof requestAnimationFrame !== "undefined") {
 			requestAnimationFrame(() => {
@@ -726,6 +806,7 @@ export class EditorExplorer {
 	hide(immediate: boolean = false) {
 		this.cancelDrag();
 		this.isVisible = false;
+		this.undockInspector();
 
 		if (this.hideTimeoutId) {
 			clearTimeout(this.hideTimeoutId);
@@ -760,49 +841,140 @@ export class EditorExplorer {
 		else this.show();
 	}
 
-	public switchTab(tab: "scene" | "library") {
+	public switchTab(tab: "scene" | "library" | "properties") {
 		this.currentTab = tab;
+
+		const updateBtnState = (btn: HTMLElement, isActive: boolean) => {
+			if (!btn) return;
+			btn.dataset.active = isActive ? "true" : "false";
+			if (isActive) {
+				btn.style.color = "#ffffff";
+				btn.style.background = "rgba(255, 255, 255, 0.16)";
+				btn.style.border = "1px solid rgba(255, 255, 255, 0.28)";
+				btn.style.borderLeft = "2px solid #ffffff";
+			} else {
+				btn.style.color = "#888";
+				btn.style.background = "transparent";
+				btn.style.border = "1px solid transparent";
+				btn.style.borderLeft = "2px solid transparent";
+			}
+		};
+
+		updateBtnState(this.btnTabScene, tab === "scene");
+		updateBtnState(this.btnTabLibrary, tab === "library");
+		updateBtnState(this.btnTabProperties, tab === "properties");
+
 		if (tab === "scene") {
-			this.sceneContentContainer.style.display = "flex";
-			this.libraryContainer.style.display = "none";
-			this.btnTabScene.style.background = "transparent";
-			this.btnTabScene.style.color = "white";
-			this.btnTabScene.style.fontWeight = "bold";
-			this.btnTabScene.style.borderBottom = "2px solid white";
-			this.btnTabLibrary.style.background = "transparent";
-			this.btnTabLibrary.style.color = "#888";
-			this.btnTabLibrary.style.fontWeight = "normal";
-			this.btnTabLibrary.style.borderBottom = "2px solid transparent";
+			if (this.sceneContentContainer) this.sceneContentContainer.style.display = "flex";
+			if (this.libraryContainer) this.libraryContainer.style.display = "none";
+			if (this.propertiesContentContainer) this.propertiesContentContainer.style.display = "none";
+			if (this.headerTitleIcon) this.headerTitleIcon.textContent = "🗂️";
+			if (this.headerTitleText) this.headerTitleText.textContent = "Jerarquía / Escena";
 			this.renderTree();
-		} else {
-			this.sceneContentContainer.style.display = "none";
-			this.libraryContainer.style.display = "flex";
-			this.btnTabLibrary.style.background = "transparent";
-			this.btnTabLibrary.style.color = "white";
-			this.btnTabLibrary.style.fontWeight = "bold";
-			this.btnTabLibrary.style.borderBottom = "2px solid white";
-			this.btnTabScene.style.background = "transparent";
-			this.btnTabScene.style.color = "#888";
-			this.btnTabScene.style.fontWeight = "normal";
-			this.btnTabScene.style.borderBottom = "2px solid transparent";
+		} else if (tab === "library") {
+			if (this.sceneContentContainer) this.sceneContentContainer.style.display = "none";
+			if (this.libraryContainer) this.libraryContainer.style.display = "flex";
+			if (this.propertiesContentContainer) this.propertiesContentContainer.style.display = "none";
+			if (this.headerTitleIcon) this.headerTitleIcon.textContent = "📦";
+			if (this.headerTitleText) this.headerTitleText.textContent = "Biblioteca de Prefabs";
 			this.loadLibraryPrefabs();
+		} else if (tab === "properties") {
+			if (this.sceneContentContainer) this.sceneContentContainer.style.display = "none";
+			if (this.libraryContainer) this.libraryContainer.style.display = "none";
+			if (this.propertiesContentContainer) this.propertiesContentContainer.style.display = "flex";
+			if (this.headerTitleIcon) this.headerTitleIcon.textContent = "🎛️";
+			if (this.headerTitleText) this.headerTitleText.textContent = "Propiedades / Inspector";
+			this.updatePropertiesView();
+		}
+	}
+
+	public updatePropertiesView() {
+		if (!this.propertiesContentContainer) return;
+
+		// Si no hay nodo seleccionado
+		if (!this.selectedNodeId) {
+			if (this.propertiesEmptyPlaceholder) this.propertiesEmptyPlaceholder.style.display = "flex";
+			if (this.game?.objectInspector?.container) {
+				this.game.objectInspector.container.style.display = "none";
+			}
+			return;
+		}
+
+		if (this.propertiesEmptyPlaceholder) this.propertiesEmptyPlaceholder.style.display = "none";
+
+		if (this.game?.objectInspector && this.game.objectInspector.container) {
+			const inspectorContainer = this.game.objectInspector.container;
+			if (inspectorContainer.parentElement !== this.propertiesContentContainer) {
+				inspectorContainer.dataset.docked = "true";
+				inspectorContainer.style.position = "static";
+				inspectorContainer.style.top = "auto";
+				inspectorContainer.style.right = "auto";
+				inspectorContainer.style.width = "100%";
+				inspectorContainer.style.maxHeight = "none";
+				inspectorContainer.style.height = "auto";
+				inspectorContainer.style.border = "none";
+				inspectorContainer.style.borderRadius = "0";
+				inspectorContainer.style.boxShadow = "none";
+				inspectorContainer.style.background = "transparent";
+				inspectorContainer.style.padding = "10px 14px";
+				inspectorContainer.style.boxSizing = "border-box";
+				if (inspectorContainer.firstElementChild) {
+					(inspectorContainer.firstElementChild as HTMLElement).style.display = "none";
+				}
+				this.propertiesContentContainer.appendChild(inspectorContainer);
+			}
+
+			const node = this.hierarchy.getNode(this.selectedNodeId);
+			if (node) {
+				if (node.isGroup) {
+					const proxy = this.groupManager.getOrCreatePivotProxy(node.id);
+					this.game.objectInspector.show(proxy);
+				} else {
+					const obj = this.resolveObject3D(node.id);
+					if (obj) this.game.objectInspector.show(obj);
+				}
+			}
+			inspectorContainer.style.display = "flex";
+		}
+	}
+
+	private undockInspector() {
+		if (this.game?.objectInspector?.container?.dataset?.docked === "true") {
+			const c = this.game.objectInspector.container;
+			delete c.dataset.docked;
+			c.style.position = "absolute";
+			c.style.top = "20px";
+			c.style.right = "20px";
+			c.style.width = "300px";
+			c.style.maxHeight = "90vh";
+			c.style.height = "";
+			c.style.background = "rgba(0, 0, 0, 0.9)";
+			c.style.border = "2px solid #444";
+			c.style.borderRadius = "12px";
+			c.style.boxShadow = "0 0 20px rgba(0, 0, 0, 0.8)";
+			c.style.padding = "15px";
+			if (c.firstElementChild) {
+				(c.firstElementChild as HTMLElement).style.display = "flex";
+			}
+			if (typeof document !== "undefined" && document.body) {
+				document.body.appendChild(c);
+			}
 		}
 	}
 
 	private toggleCollapse() {
 		this.isCollapsed = !this.isCollapsed;
-		const tabBar = this.btnTabScene?.parentElement;
-		const elementsToToggle = [tabBar, this.sceneContentContainer, this.libraryContainer];
+		const elementsToToggle = [this.sceneContentContainer, this.libraryContainer, this.propertiesContentContainer];
 		elementsToToggle.forEach((el) => {
 			if (el) (el as HTMLElement).style.display = this.isCollapsed ? "none" : "";
 		});
 		if (this.isCollapsed) {
 			this.container.style.height = "auto";
-			this.container.style.borderBottom = "2px solid #444";
+			this.container.style.borderBottom = "2px solid rgba(255, 255, 255, 0.15)";
 		} else {
 			this.container.style.height = "100vh";
 			this.container.style.height = "100dvh";
-			this.container.style.borderBottom = "2px solid #444";
+			this.container.style.borderBottom = "2px solid rgba(255, 255, 255, 0.15)";
 			this.switchTab(this.currentTab);
 		}
 	}
@@ -827,6 +999,10 @@ export class EditorExplorer {
 	selectNode(nodeId: string | null, syncInspector: boolean = true) {
 		this.selectedNodeId = nodeId;
 		this.renderTree();
+
+		if (this.currentTab === "properties") {
+			this.updatePropertiesView();
+		}
 
 		if (!syncInspector) return;
 
@@ -1627,7 +1803,7 @@ export class EditorExplorer {
 			return;
 		}
 
-		const searchQuery = this.librarySearchInput?.value.toLowerCase().trim() || "";
+		const searchQuery = (this.librarySearchInput?.value || "").toLowerCase().trim();
 		const selectedCategory = this.libraryCategorySelect?.value || "all";
 
 		const filtered = this.cachedPrefabsList.filter((p) => {
@@ -1946,6 +2122,7 @@ export class EditorExplorer {
 
 	dispose() {
 		this.cancelDrag();
+		this.undockInspector();
 		if (this.hideTimeoutId) {
 			clearTimeout(this.hideTimeoutId);
 			this.hideTimeoutId = null;

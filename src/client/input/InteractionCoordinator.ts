@@ -1,3 +1,5 @@
+import * as THREE from 'three';
+
 /** One owner per gesture. Panels never restore pointer lock; only canvas gestures do. */
 export function isTextInput(target: any): boolean {
   return !!target && (/^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName) || target.isContentEditable);
@@ -11,8 +13,6 @@ export class InteractionCoordinator {
   private handledEvents = new WeakSet<Event>();
   private suspended = false;
   private suppressClick = false;
-  private _activeTool: EditorTool = 'build';
-  public onToolChanged?: (tool: EditorTool) => void;
   public rightClickDragThreshold = 6;
 
   constructor(private game: any) {
@@ -45,19 +45,35 @@ export class InteractionCoordinator {
   }
 
   get activeTool(): EditorTool {
-    return this._activeTool;
+    return this.game.inventoryManager?.getCurrentItem?.() ? 'build' : 'edit';
   }
 
-  setTool(tool: EditorTool) {
-    if (this._activeTool === tool) return;
-    if (this.gesture) {
-      this.cancelGesture();
+  isGizmoInteracting(event?: MouseEvent | PointerEvent): boolean {
+    const gizmo = this.game.objectInspector?.transformGizmo;
+    if (!gizmo) return false;
+    if (typeof gizmo.isInteracting === 'function' && gizmo.isInteracting()) return true;
+    if (event && typeof gizmo.isPointerOverGizmo === 'function') {
+      const domElement = this.game.sceneManager?.renderer?.domElement;
+      if (domElement) {
+        const rect = domElement.getBoundingClientRect();
+        const mouse = new THREE.Vector2(
+          ((event.clientX - rect.left) / rect.width) * 2 - 1,
+          -((event.clientY - rect.top) / rect.height) * 2 + 1
+        );
+        return gizmo.isPointerOverGizmo(mouse);
+      }
     }
-    this._activeTool = tool;
-    this.sync();
-    if (this.onToolChanged) {
-      this.onToolChanged(tool);
+    return false;
+  }
+
+  isConnectorInteracting(event?: MouseEvent | PointerEvent): boolean {
+    const groupManager = this.game.editorGroupManager;
+    if (!groupManager) return false;
+    if (typeof groupManager.isConnectorDragging === 'function' && groupManager.isConnectorDragging()) return true;
+    if (event && typeof groupManager.isPointerOverConnector === 'function') {
+      return groupManager.isPointerOverConnector(event);
     }
+    return false;
   }
 
   private get overlay() {
@@ -99,25 +115,28 @@ export class InteractionCoordinator {
   get blocksScene(): boolean { return !['gameplay', 'editor'].includes(this.state); }
 
   /**
-   * Permite colocar objetos en la escena si la herramienta activa es 'build'
-   * incluso si el Inspector de objetos está abierto, siempre que no haya un gesto exclusivo
-   * ni se esté escribiendo en un input de texto o interactuando con modales.
+   * Permite colocar objetos en la escena si hay un objeto equipado en la ranura activa,
+   * no hay un gesto exclusivo activo, no se está interactuando con gizmo o conector,
+   * ni escribiendo en inputs de texto o interactuando con modales.
+   * El Inspector y el Explorer pueden permanecer abiertos sin impedir la construcción.
    */
   get canBuild(): boolean {
     if (this.game.gameMode !== 'editor') return false;
-    if (this._activeTool !== 'build') return false;
     if (this.gesture) return false;
     if (isTextInput(document.activeElement)) return false;
     if (this.overlay || this.menuOpen || this.game.cameraController?.isPaused || this.suspended) return false;
+    if (this.isGizmoInteracting() || this.isConnectorInteracting()) return false;
+    const currentItem = this.game.inventoryManager?.getCurrentItem?.();
+    if (!currentItem) return false;
     return true;
   }
 
   /**
-   * Permite seleccionar y manipular objetos con gizmo o conectores si la herramienta activa es 'edit'.
+   * Permite interactuar con herramientas de edición (gizmos, conectores, inspector)
+   * fuera de campos de texto, modales o gestos bloqueantes.
    */
   get canEdit(): boolean {
     if (this.game.gameMode !== 'editor') return false;
-    if (this._activeTool !== 'edit') return false;
     if (isTextInput(document.activeElement)) return false;
     if (this.overlay || this.menuOpen || this.game.cameraController?.isPaused || this.suspended) return false;
     return true;
@@ -171,7 +190,7 @@ export class InteractionCoordinator {
     this.game.cameraController?.setUIOpen(this.blocksGameplayActions);
     // Menus suppress tools without detaching the selected object.
     const isEditingMap = !!this.game.constructionMenu?.logicSystem?.isEditingMap;
-    const canUseGizmo = (this.game.gameMode !== 'editor' || this._activeTool === 'edit') && !this.blocksScene && !isEditingMap;
+    const canUseGizmo = !this.blocksScene && !isEditingMap;
     const controls = this.game.objectInspector?.transformGizmo?.controls;
     if (controls && !this.gesture) controls.enabled = canUseGizmo;
     const helper = this.game.objectInspector?.transformGizmo?.helper;
@@ -217,19 +236,11 @@ export class InteractionCoordinator {
     if (this.game.gameMode === 'editor' && key === 'c' && !event.ctrlKey && !event.metaKey && !event.altKey) {
       consume();
       if (event.repeat || this.overlay || this.game.cameraController?.isPaused) return;
-      if (this._activeTool === 'edit') {
-        if (this.game.editorExplorer?.toggleCouplingMode) {
-          this.game.editorExplorer.toggleCouplingMode();
-        } else if (this.game.editorGroupManager) {
-          const next = !this.game.editorGroupManager.isCouplingMode();
-          this.game.editorGroupManager.setCouplingMode(next);
-        }
-      } else {
-        if (typeof this.game.showToast === 'function') {
-          this.game.showToast("Cambia a modo Editar para usar Acoples (C)", "warning");
-        } else {
-          console.warn("[InteractionCoordinator] Cambia a modo Editar para usar Acoples (C)");
-        }
+      if (this.game.editorExplorer?.toggleCouplingMode) {
+        this.game.editorExplorer.toggleCouplingMode();
+      } else if (this.game.editorGroupManager) {
+        const next = !this.game.editorGroupManager.isCouplingMode();
+        this.game.editorGroupManager.setCouplingMode(next);
       }
       return;
     }

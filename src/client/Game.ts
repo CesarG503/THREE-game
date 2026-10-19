@@ -660,10 +660,6 @@ export class Game {
 		this.inputManager.uiCheckCallback = () => this.interaction.blocksGameplayActions;
 		this.setupGameInput();
 
-		if (this.gameMode === "editor") {
-			this.setupEditorToolSelector();
-		}
-
 		if (this.gameMode !== "editor") {
 			void this.loadInitialPlatformMap();
 		}
@@ -785,43 +781,39 @@ export class Game {
 
 				// Clic izquierdo (e.button === 0):
 				if (e.button === 0) {
-					// Modo 'build': La colocación se maneja en GameInput.
-					// No cerramos el Inspector ni deseleccionamos objetos.
-					if (this.interaction?.activeTool === "build") {
+					// Si el cursor está sobre el gizmo o el conector, su respectivo controlador maneja la interacción
+					if (this.interaction?.isGizmoInteracting(e) || this.interaction?.isConnectorInteracting(e)) {
 						return;
 					}
 
-					// Modo 'edit': Selección o deselección de objetos
-					if (this.interaction?.activeTool === "edit" && this.objectInspector) {
-						const isGizmoInteracting = !!(
-							this.objectInspector?.transformGizmo?.dragState ||
-							this.objectInspector?.transformGizmo?.controls?.axis
-						);
-						const isConnectorInteracting = !!(this.editorGroupManager?.isConnectorDragging());
+					// Si hay un objeto equipado, la colocación se delega a GameInput sin cerrar el Inspector ni deseleccionar
+					if (this.inventoryManager?.getCurrentItem?.()) {
+						return;
+					}
 
-						if (!isGizmoInteracting && !isConnectorInteracting) {
-							const selectResult = selectEditableObjectFromPointer(e);
-							if (selectResult) {
-								const target = selectResult.target;
-								if (this.objectInspector.isVisible && this.objectInspector.selectedObject && this.objectInspector.selectedObject !== target) {
-									if (!this.objectInspector.allowDynamicSwitch) {
-										return;
-									}
-								}
-								const nodeId = target.userData?.groupId || target.userData?.uuid;
-								if (this.editorExplorer && nodeId) {
-									this.editorExplorer.selectNode(nodeId, false);
-								}
-								this.objectInspector.show(target, selectResult.hitPart);
-							} else {
-								// Clic en el vacío: deseleccionar objeto actual
-								this.objectInspector.hide();
-								if (this.editorExplorer?.selectedNodeId) {
-									this.editorExplorer.selectNode(null, false);
+					// Sin objeto equipado: Selección contextual de objeto o deselección en el vacío
+					if (this.objectInspector) {
+						const selectResult = selectEditableObjectFromPointer(e);
+						if (selectResult) {
+							const target = selectResult.target;
+							if (this.objectInspector.isVisible && this.objectInspector.selectedObject && this.objectInspector.selectedObject !== target) {
+								if (!this.objectInspector.allowDynamicSwitch) {
+									return;
 								}
 							}
-							this.updateEditorInteractionMode();
+							const nodeId = target.userData?.groupId || target.userData?.uuid;
+							if (this.editorExplorer && nodeId) {
+								this.editorExplorer.selectNode(nodeId, false);
+							}
+							this.objectInspector.show(target, selectResult.hitPart);
+						} else {
+							// Clic en el vacío sin objeto equipado: deseleccionar objeto actual
+							this.objectInspector.hide();
+							if (this.editorExplorer?.selectedNodeId) {
+								this.editorExplorer.selectNode(null, false);
+							}
 						}
+						this.updateEditorInteractionMode();
 					}
 				}
 			}
@@ -957,105 +949,6 @@ export class Game {
 
 		this.showInventoryContainer();
 		this.inventoryManager?.updateUI?.();
-	}
-
-	setupEditorToolSelector() {
-		if (this.gameMode !== "editor") return;
-
-		let container = document.getElementById("viper-editor-tool-selector");
-		if (container) return;
-
-		container = document.createElement("div");
-		container.id = "viper-editor-tool-selector";
-		container.style.cssText = `
-			position: fixed;
-			top: 18px;
-			left: 50%;
-			transform: translateX(-50%);
-			display: flex;
-			align-items: center;
-			gap: 4px;
-			padding: 4px;
-			background: rgba(15, 23, 42, 0.85);
-			backdrop-filter: blur(12px);
-			-webkit-backdrop-filter: blur(12px);
-			border: 1px solid rgba(255, 255, 255, 0.15);
-			border-radius: 9999px;
-			box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-			z-index: 9999;
-			font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-			font-size: 13px;
-			font-weight: 600;
-			user-select: none;
-		`;
-
-		const createBtn = (id: string, text: string, icon: string) => {
-			const btn = document.createElement("button");
-			btn.id = id;
-			btn.innerHTML = `<span style="margin-right: 6px;">${icon}</span>${text}`;
-			btn.style.cssText = `
-				display: flex;
-				align-items: center;
-				padding: 6px 14px;
-				border-radius: 9999px;
-				border: 1px solid transparent;
-				background: transparent;
-				color: #94a3b8;
-				cursor: pointer;
-				font-size: 12px;
-				font-weight: 600;
-				font-family: inherit;
-				transition: all 0.18s ease;
-				outline: none;
-			`;
-			return btn;
-		};
-
-		const btnBuild = createBtn("vp-tool-build", "Construir", "🔨");
-		const btnEdit = createBtn("vp-tool-edit", "Editar", "✏️");
-
-		const updateVisuals = (tool: "build" | "edit") => {
-			if (tool === "build") {
-				btnBuild.style.background = "#0284c7";
-				btnBuild.style.color = "#ffffff";
-				btnBuild.style.borderColor = "#38bdf8";
-				btnBuild.style.boxShadow = "0 0 12px rgba(56, 189, 248, 0.4)";
-
-				btnEdit.style.background = "transparent";
-				btnEdit.style.color = "#94a3b8";
-				btnEdit.style.borderColor = "transparent";
-				btnEdit.style.boxShadow = "none";
-			} else {
-				btnEdit.style.background = "#0284c7";
-				btnEdit.style.color = "#ffffff";
-				btnEdit.style.borderColor = "#38bdf8";
-				btnEdit.style.boxShadow = "0 0 12px rgba(56, 189, 248, 0.4)";
-
-				btnBuild.style.background = "transparent";
-				btnBuild.style.color = "#94a3b8";
-				btnBuild.style.borderColor = "transparent";
-				btnBuild.style.boxShadow = "none";
-			}
-		};
-
-		btnBuild.addEventListener("click", () => {
-			this.interaction?.setTool("build");
-		});
-
-		btnEdit.addEventListener("click", () => {
-			this.interaction?.setTool("edit");
-		});
-
-		container.appendChild(btnBuild);
-		container.appendChild(btnEdit);
-		document.body.appendChild(container);
-
-		if (this.interaction) {
-			this.interaction.onToolChanged = (tool: "build" | "edit") => {
-				updateVisuals(tool);
-			};
-			updateVisuals(this.interaction.activeTool);
-		}
 	}
 
 	showToast(message: string, type: "info" | "warning" | "success" = "info") {

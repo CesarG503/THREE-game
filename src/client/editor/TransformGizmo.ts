@@ -124,8 +124,7 @@ export class TransformGizmo {
 		this.syncProxyFromTarget(true);
 		this.controls.attach(this.proxy);
 		this.setMode("translate");
-		const canShowGizmo = this.game.gameMode !== "editor" || this.game.interaction?.activeTool === "edit";
-		this.helper.visible = canShowGizmo;
+		this.helper.visible = true;
 		this.game.interaction?.sync?.();
 	}
 
@@ -143,6 +142,29 @@ export class TransformGizmo {
 		this.helper.visible = false;
 		this.proxy.visible = false;
 		this.restoreInput();
+	}
+
+	isInteracting(): boolean {
+		return !!(
+			this.dragState ||
+			this.controls?.dragging ||
+			this.controls?.axis ||
+			this.curvatureOriginEditing ||
+			this.originPointer !== null
+		);
+	}
+
+	isPointerOverGizmo(mouse?: THREE.Vector2): boolean {
+		if (!this.target || !this.controls || !this.helper.visible) return false;
+		if (this.controls.axis !== null || this.controls.dragging || this.dragState) return true;
+		if (mouse && this.game.sceneManager?.camera) {
+			const raycaster = new THREE.Raycaster();
+			raycaster.setFromCamera(mouse, this.game.sceneManager.camera);
+			raycaster.layers.set(GIZMO_LAYER);
+			const hits = raycaster.intersectObject(this.helper, true);
+			return hits.length > 0;
+		}
+		return false;
 	}
 
 	cycleMode() {

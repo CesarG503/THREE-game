@@ -144,6 +144,9 @@ export class CameraController {
   setupEventListeners() {
     window.addEventListener("blur", () => {
       this.isRightMouseDown = false;
+      this.isRightNavigating = false;
+      this.rightClickStartX = null;
+      this.rightClickStartY = null;
       this.lastMouseX = null;
       this.lastMouseY = null;
       this.unlock();
@@ -163,22 +166,25 @@ export class CameraController {
     this.domElement.addEventListener("mousedown", (e: MouseEvent) => {
       if (e.button === 2 && !this.isPaused) {
         this.isRightMouseDown = true;
+        this.isRightNavigating = false;
+        this.rightClickStartX = e.clientX;
+        this.rightClickStartY = e.clientY;
         this.lastMouseX = e.clientX;
         this.lastMouseY = e.clientY;
-        const isUIActive = this.isUIOpen || !!this.uiCheckCallback?.();
-        if (!this.alwaysRotateThirdPerson && !isUIActive) {
-          this.safeRequestPointerLock();
-        }
       }
     }, { signal: this.events.signal });
 
     document.addEventListener("mouseup", (e: MouseEvent) => {
       if (e.button === 2) {
+        const wasNavigating = this.isRightNavigating;
         this.isRightMouseDown = false;
+        this.isRightNavigating = false;
+        this.rightClickStartX = null;
+        this.rightClickStartY = null;
         this.lastMouseX = null;
         this.lastMouseY = null;
         const isUIActive = this.isUIOpen || !!this.uiCheckCallback?.();
-        if (!this.isFirstPerson && !this.alwaysRotateThirdPerson && !isUIActive) {
+        if (wasNavigating && !this.isFirstPerson && !this.alwaysRotateThirdPerson && !isUIActive) {
           this.unlock();
         }
       }
@@ -191,8 +197,20 @@ export class CameraController {
       if (isUIActive && !this.isRightMouseDown) return;
       if (isTextInput(document.activeElement)) return;
 
+      if (this.isRightMouseDown && !this.isRightNavigating) {
+        if (this.rightClickStartX !== null && this.rightClickStartY !== null && e.clientX !== undefined && e.clientY !== undefined) {
+          const dist = Math.hypot(e.clientX - this.rightClickStartX, e.clientY - this.rightClickStartY);
+          if (dist > (this.rightDragThreshold ?? 6)) {
+            this.isRightNavigating = true;
+            if (!this.alwaysRotateThirdPerson && !isUIActive) {
+              this.safeRequestPointerLock();
+            }
+          }
+        }
+      }
+
       const isLocked = document.pointerLockElement === this.domElement;
-      const canRotate = this.isRightMouseDown || (!isUIActive && isLocked && (
+      const canRotate = this.isRightNavigating || (!isUIActive && isLocked && (
         this.isFirstPerson ||
         this.alwaysRotateThirdPerson ||
         this.mode === 'free-fly'

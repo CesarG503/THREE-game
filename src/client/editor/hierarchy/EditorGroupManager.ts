@@ -710,6 +710,20 @@ export class EditorGroupManager {
 
 	// ── Manejadores de eventos de puntero para arrastre 3D de conectores ─────────
 
+	public isPointerOverConnector(event: MouseEvent | PointerEvent): boolean {
+		if (!this.isCouplingModeActive || !this.camera || !this.domElement) return false;
+		if (this.connectorDrag) return true;
+		const rect = this.domElement.getBoundingClientRect();
+		const mouse = new THREE.Vector2(
+			((event.clientX - rect.left) / rect.width) * 2 - 1,
+			-((event.clientY - rect.top) / rect.height) * 2 + 1
+		);
+		const raycaster = new THREE.Raycaster();
+		raycaster.setFromCamera(mouse, this.camera);
+		const hits = raycaster.intersectObjects(this.couplingConnectorsGroup.children, true);
+		return hits.some((h) => h.object.userData?.isCouplingConnectorSource || h.object.userData?.isCouplingPivotTarget);
+	}
+
 	private getRaycaster(event: PointerEvent): THREE.Raycaster | null {
 		if (!this.camera || !this.domElement) return null;
 		const rect = this.domElement.getBoundingClientRect();

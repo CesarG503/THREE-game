@@ -240,6 +240,7 @@ export function setupGameInput(this: Game) {
 
 		if (this.gameMode === "editor") {
 			if (!this.interaction?.canBuild) return;
+			if (this.interaction?.isGizmoInteracting(e) || this.interaction?.isConnectorInteracting(e)) return;
 			if (e.button === 2) return;
 		} else {
 			if (this.interaction?.blocksGameplay) return;

@@ -14,70 +14,83 @@ const { InteractionCoordinator } = await server.ssrLoadModule("/src/client/input
 const { EditorHierarchyModel } = await server.ssrLoadModule("/src/client/editor/hierarchy/EditorHierarchyModel.ts");
 const { EditorGroupManager } = await server.ssrLoadModule("/src/client/editor/hierarchy/EditorGroupManager.ts");
 
-test("InteractionCoordinator - Herramientas explícitas y permisos", () => {
+test("InteractionCoordinator - Decisiones contextuales y permisos", () => {
   globalThis.window = new EventTarget();
   globalThis.document = Object.assign(new EventTarget(), { activeElement: null });
+
+  let currentItem = { id: "wall", name: "Wall" };
 
   const fakeGame = {
     gameMode: "editor",
     isAnyEditorUIOpen: () => false,
     cameraController: { setUIOpen: () => {}, isPaused: false },
     inputManager: { reset: () => {}, resetMovement: () => {}, keys: {} },
+    inventoryManager: {
+      getCurrentItem: () => currentItem
+    },
     objectInspector: {
       isVisible: false,
       transformGizmo: {
         controls: { enabled: false },
         helper: { visible: false },
-        target: new THREE.Object3D()
+        target: new THREE.Object3D(),
+        isInteracting: () => false
       }
+    },
+    editorGroupManager: {
+      isConnectorDragging: () => false
     },
     constructionMenu: { isVisible: false, container: { style: { display: "none" } } }
   };
 
   const coordinator = new InteractionCoordinator(fakeGame);
 
-  // 1. Herramienta por defecto es 'build'
+  // 1. Con objeto equipado: canBuild es true y activeTool es 'build'
   assert.equal(coordinator.activeTool, "build");
   assert.equal(coordinator.canBuild, true);
-  assert.equal(coordinator.canEdit, false);
-
-  // Gizmo debe estar deshabilitado en modo 'build'
-  coordinator.sync();
-  assert.equal(fakeGame.objectInspector.transformGizmo.controls.enabled, false);
-  assert.equal(fakeGame.objectInspector.transformGizmo.helper.visible, false);
-
-  // 2. Inspector abierto no bloquea canBuild en modo 'build'
-  fakeGame.objectInspector.isVisible = true;
-  assert.equal(coordinator.canBuild, true);
-
-  // 3. Cambiar a modo 'edit'
-  let toolReported = null;
-  coordinator.onToolChanged = (tool) => { toolReported = tool; };
-  coordinator.setTool("edit");
-
-  assert.equal(coordinator.activeTool, "edit");
-  assert.equal(toolReported, "edit");
-  assert.equal(coordinator.canBuild, false);
   assert.equal(coordinator.canEdit, true);
 
-  // Gizmo debe estar habilitado en modo 'edit' con objeto seleccionado
+  // Gizmo debe estar habilitado si hay objeto seleccionado
   coordinator.sync();
   assert.equal(fakeGame.objectInspector.transformGizmo.controls.enabled, true);
   assert.equal(fakeGame.objectInspector.transformGizmo.helper.visible, true);
 
-  // 4. Cambiar de herramienta cancela gestos activos
-  let gestureCancelled = false;
-  coordinator.begin("tree-drag", () => { gestureCancelled = true; });
-  assert.equal(coordinator.state, "tree-drag");
+  // 2. Inspector abierto NO bloquea canBuild si hay objeto equipado
+  fakeGame.objectInspector.isVisible = true;
+  assert.equal(coordinator.canBuild, true);
 
-  coordinator.setTool("build");
-  assert.equal(gestureCancelled, true);
-  assert.equal(coordinator.activeTool, "build");
+  // 3. Sin objeto equipado: canBuild es false, activeTool reporta 'edit'
+  currentItem = null;
+  assert.equal(coordinator.activeTool, "edit");
+  assert.equal(coordinator.canBuild, false);
+  assert.equal(coordinator.canEdit, true);
+
+  // 4. Con objeto equipado pero interactuando con gizmo: canBuild es false (nunca construir al transformar)
+  currentItem = { id: "wall", name: "Wall" };
+  fakeGame.objectInspector.transformGizmo.isInteracting = () => true;
+  assert.equal(coordinator.canBuild, false, "No debe permitir construir si se interactúa con el gizmo");
+  fakeGame.objectInspector.transformGizmo.isInteracting = () => false;
+  assert.equal(coordinator.canBuild, true);
+
+  // 5. Con objeto equipado pero interactuando con conector: canBuild es false (nunca construir al arrastrar conector)
+  fakeGame.editorGroupManager.isConnectorDragging = () => true;
+  assert.equal(coordinator.canBuild, false, "No debe permitir construir si se arrastra un conector");
+  fakeGame.editorGroupManager.isConnectorDragging = () => false;
+  assert.equal(coordinator.canBuild, true);
+
+  // 6. Gesto activo bloquea escena y construcción
+  let gestureCancelled = false;
+  coordinator.begin("camera-orbit", () => { gestureCancelled = true; });
+  assert.equal(coordinator.state, "camera-orbit");
+  assert.equal(coordinator.canBuild, false);
+
+  coordinator.end("camera-orbit");
+  assert.equal(coordinator.canBuild, true);
 
   coordinator.dispose();
 });
 
-test("InteractionCoordinator - Atajo C diferenciado por herramienta", () => {
+test("InteractionCoordinator - Atajo C conmuta acoples directamente", () => {
   globalThis.window = new EventTarget();
   globalThis.document = Object.assign(new EventTarget(), { activeElement: null });
 
@@ -98,23 +111,15 @@ test("InteractionCoordinator - Atajo C diferenciado por herramienta", () => {
 
   const coordinator = new InteractionCoordinator(fakeGame);
 
-  // En modo 'build': tecla C no conmuta acoples y muestra toast de advertencia
-  coordinator.setTool("build");
+  // Tecla C conmuta acoples directamente sin necesidad de cambiar modo manualmente
   window.dispatchEvent(Object.assign(new Event("keydown", { cancelable: true }), { key: "c" }));
-  assert.equal(couplingToggled, false, "No debe conmutar acoples en modo build");
-  assert.match(toastMessage || "", /Cambia a modo Editar para usar Acoples/);
-
-  // En modo 'edit': tecla C conmuta acoples
-  toastMessage = null;
-  coordinator.setTool("edit");
-  window.dispatchEvent(Object.assign(new Event("keydown", { cancelable: true }), { key: "c" }));
-  assert.equal(couplingToggled, true, "Debe conmutar acoples en modo edit");
-  assert.equal(toastMessage, null);
+  assert.equal(couplingToggled, true, "Debe conmutar acoples directamente con C");
+  assert.equal(toastMessage, null, "No debe mostrar advertencia de cambio de modo");
 
   coordinator.dispose();
 });
 
-test("InteractionCoordinator - Atajos H y E no alteran la herramienta activa", () => {
+test("InteractionCoordinator - Atajos H y E no alteran estado indebidamente", () => {
   globalThis.window = new EventTarget();
   globalThis.document = Object.assign(new EventTarget(), { activeElement: null });
 
@@ -136,15 +141,12 @@ test("InteractionCoordinator - Atajos H y E no alteran la herramienta activa", (
   };
 
   const coordinator = new InteractionCoordinator(fakeGame);
-  coordinator.setTool("edit");
 
   window.dispatchEvent(Object.assign(new Event("keydown", { cancelable: true }), { key: "h" }));
   assert.equal(explorerToggled, true);
-  assert.equal(coordinator.activeTool, "edit", "H no debe cambiar la herramienta");
 
   window.dispatchEvent(Object.assign(new Event("keydown", { cancelable: true }), { key: "e" }));
   assert.equal(menuToggled, true);
-  assert.equal(coordinator.activeTool, "edit", "E no debe cambiar la herramienta");
 
   coordinator.dispose();
 });

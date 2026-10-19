@@ -36,7 +36,8 @@ export function setupEditorUI(this: any) {
 export function saveMap(this: any) {
 	const objects: any[] = [];
 	this.sceneManager.scene.children.forEach((obj: any) => {
-		if (obj.userData.isEditableMapObject) {
+		if (obj.userData.isEditableMapObject && !obj.userData.isEditorGroupPivot) {
+			const hierarchyNode = this.editorHierarchy?.getNode(obj.userData.uuid);
 			objects.push({
 				type: obj.userData.mapObjectType,
 				color: obj.userData.color,
@@ -51,7 +52,9 @@ export function saveMap(this: any) {
 				invisible: obj.userData.invisible,
 				opacity: obj.userData.opacity,
 				authorId: obj.userData.authorId,
-				customName: obj.userData.customName || ""
+				customName: obj.userData.customName || "",
+				parentId: hierarchyNode ? hierarchyNode.parentId : (obj.userData.parentId || null),
+				order: hierarchyNode ? hierarchyNode.order : (obj.userData.order ?? 0),
 			});
 		}
 	});
@@ -60,6 +63,7 @@ export function saveMap(this: any) {
 		gameVersion: "1.0",
 		timestamp: Date.now(),
 		objects: objects,
+		hierarchy: this.editorHierarchy ? this.editorHierarchy.serialize() : [],
 		gameConfig: (this.constructionMenu && this.constructionMenu.logicSystem)
 			? this.constructionMenu.logicSystem.gameConfig
 			: null,
@@ -113,6 +117,19 @@ export function loadMap(this: any, jsonData: any) {
 		}
 	}
 
+	if (this.editorGroupManager) {
+		this.editorGroupManager.clearProxies();
+	}
+
+	if (this.editorHierarchy) {
+		const objectUuids = jsonData.objects.map((o: any) => o.uuid);
+		if (jsonData.hierarchy && Array.isArray(jsonData.hierarchy)) {
+			this.editorHierarchy.deserialize(jsonData.hierarchy, objectUuids);
+		} else {
+			this.editorHierarchy.deserialize(null, objectUuids);
+		}
+	}
+
 	const loader = new MapObjectItem("loader", "Loading...", "wall", "", 0, { x: 1, y: 1, z: 1 });
 	void loader;
 
@@ -154,6 +171,12 @@ export function loadMap(this: any, jsonData: any) {
 			if (data.customName) {
 				lastObj.userData.customName = data.customName;
 			}
+			if (data.parentId) {
+				lastObj.userData.parentId = data.parentId;
+			}
+			if (data.order !== undefined) {
+				lastObj.userData.order = data.order;
+			}
 		}
 
 		if (data.opacity !== undefined && lastObj) {
@@ -192,6 +215,27 @@ export function loadMap(this: any, jsonData: any) {
 		}
 	});
 	this.editableMapObjects = this.sceneManager.scene.children.filter((obj: any) => obj.userData?.isEditableMapObject);
+
+	if (this.editorGroupManager) {
+		const groups = this.editorHierarchy?.getAllNodes().filter((n: any) => n.isGroup) || [];
+		groups.forEach((g: any) => {
+			this.editorGroupManager.getOrCreatePivotProxy(g.id);
+		});
+		if (this.editorGroupManager.isCouplingMode()) {
+			this.editorGroupManager.updateCouplingVisuals((id: string) => {
+				return this.sceneManager.scene.children.find((c: any) => c.userData && c.userData.uuid === id) || null;
+			});
+		}
+	}
+
+	if (this.prefabManager) {
+		this.prefabManager.restoreInstancesFromHierarchy();
+	}
+
+	if (this.editorExplorer) {
+		this.editorExplorer.renderTree();
+	}
+
 	console.log("Map Loaded:", jsonData.objects.length, "objects");
 }
 
@@ -353,6 +397,29 @@ export function useCurrentItem(this: any, isRightClickOrItem: any = false) {
 			if (!this.editableMapObjects.includes(newObject)) {
 				this.editableMapObjects.push(newObject);
 			}
+
+			// Corrección 2: Registro jerárquico automático en la creación real de objetos
+			if (this.editorHierarchy && newObject.userData.uuid) {
+				this.editorHierarchy.addNode({
+					id: newObject.userData.uuid,
+					name: newObject.userData.customName || newObject.userData.mapObjectType || "Objeto",
+					type: newObject.userData.mapObjectType || "object",
+					parentId: newObject.userData.parentId || null,
+					order: this.editorHierarchy.getChildren(newObject.userData.parentId || null).length,
+					isGroup: false,
+					customName: newObject.userData.customName,
+				});
+			}
+
+			if (this.editorGroupManager?.isCouplingMode()) {
+				this.editorGroupManager.updateCouplingVisuals((id: string) => {
+					return this.sceneManager.scene.children.find((c: any) => c.userData && c.userData.uuid === id) || null;
+				});
+			}
+
+			if (this.editorExplorer) {
+				this.editorExplorer.renderTree();
+			}
 		}
 	}
 
@@ -409,7 +476,7 @@ export function useCurrentItem(this: any, isRightClickOrItem: any = false) {
 }
 
 export function _loadSingleMapObject(this: any, data: any) {
-	if (!data || !data.type) return;
+	if (!data || !data.type || data.type === "group_pivot") return;
 
 	if (data.uuid) {
 		this.deleteObjectByUuid(data.uuid);
@@ -471,6 +538,32 @@ export function _loadSingleMapObject(this: any, data: any) {
 			lastObj.visible = false;
 		}
 	}
+	if (lastObj) {
+		if (data.parentId) lastObj.userData.parentId = data.parentId;
+		if (data.order !== undefined) lastObj.userData.order = data.order;
+
+		if (this.editorHierarchy && data.uuid) {
+			const existing = this.editorHierarchy.getNode(data.uuid);
+			if (!existing) {
+				this.editorHierarchy.addNode({
+					id: data.uuid,
+					name: data.customName || data.type || "Collab Obj",
+					type: data.type,
+					parentId: data.parentId || null,
+					order: data.order || 0,
+					isGroup: false,
+					customName: data.customName,
+				});
+			} else {
+				if (data.parentId !== undefined && existing.parentId !== data.parentId) {
+					try { this.editorHierarchy.reparent(data.uuid, data.parentId, data.order); } catch (_) {}
+				}
+			}
+		}
+		if (this.editorExplorer) {
+			this.editorExplorer.renderTree();
+		}
+	}
 }
 
 export function deleteObjectByUuid(this: any, uuid: string) {
@@ -487,11 +580,25 @@ export function deleteObjectByUuid(this: any, uuid: string) {
 	if (this.objectInspector && this.objectInspector.selectedObject === obj) {
 		this.objectInspector.hide();
 	}
+	if (this.editorHierarchy) {
+		this.editorHierarchy.removeNode(uuid, false);
+	}
+	if (this.editorGroupManager) {
+		this.editorGroupManager.removeGroupProxy(uuid);
+		if (this.editorGroupManager.isCouplingMode()) {
+			this.editorGroupManager.updateCouplingVisuals((id: string) => {
+				return this.sceneManager.scene.children.find((c: any) => c.userData && c.userData.uuid === id) || null;
+			});
+		}
+	}
+	if (this.editorExplorer) {
+		this.editorExplorer.renderTree();
+	}
 	console.log(`[Collab] Removed object ${uuid}`);
 }
 
 export function broadcastObjectUpdate(this: any, obj: any) {
-	if (!obj || !obj.userData || !obj.userData.isEditableMapObject) return;
+	if (!obj || !obj.userData || !obj.userData.isEditableMapObject || obj.userData.isEditorGroupPivot) return;
 	if (this.gameMode !== "editor" || !this.networkManager) return;
 
 	const data = {
@@ -507,7 +614,10 @@ export function broadcastObjectUpdate(this: any, obj: any) {
 		uuid: obj.userData.uuid,
 		invisible: obj.userData.invisible,
 		opacity: obj.userData.opacity,
-		authorId: obj.userData.authorId || this.networkManager.playerId || "local"
+		authorId: obj.userData.authorId || this.networkManager.playerId || "local",
+		customName: obj.userData.customName || "",
+		parentId: obj.userData.parentId || null,
+		order: obj.userData.order || 0,
 	};
 
 	this.networkManager.sendEditorPlace(data);

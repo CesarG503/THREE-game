@@ -106,12 +106,16 @@ export class TransformGizmo {
 		canvas.addEventListener("pointerup", this.handleOriginPointerUp, true);
 		canvas.addEventListener("pointercancel", this.handleOriginPointerUp, true);
 		canvas.addEventListener("lostpointercapture", this.handleOriginPointerUp, true);
+		canvas.addEventListener("pointercancel", this.finishInteraction);
+		canvas.addEventListener("lostpointercapture", this.finishInteraction);
+		window.addEventListener("blur", this.finishInteraction);
 		this.controls.addEventListener("mouseDown", this.handleMouseDown);
 		this.controls.addEventListener("mouseUp", this.handleMouseUp);
 		this.controls.addEventListener("objectChange", this.handleObjectChange);
 	}
 
 	attach(object: THREE.Object3D) {
+		if (this.dragState) this.finishInteraction();
 		this.curvatureActive = false;
 		this.curvatureOriginEditing = false;
 		this.section.visible = false;
@@ -160,11 +164,14 @@ export class TransformGizmo {
 	}
 
 	dispose() {
+		const canvas = this.game.sceneManager.renderer.domElement;
+		canvas.removeEventListener("pointercancel", this.finishInteraction);
+		canvas.removeEventListener("lostpointercapture", this.finishInteraction);
+		window.removeEventListener("blur", this.finishInteraction);
 		this.detach();
 		this.controls.removeEventListener("mouseDown", this.handleMouseDown);
 		this.controls.removeEventListener("mouseUp", this.handleMouseUp);
 		this.controls.removeEventListener("objectChange", this.handleObjectChange);
-		const canvas = this.game.sceneManager.renderer.domElement;
 		canvas.removeEventListener("pointerdown", this.handleOriginPointerDown, true);
 		canvas.removeEventListener("pointermove", this.handleOriginPointerMove, true);
 		canvas.removeEventListener("pointerup", this.handleOriginPointerUp, true);
@@ -326,7 +333,11 @@ export class TransformGizmo {
 	}
 
 	private handleMouseDown = () => {
-		if (!this.target) return;
+		if (!this.target || this.dragState) return;
+		if (this.game.interaction && !this.game.interaction.begin("gizmo-drag", this.finishInteraction)) {
+			this.controls.dragging = false;
+			return;
+		}
 
 		this.target.updateWorldMatrix(true, true);
 		this.target.userData.isGizmoDragging = true;
@@ -343,6 +354,13 @@ export class TransformGizmo {
 			targetWorldPositionStart: this.target.getWorldPosition(new THREE.Vector3()),
 			targetQuaternionStart: this.target.quaternion.clone(),
 		};
+
+		if (this.target.userData.isEditorGroupPivot && this.game.editorGroupManager) {
+			this.game.editorGroupManager.beginGroupTransform(
+				this.target.userData.groupId,
+				(id: string) => this.resolveObject3D(id)
+			);
+		}
 
 		if (this.game.inputManager) {
 			this.wasInputEnabled = this.game.inputManager.enabled;
@@ -370,11 +388,43 @@ export class TransformGizmo {
 			this.inspector.refreshPhysicsAndVisuals?.();
 		}
 
+		if (this.target.userData.isEditorGroupPivot) {
+			if (this.game.editorGroupManager) {
+				this.game.editorGroupManager.endGroupTransform(this.target.userData.groupId);
+			}
+
+			if (this.game.broadcastObjectUpdate && this.game.editorHierarchy) {
+				const descendants = this.game.editorHierarchy.getDescendants(this.target.userData.groupId);
+				descendants.forEach((d: any) => {
+					if (!d.isGroup) {
+						const obj = this.resolveObject3D(d.id);
+						if (obj) this.game.broadcastObjectUpdate(obj);
+					}
+				});
+			}
+			if (this.game.editorExplorer) {
+				this.game.editorExplorer.renderTree();
+			}
+		}
+
+		if (this.game.editorGroupManager?.isCouplingMode()) {
+			this.game.editorGroupManager.updateCouplingVisuals((id: string) => this.resolveObject3D(id));
+		}
+
 		this.dragState = null;
 		this.proxy.scale.set(1, 1, 1);
 		this.syncProxyFromTarget(true);
 		this.restoreInput();
-		this.game.cameraController?.setUIOpen?.(true);
+		this.game.interaction?.end("gizmo-drag");
+		this.game.updateEditorInteractionMode?.();
+	};
+
+	// Finalize the current transform on interrupted drags; never lose physics/history synchronization.
+	finishInteraction = () => {
+		this.finishOriginDrag();
+		if (this.dragState) this.handleMouseUp();
+		this.controls.dragging = false;
+		this.controls.axis = null;
 	};
 
 	private handleObjectChange = () => {
@@ -398,17 +448,56 @@ export class TransformGizmo {
 			const delta = this.proxy.position.clone().sub(this.dragState.proxyPositionStart);
 			const nextWorld = this.dragState.targetWorldPositionStart.clone().add(delta);
 			this.applyWorldPositionToTarget(nextWorld);
+
+			if (this.target.userData.isEditorGroupPivot && this.game.editorGroupManager) {
+				this.game.editorGroupManager.updateGroupTransform(
+					this.target.userData.groupId,
+					nextWorld,
+					this.target.quaternion,
+					(id: string) => this.resolveObject3D(id),
+					(obj: THREE.Object3D) => {
+						if (obj.userData?.rigidBody) {
+							obj.userData.rigidBody.setTranslation(obj.position, true);
+							obj.userData.rigidBody.setRotation(obj.quaternion, true);
+						}
+					}
+				);
+			} else if (this.game.editorGroupManager?.isCouplingMode()) {
+				this.game.editorGroupManager.updateCouplingVisuals((id: string) => this.resolveObject3D(id));
+			}
+
 			this.inspector.applyGizmoTransform?.(this.target, mode);
 			this.inspector.syncTransformInputs?.();
 		} else if (mode === "rotate") {
+			let nextQuat: THREE.Quaternion;
 			if (this.target.parent && this.target.parent.name !== "TransformGizmoProxy" && this.target.parent.constructor.name !== "Scene") {
 				const parentWorldQuat = this.target.parent.getWorldQuaternion(new THREE.Quaternion());
 				const localQuat = parentWorldQuat.clone().invert().multiply(this.proxy.quaternion);
 				this.target.quaternion.copy(localQuat);
+				nextQuat = localQuat;
 			} else {
 				const deltaQuat = this.proxy.quaternion.clone().multiply(this.dragState.proxyQuaternionStart.clone().invert());
-				this.target.quaternion.copy(deltaQuat.multiply(this.dragState.targetQuaternionStart));
+				nextQuat = deltaQuat.multiply(this.dragState.targetQuaternionStart);
+				this.target.quaternion.copy(nextQuat);
 			}
+
+			if (this.target.userData.isEditorGroupPivot && this.game.editorGroupManager) {
+				this.game.editorGroupManager.updateGroupTransform(
+					this.target.userData.groupId,
+					this.target.position,
+					nextQuat,
+					(id: string) => this.resolveObject3D(id),
+					(obj: THREE.Object3D) => {
+						if (obj.userData?.rigidBody) {
+							obj.userData.rigidBody.setTranslation(obj.position, true);
+							obj.userData.rigidBody.setRotation(obj.quaternion, true);
+						}
+					}
+				);
+			} else if (this.game.editorGroupManager?.isCouplingMode()) {
+				this.game.editorGroupManager.updateCouplingVisuals((id: string) => this.resolveObject3D(id));
+			}
+
 			this.inspector.applyGizmoTransform?.(this.target, mode);
 			this.inspector.syncTransformInputs?.();
 		} else if (mode === "scale") {
@@ -416,6 +505,15 @@ export class TransformGizmo {
 		}
 
 		this.updateSize();
+	};
+
+	private resolveObject3D(uuid: string): THREE.Object3D | null {
+		if (!this.game?.sceneManager?.scene) return null;
+		return (
+			this.game.sceneManager.scene.children.find(
+				(c: any) => c.userData && c.userData.uuid === uuid
+			) || null
+		);
 	};
 
 	private previewDimensionsFromProxy() {

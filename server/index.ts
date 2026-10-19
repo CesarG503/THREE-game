@@ -18,7 +18,7 @@ import { handleHttpRequest } from "./http/ApiServer.js"
 
 // ── Bootstrap ──────────────────────────────────────────────────────────────
 
-const PORT = Number(process.env.PORT) || 8080
+const PORT = Number(process.env.PORT) || 8085
 
 const roomManager = new RoomManager()
 

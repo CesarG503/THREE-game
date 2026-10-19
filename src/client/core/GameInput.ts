@@ -1,3 +1,4 @@
+import { isTextInput } from "../input/InteractionCoordinator";
 import * as THREE from "three";
 import { GunItem } from "../items/GunItem";
 import { serializeItemForNetwork } from "../items/ItemNetworkSerializer";
@@ -5,11 +6,11 @@ import type { Game } from "../Game";
 
 export function setupGameInput(this: Game) {
 	this.placementRotationIndex = 0;
-    window.addEventListener('blur', () => this.fuelZoneSystem?.interaction.release());
+    window.addEventListener('blur', () => this.fuelZoneSystem?.interaction.release(), { signal: this.inputEvents.signal });
 
 	document.addEventListener("keydown", (e: KeyboardEvent) => {
 		const activeElement = document.activeElement as HTMLElement | null;
-		if (activeElement && (activeElement.tagName === "INPUT" || activeElement.tagName === "SELECT" || activeElement.tagName === "TEXTAREA")) {
+		if (isTextInput(activeElement)) {
 			if (e.key === "Escape") {
 				activeElement.blur();
 				if (this.objectInspector && this.objectInspector.isVisible) {
@@ -28,6 +29,7 @@ export function setupGameInput(this: Game) {
 		}
 
 		const key = e.key.toLowerCase();
+		if (this.interaction?.blocksScene) return;
 
 		if (key === "r" && !e.shiftKey && this.vehicleSystem?.mounted && this.inputManager?.enabled && !this.cameraController?.isUIOpen && !this.cameraController?.isPaused) {
 			e.preventDefault();
@@ -66,7 +68,7 @@ export function setupGameInput(this: Game) {
 			return;
 		}
 
-		if (this.inputManager && !this.inputManager.enabled) return;
+		if (this.interaction?.blocksGameplay || (this.inputManager && !this.inputManager.enabled)) return;
 
 		if (key === "r") {
 			this.placementRotationIndex = (this.placementRotationIndex + 1) % 4;
@@ -217,7 +219,7 @@ export function setupGameInput(this: Game) {
 				currentItem.reload();
 			}
 		}
-	});
+	}, { signal: this.inputEvents.signal });
 
 	document.addEventListener("keyup", (e: KeyboardEvent) => {
 		if (e.key.toLowerCase() === "f") {
@@ -227,14 +229,32 @@ export function setupGameInput(this: Game) {
 			const progressBar = document.getElementById("move-progress-bar");
 			if (progressBar) progressBar.style.width = "0%";
 		}
-	});
+	}, { signal: this.inputEvents.signal });
 
 	document.addEventListener("mousedown", (e: MouseEvent) => {
 		const profile = this.playerConfigManager?.getCurrentProfile?.();
 		if (profile?.disableInteraction) return;
 
-		if (this.inputManager && !this.inputManager.enabled) return;
+		if (this.interaction?.blocksGameplay || (this.inputManager && !this.inputManager.enabled)) return;
 		if (e.target !== this.sceneManager.renderer.domElement) return;
+
+		// Si alguna interfaz de edición o panel de inspector/explorer está activa, no usar items
+		if (this.isAnyEditorUIOpen()) return;
+
+		// Outside H/Inspector, left click keeps placement; right click inspects existing objects.
+		if (this.gameMode === "editor" && this.objectInspector && e.button === 2) {
+			const rect = this.sceneManager.renderer.domElement.getBoundingClientRect();
+			const mouse = document.pointerLockElement ? new THREE.Vector2() :
+				new THREE.Vector2((e.clientX - rect.left) / rect.width * 2 - 1, -(e.clientY - rect.top) / rect.height * 2 + 1);
+			const ray = new THREE.Raycaster();
+			ray.setFromCamera(mouse, this.sceneManager.camera);
+			if (ray.intersectObjects(this.sceneManager.scene.children, true).some(hit => {
+				for (let object = hit.object; object; object = object.parent) {
+					if (object.userData?.isEditableMapObject) return true;
+				}
+				return false;
+			})) return;
+		}
 
 		const logicSystem = this.constructionMenu?.logicSystem;
 		if (logicSystem?.isEditingMap) {
@@ -242,6 +262,7 @@ export function setupGameInput(this: Game) {
 			if (logicSystem.toolbar?.activeTool === "waypoint") return;
 		}
 
+		this.interaction?.markHandled(e);
 		if (e.button === 0) {
 			if (this.isMovingFarmingZone && this.moveGhost.visible) {
 				this.farmingZone.setPosition(this.moveGhost.position);
@@ -254,5 +275,5 @@ export function setupGameInput(this: Game) {
 		} else if (e.button === 2) {
 			this.useCurrentItem(true);
 		}
-	});
+	}, { signal: this.inputEvents.signal });
 }

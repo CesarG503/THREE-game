@@ -4,6 +4,7 @@ import Busboy from "busboy"
 import { AuthError, getUserBySessionToken, loginUser, registerUser, requireUserBySessionToken, type AuthInput } from "../services/AuthService.js"
 import { createAsset, getAsset, getAssetObject, listAssets, type UploadedAssetFile } from "../services/AssetService.js"
 import { createMap, deleteMap, getMap, listMaps, updateMap, type MapWriteInput } from "../services/MapService.js"
+import { createPrefab, deletePrefab, getPrefab, listPrefabs, updatePrefab, type PrefabWriteInput } from "../services/PrefabService.js"
 import { logger } from "../utils/Logger.js"
 
 const MAX_BODY_BYTES = 1024 * 1024 * 2
@@ -124,6 +125,57 @@ export async function handleHttpRequest(
       return withApiError(res, async () => {
         const user = await getRequiredRequestUser(req)
         const result = await deleteMap(identifier, user.id)
+        sendJson(res, 200, result)
+      })
+    }
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/prefabs") {
+    return withApiError(res, async () => {
+      const user = await getOptionalRequestUser(req)
+      const result = await listPrefabs(
+        url.searchParams.get("scope"),
+        user?.id ?? null,
+        url.searchParams.get("category"),
+      )
+      sendJson(res, 200, { prefabs: result })
+    })
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/prefabs") {
+    return withJsonBody(req, res, async (body) => {
+      const user = await getRequiredRequestUser(req)
+      const result = await createPrefab(body as PrefabWriteInput, user.id)
+      sendJson(res, 201, result)
+    })
+  }
+
+  const prefabMatch = /^\/api\/prefabs\/([^/]+)$/.exec(url.pathname)
+  if (prefabMatch) {
+    const identifier = decodeURIComponent(prefabMatch[1] ?? "")
+    const versionParam = url.searchParams.get("version")
+    const versionNumber = versionParam ? parseInt(versionParam, 10) : undefined
+
+    if (req.method === "GET") {
+      return withApiError(res, async () => {
+        const user = await getOptionalRequestUser(req)
+        const result = await getPrefab(identifier, user?.id ?? null, versionNumber)
+        sendJson(res, 200, result)
+      })
+    }
+
+    if (req.method === "PUT") {
+      return withJsonBody(req, res, async (body) => {
+        const user = await getRequiredRequestUser(req)
+        const result = await updatePrefab(identifier, body as PrefabWriteInput, user.id)
+        sendJson(res, 200, result)
+      })
+    }
+
+    if (req.method === "DELETE") {
+      return withApiError(res, async () => {
+        const user = await getRequiredRequestUser(req)
+        const result = await deletePrefab(identifier, user.id)
         sendJson(res, 200, result)
       })
     }

@@ -1,3 +1,4 @@
+import { InteractionCoordinator } from "./input/InteractionCoordinator";
 import { FuelZoneSystem } from './fuel/FuelZoneSystem';
 import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
@@ -42,6 +43,12 @@ import { ObjectInspector } from "./ui/ObjectInspector";
 import { createItemFromNetworkData, serializeItemForNetwork } from "./items/ItemNetworkSerializer";
 import { getMapData, loadPlatformMapForRoom, type PlatformMap } from "./platform/mapRuntime";
 import { DEFAULT_SKYBOX_TYPE } from "./platform/mapDefaults";
+import { EditorHierarchyModel } from "./editor/hierarchy/EditorHierarchyModel";
+import { EditorGroupManager } from "./editor/hierarchy/EditorGroupManager";
+import { EditorExplorer } from "./editor/explorer/EditorExplorer";
+import { EditorClipboard } from "./editor/clipboard/EditorClipboard";
+import { EditorCommandHistory } from "./editor/history/EditorCommandHistory";
+import { PrefabManager } from "./editor/prefabs/PrefabManager";
 
 export class Game {
 	sceneManager: any;
@@ -102,6 +109,14 @@ export class Game {
 	isDisposed: boolean;
 	animationFrameId: number | null;
 	editableMapObjects: any[];
+	editorHierarchy!: EditorHierarchyModel;
+	editorGroupManager!: EditorGroupManager;
+	editorExplorer!: EditorExplorer;
+	interaction!: InteractionCoordinator;
+	inputEvents = new AbortController();
+	editorClipboard!: EditorClipboard;
+	editorHistory!: EditorCommandHistory;
+	prefabManager!: PrefabManager;
 
 	animate: any;
 	setupDebugRender: any;
@@ -182,7 +197,13 @@ export class Game {
 		if (this.isDisposed) return;
 		this.editableMapObjects = [];
 		this.sceneManager = new SceneManager("game-container");
+		this.editorHierarchy = new EditorHierarchyModel();
+		this.editorHistory = new EditorCommandHistory();
+		this.editorGroupManager = new EditorGroupManager(this.editorHierarchy, this.sceneManager.scene, this.editorHistory);
+		this.editorClipboard = new EditorClipboard();
+		this.prefabManager = new PrefabManager(this.editorHierarchy);
 		this.inputManager = new InputManager();
+		this.inputManager.pointerTarget = this.sceneManager.renderer.domElement;
 		this.clock = new THREE.Clock();
 
 		const gravity = { x: 0.0, y: -20.0, z: 0.0 };
@@ -215,6 +236,12 @@ export class Game {
 				this.sceneManager.renderer.domElement
 			);
 			this.cameraController.character = this.character;
+			this.cameraController.uiCheckCallback = () => this.isAnyEditorUIOpen();
+			if (this.inputManager) {
+				this.inputManager.movementCheckCallback = () => (this.interaction ? this.interaction.blocksMovement : this.isAnyEditorUIOpen());
+				this.inputManager.actionCheckCallback = () => (this.interaction ? this.interaction.blocksGameplayActions : this.isAnyEditorUIOpen());
+				this.inputManager.uiCheckCallback = () => (this.interaction ? this.interaction.blocksGameplayActions : this.isAnyEditorUIOpen());
+			}
 			this.logicCameraSystem = new LogicCameraSystem(this);
 			this.scopeController = new ScopeController(this.sceneManager.camera, this);
 		this.sceneManager.renderer.autoClear = false;
@@ -543,6 +570,24 @@ export class Game {
 			});
 
 			this.objectInspector = new ObjectInspector(this);
+			this.editorExplorer = new EditorExplorer(
+				this,
+				this.editorHierarchy,
+				this.editorGroupManager,
+				this.editorClipboard,
+				this.editorHistory,
+				this.prefabManager
+			);
+
+			this.editorGroupManager.attachCameraAndDom(
+				this.sceneManager.camera,
+				this.sceneManager.renderer.domElement
+			);
+			this.editorGroupManager.onHierarchyChanged = () => {
+				if (this.editorExplorer) {
+					this.editorExplorer.renderTree();
+				}
+			};
 		}
 
 		if (this.inventoryManager && this.character) {
@@ -607,6 +652,12 @@ export class Game {
 			});
 		}
 
+		this.interaction = new InteractionCoordinator(this);
+		this.editorGroupManager.interaction = this.interaction;
+		this.cameraController.uiCheckCallback = () => this.interaction.blocksGameplayActions;
+		this.inputManager.movementCheckCallback = () => this.interaction.blocksMovement;
+		this.inputManager.actionCheckCallback = () => this.interaction.blocksGameplayActions;
+		this.inputManager.uiCheckCallback = () => this.interaction.blocksGameplayActions;
 		this.setupGameInput();
 
 		if (this.gameMode !== "editor") {
@@ -624,6 +675,7 @@ export class Game {
 
 		document.addEventListener("mousedown", (e) => {
 			if (e.target !== this.sceneManager.renderer.domElement) return;
+			if (this.interaction?.blocksScene || this.interaction?.isHandled(e)) return;
 
 			if (this.gameMode === "editor") {
 				if (this.constructionMenu && this.constructionMenu.logicSystem && this.constructionMenu.logicSystem.isEditingMap) {
@@ -688,8 +740,9 @@ export class Game {
 						mouse.x = 0;
 						mouse.y = 0;
 					} else {
-						mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
-						mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+						const rect = this.sceneManager.renderer.domElement.getBoundingClientRect();
+						mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+						mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
 					}
 
 					const raycaster = new THREE.Raycaster();
@@ -715,7 +768,14 @@ export class Game {
 					return target ? { target, hitPart: hit.object } : null;
 				};
 
-					if (this.objectInspector && e.button === 2) {
+				if (this.objectInspector && (e.button === 0 || e.button === 2)) {
+					const isGizmoInteracting = !!(
+						this.objectInspector?.transformGizmo?.dragState ||
+						this.objectInspector?.transformGizmo?.controls?.axis
+					);
+					const isConnectorInteracting = !!(this.editorGroupManager?.isConnectorDragging());
+
+					if (!isGizmoInteracting && !isConnectorInteracting) {
 						const selectResult = selectEditableObjectFromPointer();
 						if (selectResult) {
 							const target = selectResult.target;
@@ -725,12 +785,18 @@ export class Game {
 								}
 							}
 							this.objectInspector.show(target, selectResult.hitPart);
+							const nodeId = target.userData?.groupId || target.userData?.uuid;
+							if (this.editorExplorer && nodeId) {
+								this.editorExplorer.selectNode(nodeId, false);
+							}
+							this.updateEditorInteractionMode();
 						}
 					}
 				}
-			}, false);
+				}
+			}, { signal: this.inputEvents.signal });
 
-		document.addEventListener("contextmenu", (e) => e.preventDefault(), false);
+		document.addEventListener("contextmenu", (e) => e.preventDefault(), { signal: this.inputEvents.signal });
 
 	}
 
@@ -773,6 +839,25 @@ export class Game {
 		}
 	}
 
+	isAnyEditorUIOpen(): boolean {
+		if (this.gameMode !== "editor") {
+			return !!(this.constructionMenu?.isVisible || this.cameraController?.isPaused);
+		}
+		const explorerOpen = !!this.editorExplorer?.isVisible;
+		const menuOpen = !!(this.constructionMenu?.isVisible && this.constructionMenu.container?.style.display !== "none");
+		const inspectorOpen = !!this.objectInspector?.isVisible;
+		const couplingActive = !!this.editorGroupManager?.isCouplingMode?.();
+		const paused = !!this.cameraController?.isPaused;
+		return explorerOpen || menuOpen || inspectorOpen || couplingActive || paused || !!this.constructionMenu?.logicSystem?.isEditingMap;
+	}
+
+	updateEditorInteractionMode(): void {
+		if (this.interaction) { this.interaction.sync(); return; }
+		const active = this.isAnyEditorUIOpen();
+		this.cameraController?.setUIOpen(active);
+		if (active) this.inputManager?.reset();
+	}
+
 	ensureEditorInventoryVisible() {
 		if (this.gameMode !== "editor") return;
 
@@ -789,6 +874,11 @@ export class Game {
 	dispose() {
 		if (this.isDisposed) return;
 		this.isDisposed = true;
+		this.interaction?.dispose();
+		this.inputEvents.abort();
+		this.inputManager?.dispose();
+		this.cameraController?.dispose();
+		this.objectInspector?.transformGizmo?.dispose();
 
 		if (this.animationFrameId !== null) {
 			cancelAnimationFrame(this.animationFrameId);
@@ -813,6 +903,8 @@ export class Game {
 		this.character?.dispose?.();
 			this.hud?.destroy?.();
 			this.objectInspector?.destroy?.();
+			this.editorExplorer?.dispose?.();
+			this.editorGroupManager?.dispose?.();
 			this.constructionMenu?.logicSystem?.dispose?.();
 			this.logicCameraSystem?.closeCameraPanel?.();
 			this.logicCameraSystem?.closeCameraPreview?.();
@@ -825,6 +917,7 @@ export class Game {
 			"chat-container",
 			"construction-menu",
 			"object-inspector",
+			"editor-explorer",
 			"logic-toolbar",
 			"logic-sequence-editor",
 			"game-hud-layer",

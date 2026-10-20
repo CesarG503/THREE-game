@@ -49,6 +49,7 @@ import { EditorExplorer } from "./editor/explorer/EditorExplorer";
 import { EditorClipboard } from "./editor/clipboard/EditorClipboard";
 import { EditorCommandHistory } from "./editor/history/EditorCommandHistory";
 import { PrefabManager } from "./editor/prefabs/PrefabManager";
+import { EditorSelectionManager } from "./editor/selection/EditorSelectionManager";
 
 export class Game {
 	sceneManager: any;
@@ -117,6 +118,7 @@ export class Game {
 	editorClipboard!: EditorClipboard;
 	editorHistory!: EditorCommandHistory;
 	prefabManager!: PrefabManager;
+	editorSelection!: EditorSelectionManager;
 
 	animate: any;
 	setupDebugRender: any;
@@ -200,6 +202,8 @@ export class Game {
 		this.editorHierarchy = new EditorHierarchyModel();
 		this.editorHistory = new EditorCommandHistory();
 		this.editorGroupManager = new EditorGroupManager(this.editorHierarchy, this.sceneManager.scene, this.editorHistory);
+		this.editorSelection = new EditorSelectionManager(this.editorHierarchy, (id: string) => this.resolveObject3D(id));
+		this.editorGroupManager.selectionManager = this.editorSelection;
 		this.editorClipboard = new EditorClipboard();
 		this.prefabManager = new PrefabManager(this.editorHierarchy);
 		this.inputManager = new InputManager();
@@ -588,6 +592,25 @@ export class Game {
 					this.editorExplorer.renderTree();
 				}
 			};
+
+			this.editorSelection.addListener((selectedIds, activeId, source) => {
+				if (this.editorExplorer) {
+					this.editorExplorer.updateSelectionVisuals();
+				}
+				if (activeId) {
+					const obj = this.resolveObject3D(activeId);
+					if (obj && this.objectInspector) {
+						this.objectInspector.show(obj);
+					}
+				} else {
+					if (this.objectInspector) {
+						this.objectInspector.detachAndClear();
+					}
+				}
+				if (this.editorGroupManager?.isCouplingMode?.()) {
+					this.editorGroupManager.updateCouplingVisuals((id: string) => this.resolveObject3D(id));
+				}
+			});
 		}
 
 		if (this.inventoryManager && this.character) {
@@ -792,29 +815,30 @@ export class Game {
 					}
 
 					// Sin objeto equipado: Selección contextual de objeto o deselección en el vacío
-					if (this.objectInspector) {
-						const selectResult = selectEditableObjectFromPointer(e);
-						if (selectResult) {
-							const target = selectResult.target;
-							if (this.objectInspector.isVisible && this.objectInspector.selectedObject && this.objectInspector.selectedObject !== target) {
-								if (!this.objectInspector.allowDynamicSwitch) {
-									return;
-								}
+					const selectResult = selectEditableObjectFromPointer(e);
+					if (selectResult) {
+						const target = selectResult.target;
+						const nodeId = target.userData?.groupId || target.userData?.uuid;
+						if (this.editorSelection && nodeId) {
+							if (e.shiftKey) {
+								this.editorSelection.toggle(nodeId, "scene");
+							} else {
+								this.editorSelection.selectSingle(nodeId, "scene");
 							}
-							const nodeId = target.userData?.groupId || target.userData?.uuid;
-							if (this.editorExplorer && nodeId) {
-								this.editorExplorer.selectNode(nodeId, false);
-							}
+						} else if (this.objectInspector) {
 							this.objectInspector.show(target, selectResult.hitPart);
-						} else {
-							// Clic en el vacío sin objeto equipado: deseleccionar objeto actual
-							this.objectInspector.hide();
-							if (this.editorExplorer?.selectedNodeId) {
-								this.editorExplorer.selectNode(null, false);
+						}
+					} else {
+						// Clic en el vacío sin objeto equipado: deseleccionar objeto actual si no es Shift
+						if (!e.shiftKey) {
+							if (this.editorSelection) {
+								this.editorSelection.clear("scene");
+							} else if (this.objectInspector) {
+								this.objectInspector.detachAndClear();
 							}
 						}
-						this.updateEditorInteractionMode();
 					}
+					this.updateEditorInteractionMode();
 				}
 			}
 		}, { signal: this.inputEvents.signal });
@@ -843,26 +867,22 @@ export class Game {
 					} else {
 						// Tap corto (<= 6px): inspeccionar y seleccionar objeto bajo el cursor
 						rightMouseDownPos = null;
-						if (this.gameMode === "editor" && this.objectInspector) {
+						if (this.gameMode === "editor") {
 							const selectResult = selectEditableObjectFromPointer(e);
 							if (selectResult) {
 								const target = selectResult.target;
-								if (this.objectInspector.isVisible && this.objectInspector.selectedObject && this.objectInspector.selectedObject !== target) {
-									if (!this.objectInspector.allowDynamicSwitch) {
-										return;
-									}
-								}
 								const nodeId = target.userData?.groupId || target.userData?.uuid;
 								if (this.editorExplorer) {
 									if (!this.editorExplorer.isVisible) {
 										this.editorExplorer.show();
 									}
 									this.editorExplorer.switchTab("properties");
-									if (nodeId) {
-										this.editorExplorer.selectNode(nodeId, false);
-									}
 								}
-								this.objectInspector.show(target, selectResult.hitPart);
+								if (this.editorSelection && nodeId) {
+									this.editorSelection.selectSingle(nodeId, "scene-right-click");
+								} else if (this.objectInspector) {
+									this.objectInspector.show(target, selectResult.hitPart);
+								}
 								this.updateEditorInteractionMode();
 							}
 						}
@@ -917,6 +937,28 @@ export class Game {
 		if (computedDisplay === "none" || inventoryContainer.style.display === "none") {
 			inventoryContainer.style.display = "flex";
 		}
+	}
+
+	resolveObject3D(id: string): THREE.Object3D | null {
+		if (!id) return null;
+		const node = this.editorHierarchy?.getNode(id);
+		if (node && node.isGroup && this.editorGroupManager) {
+			return this.editorGroupManager.getOrCreatePivotProxy(id);
+		}
+		if (this.editableMapObjects) {
+			const found = this.editableMapObjects.find((o: any) => o.userData?.uuid === id);
+			if (found) return found;
+		}
+		if (this.sceneManager?.scene) {
+			let found: THREE.Object3D | null = null;
+			this.sceneManager.scene.traverse((child: any) => {
+				if (!found && child.userData?.uuid === id) {
+					found = child;
+				}
+			});
+			if (found) return found;
+		}
+		return null;
 	}
 
 	isAnyEditorUIOpen(): boolean {

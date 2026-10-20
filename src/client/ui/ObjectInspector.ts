@@ -19,7 +19,7 @@ export class ObjectInspector {
         this.isVisible = false
         this.selectedObject = null
         this.customTextureAssets = []
-        this.allowDynamicSwitch = false
+        this.allowDynamicSwitch = true
         this.isCollapsed = false
         this.spikeTextureSelectionMode = false
         this.fuelActiveSubElement = 'zone'
@@ -1244,12 +1244,18 @@ export class ObjectInspector {
 
         // Populate Data
         const objName = object.userData.customName || object.userData.mapObjectType || "Objeto"
-        this.title.textContent = isGroupPivot ? `Grupo: ${objName}` : `Propiedades: ${objName}`
+        const selectionCount = this.game?.editorSelection?.getCount?.() || 1;
+        this.title.textContent = selectionCount > 1 ? `[${selectionCount} seleccionados] ${isGroupPivot ? `(Grupo: ${objName})` : `(${objName})`}` : (isGroupPivot ? `Grupo: ${objName}` : `Propiedades: ${objName}`);
         if (this.inputCustomName) {
             this.inputCustomName.value = object.userData.customName || ""
         }
 
-        if (this.game?.editorExplorer) {
+        if (this.game?.editorSelection) {
+            const explorerNodeId = object.userData?.groupId || object.userData?.uuid;
+            if (explorerNodeId && !this.game.editorSelection.isSelected(explorerNodeId)) {
+                this.game.editorSelection.selectSingle(explorerNodeId, "inspector");
+            }
+        } else if (this.game?.editorExplorer) {
             const explorerNodeId = object.userData?.groupId || object.userData?.uuid;
             if (explorerNodeId && this.game.editorExplorer.selectedNodeId !== explorerNodeId) {
                 this.game.editorExplorer.selectNode(explorerNodeId, false);
@@ -1400,21 +1406,21 @@ export class ObjectInspector {
         this.isVisible = false
         this.container.style.display = 'none'
 
-        this.transformGizmo.detach()
         this.game?.logicCameraSystem?.closeCameraPreview?.()
 
-        this.selectedObject = null
-        if (this.game?.editorExplorer) {
-            this.game.editorExplorer.selectNode(null, false);
-        }
         if (this.game?.updateEditorInteractionMode) {
             this.game.updateEditorInteractionMode()
         } else if (this.game?.cameraController) {
             this.game.cameraController.setUIOpen(false)
         }
+    }
 
-        // Enable Game Input - REMOVED (never disabled)
-        // if (this.game.inputManager) this.game.inputManager.enabled = true
+    detachAndClear() {
+        this.transformGizmo.detach()
+        this.selectedObject = null
+        this.isVisible = false
+        this.container.style.display = 'none'
+        this.game?.logicCameraSystem?.closeCameraPreview?.()
     }
 
     toggleCollapse() {

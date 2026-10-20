@@ -216,4 +216,77 @@ export class DuplicateCommand implements EditorCommand {
 	}
 }
 
+export class GroupNodesCommand implements EditorCommand {
+	name = "Group Nodes";
+	private createdGroupId: string | null = null;
+	private originalParents: Map<string, { parentId: string | null; order: number }> = new Map();
 
+	constructor(
+		private hierarchy: any,
+		private groupManager: any,
+		private nodeIds: string[],
+		private groupName: string,
+		private parentId: string | null = null,
+		private onAfterExecute?: (groupId?: string) => void,
+		private objectResolver?: (uuid: string) => any
+	) {}
+
+	execute() {
+		if (!this.createdGroupId) {
+			const group = this.hierarchy.createGroup(this.groupName, this.parentId);
+			this.createdGroupId = group.id;
+			for (const id of this.nodeIds) {
+				const n = this.hierarchy.getNode(id);
+				if (n) {
+					this.originalParents.set(id, { parentId: n.parentId, order: n.order });
+					this.hierarchy.reparent(id, this.createdGroupId);
+				}
+			}
+		} else {
+			this.hierarchy.addNode({
+				id: this.createdGroupId,
+				name: this.groupName,
+				customName: this.groupName,
+				parentId: this.parentId,
+				order: 0,
+				isGroup: true,
+				childrenIds: []
+			});
+			for (const id of this.nodeIds) {
+				this.hierarchy.reparent(id, this.createdGroupId);
+			}
+		}
+
+		if (this.groupManager) {
+			this.groupManager.getOrCreatePivotProxy(this.createdGroupId);
+			const resolver = this.objectResolver || this.groupManager.lastResolver || ((id: string) => this.groupManager.selectionManager?.resolveObject(id) || null);
+			this.groupManager.recenterGroupPivot(this.createdGroupId, resolver);
+		}
+
+		if (this.onAfterExecute && this.createdGroupId) {
+			this.onAfterExecute(this.createdGroupId);
+		}
+	}
+
+	undo() {
+		if (!this.createdGroupId) return;
+
+		for (const id of this.nodeIds) {
+			const orig = this.originalParents.get(id);
+			if (orig) {
+				this.hierarchy.reparent(id, orig.parentId, orig.order);
+			} else {
+				this.hierarchy.reparent(id, null);
+			}
+		}
+
+		this.hierarchy.removeNode(this.createdGroupId, false);
+		if (this.groupManager) {
+			this.groupManager.removeGroupProxy(this.createdGroupId);
+		}
+
+		if (this.onAfterExecute) {
+			this.onAfterExecute(undefined);
+		}
+	}
+}

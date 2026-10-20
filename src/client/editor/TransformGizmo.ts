@@ -3,7 +3,7 @@ import { TransformControls } from "three/examples/jsm/controls/TransformControls
 
 import { createCurveDeformer, curveDimensions, normalizeCurvature, supportsCurvature, type CurveAxis } from "../utils/CurvatureUtils";
 
-type TransformMode = "translate" | "scale" | "rotate" | "curvature";
+export type TransformMode = "translate" | "scale" | "rotate" | "curvature";
 type Axis = "x" | "y" | "z";
 
 const TRANSFORM_MODES: TransformMode[] = ["translate", "scale", "rotate", "curvature"];
@@ -40,6 +40,8 @@ export class TransformGizmo {
 	proxy: THREE.Object3D;
 	target: THREE.Object3D | null;
 	modeIndex: number;
+	private sessionMode: TransformMode = "translate";
+	private modeIndicatorTimer: any = null;
 	dragState: any;
 	wasInputEnabled: boolean | null;
 	tmpBox: THREE.Box3;
@@ -53,7 +55,6 @@ export class TransformGizmo {
 	originPath = new THREE.Line(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: 0x48ddff, depthTest: false, transparent: true, opacity: 0.45 }));
 	private originPointer: number | null = null;
 	private originDragSurface: THREE.Mesh | null = null;
-
 
 	constructor(game: any, inspector: any) {
 		this.game = game;
@@ -82,7 +83,6 @@ export class TransformGizmo {
 		this.curveArc.visible = false;
 		this.applyGizmoLayer(this.curveArc);
 		game.sceneManager.scene.add(this.curveArc);
-
 
 		this.controls = new TransformControls(game.sceneManager.camera, game.sceneManager.renderer.domElement);
 		this.controls.setMode("translate");
@@ -114,18 +114,38 @@ export class TransformGizmo {
 		this.controls.addEventListener("objectChange", this.handleObjectChange);
 	}
 
+	public getSupportedModes(targetObj?: THREE.Object3D): TransformMode[] {
+		const target = targetObj || this.target;
+		if (!target) return ["translate"];
+		if (target.userData?.isEditorGroupPivot || target.userData?.isGroup) {
+			return ["translate", "rotate"];
+		}
+		const canCurv = target === this.target ? this.canCurve() : (supportsCurvature(target.userData?.mapObjectType) && target.userData?.originalScale?.curvature?.enabled);
+		if (canCurv) {
+			return ["translate", "scale", "rotate", "curvature"];
+		}
+		return ["translate", "scale", "rotate"];
+	}
+
 	attach(object: THREE.Object3D) {
 		if (this.dragState) this.finishInteraction();
 		this.curvatureActive = false;
 		this.curvatureOriginEditing = false;
 		this.section.visible = false;
 		this.target = object;
-		this.modeIndex = 0;
+
+		// Preservar modo de sesión si el nuevo objetivo lo admite
+		const supported = this.getSupportedModes();
+		if (!supported.includes(this.sessionMode)) {
+			this.sessionMode = "translate";
+		}
+		this.modeIndex = supported.indexOf(this.sessionMode);
 		this.syncProxyFromTarget(true);
 		this.controls.attach(this.proxy);
-		this.setMode("translate");
+		this.setMode(this.sessionMode);
 		this.helper.visible = true;
 		this.game.interaction?.sync?.();
+		this.showModeIndicator(this.sessionMode);
 	}
 
 	detach() {
@@ -167,18 +187,21 @@ export class TransformGizmo {
 		return false;
 	}
 
-	cycleMode() {
+	cycleMode(): TransformMode {
 		if (!this.target || this.dragState) return this.getMode();
-		const count = this.canCurve() ? TRANSFORM_MODES.length : TRANSFORM_MODES.length - 1;
-		this.modeIndex = (this.modeIndex + 1) % count;
-		const mode = TRANSFORM_MODES[this.modeIndex];
-		this.setMode(mode);
+		const modes = this.getSupportedModes();
+		const currentIndex = modes.indexOf(this.sessionMode);
+		const nextIndex = (currentIndex + 1) % modes.length;
+		this.sessionMode = modes[nextIndex];
+		this.modeIndex = nextIndex;
+		this.setMode(this.sessionMode);
 		this.syncProxyFromTarget(true);
-		return mode;
+		this.showModeIndicator(this.sessionMode);
+		return this.sessionMode;
 	}
 
-	getMode() {
-		return TRANSFORM_MODES[this.modeIndex];
+	getMode(): TransformMode {
+		return this.sessionMode;
 	}
 
 	update() {
@@ -223,6 +246,8 @@ export class TransformGizmo {
 				child.material?.dispose?.();
 			}
 		});
+		if (this.modeIndicatorTimer) clearTimeout(this.modeIndicatorTimer);
+		document.getElementById("viper-gizmo-mode-badge")?.remove();
 	}
 
 	private canCurve() {
@@ -230,9 +255,14 @@ export class TransformGizmo {
 	}
 
 	setMode(mode: TransformMode) {
+		const supported = this.getSupportedModes();
+		if (!supported.includes(mode)) {
+			mode = "translate";
+		}
 		if (this.dragState || (mode === "curvature" && !this.canCurve())) return;
+		this.sessionMode = mode;
 		this.curvatureActive = mode === "curvature";
-		this.modeIndex = TRANSFORM_MODES.indexOf(mode);
+		this.modeIndex = supported.indexOf(mode);
 		this.controls.setMode(mode === "curvature" ? "translate" : mode);
 		this.controls.setSpace("local");
 		this.controls.setColors(...(this.curvatureActive ? (this.curvatureOriginEditing ? [0x48ddff, 0x48ddff, 0x48ddff, 0xffffff] : [0xffbd45, 0xffbd45, 0xffbd45, 0xffffff]) : [0xff4d4d, 0x4dff6d, 0x4d8dff, 0xffd84d]) as [number, number, number, number]);
@@ -252,7 +282,6 @@ export class TransformGizmo {
 		this.controls.showX = !this.curvatureActive || axis === "x";
 		this.controls.showY = !this.curvatureActive || axis === "y";
 		this.controls.showZ = !this.curvatureActive || axis === "z";
-
 	}
 
 	private pointerRay(event: PointerEvent) {
@@ -279,8 +308,6 @@ export class TransformGizmo {
 			this.inspector.updateCurvature?.({ activeLayer: marker.object.userData.curveLayer }, false);
 			this.syncProxyFromTarget(true);
 		}
-		// Pick against the shape at drag start so rebuilding the bend cannot make
-		// the pointer chase its own deformation or jump to another section.
 		this.originDragSurface = new THREE.Mesh(mesh.geometry.clone(), new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }));
 		this.originDragSurface.matrixAutoUpdate = false;
 		this.originDragSurface.matrix.copy(mesh.matrixWorld);
@@ -312,7 +339,6 @@ export class TransformGizmo {
 			indices.forEach((i, j) => material.addScaledVector(new THREE.Vector3().fromBufferAttribute(source, i), weights.getComponent(j)));
 			origin = material[curve.axis] / dims[curve.axis] + 0.5;
 		} else {
-			// Outside the surface, follow the closest point of the visible path.
 			const deformer = createCurveDeformer(dims, curve);
 			let best = Infinity;
 			origin = curve.origin;
@@ -321,7 +347,6 @@ export class TransformGizmo {
 				const p = new THREE.Vector3(); p[curve.axis] = (i / 192 - 0.5) * dims[curve.axis];
 				this.target.localToWorld(deformer.transform(p)).project(this.game.sceneManager.camera);
 				const distance = ((p.x + 1) * rect.width / 2 + rect.left - event.clientX) ** 2 + ((1 - p.y) * rect.height / 2 + rect.top - event.clientY) ** 2;
-				// At closed/overlapping paths, prefer the current material section.
 				const score = distance + Math.abs(i / 192 - this.target.userData.originalScale.curvature.origin) * 0.01;
 				if (score < best) { best = score; origin = i / 192; }
 			}
@@ -386,11 +411,8 @@ export class TransformGizmo {
 			);
 		}
 
-		if (this.game.inputManager) {
-			this.wasInputEnabled = this.game.inputManager.enabled;
-			this.game.inputManager.enabled = false;
-			this.game.inputManager.reset?.();
-		}
+		// NO desactivamos inputManager.enabled para permitir movimiento WASD y salto.
+		// InteractionCoordinator maneja el bloqueo exclusivo de acciones de ataque y construcción.
 
 		document.exitPointerLock?.();
 		this.game.cameraController?.setUIOpen?.(true);
@@ -532,13 +554,72 @@ export class TransformGizmo {
 	};
 
 	private resolveObject3D(uuid: string): THREE.Object3D | null {
+		if (typeof this.game?.resolveObject3D === "function") {
+			return this.game.resolveObject3D(uuid);
+		}
+		if (this.game?.editableMapObjects) {
+			const found = this.game.editableMapObjects.find(
+				(obj: any) => obj.userData && obj.userData.uuid === uuid
+			);
+			if (found) return found;
+		}
 		if (!this.game?.sceneManager?.scene) return null;
-		return (
-			this.game.sceneManager.scene.children.find(
-				(c: any) => c.userData && c.userData.uuid === uuid
-			) || null
+		const direct = this.game.sceneManager.scene.children.find(
+			(c: any) => c.userData && c.userData.uuid === uuid
 		);
-	};
+		if (direct) return direct;
+		let foundTraverse: THREE.Object3D | null = null;
+		this.game.sceneManager.scene.traverse((child: any) => {
+			if (!foundTraverse && child.userData && child.userData.uuid === uuid) {
+				foundTraverse = child;
+			}
+		});
+		return foundTraverse;
+	}
+
+	public showModeIndicator(mode: TransformMode) {
+		if (typeof document === "undefined") return;
+		let el = document.getElementById("viper-gizmo-mode-badge");
+		if (!el) {
+			el = document.createElement("div");
+			el.id = "viper-gizmo-mode-badge";
+			el.style.cssText = `
+				position: fixed;
+				bottom: 24px;
+				left: 50%;
+				transform: translateX(-50%);
+				background: rgba(15, 23, 42, 0.88);
+				backdrop-filter: blur(8px);
+				border: 1px solid rgba(56, 189, 248, 0.5);
+				border-radius: 9999px;
+				padding: 6px 16px;
+				color: #38bdf8;
+				font-size: 12px;
+				font-weight: 600;
+				font-family: system-ui, -apple-system, sans-serif;
+				pointer-events: none;
+				z-index: 9999;
+				box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+				transition: opacity 0.3s ease;
+			`;
+			document.body.appendChild(el);
+		}
+
+		const labels: Record<TransformMode, string> = {
+			translate: "Traslación (R)",
+			rotate: "Rotación (R)",
+			scale: "Escala (R)",
+			curvature: "Curvatura (R)"
+		};
+
+		el.textContent = `Modo: ${labels[mode] || mode}`;
+		el.style.opacity = "1";
+
+		if (this.modeIndicatorTimer) clearTimeout(this.modeIndicatorTimer);
+		this.modeIndicatorTimer = setTimeout(() => {
+			if (el) el.style.opacity = "0";
+		}, 1800);
+	}
 
 	private previewDimensionsFromProxy() {
 		const dimensions = this.dragState.dimensionsStart;
@@ -605,7 +686,6 @@ export class TransformGizmo {
 		const deformer = createCurveDeformer(dims, curve);
 		const transform = (point: THREE.Vector3) => this.target!.localToWorld(deformer.transform(point));
 		const axes = (["x", "y", "z"] as CurveAxis[]).filter(axis => axis !== curve.axis);
-		// Subdivide the section too: later bends can curve its edges.
 		const corners = [[-1, -1], [1, -1], [1, 1], [-1, 1]];
 		const points: THREE.Vector3[] = [];
 		for (let edge = 0; edge < 4; edge++) for (let step = 0; step < 16; step++) {

@@ -66,8 +66,27 @@ export class EditorGroupManager {
 	// Estado de arrastre de conectores 3D
 	private connectorDrag: ConnectorDragState | null = null;
 	interaction: any = null;
+	public selectionManager?: any;
 	private pointerId: number | null = null;
 	private rubberBandLine: THREE.Line | null = null;
+	private pendingConnectorPress: {
+		pointerId: number;
+		startX: number;
+		startY: number;
+		hitConnector: any;
+		sourceNodeId: string;
+		isGroupNode: boolean;
+		isReparent: boolean;
+		targetObject: THREE.Object3D | null;
+		dragPlane: THREE.Plane;
+		startIntersection: THREE.Vector3;
+		hitPoint: THREE.Vector3;
+	} | null = null;
+	private matConnectorSelected = new THREE.MeshBasicMaterial({
+		color: 0x3b82f6,
+		depthTest: false,
+		depthWrite: false,
+	});
 
 	// Callback emitido ante cambios en la jerarquía
 	public onHierarchyChanged?: () => void;
@@ -246,6 +265,21 @@ export class EditorGroupManager {
 	/**
 	 * Obtiene o crea el proxy de pivote para un grupo en la escena.
 	 */
+	removeGroupProxy(groupId: string) {
+		const proxy = this.pivotProxies.get(groupId);
+		if (proxy) {
+			this.scene.remove(proxy);
+			proxy.traverse((child: any) => {
+				child.geometry?.dispose?.();
+				if (child.material) {
+					if (Array.isArray(child.material)) child.material.forEach((m: any) => m.dispose?.());
+					else child.material.dispose?.();
+				}
+			});
+			this.pivotProxies.delete(groupId);
+		}
+	}
+
 	getOrCreatePivotProxy(groupId: string): THREE.Object3D {
 		let proxy = this.pivotProxies.get(groupId);
 		if (!proxy) {
@@ -309,14 +343,15 @@ export class EditorGroupManager {
 	/**
 	 * Calcula el centro geométrico de todos los objetos directos o indirectos del grupo.
 	 */
-	calculateGroupCenter(groupId: string, objectResolver: (uuid: string) => THREE.Object3D | null): THREE.Vector3 {
+	calculateGroupCenter(groupId: string, objectResolver?: (uuid: string) => THREE.Object3D | null): THREE.Vector3 {
+		const resolver = objectResolver || this.lastResolver || ((id: string) => this.selectionManager?.resolveObject(id) || null);
 		const descendants = this.hierarchy.getDescendants(groupId);
 		const center = new THREE.Vector3();
 		let count = 0;
 
 		descendants.forEach((node) => {
 			if (!node.isGroup) {
-				const obj = objectResolver(node.id);
+				const obj = resolver(node.id);
 				if (obj) {
 					center.add(obj.position);
 					count++;
@@ -333,8 +368,9 @@ export class EditorGroupManager {
 	/**
 	 * Inicializa o recalcula el pivote central de un grupo a partir de sus objetos.
 	 */
-	recenterGroupPivot(groupId: string, objectResolver: (uuid: string) => THREE.Object3D | null): THREE.Vector3 {
-		const center = this.calculateGroupCenter(groupId, objectResolver);
+	recenterGroupPivot(groupId: string, objectResolver?: (uuid: string) => THREE.Object3D | null): THREE.Vector3 {
+		const resolver = objectResolver || this.lastResolver || ((id: string) => this.selectionManager?.resolveObject(id) || null);
+		const center = this.calculateGroupCenter(groupId, resolver);
 		const proxy = this.getOrCreatePivotProxy(groupId);
 		proxy.position.copy(center);
 		proxy.quaternion.identity();
@@ -373,7 +409,7 @@ export class EditorGroupManager {
 					});
 				}
 			} else {
-				const subProxy = this.pivotProxies.get(node.id);
+				const subProxy = this.getOrCreatePivotProxy(node.id);
 				if (subProxy) {
 					subProxy.updateMatrixWorld(true);
 					initialTransforms.set(node.id, {
@@ -473,7 +509,7 @@ export class EditorGroupManager {
 					}
 				}
 			} else {
-				const subProxy = this.pivotProxies.get(node.id);
+				const subProxy = this.getOrCreatePivotProxy(node.id);
 				if (subProxy) {
 					const nextSubMat = deltaMatrix.clone().multiply(initial.matrix);
 					const nextPos = new THREE.Vector3();
@@ -657,7 +693,8 @@ export class EditorGroupManager {
 				const offsetY = Math.max(0.6, boxHeight / 2 + 0.35);
 
 				let connectorMesh = this.connectorMeshes.get(node.id);
-				const targetMat = isConnected ? this.matConnectorConnected : this.matConnectorDisconnected;
+				const isSelected = this.selectionManager ? this.selectionManager.isSelected(node.id) : false;
+				const targetMat = isSelected ? this.matConnectorSelected : (isConnected ? this.matConnectorConnected : this.matConnectorDisconnected);
 
 				if (!connectorMesh) {
 					connectorMesh = new THREE.Mesh(this.sharedBoxGeom, targetMat);
@@ -774,7 +811,6 @@ export class EditorGroupManager {
 
 			// Clic izquierdo:
 			if (event.button === 0) {
-				if (this.interaction && !this.interaction.begin("connector-drag", this.cancelConnectorDrag)) return;
 				this.pointerId = event.pointerId;
 				this.domElement?.setPointerCapture?.(event.pointerId);
 				event.preventDefault();
@@ -792,28 +828,57 @@ export class EditorGroupManager {
 				const intersectPoint = new THREE.Vector3();
 				raycaster.ray.intersectPlane(dragPlane, intersectPoint);
 
-				this.connectorDrag = {
-					mode: isReparent ? "reparent" : "move",
+				this.pendingConnectorPress = {
+					pointerId: event.pointerId,
+					startX: event.clientX,
+					startY: event.clientY,
+					hitConnector,
 					sourceNodeId,
-					sourceMarker: hitConnector.object,
-					initialMarkerPos: hitConnector.object.position.clone(),
+					isGroupNode,
+					isReparent,
 					targetObject,
-					initialObjectPos: targetObject ? targetObject.position.clone() : (hitConnector.point ? hitConnector.point.clone() : new THREE.Vector3()),
-					startIntersection: intersectPoint.clone(),
 					dragPlane,
-					currentPointerPos: intersectPoint.clone(),
+					startIntersection: intersectPoint.clone(),
+					hitPoint: (hitConnector.point ? hitConnector.point.clone() : hitConnector.object.position.clone()),
+				};
+			}
+		}
+	}
+
+	private handlePointerMove(event: PointerEvent) {
+		if (!this.camera || (this.pointerId != null && event.pointerId !== this.pointerId)) return;
+
+		// Diferenciar tap corto vs arrastre si hay un clic pendiente en el conector
+		if (this.pendingConnectorPress && !this.connectorDrag) {
+			const dist = Math.hypot(
+				event.clientX - this.pendingConnectorPress.startX,
+				event.clientY - this.pendingConnectorPress.startY
+			);
+			if (dist > (this.interaction?.rightClickDragThreshold ?? 6)) {
+				if (this.interaction && !this.interaction.begin("connector-drag", this.cancelConnectorDrag)) {
+					this.pendingConnectorPress = null;
+					return;
+				}
+				const p = this.pendingConnectorPress;
+				this.connectorDrag = {
+					mode: p.isReparent ? "reparent" : "move",
+					sourceNodeId: p.sourceNodeId,
+					sourceMarker: p.hitConnector.object,
+					initialMarkerPos: p.hitConnector.object.position.clone(),
+					targetObject: p.targetObject,
+					initialObjectPos: p.targetObject ? p.targetObject.position.clone() : p.hitPoint.clone(),
+					startIntersection: p.startIntersection.clone(),
+					dragPlane: p.dragPlane,
+					currentPointerPos: p.startIntersection.clone(),
 					hoveredTargetGroupId: null,
 					isValidTarget: false,
 				};
 
-				if (isReparent) {
-					// Resaltar conector en amarillo brillante para reparenting
-					(hitConnector.object as THREE.Mesh).material = this.matConnectorReparent;
-
-					// Línea elástica rubberband con BufferAttribute
+				if (p.isReparent) {
+					(p.hitConnector.object as THREE.Mesh).material = this.matConnectorReparent;
 					const positions = new Float32Array([
-						hitConnector.object.position.x, hitConnector.object.position.y, hitConnector.object.position.z,
-						intersectPoint.x, intersectPoint.y, intersectPoint.z,
+						p.hitConnector.object.position.x, p.hitConnector.object.position.y, p.hitConnector.object.position.z,
+						p.startIntersection.x, p.startIntersection.y, p.startIntersection.z,
 					]);
 					const geom = new THREE.BufferGeometry();
 					geom.setAttribute("position", new THREE.BufferAttribute(positions, 3));
@@ -821,15 +886,14 @@ export class EditorGroupManager {
 					this.rubberBandLine.renderOrder = 2000;
 					this.scene.add(this.rubberBandLine);
 				} else {
-					// Modo traslación espacial 3D: Resaltar en cian brillante
-					(hitConnector.object as THREE.Mesh).material = this.matConnectorMove;
+					(p.hitConnector.object as THREE.Mesh).material = this.matConnectorMove;
 				}
+			} else {
+				return;
 			}
 		}
-	}
 
-	private handlePointerMove(event: PointerEvent) {
-		if (!this.connectorDrag || !this.camera || (this.pointerId != null && event.pointerId !== this.pointerId)) return;
+		if (!this.connectorDrag) return;
 
 		const raycaster = this.getRaycaster(event);
 		if (!raycaster) return;
@@ -915,7 +979,26 @@ export class EditorGroupManager {
 	}
 
 	private handlePointerUp(event: PointerEvent) {
-		if (!this.connectorDrag || (this.pointerId != null && event.pointerId !== this.pointerId)) return;
+		if (this.pointerId != null && event.pointerId !== this.pointerId) return;
+
+		// Tap corto (<= 6px): Seleccionar el nodo correspondiente sin moverlo ni alterar acoples
+		if (this.pendingConnectorPress && !this.connectorDrag) {
+			const p = this.pendingConnectorPress;
+			this.pendingConnectorPress = null;
+			this.releaseConnectorPointer();
+
+			if (this.selectionManager) {
+				if (event.shiftKey) {
+					this.selectionManager.toggle(p.sourceNodeId, "coupling-connector");
+				} else {
+					this.selectionManager.selectSingle(p.sourceNodeId, "coupling-connector");
+				}
+			}
+			this.updateCouplingVisuals(this.lastResolver || undefined);
+			return;
+		}
+
+		if (!this.connectorDrag) return;
 
 		const drag = this.connectorDrag;
 
@@ -1015,6 +1098,7 @@ export class EditorGroupManager {
 	}
 
 	cancelConnectorDrag = () => {
+		this.pendingConnectorPress = null;
 		if (!this.connectorDrag) return;
 		const drag = this.connectorDrag;
 		this.connectorDrag = null;
@@ -1058,6 +1142,7 @@ export class EditorGroupManager {
 		this.matPivotTargetValid.dispose();
 		this.matPivotTargetInvalid.dispose();
 		this.matConnectorConnected.dispose();
+		this.matConnectorSelected.dispose();
 		this.matConnectorDisconnected.dispose();
 		this.matConnectorMove.dispose();
 		this.matConnectorReparent.dispose();

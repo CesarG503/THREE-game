@@ -40,6 +40,7 @@ export class InteractionCoordinator {
       if (this.suspended) { this.suspended = false; this.sync(); }
     }, options);
     window.addEventListener('mousedown', () => {
+      this.suppressClick = false;
       if (this.suspended) { this.suspended = false; this.sync(); }
     }, options);
   }
@@ -112,7 +113,9 @@ export class InteractionCoordinator {
     return this.blocksGameplayActions;
   }
 
-  get blocksScene(): boolean { return !['gameplay', 'editor'].includes(this.state); }
+  get blocksScene(): boolean {
+    return ['text', 'menu', 'overlay', 'paused', 'suspended'].includes(this.state);
+  }
 
   /**
    * Permite colocar objetos en la escena si hay un objeto equipado en la ranura activa,
@@ -169,6 +172,23 @@ export class InteractionCoordinator {
     this.sync();
   }
 
+  public handleEscapeKey(event?: any): void {
+    if (this.gesture) this.cancelGesture();
+    else if (this.overlay) this.overlay.hide();
+    else if (this.menuOpen) this.game.constructionMenu.toggle();
+    else if (this.game.constructionMenu?.logicSystem?.isEditingMap) this.game.constructionMenu.logicSystem.endMapEdit();
+    else if (this.game.editorSelection?.getCount() > 0) this.game.editorSelection.clear();
+    else if (this.game.objectInspector?.isVisible) this.game.objectInspector.hide();
+    else if (this.game.editorExplorer?.isVisible) this.game.editorExplorer.hide();
+    else if (this.game.editorGroupManager?.isCouplingMode()) this.game.editorGroupManager.setCouplingMode(false);
+    else this.game.cameraController?.togglePause();
+    if (event) {
+      event.preventDefault?.();
+      event.stopImmediatePropagation?.();
+    }
+    this.sync();
+  }
+
   sync() {
     if (this.blocksMovement) {
       if (typeof this.game.inputManager?.resetMovement === 'function') {
@@ -221,16 +241,7 @@ export class InteractionCoordinator {
     }
     if (key === 'escape') {
       if (event.repeat) { consume(); return; }
-      if (this.gesture) this.cancelGesture();
-      else if (this.overlay) this.overlay.hide();
-      else if (this.menuOpen) this.game.constructionMenu.toggle();
-      else if (this.game.constructionMenu?.logicSystem?.isEditingMap) this.game.constructionMenu.logicSystem.endMapEdit();
-      else if (this.game.objectInspector?.isVisible) this.game.objectInspector.hide();
-      else if (this.game.editorExplorer?.isVisible) this.game.editorExplorer.hide();
-      else if (this.game.editorGroupManager?.isCouplingMode()) this.game.editorGroupManager.setCouplingMode(false);
-      else this.game.cameraController?.togglePause();
-      consume();
-      this.sync();
+      this.handleEscapeKey(event);
       return;
     }
     if (this.game.gameMode === 'editor' && key === 'c' && !event.ctrlKey && !event.metaKey && !event.altKey) {

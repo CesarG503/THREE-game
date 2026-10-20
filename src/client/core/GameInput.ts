@@ -49,14 +49,27 @@ export function setupGameInput(this: Game) {
 			if (key === "e" || (key === "escape" && this.constructionMenu.isVisible)) return;
 		}
 
-		if (key === "escape" && this.objectInspector && this.objectInspector.isVisible) {
-			this.objectInspector.hide();
+		if (key === "escape") {
+			if (this.editorSelection && this.editorSelection.getCount() > 0) {
+				this.editorSelection.clear("escape");
+			}
+			if (this.objectInspector && this.objectInspector.isVisible) {
+				this.objectInspector.hide();
+			}
 		}
 
-		if (key === "r" && this.objectInspector?.isVisible && this.objectInspector?.selectedObject) {
+		const hasActiveTransformTarget = !!(
+			this.editorSelection?.getActiveObject?.() ||
+			this.objectInspector?.transformGizmo?.target ||
+			this.objectInspector?.selectedObject
+		);
+
+		if (key === "r" && hasActiveTransformTarget && !this.inventoryManager?.getCurrentItem?.()) {
 			e.preventDefault();
 			if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
-			const mode = this.objectInspector.cycleTransformMode();
+			const mode = this.objectInspector?.transformGizmo
+				? this.objectInspector.transformGizmo.cycleMode()
+				: this.objectInspector?.cycleTransformMode?.();
 			console.log("Transform Gizmo Mode:", mode);
 			return;
 		}

@@ -15,7 +15,7 @@ import { isTextInput } from "../../input/InteractionCoordinator";
 import { EditorHierarchyModel, type HierarchyNode } from "../hierarchy/EditorHierarchyModel";
 import { EditorGroupManager } from "../hierarchy/EditorGroupManager";
 import { EditorClipboard } from "../clipboard/EditorClipboard";
-import { EditorCommandHistory, ReparentCommand, DuplicateCommand } from "../history/EditorCommandHistory";
+import { EditorCommandHistory, ReparentCommand, DuplicateCommand, GroupNodesCommand } from "../history/EditorCommandHistory";
 import { PrefabManager } from "../prefabs/PrefabManager";
 import { PrefabSerializer } from "../prefabs/PrefabSerializer";
 import { PrefabService } from "../prefabs/PrefabService";
@@ -63,7 +63,85 @@ export class EditorExplorer {
 	public isVisible: boolean = false;
 	private isCollapsed: boolean = false;
 	private collapsedGroups: Set<string> = new Set();
-	private selectedNodeId: string | null = null;
+	private _selectedNodeId: string | null = null;
+	get selectedNodeId(): string | null {
+		return this.game?.editorSelection?.getActiveId() ?? this._selectedNodeId;
+	}
+	set selectedNodeId(v: string | null) {
+		this._selectedNodeId = v;
+	}
+
+	isNodeSelected(nodeId: string): boolean {
+		if (this.game?.editorSelection) {
+			return this.game.editorSelection.isSelected(nodeId);
+		}
+		return this.selectedNodeId === nodeId;
+	}
+
+	getVisibleNodeIds(): string[] {
+		const visible: string[] = [];
+		const traverse = (parentId: string | null) => {
+			const children = this.hierarchy.getChildren(parentId);
+			for (const child of children) {
+				if (this.searchQuery) {
+					const matchSelf = (child.customName || child.name).toLowerCase().includes(this.searchQuery);
+					const matchDescendant = this.hierarchy.getDescendants(child.id).some((d) =>
+						(d.customName || d.name).toLowerCase().includes(this.searchQuery)
+					);
+					if (!matchSelf && !matchDescendant) continue;
+				}
+				visible.push(child.id);
+				if (child.isGroup && !this.collapsedGroups.has(child.id)) {
+					traverse(child.id);
+				}
+			}
+		};
+		traverse(null);
+		return visible;
+	}
+
+	updateSelectionVisuals() {
+		const rows = this.treeContainer.querySelectorAll<HTMLElement>("[data-node-id]");
+		const selection = this.game?.editorSelection;
+		const activeId = selection ? selection.getActiveId() : this.selectedNodeId;
+
+		rows.forEach((row) => {
+			const nodeId = row.getAttribute("data-node-id");
+			if (!nodeId) return;
+			const isSelected = selection ? selection.isSelected(nodeId) : (this.selectedNodeId === nodeId);
+			const isActive = (activeId === nodeId);
+			const node = this.hierarchy.getNode(nodeId);
+			const isPrefabRoot = !!node?.metadata?.isPrefabRoot;
+			const isPrefabMember = !!node?.metadata?.prefabInstanceId;
+
+			row.classList.toggle("selected", isSelected);
+			row.classList.toggle("active-selection", isActive);
+
+			if (isActive) {
+				row.style.background = "rgba(255, 255, 255, 0.22)";
+				row.style.color = "#ffffff";
+				row.style.fontWeight = "bold";
+				row.style.borderColor = "#888";
+				row.style.borderLeft = isPrefabRoot ? "3px solid #ffc107" : isPrefabMember ? "2px solid #ca8a04" : "3px solid #fff";
+			} else if (isSelected) {
+				row.style.background = "rgba(255, 255, 255, 0.12)";
+				row.style.color = "#eeeeee";
+				row.style.fontWeight = "bold";
+				row.style.borderColor = "#555";
+				row.style.borderLeft = isPrefabRoot ? "3px solid #ffc107" : isPrefabMember ? "2px solid #ca8a04" : "3px solid #60a5fa";
+			} else {
+				row.style.background = "transparent";
+				row.style.color = "#cccccc";
+				row.style.fontWeight = "normal";
+				row.style.borderColor = "transparent";
+				row.style.borderLeft = isPrefabRoot ? "3px solid #ffc107" : isPrefabMember ? "2px solid #ca8a04" : "transparent";
+			}
+		});
+
+		if (this.currentTab === "properties") {
+			this.updatePropertiesView(false);
+		}
+	}
 	private searchQuery: string = "";
 	private shortcutKey: string = "h";
 
@@ -812,11 +890,6 @@ export class EditorExplorer {
 		this.cancelDrag();
 		this.isVisible = false;
 
-		if (this.game?.objectInspector && this.game.objectInspector.isVisible) {
-			this.game.objectInspector.hide();
-		}
-		this.selectNode(null, false);
-
 		if (this.hideTimeoutId) {
 			clearTimeout(this.hideTimeoutId);
 			this.hideTimeoutId = null;
@@ -1004,18 +1077,27 @@ export class EditorExplorer {
 
 		this.isSyncingSelection = true;
 		try {
-			this.selectedNodeId = nodeId;
-			this.renderTree();
+			this._selectedNodeId = nodeId;
 
-			if (this.currentTab === "properties") {
-				this.updatePropertiesView(false);
+			if (this.game?.editorSelection) {
+				if (nodeId) {
+					if (!this.game.editorSelection.isSelected(nodeId)) {
+						this.game.editorSelection.selectSingle(nodeId, "explorer");
+					}
+				} else {
+					if (this.game.editorSelection.getCount() > 0) {
+						this.game.editorSelection.clear("explorer");
+					}
+				}
 			}
+
+			this.updateSelectionVisuals();
 
 			if (!syncInspector) return;
 
 			if (!nodeId) {
 				if (this.game?.objectInspector && this.game.objectInspector.isVisible) {
-					this.game.objectInspector.hide();
+					this.game.objectInspector.detachAndClear?.();
 				}
 				return;
 			}
@@ -1129,7 +1211,9 @@ export class EditorExplorer {
 		const isPrefabRoot = !!node.metadata?.isPrefabRoot;
 
 		const itemRow = document.createElement("div");
-		const isSelected = this.selectedNodeId === node.id;
+		itemRow.setAttribute("data-node-id", node.id);
+		const isSelected = this.isNodeSelected(node.id);
+		const isActive = this.selectedNodeId === node.id;
 		itemRow.style.cssText = `
 			display: flex;
 			align-items: center;
@@ -1139,16 +1223,16 @@ export class EditorExplorer {
 			border-radius: 4px;
 			cursor: grab;
 			margin-bottom: 2px;
-			background: ${isSelected ? "rgba(255, 255, 255, 0.15)" : "transparent"};
+			background: ${isActive ? "rgba(255, 255, 255, 0.22)" : isSelected ? "rgba(255, 255, 255, 0.12)" : "transparent"};
 			color: ${isSelected ? "#ffffff" : "#cccccc"};
 			font-weight: ${isSelected ? "bold" : "normal"};
 			transition: background 0.1s ease, border 0.1s ease;
-			border: 1px solid ${isSelected ? "#666" : "transparent"};
+			border: 1px solid ${isActive ? "#888" : isSelected ? "#555" : "transparent"};
 			box-sizing: border-box;
 			width: 100%;
 			min-width: 0;
 			flex-shrink: 0;
-			${isPrefabRoot ? "border-left: 3px solid #ffc107;" : isPrefabMember ? "border-left: 2px solid #ca8a04;" : (isSelected ? "border-left: 3px solid #fff;" : "")}
+			${isPrefabRoot ? "border-left: 3px solid #ffc107;" : isPrefabMember ? "border-left: 2px solid #ca8a04;" : isActive ? "border-left: 3px solid #fff;" : isSelected ? "border-left: 3px solid #60a5fa;" : ""}
 		`;
 
 		// ── Drag & Drop de Explorer (Corrección 3) ───────────────────────────────
@@ -1402,8 +1486,18 @@ export class EditorExplorer {
 		itemRow.appendChild(leftBox);
 		itemRow.appendChild(actionBox);
 
-		itemRow.onclick = () => {
-			this.selectNode(node.id);
+		itemRow.onclick = (e: MouseEvent) => {
+			if (this.game?.editorSelection) {
+				if (e.shiftKey) {
+					this.game.editorSelection.selectRange(node.id, this.getVisibleNodeIds(), "explorer");
+				} else if (e.ctrlKey || e.metaKey) {
+					this.game.editorSelection.toggle(node.id, "explorer");
+				} else {
+					this.game.editorSelection.selectSingle(node.id, "explorer");
+				}
+			} else {
+				this.selectNode(node.id);
+			}
 		};
 
 		parentElement.appendChild(itemRow);
@@ -1488,22 +1582,47 @@ export class EditorExplorer {
 	 * Agrupa el elemento seleccionado o varios elementos bajo un nuevo grupo.
 	 */
 	private handleGroupSelection() {
-		if (!this.selectedNodeId) {
-			alert("Selecciona un objeto o grupo para agrupar.");
+		const selection = this.game?.editorSelection;
+		const targetNodes = selection && selection.getCount() > 0
+			? selection.getEffectiveTransformNodeIds()
+			: (this.selectedNodeId ? [this.selectedNodeId] : []);
+
+		if (targetNodes.length === 0) {
+			alert("Selecciona al menos un objeto o grupo para agrupar.");
 			return;
 		}
-
-		const selectedNode = this.hierarchy.getNode(this.selectedNodeId);
-		if (!selectedNode) return;
 
 		const name = prompt("Nombre del grupo contenedor:", "Nuevo Grupo");
 		if (!name || !name.trim()) return;
 
-		const group = this.hierarchy.createGroup(name.trim(), selectedNode.parentId);
-		this.hierarchy.reparent(selectedNode.id, group.id);
-		this.groupManager.recenterGroupPivot(group.id, (id) => this.resolveObject3D(id));
-		this.renderTree();
-		this.selectNode(group.id);
+		const firstNode = this.hierarchy.getNode(targetNodes[0]);
+		const commonParent = firstNode?.parentId ?? null;
+		const allSameParent = targetNodes.every((id) => this.hierarchy.getNode(id)?.parentId === commonParent);
+		const parentId = allSameParent ? commonParent : null;
+
+		const cmd = new GroupNodesCommand(
+			this.hierarchy,
+			this.groupManager,
+			targetNodes,
+			name.trim(),
+			parentId,
+			(createdGroupId) => {
+				this.renderTree();
+				if (createdGroupId) {
+					if (selection) {
+						selection.selectSingle(createdGroupId, "explorer");
+					} else {
+						this.selectNode(createdGroupId);
+					}
+				}
+			}
+		);
+
+		if (this.history) {
+			this.history.execute(cmd);
+		} else {
+			cmd.execute();
+		}
 	}
 
 	private handleUngroup() {
@@ -1547,14 +1666,19 @@ export class EditorExplorer {
 	}
 
 	private handleCopy() {
-		if (!this.selectedNodeId) return;
+		const selection = this.game?.editorSelection;
+		const targetNodes = selection && selection.getCount() > 0
+			? selection.getEffectiveTransformNodeIds()
+			: (this.selectedNodeId ? [this.selectedNodeId] : []);
+		if (targetNodes.length === 0) return;
+
 		const copied = this.clipboard.copy(
-			[this.selectedNodeId],
+			targetNodes,
 			this.hierarchy,
 			(id) => this.fetchObjectData(id)
 		);
 		if (copied) {
-			console.log(`[Explorer] Nodo ${this.selectedNodeId} copiado al portapapeles.`);
+			console.log(`[Explorer] ${targetNodes.length} nodos copiados al portapapeles.`);
 		}
 	}
 
@@ -1650,20 +1774,25 @@ export class EditorExplorer {
 	}
 
 	private handleDuplicate() {
-		if (!this.selectedNodeId) return;
-		const node = this.hierarchy.getNode(this.selectedNodeId);
-		if (!node) return;
+		const selection = this.game?.editorSelection;
+		const targetNodes = selection && selection.getCount() > 0
+			? selection.getEffectiveTransformNodeIds()
+			: (this.selectedNodeId ? [this.selectedNodeId] : []);
+		if (targetNodes.length === 0) return;
+
+		const firstNode = this.hierarchy.getNode(targetNodes[0]);
+		if (!firstNode) return;
 
 		// Copiar la selección actual
 		const copied = this.clipboard.copy(
-			[this.selectedNodeId],
+			targetNodes,
 			this.hierarchy,
 			(id) => this.fetchObjectData(id)
 		);
 		if (!copied) return;
 
-		// El duplicado debe crearse como hermano del original (targetParent = node.parentId)
-		const targetParent = node.parentId;
+		// El duplicado debe crearse como hermano del original (targetParent = firstNode.parentId)
+		const targetParent = firstNode.parentId;
 		const spawnPos = this.calculateSpawnPlacement(3.0);
 		const prepared = this.clipboard.preparePaste(spawnPos, targetParent);
 		if (!prepared) return;
@@ -1680,7 +1809,11 @@ export class EditorExplorer {
 			(newSelectedId) => {
 				this.renderTree();
 				if (newSelectedId) {
-					this.selectNode(newSelectedId);
+					if (selection) {
+						selection.selectSingle(newSelectedId, "explorer");
+					} else {
+						this.selectNode(newSelectedId);
+					}
 				}
 			}
 		);

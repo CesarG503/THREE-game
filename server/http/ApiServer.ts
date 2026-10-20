@@ -133,10 +133,12 @@ export async function handleHttpRequest(
   if (req.method === "GET" && url.pathname === "/api/prefabs") {
     return withApiError(res, async () => {
       const user = await getOptionalRequestUser(req)
+      const includeData = url.searchParams.get("includeData") === "true"
       const result = await listPrefabs(
         url.searchParams.get("scope"),
         user?.id ?? null,
         url.searchParams.get("category"),
+        includeData,
       )
       sendJson(res, 200, { prefabs: result })
     })

@@ -1980,43 +1980,96 @@ export class EditorExplorer {
 		}
 	}
 
-	private handleInsertPrefab(prefab: PlatformPrefabDto) {
+	private async handleInsertPrefab(prefab: PlatformPrefabDto) {
+		let fullPrefab = prefab;
+		if (!fullPrefab.data || !fullPrefab.data.hierarchy || !fullPrefab.data.objects) {
+			try {
+				fullPrefab = await PrefabService.getPrefab(prefab.id, prefab.version);
+			} catch (err: any) {
+				console.error("[Explorer] Error cargando datos completos del prefab:", err);
+				alert(`No se pudo cargar los datos del prefab '${prefab.name}': ${err.message}`);
+				return;
+			}
+		}
+
+		const prefabData = fullPrefab.data || fullPrefab.currentVersion?.data;
+		if (!prefabData || !Array.isArray(prefabData.hierarchy) || !Array.isArray(prefabData.objects)) {
+			console.error("[Explorer] El prefab no contiene datos válidos de jerarquía u objetos:", fullPrefab);
+			alert(`El prefab '${prefab.name}' no tiene datos válidos o está dañado.`);
+			return;
+		}
+
 		const spawnPos = this.calculateSpawnPlacement(5.0);
 
 		const targetParent = this.selectedNodeId && this.hierarchy.getNode(this.selectedNodeId)?.isGroup
 			? this.selectedNodeId
 			: null;
 
-		const result = this.prefabManager.instantiatePrefab(
-			prefab.data,
-			prefab.id,
-			prefab.version,
-			spawnPos,
-			targetParent,
-			(data) => {
-				this.game._loadSingleMapObject(data);
-			},
-			(groupId, pos) => {
-				const proxy = this.groupManager.getOrCreatePivotProxy(groupId);
-				if (pos) {
-					proxy.position.set(pos.x, pos.y, pos.z);
+		try {
+			const result = this.prefabManager.instantiatePrefab(
+				prefabData,
+				fullPrefab.id,
+				fullPrefab.version,
+				spawnPos,
+				targetParent,
+				(data) => {
+					this.game._loadSingleMapObject(data);
+					if (this.game.networkManager && typeof this.game.networkManager.sendEditorPlace === "function") {
+						this.game.networkManager.sendEditorPlace(data);
+					}
+				},
+				(groupId, pos) => {
+					const proxy = this.groupManager.getOrCreatePivotProxy(groupId);
+					if (pos) {
+						proxy.position.set(pos.x, pos.y, pos.z);
+					}
+				}
+			);
+
+			if (this.groupManager.isCouplingMode()) {
+				this.groupManager.updateCouplingVisuals((id) => this.resolveObject3D(id));
+			}
+
+			this.renderTree();
+			this.switchTab("scene");
+
+			if (result && result.rootNodeId) {
+				if (this.game?.editorSelection) {
+					this.game.editorSelection.selectSingle(result.rootNodeId, "explorer");
+				} else {
+					this.selectNode(result.rootNodeId);
 				}
 			}
-		);
-
-		this.switchTab("scene");
-		if (result && result.rootNodeId) {
-			this.selectNode(result.rootNodeId);
+		} catch (err: any) {
+			console.error("[Explorer] Error instanciando prefab:", err);
+			alert(`Error al instanciar el prefab: ${err.message}`);
 		}
 	}
 
-	private handleExportPrefabDtoJson(prefab: PlatformPrefabDto) {
-		const json = PrefabSerializer.exportToPackageJson(prefab.data, prefab.ownerId || "VIPER IO User");
+	private async handleExportPrefabDtoJson(prefab: PlatformPrefabDto) {
+		let fullPrefab = prefab;
+		if (!fullPrefab.data || !fullPrefab.data.hierarchy || !fullPrefab.data.objects) {
+			try {
+				fullPrefab = await PrefabService.getPrefab(prefab.id, prefab.version);
+			} catch (err: any) {
+				console.error("[Explorer] Error cargando datos completos del prefab para exportar:", err);
+				alert(`No se pudo cargar el prefab '${prefab.name}': ${err.message}`);
+				return;
+			}
+		}
+
+		const prefabData = fullPrefab.data || fullPrefab.currentVersion?.data;
+		if (!prefabData) {
+			alert(`No hay datos disponibles para exportar el prefab '${prefab.name}'.`);
+			return;
+		}
+
+		const json = PrefabSerializer.exportToPackageJson(prefabData, fullPrefab.ownerId || "VIPER IO User");
 		const blob = new Blob([json], { type: "application/json" });
 		const url = URL.createObjectURL(blob);
 		const a = document.createElement("a");
 		a.href = url;
-		a.download = `${prefab.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}.prefab.json`;
+		a.download = `${fullPrefab.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}.prefab.json`;
 		a.click();
 		URL.revokeObjectURL(url);
 	}
@@ -2170,7 +2223,7 @@ export class EditorExplorer {
 			const metaInfo = document.createElement("div");
 			metaInfo.style.cssText = `display: flex; align-items: center; justify-content: space-between; margin-top: 2px;`;
 
-			const objectCount = prefab.data?.objects?.length ?? 0;
+			const objectCount = prefab.data?.objects?.length ?? (prefab as any).objectCount ?? 0;
 			const groupCount = prefab.data?.hierarchy?.filter((n: any) => n.isGroup).length ?? 0;
 			const objCountSpan = document.createElement("span");
 			objCountSpan.textContent = `🧱 ${objectCount} objeto${objectCount === 1 ? "" : "s"}${groupCount > 0 ? ` (${groupCount} grupo${groupCount === 1 ? "" : "s"})` : ""}`;
@@ -2301,7 +2354,7 @@ export class EditorExplorer {
 					? this.selectedNodeId
 					: null;
 
-				this.prefabManager.instantiatePrefab(
+				const result = this.prefabManager.instantiatePrefab(
 					validation.data,
 					`imported_${Date.now()}`,
 					1,
@@ -2309,6 +2362,9 @@ export class EditorExplorer {
 					targetParent,
 					(data) => {
 						this.game._loadSingleMapObject(data);
+						if (this.game.networkManager && typeof this.game.networkManager.sendEditorPlace === "function") {
+							this.game.networkManager.sendEditorPlace(data);
+						}
 					},
 					(groupId, pos) => {
 						const proxy = this.groupManager.getOrCreatePivotProxy(groupId);
@@ -2318,7 +2374,21 @@ export class EditorExplorer {
 					}
 				);
 
+				if (this.groupManager.isCouplingMode()) {
+					this.groupManager.updateCouplingVisuals((id) => this.resolveObject3D(id));
+				}
+
 				this.renderTree();
+				this.switchTab("scene");
+
+				if (result && result.rootNodeId) {
+					if (this.game?.editorSelection) {
+						this.game.editorSelection.selectSingle(result.rootNodeId, "explorer");
+					} else {
+						this.selectNode(result.rootNodeId);
+					}
+				}
+
 				alert(`Prefab '${validation.data.name}' importado con éxito.`);
 			} catch (err: any) {
 				console.error("[Explorer] Error leyendo archivo de prefab:", err);

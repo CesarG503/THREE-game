@@ -37,6 +37,7 @@ export async function listPrefabs(
   scope: string | null,
   userId: string | null,
   category: string | null = null,
+  includeData: boolean = false,
 ) {
   const where: any = {}
 
@@ -59,7 +60,7 @@ export async function listPrefabs(
     take: 100,
   })
 
-  return prefabs.map((p) => toPrefabDto(p, false))
+  return prefabs.map((p) => toPrefabDto(p, includeData))
 }
 
 export async function getPrefab(
@@ -206,6 +207,8 @@ function toPrefabDto(
     ? versions.find((v) => v.version === specificVersion) ?? versions[0]
     : versions.find((v) => v.id === prefab.currentVersionId) ?? versions[0]
 
+  const versionData = targetVersion?.data as any
+
   return {
     id: prefab.id,
     slug: prefab.slug,
@@ -220,6 +223,8 @@ function toPrefabDto(
     currentVersionId: prefab.currentVersionId,
     version: targetVersion?.version ?? 1,
     versionCount: versions.length,
+    objectCount: versionData?.objects?.length ?? 0,
+    ...(includeData && targetVersion ? { data: targetVersion.data } : {}),
     currentVersion: targetVersion
       ? {
           id: targetVersion.id,

@@ -25,14 +25,26 @@ export class PrefabService {
 			const qs = params.toString() ? `?${params.toString()}` : "";
 
 			const response = await apiFetch<{ prefabs: PlatformPrefabDto[] }>(`/prefabs${qs}`);
-			const serverPrefabs = response.prefabs.map((p) => ({
-				...p,
-				data: p.data || p.currentVersion?.data,
-				storageStatus: "server" as const,
-			}));
+			const serverPrefabs = response.prefabs.map((p) => {
+				const local = this.getLocalPrefab(p.id) || this.getLocalPrefab(p.slug);
+				return {
+					...p,
+					data: p.data || p.currentVersion?.data || local?.data,
+					storageStatus: "server" as const,
+				};
+			});
 
-			// Actualizar caché local de los prefabs remotos
-			serverPrefabs.forEach((sp) => this.saveLocalPrefab(sp));
+			// Actualizar caché local de los prefabs remotos preservando data si existía
+			serverPrefabs.forEach((sp) => {
+				if (sp.data) {
+					this.saveLocalPrefab(sp);
+				} else {
+					const existing = this.getLocalPrefab(sp.id) || this.getLocalPrefab(sp.slug);
+					if (existing?.data) {
+						sp.data = existing.data;
+					}
+				}
+			});
 
 			// Combinar con los prefabs locales que no están en el servidor
 			const serverIds = new Set(serverPrefabs.map((p) => p.id));
@@ -56,7 +68,9 @@ export class PrefabService {
 		try {
 			const qs = version ? `?version=${version}` : "";
 			const prefab = await apiFetch<PlatformPrefabDto>(`/prefabs/${encodeURIComponent(identifier)}${qs}`);
+			prefab.data = prefab.data || prefab.currentVersion?.data;
 			prefab.storageStatus = "server";
+			this.saveLocalPrefab(prefab);
 			return prefab;
 		} catch (err) {
 			console.warn(`[PrefabService] Buscando prefab '${identifier}' en almacenamiento local:`, err);
@@ -258,7 +272,12 @@ export class PrefabService {
 
 	private static saveLocalPrefab(prefab: PlatformPrefabDto) {
 		const store = this.getRawLocalStore();
-		store[prefab.id] = prefab;
+		const existing = store[prefab.id] || (prefab.slug ? Object.values(store).find((p) => p.slug === prefab.slug) : null);
+		const toSave: PlatformPrefabDto = {
+			...prefab,
+			data: prefab.data || prefab.currentVersion?.data || existing?.data,
+		};
+		store[prefab.id] = toSave;
 		this.setRawLocalStore(store);
 	}
 

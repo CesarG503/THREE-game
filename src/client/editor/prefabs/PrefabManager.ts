@@ -68,6 +68,11 @@ export class PrefabManager {
 		objectSpawner: (data: SerializedMapObjectData) => void,
 		groupProxyCreator?: (groupId: string, pos?: { x: number; y: number; z: number }) => void
 	): { instanceId: string; rootNodeId: string; createdUuids: string[] } {
+		if (!prefabData || !Array.isArray(prefabData.hierarchy) || !Array.isArray(prefabData.objects)) {
+			console.error("[PrefabManager] Datos de prefab inválidos o incompletos:", prefabData);
+			return { instanceId: "", rootNodeId: "", createdUuids: [] };
+		}
+
 		const instanceId = `inst_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
 		const uuidMap = new Map<string, string>();
 
@@ -86,10 +91,11 @@ export class PrefabManager {
 		});
 
 		// 2. Calcular delta respecto al pivote original del prefab
+		const pivot = prefabData.pivot || { x: 0, y: 0, z: 0 };
 		const offset = {
-			x: targetPosition.x - prefabData.pivot.x,
-			y: targetPosition.y - prefabData.pivot.y,
-			z: targetPosition.z - prefabData.pivot.z,
+			x: targetPosition.x - pivot.x,
+			y: targetPosition.y - pivot.y,
+			z: targetPosition.z - pivot.z,
 		};
 
 		let rootNodeId: string = "";

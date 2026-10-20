@@ -15,7 +15,7 @@ import { isTextInput } from "../../input/InteractionCoordinator";
 import { EditorHierarchyModel, type HierarchyNode } from "../hierarchy/EditorHierarchyModel";
 import { EditorGroupManager } from "../hierarchy/EditorGroupManager";
 import { EditorClipboard } from "../clipboard/EditorClipboard";
-import { EditorCommandHistory, ReparentCommand, DuplicateCommand, GroupNodesCommand } from "../history/EditorCommandHistory";
+import { EditorCommandHistory, ReparentCommand, DuplicateCommand, GroupNodesCommand, CompositeCommand } from "../history/EditorCommandHistory";
 import { PrefabManager } from "../prefabs/PrefabManager";
 import { PrefabSerializer } from "../prefabs/PrefabSerializer";
 import { PrefabService } from "../prefabs/PrefabService";
@@ -153,8 +153,14 @@ export class EditorExplorer {
 	private resizerElement!: HTMLElement;
 	private hideTimeoutId: any = null;
 
-	// Estado de arrastre en el árbol
-	private draggedNodeId: string | null = null;
+	// Estado de arrastre en el árbol (soporta arrastre múltiple)
+	private draggedNodeIds: string[] = [];
+	get draggedNodeId(): string | null {
+		return this.draggedNodeIds.length > 0 ? this.draggedNodeIds[0] : null;
+	}
+	set draggedNodeId(id: string | null) {
+		this.draggedNodeIds = id ? [id] : [];
+	}
 	private isSyncingSelection: boolean = false;
 
 	constructor(
@@ -1157,8 +1163,7 @@ export class EditorExplorer {
 		decoupleZone.textContent = "📥 Soltar aquí para desacoplar a la raíz";
 
 		decoupleZone.ondragover = (e) => {
-			const draggedId = this.draggedNodeId || (e.dataTransfer?.types.includes("text/plain") ? this.draggedNodeId : null);
-			if (!draggedId) return;
+			if (this.draggedNodeIds.length === 0 && !e.dataTransfer?.types.includes("text/plain")) return;
 			e.preventDefault();
 			if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
 			decoupleZone.style.borderColor = "#fff";
@@ -1174,24 +1179,64 @@ export class EditorExplorer {
 
 		decoupleZone.ondrop = (e) => {
 			e.preventDefault();
-			const draggedId = this.draggedNodeId || e.dataTransfer?.getData("text/plain");
-			if (!draggedId) return;
-			const node = this.hierarchy.getNode(draggedId);
-			if (!node || !node.parentId) return;
+			let draggedIds = [...this.draggedNodeIds];
+			if (draggedIds.length === 0) {
+				const json = e.dataTransfer?.getData("application/json");
+				if (json) {
+					try { draggedIds = JSON.parse(json); } catch (_) {}
+				}
+				if (draggedIds.length === 0) {
+					const plain = e.dataTransfer?.getData("text/plain");
+					if (plain) draggedIds = [plain];
+				}
+			}
 
-			const oldParentId = node.parentId;
-			const oldOrder = node.order;
+			if (draggedIds.length === 0) return;
 
-			this.hierarchy.reparent(draggedId, null);
-			if (oldParentId) {
-				this.groupManager.recenterGroupPivot(oldParentId, (id) => this.resolveObject3D(id));
+			const affectedOldParents = new Set<string>();
+			const commands: ReparentCommand[] = [];
+			const validIds: string[] = [];
+
+			for (const id of draggedIds) {
+				const n = this.hierarchy.getNode(id);
+				if (!n || !n.parentId) continue;
+
+				const oldParentId = n.parentId;
+				const oldOrder = n.order;
+				affectedOldParents.add(oldParentId);
+				validIds.push(id);
+
+				this.hierarchy.reparent(id, null);
+
+				commands.push(
+					new ReparentCommand(this.hierarchy, id, oldParentId, oldOrder, null, undefined, () => this.renderTree())
+				);
+			}
+
+			if (validIds.length === 0) return;
+
+			for (const oldPId of affectedOldParents) {
+				this.groupManager.recenterGroupPivot(oldPId, (id) => this.resolveObject3D(id));
 			}
 			this.groupManager.updateCouplingVisuals((id) => this.resolveObject3D(id));
-			this.history.execute(
-				new ReparentCommand(this.hierarchy, draggedId, oldParentId, oldOrder, null, undefined, () => this.renderTree())
-			);
+
+			if (commands.length === 1) {
+				this.history.execute(commands[0]);
+			} else if (commands.length > 1) {
+				const composite = new CompositeCommand("Decouple Multiple Nodes", commands);
+				this.history.execute(composite);
+			}
+
 			this.renderTree();
-			this.selectNode(draggedId);
+
+			if (this.game?.editorSelection) {
+				this.game.editorSelection.clear("explorer");
+				for (const id of validIds) {
+					this.game.editorSelection.toggle(id, "explorer");
+				}
+			} else {
+				this.selectNode(validIds[0]);
+			}
 		};
 
 		this.treeContainer.appendChild(decoupleZone);
@@ -1245,22 +1290,52 @@ export class EditorExplorer {
 			if (this.game.interaction) {
 				this.game.interaction.begin("tree-drag", () => this.cancelDrag());
 			}
-			e.dataTransfer?.setData("text/plain", node.id);
+
+			// Si el nodo arrastrado está dentro de la multiselección, arrastramos todos los nodos seleccionados
+			const selection = this.game?.editorSelection;
+			if (selection && selection.isSelected(node.id)) {
+				this.draggedNodeIds = selection.getEffectiveTransformNodeIds();
+			} else {
+				this.draggedNodeIds = [node.id];
+				if (selection) {
+					selection.selectSingle(node.id, "explorer");
+				} else {
+					this.selectNode(node.id, false);
+				}
+			}
+
+			e.dataTransfer?.setData("application/json", JSON.stringify(this.draggedNodeIds));
+			e.dataTransfer?.setData("text/plain", this.draggedNodeIds[0] || node.id);
 			if (e.dataTransfer) e.dataTransfer.effectAllowed = "move";
-			this.draggedNodeId = node.id;
-			itemRow.style.opacity = "0.45";
+
+			// Atenuar visualmente todas las filas que se arrastran
+			for (const draggedId of this.draggedNodeIds) {
+				const row = this.treeContainer.querySelector<HTMLElement>(`[data-node-id="${draggedId}"]`);
+				if (row) row.style.opacity = "0.45";
+			}
 		};
 
 		itemRow.ondragend = () => {
 			this.game.interaction?.end("tree-drag");
-			this.draggedNodeId = null;
-			itemRow.style.opacity = "1";
-			this.resetRowDropStyles(itemRow, isSelected, isPrefabRoot, isPrefabMember);
+			for (const draggedId of this.draggedNodeIds) {
+				const row = this.treeContainer.querySelector<HTMLElement>(`[data-node-id="${draggedId}"]`);
+				if (row) {
+					row.style.opacity = "1";
+					const isSel = this.isNodeSelected(draggedId);
+					const n = this.hierarchy.getNode(draggedId);
+					this.resetRowDropStyles(row, isSel, !!n?.metadata?.isPrefabRoot, !!n?.metadata?.prefabInstanceId, this.selectedNodeId === draggedId);
+				}
+			}
+			this.draggedNodeIds = [];
+			this.updateSelectionVisuals();
 		};
 
 		itemRow.ondragover = (e) => {
-			const draggedId = this.draggedNodeId || (e.dataTransfer?.types.includes("text/plain") ? this.draggedNodeId : null);
-			if (!draggedId || draggedId === node.id) return;
+			let draggedIds = this.draggedNodeIds;
+			if (draggedIds.length === 0 && e.dataTransfer?.types.includes("text/plain")) {
+				draggedIds = this.draggedNodeId ? [this.draggedNodeId] : [];
+			}
+			if (draggedIds.length === 0 || draggedIds.includes(node.id)) return;
 			e.preventDefault();
 
 			const rect = itemRow.getBoundingClientRect();
@@ -1276,17 +1351,17 @@ export class EditorExplorer {
 				dropPosition = node.isGroup ? "inside" : (relY < height * 0.5 ? "before" : "after");
 			}
 
-			// Validar contra ciclos y restricciones jerárquicas
+			// Validar que todos los nodos arrastrados puedan reparentarse hacia targetParentId
 			const targetParentId = dropPosition === "inside" ? node.id : node.parentId;
-			const check = this.hierarchy.canReparent(draggedId, targetParentId);
+			const allAllowed = draggedIds.every((id) => this.hierarchy.canReparent(id, targetParentId).allowed);
 
-			if (!check.allowed) {
+			if (!allAllowed) {
 				if (e.dataTransfer) e.dataTransfer.dropEffect = "none";
 				itemRow.style.borderColor = "#cc3333";
 				itemRow.style.background = "rgba(204, 51, 51, 0.2)";
 			} else {
 				if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
-				this.resetRowDropStyles(itemRow, isSelected, isPrefabRoot, isPrefabMember);
+				this.resetRowDropStyles(itemRow, isSelected, isPrefabRoot, isPrefabMember, this.selectedNodeId === node.id);
 
 				if (dropPosition === "before") {
 					itemRow.style.borderTop = "2px solid #fff";
@@ -1300,18 +1375,30 @@ export class EditorExplorer {
 		};
 
 		itemRow.ondragleave = () => {
-			this.resetRowDropStyles(itemRow, isSelected, isPrefabRoot, isPrefabMember);
+			this.resetRowDropStyles(itemRow, isSelected, isPrefabRoot, isPrefabMember, this.selectedNodeId === node.id);
 		};
 
 		itemRow.ondrop = (e) => {
 			e.preventDefault();
 			e.stopPropagation();
-			this.resetRowDropStyles(itemRow, isSelected, isPrefabRoot, isPrefabMember);
+			this.resetRowDropStyles(itemRow, isSelected, isPrefabRoot, isPrefabMember, this.selectedNodeId === node.id);
 
-			const draggedId = this.draggedNodeId || e.dataTransfer?.getData("text/plain");
-			if (!draggedId || draggedId === node.id) return;
-			const draggedNode = this.hierarchy.getNode(draggedId);
-			if (!draggedNode) return;
+			let draggedIds = [...this.draggedNodeIds];
+			if (draggedIds.length === 0) {
+				const json = e.dataTransfer?.getData("application/json");
+				if (json) {
+					try { draggedIds = JSON.parse(json); } catch (_) {}
+				}
+				if (draggedIds.length === 0) {
+					const plain = e.dataTransfer?.getData("text/plain");
+					if (plain) draggedIds = [plain];
+				}
+			}
+
+			if (draggedIds.length === 0) return;
+
+			draggedIds = draggedIds.filter((id) => id !== node.id);
+			if (draggedIds.length === 0) return;
 
 			const rect = itemRow.getBoundingClientRect();
 			const relY = e.clientY - rect.top;
@@ -1327,35 +1414,67 @@ export class EditorExplorer {
 			}
 
 			let targetParentId: string | null = null;
-			let targetOrder: number | undefined = undefined;
+			let baseTargetOrder: number | undefined = undefined;
 
 			if (dropPosition === "inside") {
 				targetParentId = node.id;
-				targetOrder = undefined;
+				baseTargetOrder = undefined;
 			} else if (dropPosition === "before") {
 				targetParentId = node.parentId;
-				targetOrder = node.order;
+				baseTargetOrder = node.order;
 			} else {
 				targetParentId = node.parentId;
-				targetOrder = node.order + 1;
+				baseTargetOrder = node.order + 1;
 			}
 
-			const validation = this.hierarchy.canReparent(draggedId, targetParentId);
-			if (!validation.allowed) {
-				console.warn(`[Explorer DragDrop] Operación no permitida: ${validation.reason}`);
-				return;
+			// Validar cada nodo arrastrado
+			const validIds: string[] = [];
+			for (const id of draggedIds) {
+				const validation = this.hierarchy.canReparent(id, targetParentId);
+				if (validation.allowed) {
+					validIds.push(id);
+				} else {
+					console.warn(`[Explorer DragDrop] Operación no permitida para ${id}: ${validation.reason}`);
+				}
 			}
 
-			const oldParentId = draggedNode.parentId;
-			const oldOrder = draggedNode.order;
+			if (validIds.length === 0) return;
 
-			// Ejecutar reparenting conservando transformaciones mundiales
-			this.hierarchy.reparent(draggedId, targetParentId, targetOrder);
+			const affectedOldParents = new Set<string>();
+			const commands: ReparentCommand[] = [];
 
-			// Recalcular pivotes de grupos afectados
-			if (oldParentId) {
-				this.groupManager.recenterGroupPivot(oldParentId, (id) => this.resolveObject3D(id));
+			// Ejecutar reparenting para cada nodo
+			validIds.forEach((id, index) => {
+				const n = this.hierarchy.getNode(id);
+				if (!n) return;
+				const oldParentId = n.parentId;
+				const oldOrder = n.order;
+				if (oldParentId) affectedOldParents.add(oldParentId);
+
+				const targetOrder = baseTargetOrder !== undefined ? baseTargetOrder + index : undefined;
+
+				this.hierarchy.reparent(id, targetParentId, targetOrder);
+
+				commands.push(
+					new ReparentCommand(this.hierarchy, id, oldParentId, oldOrder, targetParentId, targetOrder, () => {
+						this.renderTree();
+					})
+				);
+
+				const movedObj = this.resolveObject3D(id);
+				if (movedObj && this.game.broadcastObjectUpdate) {
+					this.game.broadcastObjectUpdate(movedObj);
+				}
+			});
+
+			// Recalcular pivotes de grupos de origen afectados
+			for (const oldPId of affectedOldParents) {
+				if (oldPId !== targetParentId) {
+					this.groupManager.recenterGroupPivot(oldPId, (id) => this.resolveObject3D(id));
+				}
 			}
+
+			// Recalcular pivote de grupo de destino si aplica
 			if (targetParentId) {
 				this.groupManager.recenterGroupPivot(targetParentId, (id) => this.resolveObject3D(id));
 			}
@@ -1363,21 +1482,25 @@ export class EditorExplorer {
 			// Actualizar visuales de acople 3D
 			this.groupManager.updateCouplingVisuals((id) => this.resolveObject3D(id));
 
-			// Registrar comando en historial Undo/Redo
-			this.history.execute(
-				new ReparentCommand(this.hierarchy, draggedId, oldParentId, oldOrder, targetParentId, targetOrder, () => {
-					this.renderTree();
-				})
-			);
-
-			// Actualizar colaborativo si corresponde
-			const movedObj = this.resolveObject3D(draggedId);
-			if (movedObj && this.game.broadcastObjectUpdate) {
-				this.game.broadcastObjectUpdate(movedObj);
+			// Registrar en historial Undo/Redo
+			if (commands.length === 1) {
+				this.history.execute(commands[0]);
+			} else if (commands.length > 1) {
+				const composite = new CompositeCommand("Reparent Multiple Nodes", commands);
+				this.history.execute(composite);
 			}
 
 			this.renderTree();
-			this.selectNode(draggedId);
+
+			// Conservar seleccionados todos los nodos arrastrados
+			if (this.game?.editorSelection) {
+				this.game.editorSelection.clear("explorer");
+				for (const id of validIds) {
+					this.game.editorSelection.toggle(id, "explorer");
+				}
+			} else {
+				this.selectNode(validIds[0]);
+			}
 		};
 
 		itemRow.onmouseenter = () => {
@@ -2259,7 +2382,7 @@ export class EditorExplorer {
 	}
 
 	public cancelDrag() {
-		this.draggedNodeId = null;
+		this.draggedNodeIds = [];
 		this.game.interaction?.end("tree-drag");
 	}
 

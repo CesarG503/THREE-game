@@ -42,6 +42,7 @@ function setupMockDom() {
 			pointerLockedElement = null;
 		},
 		createElement: (tag) => {
+			const attrs = new Map();
 			const el = {
 				tagName: tag.toUpperCase(),
 				style: {},
@@ -54,9 +55,33 @@ function setupMockDom() {
 					toggle: () => {},
 					contains: () => false,
 				},
-				setAttribute: () => {},
-				getAttribute: () => null,
-				querySelectorAll: () => [],
+				setAttribute(name, val) { attrs.set(name, String(val)); },
+				getAttribute(name) { return attrs.get(name) || null; },
+				querySelector(sel) {
+					const all = this.querySelectorAll(sel);
+					return all.length > 0 ? all[0] : null;
+				},
+				querySelectorAll(sel) {
+					const match = [];
+					const check = (node) => {
+						if (!node) return;
+						if (sel.startsWith("[data-node-id")) {
+							const m = sel.match(/\[data-node-id="([^"]+)"\]/);
+							if (m && node.getAttribute?.("data-node-id") === m[1]) {
+								match.push(node);
+							} else if (sel === "[data-node-id]" && node.getAttribute?.("data-node-id")) {
+								match.push(node);
+							}
+						}
+						for (const c of node.children || []) {
+							check(c);
+						}
+					};
+					for (const c of this.children || []) {
+						check(c);
+					}
+					return match;
+				},
 				appendChild(child) {
 					this.children.push(child);
 					this.childNodes.push(child);
@@ -70,6 +95,7 @@ function setupMockDom() {
 				},
 				replaceChildren(...newChildren) {
 					this.children = [...newChildren];
+					this.childNodes = [...newChildren];
 				},
 				addEventListener: () => {},
 				removeEventListener: () => {},
@@ -127,6 +153,7 @@ const { EditorSelectionManager } = await server.ssrLoadModule("/src/client/edito
 const { EditorCommandHistory, GroupNodesCommand } = await server.ssrLoadModule("/src/client/editor/history/EditorCommandHistory.ts");
 const { TransformGizmo } = await server.ssrLoadModule("/src/client/editor/TransformGizmo.ts");
 const { InteractionCoordinator } = await server.ssrLoadModule("/src/client/input/InteractionCoordinator.ts");
+const { EditorExplorer } = await server.ssrLoadModule("/src/client/editor/explorer/EditorExplorer.ts");
 
 test("FASE 2: EditorSelectionManager - Selección única, toggle y getEffectiveTransformNodes", () => {
 	const hierarchy = new EditorHierarchyModel();
@@ -431,4 +458,102 @@ test("FASE 7: GroupNodesCommand - Agrupación atómica de multiselección con Un
 	history.redo();
 	assert.ok(hierarchy.hasNode(callbackGroupId), "El grupo debe haber sido restaurado en Redo");
 	assert.equal(hierarchy.getChildren(callbackGroupId).length, 3);
+});
+
+test("FASE 8: EditorExplorer - Arrastrar múltiples objetos seleccionados con Shift+Click a un grupo con Undo/Redo", () => {
+	const hierarchy = new EditorHierarchyModel();
+	const scene = new THREE.Scene();
+	const history = new EditorCommandHistory();
+	const groupManager = new EditorGroupManager(hierarchy, scene, history);
+
+	const groupDestino = hierarchy.createGroup("Grupo Destino", null);
+	const wall1 = hierarchy.addNode({ id: "wall-a", name: "Pared A", parentId: null, order: 1, isGroup: false });
+	const wall2 = hierarchy.addNode({ id: "wall-b", name: "Pared B", parentId: null, order: 2, isGroup: false });
+	const wall3 = hierarchy.addNode({ id: "wall-c", name: "Pared C", parentId: null, order: 3, isGroup: false });
+
+	const selection = new EditorSelectionManager(hierarchy, () => null);
+
+	const dummyGame = {
+		editorSelection: selection,
+		interaction: { begin: () => true, end: () => {} },
+		cameraController: { isUIOpen: false, setUIOpen: () => {} },
+		objectInspector: { show: () => {}, hide: () => {}, detachAndClear: () => {} },
+		broadcastObjectUpdate: () => {},
+	};
+
+	const explorer = new EditorExplorer(
+		dummyGame,
+		hierarchy,
+		groupManager,
+		{},
+		history,
+		{}
+	);
+
+	explorer.renderTree();
+
+	// 1. Seleccionar wall-a, wall-b y wall-c con Shift+Click
+	selection.selectSingle("wall-a");
+	selection.selectRange("wall-c", explorer.getVisibleNodeIds());
+	assert.equal(selection.getCount(), 3);
+	assert.deepEqual(selection.getEffectiveTransformNodeIds().sort(), ["wall-a", "wall-b", "wall-c"].sort());
+
+	// 2. Iniciar drag sobre la fila de wall-a
+	const rowWallA = explorer.treeContainer.querySelector('[data-node-id="wall-a"]');
+	assert.ok(rowWallA, "Fila de wall-a debe existir en el DOM");
+
+	const mockDataTransfer = {
+		data: {},
+		setData(type, val) { this.data[type] = val; },
+		getData(type) { return this.data[type]; },
+		effectAllowed: "none",
+		dropEffect: "none",
+	};
+
+	rowWallA.ondragstart({
+		dataTransfer: mockDataTransfer,
+	});
+
+	// Verificar que draggedNodeIds contiene los 3 objetos seleccionados
+	assert.equal(explorer.draggedNodeIds.length, 3);
+	assert.deepEqual(explorer.draggedNodeIds.sort(), ["wall-a", "wall-b", "wall-c"].sort());
+
+	// 3. Drop sobre la fila de groupDestino (dropPosition = "inside")
+	const rowGroup = explorer.treeContainer.querySelector(`[data-node-id="${groupDestino.id}"]`);
+	assert.ok(rowGroup, "Fila de grupo destino debe existir");
+	rowGroup.getBoundingClientRect = () => ({ top: 100, height: 40 });
+
+	rowGroup.ondrop({
+		preventDefault: () => {},
+		stopPropagation: () => {},
+		clientY: 120, // relY = 20 (50% de altura => "inside")
+		dataTransfer: mockDataTransfer,
+	});
+
+	// Comprobar que los 3 objetos ahora son hijos de groupDestino
+	assert.equal(hierarchy.getNode("wall-a").parentId, groupDestino.id);
+	assert.equal(hierarchy.getNode("wall-b").parentId, groupDestino.id);
+	assert.equal(hierarchy.getNode("wall-c").parentId, groupDestino.id);
+	const children = hierarchy.getChildren(groupDestino.id);
+	assert.equal(children.length, 3);
+
+	// Comprobar que los 3 objetos siguen seleccionados
+	assert.equal(selection.getCount(), 3);
+	assert.ok(selection.isSelected("wall-a"));
+	assert.ok(selection.isSelected("wall-b"));
+	assert.ok(selection.isSelected("wall-c"));
+
+	// 4. Probar Undo atómico (los 3 vuelven a la raíz con una sola operación)
+	history.undo();
+	assert.equal(hierarchy.getNode("wall-a").parentId, null);
+	assert.equal(hierarchy.getNode("wall-b").parentId, null);
+	assert.equal(hierarchy.getNode("wall-c").parentId, null);
+	assert.equal(hierarchy.getChildren(groupDestino.id).length, 0);
+
+	// 5. Probar Redo atómico (los 3 regresan a groupDestino)
+	history.redo();
+	assert.equal(hierarchy.getNode("wall-a").parentId, groupDestino.id);
+	assert.equal(hierarchy.getNode("wall-b").parentId, groupDestino.id);
+	assert.equal(hierarchy.getNode("wall-c").parentId, groupDestino.id);
+	assert.equal(hierarchy.getChildren(groupDestino.id).length, 3);
 });

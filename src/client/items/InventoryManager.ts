@@ -1,5 +1,6 @@
 import type { ItemLike } from "../types";
 import { ensureItemUid, getItemUid } from "./ItemInstance";
+import { isTextInput } from "../input/InteractionCoordinator";
 
 export class InventoryManager {
   uiSlots: NodeListOf<Element>;
@@ -30,6 +31,7 @@ export class InventoryManager {
     document.addEventListener("keydown", (e: KeyboardEvent) => {
       const profile = this.game?.playerConfigManager?.getCurrentProfile?.();
       if (profile?.disableInteraction) return;
+      if (isTextInput(e.target) || isTextInput(document.activeElement)) return;
 
       const key = parseInt(e.key, 10);
       if (!isNaN(key) && key >= 1 && key <= this.capacity) {
@@ -40,6 +42,7 @@ export class InventoryManager {
     document.addEventListener("wheel", (e: WheelEvent) => {
       const profile = this.game?.playerConfigManager?.getCurrentProfile?.();
       if (profile?.disableInteraction) return;
+      if (isTextInput(e.target) || isTextInput(document.activeElement)) return;
 
       if (!e.shiftKey) {
         if (e.deltaY > 0) {

@@ -267,7 +267,7 @@ export class Game {
 
 		this.chatManager = new ChatManager(this.networkManager);
 
-		this.placementManager = new PlacementManager(this.sceneManager.scene, this.sceneManager.camera);
+		this.placementManager = new PlacementManager(this.sceneManager.scene, this.sceneManager.camera, this.sceneManager.renderer.domElement);
 
 		if (this.gameMode !== "editor") {
 			// NPC removido temporalmente para manejarlo en lógica de partida

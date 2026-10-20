@@ -74,9 +74,17 @@ export class PlacementManager {
     lastValidPosition: THREE.Vector3 | null;
     lastValidQuaternion: THREE.Quaternion | null;
 
-    constructor(scene, camera) {
+    domElement: HTMLElement | null = null;
+    pointerNDC: THREE.Vector2 = new THREE.Vector2(0, 0);
+    isPointerOverCanvas: boolean = true;
+    private pointerMoveHandler: ((e: MouseEvent | PointerEvent) => void) | null = null;
+
+    constructor(scene, camera, domElement?: HTMLElement) {
         this.scene = scene;
         this.camera = camera;
+        if (domElement) {
+            this.setDomElement(domElement);
+        }
 
         // Grupo para la visualización fantasma
         this.placementGhost = null;
@@ -233,6 +241,54 @@ export class PlacementManager {
 
         // Ocultar por defecto
         this.placementGhost.visible = false;
+    }
+
+    setDomElement(domElement: HTMLElement) {
+        if (this.domElement === domElement && this.pointerMoveHandler) return;
+        this.domElement = domElement;
+
+        if (this.pointerMoveHandler && typeof window !== "undefined") {
+            window.removeEventListener("pointermove", this.pointerMoveHandler);
+            window.removeEventListener("mousemove", this.pointerMoveHandler);
+        }
+
+        this.pointerMoveHandler = (e: MouseEvent | PointerEvent) => {
+            if (!this.domElement) return;
+            const rect = this.domElement.getBoundingClientRect();
+            if (rect.width > 0 && rect.height > 0) {
+                this.pointerNDC.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+                this.pointerNDC.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+                const inBounds = (e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom);
+                this.isPointerOverCanvas = inBounds && (e.target === this.domElement);
+            }
+        };
+
+        if (typeof window !== "undefined") {
+            window.addEventListener("pointermove", this.pointerMoveHandler, { passive: true });
+            window.addEventListener("mousemove", this.pointerMoveHandler, { passive: true });
+        }
+    }
+
+    setPointerFromEvent(e: MouseEvent | PointerEvent) {
+        if (!this.domElement && typeof document !== "undefined") {
+            const canvas = document.querySelector("canvas");
+            if (canvas) this.setDomElement(canvas);
+        }
+        if (this.domElement) {
+            const rect = this.domElement.getBoundingClientRect();
+            if (rect.width > 0 && rect.height > 0) {
+                this.pointerNDC.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+                this.pointerNDC.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+                this.isPointerOverCanvas = true;
+            }
+        }
+    }
+
+    getPointerNDC(): THREE.Vector2 {
+        if (typeof document !== "undefined" && document.pointerLockElement) {
+            return new THREE.Vector2(0, 0);
+        }
+        return this.pointerNDC;
     }
 
     initLogicToolbar() {
@@ -683,7 +739,8 @@ export class PlacementManager {
     shouldIgnorePlacementRaycast(object) {
         let current = object;
         while (current) {
-            if (current.userData?.ignorePlacementRaycast) return true;
+            if (current.userData?.ignorePlacementRaycast || current.userData?.ignoreRaycast) return true;
+            if (current.userData?.isEditorGroupPivot) return true;
             if (current === this.placementGhost) return true;
             current = current.parent;
         }
@@ -1054,7 +1111,13 @@ export class PlacementManager {
 
         // Raycast
         const raycaster = new THREE.Raycaster();
-        raycaster.setFromCamera(new THREE.Vector2(0, 0), this.camera);
+        if (typeof document !== "undefined" && !document.pointerLockElement && !this.isPointerOverCanvas) {
+            this.placementGhost.visible = false;
+            this.currentHit = null;
+            return;
+        }
+
+        raycaster.setFromCamera(this.getPointerNDC(), this.camera);
         const intersects = raycaster.intersectObjects(this.scene.children, true);
 
         // Filter out ghost and characters
@@ -1944,7 +2007,13 @@ export class PlacementManager {
 
         // Raycast logic
         const raycaster = new THREE.Raycaster();
-        raycaster.setFromCamera(new THREE.Vector2(0, 0), this.camera);
+        if (typeof document !== "undefined" && !document.pointerLockElement && !this.isPointerOverCanvas) {
+            this.placementGhost.visible = false;
+            this.currentHit = null;
+            return;
+        }
+
+        raycaster.setFromCamera(this.getPointerNDC(), this.camera);
         const intersects = raycaster.intersectObjects(this.scene.children, true);
 
         const hit = intersects.find(h => {

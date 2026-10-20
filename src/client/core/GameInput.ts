@@ -81,6 +81,15 @@ export function setupGameInput(this: Game) {
 			return;
 		}
 
+		if (key === "r" && this.inventoryManager?.getCurrentItem?.()) {
+			e.preventDefault();
+			if (!e.repeat) {
+				this.placementRotationIndex = (this.placementRotationIndex + 1) % 4;
+				console.log("Placement Rotation:", this.placementRotationIndex);
+			}
+			return;
+		}
+
 		if (this.interaction?.blocksGameplay || (this.inputManager && !this.inputManager.enabled)) return;
 
 		if (key === "r") {
@@ -274,6 +283,12 @@ export function setupGameInput(this: Game) {
 				this.moveGhost.visible = false;
 				console.log("Farming Zone Moved");
 			} else {
+				if (this.placementManager) {
+					this.placementManager.setPointerFromEvent(e);
+					const currentItem = this.inventoryManager?.getCurrentItem?.();
+					const charPos = this.character ? this.character.getPosition() : null;
+					this.placementManager.update(currentItem, this.placementRotationIndex || 0, charPos, this.character?.getGravityQuaternion?.());
+				}
 				this.useCurrentItem(false);
 			}
 		} else if (e.button === 2) {

@@ -168,23 +168,18 @@ export class TransformGizmo {
 		return !!(
 			this.dragState ||
 			this.controls?.dragging ||
-			this.controls?.axis ||
-			this.curvatureOriginEditing ||
 			this.originPointer !== null
 		);
 	}
 
 	isPointerOverGizmo(mouse?: THREE.Vector2): boolean {
 		if (!this.target || !this.controls || !this.helper.visible) return false;
-		if (this.controls.axis !== null || this.controls.dragging || this.dragState) return true;
-		if (mouse && this.game.sceneManager?.camera) {
-			const raycaster = new THREE.Raycaster();
-			raycaster.setFromCamera(mouse, this.game.sceneManager.camera);
-			raycaster.layers.set(GIZMO_LAYER);
-			const hits = raycaster.intersectObject(this.helper, true);
-			return hits.length > 0;
+		if (this.controls.dragging || this.dragState || this.originPointer !== null) return true;
+		if (mouse && typeof this.controls.pointerHover === "function") {
+			this.controls.pointerHover(mouse);
+			return this.controls.axis !== null;
 		}
-		return false;
+		return this.controls.axis !== null;
 	}
 
 	cycleMode(): TransformMode {

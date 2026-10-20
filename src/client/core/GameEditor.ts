@@ -261,7 +261,7 @@ export function useCurrentItem(this: any, isRightClickOrItem: any = false) {
 
 	if (item.type === "movement_controller" && this.placementManager) {
 		const raycaster = new THREE.Raycaster();
-		raycaster.setFromCamera(new THREE.Vector2(0, 0), this.sceneManager.camera);
+		raycaster.setFromCamera(this.placementManager.getPointerNDC ? this.placementManager.getPointerNDC() : new THREE.Vector2(0, 0), this.sceneManager.camera);
 		const intersects = raycaster.intersectObjects(this.sceneManager.scene.children, true);
 
 		const findEditableTarget = (intersects: any[]) => {
@@ -314,7 +314,7 @@ export function useCurrentItem(this: any, isRightClickOrItem: any = false) {
 
 	if (item.type === "damage_controller" && this.placementManager) {
 		const raycaster = new THREE.Raycaster();
-		raycaster.setFromCamera(new THREE.Vector2(0, 0), this.sceneManager.camera);
+		raycaster.setFromCamera(this.placementManager.getPointerNDC ? this.placementManager.getPointerNDC() : new THREE.Vector2(0, 0), this.sceneManager.camera);
 		const intersects = raycaster.intersectObjects(this.sceneManager.scene.children, true);
 
 		const findEditableTarget = (intersects: any[]) => {

@@ -245,10 +245,19 @@ export class PrefabService {
 
 	private static getLocalPrefabs(scope: string, category?: string): PlatformPrefabDto[] {
 		const store = this.getRawLocalStore();
-		let list = Object.values(store).map((p) => ({
-			...p,
-			data: p.data || p.currentVersion?.data,
-		}));
+		let list = Object.values(store).map((p) => {
+			let data = p.data || p.currentVersion?.data || (p as any).versions?.[0]?.data;
+			if (typeof data === "string") {
+				try { data = JSON.parse(data); } catch (_) {}
+			}
+			if (data?.format === "viper-prefab-package" && data.prefab) {
+				data = data.prefab;
+			}
+			return {
+				...p,
+				data,
+			};
+		});
 		if (category) {
 			list = list.filter((p) => p.category === category);
 		}
@@ -259,12 +268,19 @@ export class PrefabService {
 		const store = this.getRawLocalStore();
 		let prefab = store[identifier];
 		if (!prefab) {
-			prefab = Object.values(store).find((p) => p.slug === identifier) || null as any;
+			prefab = Object.values(store).find((p) => p.slug === identifier) || (null as any);
 		}
 		if (prefab) {
+			let data = prefab.data || prefab.currentVersion?.data || (prefab as any).versions?.[0]?.data;
+			if (typeof data === "string") {
+				try { data = JSON.parse(data); } catch (_) {}
+			}
+			if (data?.format === "viper-prefab-package" && data.prefab) {
+				data = data.prefab;
+			}
 			return {
 				...prefab,
-				data: prefab.data || prefab.currentVersion?.data,
+				data,
 			};
 		}
 		return null;

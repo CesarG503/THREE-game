@@ -486,6 +486,7 @@ export class MapObjectItem extends Item {
       if (context.isRightClick) {
         const raycaster = new THREE.Raycaster();
         raycaster.set(context.origin, context.direction);
+        if (context.camera) raycaster.camera = context.camera;
         const intersects = raycaster.intersectObjects(context.scene.children, true);
         const target = findEditableTarget(intersects);
 
@@ -553,6 +554,7 @@ export class MapObjectItem extends Item {
     if (this.type === "movement_controller") {
       const raycaster = new THREE.Raycaster();
       raycaster.set(context.origin, context.direction);
+      if (context.camera) raycaster.camera = context.camera;
 
       const intersects = raycaster.intersectObjects(context.scene.children, true);
       const target = findEditableTarget(intersects);
@@ -590,6 +592,7 @@ export class MapObjectItem extends Item {
     if (this.type === "damage_controller") {
       const raycaster = new THREE.Raycaster();
       raycaster.set(context.origin, context.direction);
+      if (context.camera) raycaster.camera = context.camera;
 
       const intersects = raycaster.intersectObjects(context.scene.children, true);
       const target = findEditableTarget(intersects);

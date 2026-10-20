@@ -1820,7 +1820,7 @@ export class EditorExplorer {
 			charPos = new THREE.Vector3(t.x, t.y, t.z);
 		}
 
-		const camera = this.game.sceneManager?.camera;
+		const camera = this.game.sceneManager?.camera || this.game.cameraController?.camera || this.game.camera;
 		const lookDir = new THREE.Vector3(0, 0, 1);
 
 		if (camera && typeof camera.getWorldDirection === "function") {
@@ -1839,23 +1839,39 @@ export class EditorExplorer {
 			let targetY = charPos.y;
 
 			if (this.game.sceneManager?.scene) {
-				const rayOrigin = new THREE.Vector3(targetX, charPos.y + 10, targetZ);
-				const rayDir = new THREE.Vector3(0, -1, 0);
-				const raycaster = new THREE.Raycaster(rayOrigin, rayDir, 0.1, 40);
-				const hits = raycaster.intersectObjects(this.game.sceneManager.scene.children, true);
-				const groundHit = hits.find((h: any) => {
-					let obj = h.object;
-					while (obj) {
-						if (obj.userData?.isEditableMapObject || obj.userData?.isTerrain || obj.userData?.mapObjectType === "wall" || obj.userData?.mapObjectType === "floor") {
-							return true;
-						}
-						obj = obj.parent;
+				try {
+					const rayOrigin = new THREE.Vector3(targetX, charPos.y + 10, targetZ);
+					const rayDir = new THREE.Vector3(0, -1, 0);
+					const raycaster = new THREE.Raycaster(rayOrigin, rayDir, 0.1, 40);
+					if (camera) {
+						raycaster.camera = camera;
+					} else {
+						raycaster.camera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000);
 					}
-					return false;
-				});
 
-				if (groundHit) {
-					targetY = groundHit.point.y + 0.05;
+					const rawTargets = this.game.editableMapObjects && this.game.editableMapObjects.length > 0
+						? this.game.editableMapObjects
+						: this.game.sceneManager.scene.children;
+
+					const collidables = rawTargets.filter((c: any) => !c.isSprite && c.type !== "Sprite");
+
+					const hits = raycaster.intersectObjects(collidables, true);
+					const groundHit = hits.find((h: any) => {
+						let obj = h.object;
+						while (obj) {
+							if (obj.userData?.isEditableMapObject || obj.userData?.isTerrain || obj.userData?.mapObjectType === "wall" || obj.userData?.mapObjectType === "floor") {
+								return true;
+							}
+							obj = obj.parent;
+						}
+						return false;
+					});
+
+					if (groundHit) {
+						targetY = groundHit.point.y + 0.05;
+					}
+				} catch (rayErr) {
+					console.warn("[Explorer] Raycast en calculateSpawnPlacement no pudo completarse (usando altura estimada):", rayErr);
 				}
 			}
 
@@ -1981,31 +1997,38 @@ export class EditorExplorer {
 	}
 
 	private async handleInsertPrefab(prefab: PlatformPrefabDto) {
-		let fullPrefab = prefab;
-		if (!fullPrefab.data || !fullPrefab.data.hierarchy || !fullPrefab.data.objects) {
-			try {
-				fullPrefab = await PrefabService.getPrefab(prefab.id, prefab.version);
-			} catch (err: any) {
-				console.error("[Explorer] Error cargando datos completos del prefab:", err);
-				alert(`No se pudo cargar los datos del prefab '${prefab.name}': ${err.message}`);
+		try {
+			let fullPrefab = prefab;
+			if (!fullPrefab.data || !fullPrefab.data.hierarchy || !fullPrefab.data.objects) {
+				try {
+					fullPrefab = await PrefabService.getPrefab(prefab.id, prefab.version);
+				} catch (err: any) {
+					console.error("[Explorer] Error cargando datos completos del prefab:", err);
+					alert(`No se pudo cargar los datos del prefab '${prefab.name}': ${err.message}`);
+					return;
+				}
+			}
+
+			let prefabData = fullPrefab.data || fullPrefab.currentVersion?.data || (fullPrefab as any).versions?.[0]?.data;
+			if (typeof prefabData === "string") {
+				try { prefabData = JSON.parse(prefabData); } catch (_) {}
+			}
+			if (prefabData?.format === "viper-prefab-package" && prefabData.prefab) {
+				prefabData = prefabData.prefab;
+			}
+
+			if (!prefabData || !Array.isArray(prefabData.hierarchy) || !Array.isArray(prefabData.objects)) {
+				console.error("[Explorer] El prefab no contiene datos válidos de jerarquía u objetos:", fullPrefab);
+				alert(`El prefab '${prefab.name}' no tiene datos válidos o está dañado.`);
 				return;
 			}
-		}
 
-		const prefabData = fullPrefab.data || fullPrefab.currentVersion?.data;
-		if (!prefabData || !Array.isArray(prefabData.hierarchy) || !Array.isArray(prefabData.objects)) {
-			console.error("[Explorer] El prefab no contiene datos válidos de jerarquía u objetos:", fullPrefab);
-			alert(`El prefab '${prefab.name}' no tiene datos válidos o está dañado.`);
-			return;
-		}
+			const spawnPos = this.calculateSpawnPlacement(5.0);
 
-		const spawnPos = this.calculateSpawnPlacement(5.0);
+			const targetParent = this.selectedNodeId && this.hierarchy.getNode(this.selectedNodeId)?.isGroup
+				? this.selectedNodeId
+				: null;
 
-		const targetParent = this.selectedNodeId && this.hierarchy.getNode(this.selectedNodeId)?.isGroup
-			? this.selectedNodeId
-			: null;
-
-		try {
 			const result = this.prefabManager.instantiatePrefab(
 				prefabData,
 				fullPrefab.id,
@@ -2047,31 +2070,43 @@ export class EditorExplorer {
 	}
 
 	private async handleExportPrefabDtoJson(prefab: PlatformPrefabDto) {
-		let fullPrefab = prefab;
-		if (!fullPrefab.data || !fullPrefab.data.hierarchy || !fullPrefab.data.objects) {
-			try {
-				fullPrefab = await PrefabService.getPrefab(prefab.id, prefab.version);
-			} catch (err: any) {
-				console.error("[Explorer] Error cargando datos completos del prefab para exportar:", err);
-				alert(`No se pudo cargar el prefab '${prefab.name}': ${err.message}`);
+		try {
+			let fullPrefab = prefab;
+			if (!fullPrefab.data || !fullPrefab.data.hierarchy || !fullPrefab.data.objects) {
+				try {
+					fullPrefab = await PrefabService.getPrefab(prefab.id, prefab.version);
+				} catch (err: any) {
+					console.error("[Explorer] Error cargando datos completos del prefab para exportar:", err);
+					alert(`No se pudo cargar el prefab '${prefab.name}': ${err.message}`);
+					return;
+				}
+			}
+
+			let prefabData = fullPrefab.data || fullPrefab.currentVersion?.data || (fullPrefab as any).versions?.[0]?.data;
+			if (typeof prefabData === "string") {
+				try { prefabData = JSON.parse(prefabData); } catch (_) {}
+			}
+			if (prefabData?.format === "viper-prefab-package" && prefabData.prefab) {
+				prefabData = prefabData.prefab;
+			}
+
+			if (!prefabData) {
+				alert(`No hay datos disponibles para exportar el prefab '${prefab.name}'.`);
 				return;
 			}
-		}
 
-		const prefabData = fullPrefab.data || fullPrefab.currentVersion?.data;
-		if (!prefabData) {
-			alert(`No hay datos disponibles para exportar el prefab '${prefab.name}'.`);
-			return;
+			const json = PrefabSerializer.exportToPackageJson(prefabData, fullPrefab.ownerId || "VIPER IO User");
+			const blob = new Blob([json], { type: "application/json" });
+			const url = URL.createObjectURL(blob);
+			const a = document.createElement("a");
+			a.href = url;
+			a.download = `${fullPrefab.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}.prefab.json`;
+			a.click();
+			URL.revokeObjectURL(url);
+		} catch (err: any) {
+			console.error("[Explorer] Error exportando prefab:", err);
+			alert(`Error al exportar prefab: ${err.message}`);
 		}
-
-		const json = PrefabSerializer.exportToPackageJson(prefabData, fullPrefab.ownerId || "VIPER IO User");
-		const blob = new Blob([json], { type: "application/json" });
-		const url = URL.createObjectURL(blob);
-		const a = document.createElement("a");
-		a.href = url;
-		a.download = `${fullPrefab.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}.prefab.json`;
-		a.click();
-		URL.revokeObjectURL(url);
 	}
 
 	private async handleDeletePrefab(prefab: PlatformPrefabDto) {

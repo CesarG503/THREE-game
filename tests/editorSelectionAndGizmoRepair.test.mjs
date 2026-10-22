@@ -154,6 +154,7 @@ const { EditorCommandHistory, GroupNodesCommand } = await server.ssrLoadModule("
 const { TransformGizmo } = await server.ssrLoadModule("/src/client/editor/TransformGizmo.ts");
 const { InteractionCoordinator } = await server.ssrLoadModule("/src/client/input/InteractionCoordinator.ts");
 const { EditorExplorer } = await server.ssrLoadModule("/src/client/editor/explorer/EditorExplorer.ts");
+const { EditorClipboard } = await server.ssrLoadModule("/src/client/editor/clipboard/EditorClipboard.ts");
 
 test("FASE 2: EditorSelectionManager - Selección única, toggle y getEffectiveTransformNodes", () => {
 	const hierarchy = new EditorHierarchyModel();
@@ -556,4 +557,132 @@ test("FASE 8: EditorExplorer - Arrastrar múltiples objetos seleccionados con Sh
 	assert.equal(hierarchy.getNode("wall-b").parentId, groupDestino.id);
 	assert.equal(hierarchy.getNode("wall-c").parentId, groupDestino.id);
 	assert.equal(hierarchy.getChildren(groupDestino.id).length, 3);
+});
+
+test("FASE 2: Agrupar selección múltiple (Shift+Click) de una sola vez", () => {
+	const hierarchy = new EditorHierarchyModel();
+	const scene = new THREE.Scene();
+	const history = new EditorCommandHistory();
+	const groupManager = new EditorGroupManager(hierarchy, scene, history);
+
+	const n1 = hierarchy.addNode({ id: "box-1", name: "Caja 1", parentId: null, order: 0, isGroup: false });
+	const n2 = hierarchy.addNode({ id: "box-2", name: "Caja 2", parentId: null, order: 1, isGroup: false });
+	const n3 = hierarchy.addNode({ id: "box-3", name: "Caja 3", parentId: null, order: 2, isGroup: false });
+
+	const selection = new EditorSelectionManager(hierarchy, () => null);
+	groupManager.selectionManager = selection;
+
+	const dummyGame = {
+		editorSelection: selection,
+		interaction: { begin: () => true, end: () => {} },
+		cameraController: { isUIOpen: false, setUIOpen: () => {} },
+		objectInspector: { show: () => {}, hide: () => {}, detachAndClear: () => {} },
+		broadcastObjectUpdate: () => {},
+		resolveObject3D: () => null,
+	};
+
+	const explorer = new EditorExplorer(
+		dummyGame,
+		hierarchy,
+		groupManager,
+		{},
+		history,
+		{}
+	);
+
+	explorer.renderTree();
+
+	// 1. Simular Shift+Click seleccionando las 3 cajas
+	selection.selectSingle("box-1");
+	selection.selectRange("box-3", explorer.getVisibleNodeIds());
+	assert.equal(selection.getCount(), 3);
+
+	// 2. Presionar el botón Grupo / handleCreateGroup
+	const origPrompt = globalThis.prompt;
+	globalThis.prompt = () => "Grupo De Cajas";
+
+	explorer.handleCreateGroup();
+
+	globalThis.prompt = origPrompt;
+
+	// Verificar que se creó un nuevo grupo con las 3 cajas dentro
+	const createdGroupId = selection.getActiveId();
+	assert.ok(createdGroupId, "El nuevo grupo debe quedar activo");
+	const groupNode = hierarchy.getNode(createdGroupId);
+	assert.ok(groupNode && groupNode.isGroup, "El nodo creado debe ser un grupo");
+	assert.equal(groupNode.customName, "Grupo De Cajas");
+
+	assert.equal(hierarchy.getNode("box-1").parentId, createdGroupId);
+	assert.equal(hierarchy.getNode("box-2").parentId, createdGroupId);
+	assert.equal(hierarchy.getNode("box-3").parentId, createdGroupId);
+	assert.equal(hierarchy.getChildren(createdGroupId).length, 3);
+
+	// 3. Undo y Redo atómicos
+	history.undo();
+	assert.equal(hierarchy.getNode("box-1").parentId, null);
+	assert.equal(hierarchy.getNode("box-2").parentId, null);
+	assert.equal(hierarchy.getNode("box-3").parentId, null);
+
+	history.redo();
+	assert.equal(hierarchy.getNode("box-1").parentId, createdGroupId);
+	assert.equal(hierarchy.getNode("box-2").parentId, createdGroupId);
+	assert.equal(hierarchy.getNode("box-3").parentId, createdGroupId);
+});
+
+test("FASE 2: Portapapeles con atajos universales y sin botones en menú H", () => {
+	const hierarchy = new EditorHierarchyModel();
+	const scene = new THREE.Scene();
+	const history = new EditorCommandHistory();
+	const groupManager = new EditorGroupManager(hierarchy, scene, history);
+	const clipboard = new EditorClipboard();
+
+	const n1 = hierarchy.addNode({ id: "mesh-1", name: "Malla 1", parentId: null, order: 0, isGroup: false });
+
+	const mockObj = new THREE.Mesh();
+	mockObj.userData = { uuid: "mesh-1", isEditableMapObject: true, mapObjectType: "wall" };
+
+	const selection = new EditorSelectionManager(hierarchy, (id) => id === "mesh-1" ? mockObj : null);
+	groupManager.selectionManager = selection;
+
+	let singleLoaded = null;
+	const dummyGame = {
+		gameMode: "editor",
+		editorSelection: selection,
+		interaction: { begin: () => true, end: () => {} },
+		cameraController: { isUIOpen: false, setUIOpen: () => {} },
+		objectInspector: { show: () => {}, hide: () => {}, detachAndClear: () => {} },
+		broadcastObjectUpdate: () => {},
+		resolveObject3D: (id) => id === "mesh-1" ? mockObj : null,
+		_loadSingleMapObject: (data) => { singleLoaded = data; },
+		editableMapObjects: [mockObj],
+		sceneManager: {
+			scene: new THREE.Scene(),
+			camera: new THREE.PerspectiveCamera(),
+		}
+	};
+
+	const explorer = new EditorExplorer(
+		dummyGame,
+		hierarchy,
+		groupManager,
+		clipboard,
+		history,
+		{}
+	);
+
+	// 1. Verificar que los botones manuales "Copiar" y "Pegar" ya NO están en la barra de herramientas de H
+	const buttons = Array.from(explorer.sceneContentContainer.querySelectorAll("button"));
+	const buttonTexts = buttons.map(b => b.textContent?.trim());
+	assert.ok(!buttonTexts.includes("Copiar"), "La barra de H no debe incluir botón Copiar");
+	assert.ok(!buttonTexts.includes("Pegar"), "La barra de H no debe incluir botón Pegar");
+
+	// 2. Probar copiar con selección activa
+	selection.selectSingle("mesh-1");
+	explorer.handleCopy();
+	assert.ok(clipboard.hasContent(), "El portapapeles debe tener contenido tras handleCopy");
+
+	// 3. Probar pegar
+	explorer.handlePaste();
+	assert.ok(singleLoaded, "handlePaste debe haber instanciado el objeto duplicado");
+	assert.notEqual(singleLoaded.uuid, "mesh-1", "El objeto pegado debe tener un UUID nuevo");
 });

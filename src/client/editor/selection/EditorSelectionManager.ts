@@ -55,6 +55,11 @@ export class EditorSelectionManager {
 		return this.selectedIds.size;
 	}
 
+	public resolveObject(id: string): THREE.Object3D | null {
+		if (!this.objectResolver) return null;
+		return this.objectResolver(id);
+	}
+
 	public getActiveObject(): THREE.Object3D | null {
 		if (!this.activeId || !this.objectResolver) return null;
 		return this.objectResolver(this.activeId);
@@ -78,7 +83,21 @@ export class EditorSelectionManager {
 	public getEffectiveTransformNodes(): HierarchyNode[] {
 		const nodes: HierarchyNode[] = [];
 		for (const id of this.selectedIds) {
-			const node = this.hierarchy.getNode(id);
+			let node = this.hierarchy.getNode(id);
+			if (!node && this.objectResolver) {
+				const obj = this.objectResolver(id);
+				if (obj && obj.userData?.uuid) {
+					node = this.hierarchy.addNode({
+						id: obj.userData.uuid,
+						name: obj.userData.customName || obj.userData.mapObjectType || "Objeto",
+						type: obj.userData.mapObjectType || "object",
+						parentId: obj.userData.parentId || null,
+						order: this.hierarchy.getChildren(obj.userData.parentId || null).length,
+						isGroup: !!obj.userData.isEditorGroupPivot,
+						customName: obj.userData.customName,
+					});
+				}
+			}
 			if (node) nodes.push(node);
 		}
 

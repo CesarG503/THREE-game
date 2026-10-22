@@ -1018,9 +1018,33 @@ export class ObjectInspector {
                 this.container.addEventListener(eventType, (e) => {
                     const typing = e.target instanceof HTMLInputElement && e.target.type !== 'checkbox' ||
                         e.target instanceof HTMLSelectElement || e.target instanceof HTMLTextAreaElement || e.target.isContentEditable
-                    if (eventType === 'keydown' && e.key.toLowerCase() === 'r' && !typing && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey) {
-                        e.preventDefault()
-                        this.cycleTransformMode()
+                    if (eventType === 'keydown' && !typing && !e.repeat) {
+                        const key = e.key.toLowerCase();
+                        if (key === 'r' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+                            e.preventDefault();
+                            this.cycleTransformMode();
+                            return;
+                        }
+                        if ((e.ctrlKey || e.metaKey) && key === 'c' && !e.shiftKey && !e.altKey) {
+                            e.preventDefault();
+                            this.game?.editorExplorer?.handleCopy?.();
+                            return;
+                        }
+                        if ((e.ctrlKey || e.metaKey) && key === 'v' && !e.shiftKey && !e.altKey) {
+                            e.preventDefault();
+                            this.game?.editorExplorer?.handlePaste?.();
+                            return;
+                        }
+                        if ((e.ctrlKey || e.metaKey) && key === 'd' && !e.shiftKey && !e.altKey) {
+                            e.preventDefault();
+                            this.game?.editorExplorer?.handleDuplicate?.();
+                            return;
+                        }
+                        if ((e.ctrlKey || e.metaKey) && key === 'g' && !e.shiftKey && !e.altKey) {
+                            e.preventDefault();
+                            this.game?.editorExplorer?.handleGroupSelection?.();
+                            return;
+                        }
                     }
                     e.stopPropagation()
                 })

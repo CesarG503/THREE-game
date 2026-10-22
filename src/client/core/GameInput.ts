@@ -58,6 +58,38 @@ export function setupGameInput(this: Game) {
 			}
 		}
 
+		// Atajos de portapapeles y jerarquía en modo editor (Ctrl+C, Ctrl+V, Ctrl+D, Ctrl+G)
+		if ((e.ctrlKey || e.metaKey) && this.gameMode === "editor") {
+			if (key === "c" && !e.shiftKey && !e.altKey) {
+				if (this.editorExplorer?.handleCopy) {
+					e.preventDefault();
+					this.editorExplorer.handleCopy();
+					return;
+				}
+			}
+			if (key === "v" && !e.shiftKey && !e.altKey) {
+				if (this.editorExplorer?.handlePaste) {
+					e.preventDefault();
+					this.editorExplorer.handlePaste();
+					return;
+				}
+			}
+			if (key === "d" && !e.shiftKey && !e.altKey) {
+				if (this.editorExplorer?.handleDuplicate) {
+					e.preventDefault();
+					this.editorExplorer.handleDuplicate();
+					return;
+				}
+			}
+			if (key === "g" && !e.shiftKey && !e.altKey) {
+				if (this.editorExplorer?.handleGroupSelection) {
+					e.preventDefault();
+					this.editorExplorer.handleGroupSelection();
+					return;
+				}
+			}
+		}
+
 		const activeObj =
 			this.editorSelection?.getActiveObject?.() ||
 			this.objectInspector?.transformGizmo?.target ||

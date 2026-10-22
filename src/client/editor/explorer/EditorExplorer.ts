@@ -442,23 +442,23 @@ export class EditorExplorer {
 			return btn;
 		};
 
-		// Botón Crear Grupo en Raíz (Corrección 1: Nunca anida automáticamente)
-		const btnNewGroup = createBtn("+ Grupo", "Crea un nuevo grupo en la raíz de la escena", () => {
+		// Botón Grupo (Agrupa elementos seleccionados o crea grupo en raíz)
+		const btnNewGroup = createBtn("Grupo", "Agrupa los elementos seleccionados en un nuevo grupo (Ctrl+G), o crea un grupo vacío si no hay selección", () => {
 			this.handleCreateGroup();
 		});
 
-		// Botón Crear Subgrupo Explícito (Corrección 1: Acción diferenciada)
+		// Botón Crear Subgrupo Explícito (Acción diferenciada)
 		const btnNewSubgroup = createBtn("+ Subgrupo", "Crea un subgrupo explícito dentro del grupo seleccionado", () => {
 			this.handleCreateSubgroup();
 		});
 
-		// Botón Agrupar Selección (Agrupa el elemento seleccionado bajo un nuevo grupo)
-		const btnGroupSelection = createBtn("Agrupar", "Agrupa el elemento seleccionado dentro de un nuevo grupo", () => {
+		// Botón Agrupar Selección (Agrupa el elemento seleccionado dentro de un nuevo grupo)
+		const btnGroupSelection = createBtn("Agrupar", "Agrupa los elementos seleccionados dentro de un nuevo grupo (Ctrl+G)", () => {
 			this.handleGroupSelection();
 		});
 
 		// Botón Desagrupar
-		const btnUngroup = createBtn("Desagrupar", "Desagrupa el grupo seleccionado devolviendo sus hijos al nivel superior", () => {
+		const btnUngroup = createBtn("Desagrupar", "Desagrupa el grupo seleccionado devolviendo sus hijos al nivel superior (Ctrl+Shift+G)", () => {
 			this.handleUngroup();
 		});
 
@@ -481,10 +481,8 @@ export class EditorExplorer {
 			this.togglePivotEditMode();
 		});
 
-		// Botones Portapapeles
-		const btnCopy = createBtn("Copiar", "Copia el nodo seleccionado", () => this.handleCopy());
-		const btnPaste = createBtn("Pegar", "Pega el contenido del portapapeles", () => this.handlePaste());
-		const btnDuplicate = createBtn("Duplicar", "Duplica el elemento o grupo actual con nuevos UUIDs", () => this.handleDuplicate());
+		// Botón Duplicar (Portapapeles gestionado por atajos universales Ctrl+C / Ctrl+V)
+		const btnDuplicate = createBtn("Duplicar", "Duplica el elemento o grupo actual con nuevos UUIDs (Ctrl+D)", () => this.handleDuplicate());
 
 		// Botones Prefab
 		const btnSavePrefab = createBtn("⭐ Prefab", "Guarda el grupo seleccionado como un prefab persistente", () => this.handleSavePrefab());
@@ -498,8 +496,6 @@ export class EditorExplorer {
 		toolbar.appendChild(btnDecouple);
 		toolbar.appendChild(this.btnToggleCoupling);
 		toolbar.appendChild(this.btnTogglePivotEdit);
-		toolbar.appendChild(btnCopy);
-		toolbar.appendChild(btnPaste);
 		toolbar.appendChild(btnDuplicate);
 		toolbar.appendChild(btnSavePrefab);
 		toolbar.appendChild(btnExport);
@@ -840,16 +836,39 @@ export class EditorExplorer {
 				}
 			}
 
+			// Copiar con Ctrl+C
+			if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "c" && !e.shiftKey && !e.altKey) {
+				e.preventDefault();
+				this.handleCopy();
+				return;
+			}
+
+			// Pegar con Ctrl+V
+			if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "v" && !e.shiftKey && !e.altKey) {
+				e.preventDefault();
+				this.handlePaste();
+				return;
+			}
+
+			// Duplicar con Ctrl+D
+			if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "d" && !e.shiftKey && !e.altKey) {
+				e.preventDefault();
+				this.handleDuplicate();
+				return;
+			}
+
 			// Agrupar con Ctrl+G
 			if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "g" && !e.shiftKey) {
 				e.preventDefault();
 				this.handleGroupSelection();
+				return;
 			}
 
 			// Desagrupar con Ctrl+Shift+G
 			if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "g" && e.shiftKey) {
 				e.preventDefault();
 				this.handleUngroup();
+				return;
 			}
 		}, { signal: this.events.signal });
 	}
@@ -1663,10 +1682,17 @@ export class EditorExplorer {
 	// ── Acciones de toolbar y operaciones ──────────────────────────────────────
 
 	/**
-	 * Corrección 1: Crear grupo nuevo SIEMPRE en la raíz por defecto,
-	 * sin convertir automáticamente el grupo seleccionado en su hijo.
+	 * Agrupa la selección activa en un nuevo grupo contenedor,
+	 * o crea un grupo nuevo vacío en la raíz si no hay nada seleccionado.
 	 */
-	private handleCreateGroup() {
+	public handleCreateGroup() {
+		const selection = this.game?.editorSelection;
+		const count = selection ? selection.getCount() : (this.selectedNodeId ? 1 : 0);
+		if (count > 0) {
+			this.handleGroupSelection();
+			return;
+		}
+
 		const name = prompt("Nombre del nuevo grupo:", "Nuevo Grupo");
 		if (!name || !name.trim()) return;
 
@@ -1674,12 +1700,13 @@ export class EditorExplorer {
 		this.groupManager.getOrCreatePivotProxy(newGroup.id);
 		this.renderTree();
 		this.selectNode(newGroup.id);
+		this.showToast(`📁 Grupo '${name.trim()}' creado`);
 	}
 
 	/**
 	 * Corrección 1: Crear subgrupo explícito dentro del grupo seleccionado.
 	 */
-	private handleCreateSubgroup() {
+	public handleCreateSubgroup() {
 		if (!this.selectedNodeId) {
 			alert("Selecciona un grupo padre para crear un subgrupo dentro de él.");
 			return;
@@ -1699,23 +1726,28 @@ export class EditorExplorer {
 		this.groupManager.getOrCreatePivotProxy(subGroup.id);
 		this.renderTree();
 		this.selectNode(subGroup.id);
+		this.showToast(`📁 Subgrupo '${name.trim()}' creado`);
 	}
 
 	/**
-	 * Agrupa el elemento seleccionado o varios elementos bajo un nuevo grupo.
+	 * Agrupa todos los elementos seleccionados bajo un nuevo grupo de una sola vez.
 	 */
-	private handleGroupSelection() {
+	public handleGroupSelection() {
 		const selection = this.game?.editorSelection;
-		const targetNodes = selection && selection.getCount() > 0
+		let targetNodes = selection && selection.getCount() > 0
 			? selection.getEffectiveTransformNodeIds()
 			: (this.selectedNodeId ? [this.selectedNodeId] : []);
+
+		if (targetNodes.length === 0 && selection && selection.getCount() > 0) {
+			targetNodes = selection.getSelectedIds();
+		}
 
 		if (targetNodes.length === 0) {
 			alert("Selecciona al menos un objeto o grupo para agrupar.");
 			return;
 		}
 
-		const name = prompt("Nombre del grupo contenedor:", "Nuevo Grupo");
+		const name = prompt(`Nombre del grupo para los ${targetNodes.length} elementos seleccionados:`, "Nuevo Grupo");
 		if (!name || !name.trim()) return;
 
 		const firstNode = this.hierarchy.getNode(targetNodes[0]);
@@ -1738,7 +1770,8 @@ export class EditorExplorer {
 						this.selectNode(createdGroupId);
 					}
 				}
-			}
+			},
+			(uuid: string) => this.resolveObject3D(uuid)
 		);
 
 		if (this.history) {
@@ -1746,6 +1779,8 @@ export class EditorExplorer {
 		} else {
 			cmd.execute();
 		}
+
+		this.showToast(`📁 ${targetNodes.length} ${targetNodes.length === 1 ? "elemento agrupado" : "elementos agrupados"} en '${name.trim()}'`);
 	}
 
 	private handleUngroup() {
@@ -1788,11 +1823,19 @@ export class EditorExplorer {
 		this.renderTree();
 	}
 
-	private handleCopy() {
+	public handleCopy() {
 		const selection = this.game?.editorSelection;
-		const targetNodes = selection && selection.getCount() > 0
-			? selection.getEffectiveTransformNodeIds()
-			: (this.selectedNodeId ? [this.selectedNodeId] : []);
+		let targetNodes: string[] = [];
+		if (selection && selection.getCount() > 0) {
+			targetNodes = selection.getEffectiveTransformNodeIds();
+			if (targetNodes.length === 0) targetNodes = selection.getSelectedIds();
+		} else if (this.selectedNodeId) {
+			targetNodes = [this.selectedNodeId];
+		} else if (this.game?.objectInspector?.selectedObject) {
+			const obj = this.game.objectInspector.selectedObject;
+			const id = obj.userData?.groupId || obj.userData?.uuid;
+			if (id) targetNodes = [id];
+		}
 		if (targetNodes.length === 0) return;
 
 		const copied = this.clipboard.copy(
@@ -1802,6 +1845,7 @@ export class EditorExplorer {
 		);
 		if (copied) {
 			console.log(`[Explorer] ${targetNodes.length} nodos copiados al portapapeles.`);
+			this.showToast(`📋 ${targetNodes.length} ${targetNodes.length === 1 ? "elemento copiado" : "elementos copiados"} (Ctrl+V para pegar)`);
 		}
 	}
 
@@ -1881,12 +1925,21 @@ export class EditorExplorer {
 		return { x: 5, y: 0, z: 5 };
 	}
 
-	private handlePaste() {
+	public handlePaste() {
 		if (!this.clipboard.hasContent()) return;
 
-		const targetParent = this.selectedNodeId && this.hierarchy.getNode(this.selectedNodeId)?.isGroup
-			? this.selectedNodeId
-			: null;
+		let targetParent: string | null = null;
+		if (this.selectedNodeId && this.hierarchy.getNode(this.selectedNodeId)?.isGroup) {
+			targetParent = this.selectedNodeId;
+		} else if (this.game?.editorSelection?.getActiveId()) {
+			const activeId = this.game.editorSelection.getActiveId()!;
+			const node = this.hierarchy.getNode(activeId);
+			if (node?.isGroup) {
+				targetParent = activeId;
+			} else if (node?.parentId) {
+				targetParent = node.parentId;
+			}
+		}
 
 		const spawnPos = this.calculateSpawnPlacement(4.5);
 		const prepared = this.clipboard.preparePaste(spawnPos, targetParent);
@@ -1904,19 +1957,32 @@ export class EditorExplorer {
 			(newSelectedId) => {
 				this.renderTree();
 				if (newSelectedId) {
-					this.selectNode(newSelectedId);
+					if (this.game?.editorSelection) {
+						this.game.editorSelection.selectSingle(newSelectedId, "explorer");
+					} else {
+						this.selectNode(newSelectedId);
+					}
 				}
 			}
 		);
 
 		this.history.execute(cmd);
+		this.showToast(`📋 ${prepared.rootNodeIds.length} ${prepared.rootNodeIds.length === 1 ? "elemento pegado" : "elementos pegados"}`);
 	}
 
-	private handleDuplicate() {
+	public handleDuplicate() {
 		const selection = this.game?.editorSelection;
-		const targetNodes = selection && selection.getCount() > 0
-			? selection.getEffectiveTransformNodeIds()
-			: (this.selectedNodeId ? [this.selectedNodeId] : []);
+		let targetNodes: string[] = [];
+		if (selection && selection.getCount() > 0) {
+			targetNodes = selection.getEffectiveTransformNodeIds();
+			if (targetNodes.length === 0) targetNodes = selection.getSelectedIds();
+		} else if (this.selectedNodeId) {
+			targetNodes = [this.selectedNodeId];
+		} else if (this.game?.objectInspector?.selectedObject) {
+			const obj = this.game.objectInspector.selectedObject;
+			const id = obj.userData?.groupId || obj.userData?.uuid;
+			if (id) targetNodes = [id];
+		}
 		if (targetNodes.length === 0) return;
 
 		const firstNode = this.hierarchy.getNode(targetNodes[0]);
@@ -1948,8 +2014,8 @@ export class EditorExplorer {
 			(newSelectedId) => {
 				this.renderTree();
 				if (newSelectedId) {
-					if (selection) {
-						selection.selectSingle(newSelectedId, "explorer");
+					if (this.game?.editorSelection) {
+						this.game.editorSelection.selectSingle(newSelectedId, "explorer");
 					} else {
 						this.selectNode(newSelectedId);
 					}
@@ -1958,6 +2024,7 @@ export class EditorExplorer {
 		);
 
 		this.history.execute(cmd);
+		this.showToast(`📋 ${prepared.rootNodeIds.length} ${prepared.rootNodeIds.length === 1 ? "elemento duplicado" : "elementos duplicados"}`);
 	}
 
 	private async handleSavePrefab() {
@@ -2433,9 +2500,51 @@ export class EditorExplorer {
 		input.click();
 	}
 
-	// ── Ayudantes de resolución de objetos ──────────────────────────────────────
+	// ── Feedback y Ayudantes de resolución de objetos ───────────────────────────
+
+	private showToast(message: string, durationMs: number = 2200) {
+		if (typeof document === "undefined" || !document.body) return;
+		let toast = document.getElementById("viper-editor-toast");
+		if (!toast) {
+			toast = document.createElement("div");
+			toast.id = "viper-editor-toast";
+			toast.style.cssText = `
+				position: fixed;
+				bottom: 60px;
+				left: 50%;
+				transform: translateX(-50%);
+				background: rgba(15, 23, 42, 0.92);
+				backdrop-filter: blur(8px);
+				border: 1px solid rgba(56, 189, 248, 0.6);
+				border-radius: 9999px;
+				padding: 7px 18px;
+				color: #e0f2fe;
+				font-size: 13px;
+				font-weight: 600;
+				font-family: system-ui, -apple-system, sans-serif;
+				pointer-events: none;
+				z-index: 10000;
+				box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+				transition: opacity 0.3s ease;
+			`;
+			document.body.appendChild(toast);
+		}
+		toast.textContent = message;
+		toast.style.opacity = "1";
+		if ((this as any)._toastTimeout) clearTimeout((this as any)._toastTimeout);
+		(this as any)._toastTimeout = setTimeout(() => {
+			if (toast) toast.style.opacity = "0";
+		}, durationMs);
+	}
 
 	private resolveObject3D(uuid: string): any {
+		if (this.game?.resolveObject3D) {
+			return this.game.resolveObject3D(uuid);
+		}
+		const node = this.hierarchy.getNode(uuid);
+		if (node?.isGroup && this.groupManager) {
+			return this.groupManager.getOrCreatePivotProxy(uuid);
+		}
 		if (this.game?.editableMapObjects) {
 			const found = this.game.editableMapObjects.find(
 				(obj: any) => obj.userData && obj.userData.uuid === uuid

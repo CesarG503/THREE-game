@@ -157,6 +157,7 @@ after(() => server.close());
 const { InteractionCoordinator, isTextInput } = await server.ssrLoadModule("/src/client/input/InteractionCoordinator.ts");
 const { PlacementManager } = await server.ssrLoadModule("/src/client/editor/PlacementManager.ts");
 const { TransformGizmo } = await server.ssrLoadModule("/src/client/editor/TransformGizmo.ts");
+const { setupGameInput } = await server.ssrLoadModule("/src/client/core/GameInput.ts");
 
 test("PlacementManager - Rastrear cursor cuando pointer lock no está activo", () => {
   const { domElement, mockDocument } = setupMockDom();
@@ -272,4 +273,90 @@ test("isTextInput - Evitar interferencias al escribir en inputs del Inspector", 
 
   const div = { tagName: "DIV", isContentEditable: false };
   assert.equal(isTextInput(div), false);
+});
+
+test("Tecla R - Con objeto seleccionado prioriza ciclo de gizmo sin alterar rotación de colocación", () => {
+  const { domElement, mockDocument } = setupMockDom();
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000);
+
+  const targetMesh = new THREE.Mesh(new THREE.BoxGeometry(2, 2, 2), new THREE.MeshBasicMaterial());
+  targetMesh.userData = { isEditableMapObject: true, uuid: "box-target" };
+  scene.add(targetMesh);
+
+  let currentItem = { id: "wall", name: "Wall", type: "wall" };
+  let gizmoModeCycled = false;
+
+  const fakeGizmo = {
+    target: targetMesh,
+    cycleMode: () => {
+      gizmoModeCycled = true;
+      return "rotate";
+    },
+    attach: (obj) => {
+      fakeGizmo.target = obj;
+    }
+  };
+
+  const inputEvents = new AbortController();
+  const fakeGame = {
+    gameMode: "editor",
+    inputEvents,
+    sceneManager: {
+      scene,
+      camera,
+      renderer: { domElement }
+    },
+    isAnyEditorUIOpen: () => true,
+    cameraController: { isUIOpen: true, isPaused: false },
+    inputManager: { enabled: true, keys: {} },
+    inventoryManager: {
+      getCurrentItem: () => currentItem,
+    },
+    objectInspector: {
+      isVisible: true,
+      selectedObject: targetMesh,
+      transformGizmo: fakeGizmo
+    },
+    editorSelection: {
+      getActiveObject: () => targetMesh,
+      getCount: () => 1
+    },
+    constructionMenu: { isVisible: false }
+  };
+
+  setupGameInput.call(fakeGame);
+
+  // 1. Presionar R teniendo un objeto seleccionado e item equipado:
+  // Debe ciclar el gizmo del objeto y NO rotar la proyección de colocación
+  const eventR = {
+    key: "r",
+    repeat: false,
+    ctrlKey: false,
+    metaKey: false,
+    altKey: false,
+    shiftKey: false,
+    preventDefault: () => {}
+  };
+
+  mockDocument.dispatchEvent({ type: "keydown", ...eventR });
+
+  assert.equal(gizmoModeCycled, true, "El gizmo debe haber ciclado de modo con R");
+  assert.equal(fakeGame.placementRotationIndex, 0, "placementRotationIndex no debe haber cambiado al tener objeto seleccionado");
+
+  // 2. Deseleccionar objeto: ahora al presionar R debe rotar la colocación proyectada
+  fakeGame.editorSelection.getActiveObject = () => null;
+  fakeGame.objectInspector.selectedObject = null;
+  fakeGizmo.target = null;
+  gizmoModeCycled = false;
+
+  mockDocument.dispatchEvent({ type: "keydown", ...eventR });
+
+  assert.equal(gizmoModeCycled, false, "El gizmo no debe ciclar si no hay objeto seleccionado");
+  assert.equal(fakeGame.placementRotationIndex, 1, "placementRotationIndex debe incrementarse a 1");
+
+  mockDocument.dispatchEvent({ type: "keydown", ...eventR });
+  assert.equal(fakeGame.placementRotationIndex, 2, "placementRotationIndex debe incrementarse a 2");
+
+  inputEvents.abort();
 });

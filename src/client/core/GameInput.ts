@@ -58,19 +58,26 @@ export function setupGameInput(this: Game) {
 			}
 		}
 
-		const hasActiveTransformTarget = !!(
+		const activeObj =
 			this.editorSelection?.getActiveObject?.() ||
 			this.objectInspector?.transformGizmo?.target ||
-			this.objectInspector?.selectedObject
-		);
+			this.objectInspector?.selectedObject;
 
-		if (key === "r" && hasActiveTransformTarget && !this.inventoryManager?.getCurrentItem?.()) {
+		const hasActiveTransformTarget = !!activeObj;
+
+		if (key === "r" && hasActiveTransformTarget) {
 			e.preventDefault();
 			if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
-			const mode = this.objectInspector?.transformGizmo
-				? this.objectInspector.transformGizmo.cycleMode()
-				: this.objectInspector?.cycleTransformMode?.();
-			console.log("Transform Gizmo Mode:", mode);
+			if (this.objectInspector?.transformGizmo) {
+				if (!this.objectInspector.transformGizmo.target && activeObj) {
+					this.objectInspector.transformGizmo.attach(activeObj);
+				}
+				const mode = this.objectInspector.transformGizmo.cycleMode();
+				console.log("Transform Gizmo Mode:", mode);
+			} else if (this.objectInspector?.cycleTransformMode) {
+				const mode = this.objectInspector.cycleTransformMode();
+				console.log("Transform Gizmo Mode:", mode);
+			}
 			return;
 		}
 
@@ -82,6 +89,11 @@ export function setupGameInput(this: Game) {
 		}
 
 		if (key === "r" && this.inventoryManager?.getCurrentItem?.()) {
+			const currentItem = this.inventoryManager.getCurrentItem();
+			if (currentItem instanceof GunItem) {
+				currentItem.reload();
+				return;
+			}
 			e.preventDefault();
 			if (!e.repeat) {
 				this.placementRotationIndex = (this.placementRotationIndex + 1) % 4;

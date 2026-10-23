@@ -8,12 +8,34 @@ export type RespawnPolicy = "start" | "checkpoint" | "spectator" | "none";
 
 export type SpectatorPerspective = "first_person" | "third_person" | "switchable";
 
+export interface SpectatorTransitionConfig {
+	enabled?: boolean;
+	duration?: number; // ms
+	style?: "smooth" | "cinematic" | "instant";
+}
+
 export interface SpectatorConfig {
 	enabled?: boolean;
 	allowFollow?: boolean;
 	perspective?: SpectatorPerspective;
 	allowedRoleIds?: string[];
 	quality?: "full" | "balanced" | "low";
+	transition?: SpectatorTransitionConfig;
+}
+
+export type RespawnProtectionType = "invulnerability" | "shield" | "damage_reduction";
+
+export type RespawnDelayBehavior = "auto" | "button";
+
+/** Temporary protection granted after the player has respawned. */
+export interface RespawnProtectionConfig {
+	enabled?: boolean;
+	duration?: number; // seconds
+	type?: RespawnProtectionType;
+	shieldPoints?: number;
+	damageMultiplier?: number; // fraction of incoming damage that reaches health
+	showVisual?: boolean;
+	cancelOnAttack?: boolean;
 }
 
 export type DeathActionButtonType = "respawn" | "spectate" | "restart" | "lobby";
@@ -47,6 +69,32 @@ export type DeathScreenAnchor =
 	| "bottom-left"
 	| "bottom-center"
 	| "bottom-right";
+
+export type DeathScreenAnimationType =
+	| "none"
+	| "fade"
+	| "slide_up"
+	| "slide_down"
+	| "slide_left"
+	| "slide_right"
+	| "scale_up"
+	| "blur_in";
+
+export type DeathScreenEasing =
+	| "linear"
+	| "easeInQuad"
+	| "easeOutQuad"
+	| "easeInOutQuad"
+	| "easeOutCubic"
+	| "easeOutBack"
+	| "easeOutElastic";
+
+export interface DeathScreenElementAnimation {
+	type?: DeathScreenAnimationType;
+	duration?: number; // ms
+	delay?: number; // ms
+	easing?: DeathScreenEasing;
+}
 
 export interface DeathScreenElementStyle {
 	fontSize?: number;
@@ -96,6 +144,7 @@ export interface DeathScreenElement {
 	isPrimary?: boolean;
 	conditions?: DeathScreenElementConditions;
 	causeOverrides?: Record<string, { content?: string; color?: string; style?: DeathScreenElementStyle }>;
+	animation?: DeathScreenElementAnimation;
 }
 
 export interface DeathScreenTransitions {
@@ -112,6 +161,50 @@ export interface DeathScreenAccessibility {
 	ariaLive?: "polite" | "assertive";
 }
 
+export type DeathScreenBackgroundType = "color" | "gradient" | "image" | "animated";
+
+export type DeathScreenBgAnimationType = "none" | "ken_burns" | "pulse_glow" | "scanlines" | "pan";
+
+export interface DeathScreenBgAnimationConfig {
+	enabled?: boolean;
+	type?: DeathScreenBgAnimationType;
+	duration?: number; // ms
+	speed?: number; // multiplier
+	intensity?: number; // 0 - 1
+}
+
+export interface DeathScreenBackgroundConfig {
+	type?: DeathScreenBackgroundType;
+	color?: string;
+	gradient?: string;
+	imageUrl?: string;
+	imageFit?: "cover" | "contain" | "fill";
+	imagePosition?: string;
+	overlayColor?: string;
+	overlayOpacity?: number; // 0 - 1
+	animation?: DeathScreenBgAnimationConfig;
+}
+
+export type DeathScreenAnimationPreset =
+	| "none"
+	| "subtle"
+	| "dramatic"
+	| "arcade"
+	| "cinematic"
+	| "tactical"
+	| "speed"
+	| "minimalist";
+
+export interface DeathScreenAnimationConfig {
+	enabled?: boolean;
+	preset?: DeathScreenAnimationPreset;
+	stagger?: number; // ms between elements
+	duration?: number; // ms
+	easing?: DeathScreenEasing;
+	exitAnimation?: "none" | "fade" | "scale_down" | "slide_down";
+	spectatorTransition?: SpectatorTransitionConfig;
+}
+
 export interface DeathScreenConfig {
 	version?: number;
 	enabled: boolean;
@@ -120,11 +213,13 @@ export interface DeathScreenConfig {
 	backgroundColor: string;
 	accentColor: string;
 	backgroundImage?: string;
+	background?: DeathScreenBackgroundConfig;
 	screenBlur?: number;
 	buttons: DeathScreenActionButton[];
 	transitions?: DeathScreenTransitions;
 	accessibility?: DeathScreenAccessibility;
 	elements?: DeathScreenElement[];
+	animations?: DeathScreenAnimationConfig;
 }
 
 export interface ExperienceModeProfile {
@@ -138,7 +233,10 @@ export interface ExperienceModeProfile {
 	};
 	respawnPolicy: RespawnPolicy;
 	respawnDelay?: number | null; // in seconds (null/undefined = inherit from player profile)
+	respawnDelayBehavior?: RespawnDelayBehavior; // "auto" (default) or "button" (wait for click after delay)
+	allowSkipRespawnDelay?: boolean; // whether player can skip delay and respawn immediately
 	respawns?: number | null; // null/undefined = inherit from player profile (-1 for infinite, 0 for permadeath, N for extra lives)
+	respawnProtection?: RespawnProtectionConfig;
 	explodeOnDeath?: boolean | null; // null/undefined = inherit from player profile (true/false = explicit override)
 	/** Optional per-role route to another death profile in the same experience. */
 	roleModeAssignments?: Record<string, string>;
@@ -164,6 +262,8 @@ export interface DeathState {
 	cause: DeathCause;
 	willRespawn: boolean;
 	respawnDelay: number;
+	respawnDelayBehavior?: RespawnDelayBehavior;
+	allowSkipRespawnDelay?: boolean;
 	remainingRespawns: number;
 	activeMode: ExperienceModeProfile;
 	context?: DeathContext;
@@ -192,7 +292,7 @@ export function sanitizeImageUrl(url: any): string | undefined {
  * Creates default visual death screen elements for specified starter templates.
  */
 export function createDefaultDeathScreenElements(
-	templateType: "classic" | "tactical" | "racing" | "minimal" = "classic",
+	templateType: "classic" | "tactical" | "racing" | "minimal" | "arcade" | "cinematic" | "speed" = "classic",
 	accentColor = "#ff3b47",
 	backgroundColor = "rgba(13, 15, 23, 0.94)",
 	titleText = "HAS MUERTO",
@@ -568,6 +668,268 @@ export function createDefaultDeathScreenElements(
 		];
 	}
 
+	if (templateType === "arcade") {
+		return [
+			{
+				id: "elem_title",
+				name: "Título Arcade",
+				type: "title",
+				visible: true,
+				x: 50,
+				y: 32,
+				width: 70,
+				height: 14,
+				anchor: "center",
+				zIndex: 2,
+				content: titleText || "GAME OVER",
+				animation: { type: "scale_up", duration: 450, easing: "easeOutBack" },
+				style: {
+					fontSize: 48,
+					fontWeight: "800",
+					color: "#ffd166",
+					textAlign: "center",
+					letterSpacing: "0.15em",
+					textTransform: "uppercase",
+					textShadow: `0 0 25px ${accentColor}, 0 0 10px #ff0055`,
+				},
+			},
+			{
+				id: "elem_subtitle",
+				name: "Subtítulo Arcade",
+				type: "subtitle",
+				visible: true,
+				x: 50,
+				y: 47,
+				width: 60,
+				height: 8,
+				anchor: "center",
+				zIndex: 2,
+				content: messageText || "CONTINUE? INSERTA MONEDA O REINTENTA",
+				animation: { type: "fade", duration: 350, delay: 100 },
+				style: {
+					fontSize: 16,
+					fontWeight: "bold",
+					color: "#00d2ff",
+					textAlign: "center",
+					textTransform: "uppercase",
+					letterSpacing: "0.08em",
+				},
+			},
+			{
+				id: "elem_countdown",
+				name: "Tiempo Límite",
+				type: "respawn_countdown",
+				visible: true,
+				x: 50,
+				y: 57,
+				width: 50,
+				height: 8,
+				anchor: "center",
+				zIndex: 2,
+				content: "CUENTA REGRESIVA: {countdown}",
+				fallbackContent: "LISTO PARA REJUGAR",
+				animation: { type: "scale_up", duration: 300, delay: 200 },
+				style: {
+					fontSize: 22,
+					fontWeight: "800",
+					color: "#ffffff",
+					textAlign: "center",
+					textShadow: "0 0 12px rgba(255, 255, 255, 0.8)",
+				},
+			},
+			{
+				id: "elem_btn_retry",
+				name: "Botón Reintentar Arcade",
+				type: "action_button",
+				visible: true,
+				x: 50,
+				y: 69,
+				width: 28,
+				height: 9,
+				anchor: "center",
+				zIndex: 3,
+				content: "REINTENTAR YA",
+				action: "respawn",
+				isPrimary: true,
+				animation: { type: "scale_up", duration: 400, delay: 250, easing: "easeOutBack" },
+				style: {
+					backgroundColor: accentColor,
+					color: "#0d0f17",
+					fontSize: 16,
+					fontWeight: "800",
+					borderRadius: 6,
+					borderColor: "#ffffff",
+					borderWidth: 2,
+					borderStyle: "solid",
+					boxShadow: `0 0 20px ${accentColor}aa`,
+				},
+			},
+		];
+	}
+
+	if (templateType === "cinematic") {
+		return [
+			{
+				id: "elem_title",
+				name: "Título Cinemático",
+				type: "title",
+				visible: true,
+				x: 50,
+				y: 38,
+				width: 80,
+				height: 12,
+				anchor: "center",
+				zIndex: 2,
+				content: titleText || "CAÍDO EN COMBATE",
+				animation: { type: "blur_in", duration: 800, easing: "easeOutCubic" },
+				style: {
+					fontSize: 34,
+					fontWeight: "bold",
+					color: "#ffffff",
+					textAlign: "center",
+					letterSpacing: "0.22em",
+					textTransform: "uppercase",
+					fontFamily: "Georgia, serif",
+				},
+			},
+			{
+				id: "elem_divider",
+				name: "Separador Cinemático",
+				type: "divider",
+				visible: true,
+				x: 50,
+				y: 46,
+				width: 20,
+				height: 1,
+				anchor: "center",
+				zIndex: 2,
+				animation: { type: "fade", duration: 600, delay: 200 },
+				style: {
+					backgroundColor: `${accentColor}88`,
+				},
+			},
+			{
+				id: "elem_subtitle",
+				name: "Mensaje Cinemático",
+				type: "subtitle",
+				visible: true,
+				x: 50,
+				y: 53,
+				width: 60,
+				height: 8,
+				anchor: "center",
+				zIndex: 2,
+				content: messageText || "Tu señal táctica ha sido interrumpida.",
+				animation: { type: "fade", duration: 600, delay: 300 },
+				style: {
+					fontSize: 15,
+					fontWeight: "normal",
+					color: "rgba(255, 255, 255, 0.75)",
+					textAlign: "center",
+					letterSpacing: "0.05em",
+				},
+			},
+			{
+				id: "elem_btn_continue",
+				name: "Botón Cinemático",
+				type: "action_button",
+				visible: true,
+				x: 50,
+				y: 66,
+				width: 22,
+				height: 8,
+				anchor: "center",
+				zIndex: 3,
+				content: "Reanudar Misión",
+				action: "respawn",
+				isPrimary: true,
+				animation: { type: "fade", duration: 500, delay: 400 },
+				style: {
+					backgroundColor: "rgba(255, 255, 255, 0.12)",
+					borderColor: "rgba(255, 255, 255, 0.35)",
+					borderWidth: 1,
+					borderStyle: "solid",
+					borderRadius: 24,
+					color: "#ffffff",
+					fontSize: 13,
+					fontWeight: "600",
+					letterSpacing: "0.08em",
+				},
+			},
+		];
+	}
+
+	if (templateType === "speed") {
+		return [
+			{
+				id: "elem_title",
+				name: "Título Velocidad",
+				type: "title",
+				visible: true,
+				x: 50,
+				y: 35,
+				width: 70,
+				height: 12,
+				anchor: "center",
+				zIndex: 2,
+				content: titleText || "COLISIÓN CRÍTICA",
+				animation: { type: "slide_left", duration: 350, easing: "easeOutCubic" },
+				style: {
+					fontSize: 38,
+					fontWeight: "800",
+					color: accentColor,
+					textAlign: "center",
+					letterSpacing: "0.1em",
+					textTransform: "uppercase",
+					textShadow: `0 0 20px ${accentColor}88`,
+				},
+			},
+			{
+				id: "elem_subtitle",
+				name: "Subtítulo Velocidad",
+				type: "subtitle",
+				visible: true,
+				x: 50,
+				y: 47,
+				width: 60,
+				height: 8,
+				anchor: "center",
+				zIndex: 2,
+				content: messageText || "Pérdida de control del vehículo.",
+				animation: { type: "slide_right", duration: 350, delay: 80 },
+				style: {
+					fontSize: 15,
+					fontWeight: "600",
+					color: "#ffffff",
+					textAlign: "center",
+				},
+			},
+			{
+				id: "elem_btn_reenter",
+				name: "Botón Volver a la Pista",
+				type: "action_button",
+				visible: true,
+				x: 50,
+				y: 62,
+				width: 26,
+				height: 9,
+				anchor: "center",
+				zIndex: 3,
+				content: "VOLVER A LA PISTA",
+				action: "respawn",
+				isPrimary: true,
+				animation: { type: "scale_up", duration: 300, delay: 150 },
+				style: {
+					backgroundColor: accentColor,
+					color: "#05070c",
+					fontSize: 14,
+					fontWeight: "800",
+					borderRadius: 4,
+				},
+			},
+		];
+	}
+
 	// Classic Template (Default)
 	return [
 		{
@@ -777,6 +1139,19 @@ export function normalizeDeathScreenElements(rawElements: any[]): DeathScreenEle
 				? e.action
 				: "respawn";
 
+			const animation = e.animation && typeof e.animation === "object"
+				? {
+						type: (["none", "fade", "slide_up", "slide_down", "slide_left", "slide_right", "scale_up", "blur_in"].includes(e.animation.type)
+							? e.animation.type
+							: "slide_up") as DeathScreenAnimationType,
+						duration: typeof e.animation.duration === "number" ? Math.max(0, e.animation.duration) : undefined,
+						delay: typeof e.animation.delay === "number" ? Math.max(0, e.animation.delay) : undefined,
+						easing: (["linear", "easeInQuad", "easeOutQuad", "easeInOutQuad", "easeOutCubic", "easeOutBack", "easeOutElastic"].includes(e.animation.easing)
+							? e.animation.easing
+							: undefined) as DeathScreenEasing,
+					}
+				: undefined;
+
 			return {
 				id,
 				name,
@@ -797,8 +1172,62 @@ export function normalizeDeathScreenElements(rawElements: any[]): DeathScreenEle
 				isPrimary: Boolean(e.isPrimary),
 				conditions: e.conditions && typeof e.conditions === "object" ? { ...e.conditions } : undefined,
 				causeOverrides: e.causeOverrides && typeof e.causeOverrides === "object" ? { ...e.causeOverrides } : undefined,
+				animation,
 			};
 		});
+}
+
+/**
+ * Normalizes background configuration with backwards compatibility for legacy attributes.
+ */
+export function normalizeDeathScreenBackground(
+	rawBg: any,
+	legacyBgColor?: string,
+	legacyBgImg?: string
+): DeathScreenBackgroundConfig {
+	const raw = rawBg && typeof rawBg === "object" ? rawBg : {};
+
+	let type: DeathScreenBackgroundType = "gradient";
+	if (["color", "gradient", "image", "animated"].includes(raw.type)) {
+		type = raw.type;
+	} else if (raw.imageUrl || legacyBgImg) {
+		type = "image";
+	} else if (raw.gradient) {
+		type = "gradient";
+	} else if (raw.color || legacyBgColor) {
+		type = "gradient";
+	}
+
+	const color = typeof raw.color === "string" ? raw.color : (typeof legacyBgColor === "string" ? legacyBgColor : "rgba(13, 15, 23, 0.94)");
+	const gradient = typeof raw.gradient === "string" ? raw.gradient : undefined;
+	const imageUrl = sanitizeImageUrl(raw.imageUrl ?? legacyBgImg);
+	const imageFit = ["cover", "contain", "fill"].includes(raw.imageFit) ? raw.imageFit : "cover";
+	const imagePosition = typeof raw.imagePosition === "string" ? raw.imagePosition : "center";
+	const overlayColor = typeof raw.overlayColor === "string" ? raw.overlayColor : "rgba(0, 0, 0, 0.7)";
+	const overlayOpacity = typeof raw.overlayOpacity === "number" ? Math.max(0, Math.min(1, raw.overlayOpacity)) : 0.7;
+
+	const animRaw = raw.animation && typeof raw.animation === "object" ? raw.animation : {};
+	const animation: DeathScreenBgAnimationConfig = {
+		enabled: type === "animated" ? animRaw.enabled !== false : Boolean(animRaw.enabled),
+		type: (["none", "ken_burns", "pulse_glow", "scanlines", "pan"].includes(animRaw.type)
+			? animRaw.type
+			: (type === "animated" ? "ken_burns" : "none")) as DeathScreenBgAnimationType,
+		duration: typeof animRaw.duration === "number" ? Math.max(500, animRaw.duration) : 8000,
+		speed: typeof animRaw.speed === "number" ? animRaw.speed : 1,
+		intensity: typeof animRaw.intensity === "number" ? Math.max(0, Math.min(1, animRaw.intensity)) : 0.5,
+	};
+
+	return {
+		type,
+		color,
+		gradient,
+		imageUrl,
+		imageFit,
+		imagePosition,
+		overlayColor,
+		overlayOpacity,
+		animation,
+	};
 }
 
 /**
@@ -814,9 +1243,10 @@ export function migrateDeathScreenConfig(rawScreen: any, mode?: Partial<Experien
 	const title = typeof rawScreen?.title === "string" && rawScreen.title.trim() ? rawScreen.title.trim() : "HAS MUERTO";
 	const message = typeof rawScreen?.message === "string" ? rawScreen.message : "Has sido eliminado de la partida.";
 	const accentColor = typeof rawScreen?.accentColor === "string" ? rawScreen.accentColor : "#ff3b47";
-	const backgroundColor = typeof rawScreen?.backgroundColor === "string" ? rawScreen.backgroundColor : "rgba(13, 15, 23, 0.92)";
+	const background = normalizeDeathScreenBackground(rawScreen?.background, rawScreen?.backgroundColor, rawScreen?.backgroundImage);
+	const backgroundColor = background.color || (typeof rawScreen?.backgroundColor === "string" ? rawScreen.backgroundColor : "rgba(13, 15, 23, 0.92)");
+	const backgroundImage = background.imageUrl || sanitizeImageUrl(rawScreen?.backgroundImage);
 	const screenBlur = typeof rawScreen?.screenBlur === "number" ? Math.max(0, rawScreen.screenBlur) : 12;
-	const backgroundImage = sanitizeImageUrl(rawScreen?.backgroundImage);
 
 	const buttons: DeathScreenActionButton[] = Array.isArray(rawScreen?.buttons) && rawScreen.buttons.length > 0
 		? rawScreen.buttons.map((b: any, idx: number) => ({
@@ -830,7 +1260,7 @@ export function migrateDeathScreenConfig(rawScreen: any, mode?: Partial<Experien
 			];
 
 	let elements: DeathScreenElement[] = [];
-	if (Array.isArray(rawScreen?.elements) && rawScreen.elements.length > 0) {
+	if (Array.isArray(rawScreen?.elements) && (rawScreen?.version === 2 || rawScreen.elements.length > 0)) {
 		elements = normalizeDeathScreenElements(rawScreen.elements);
 	} else {
 		// Generate equivalent starter elements from legacy attributes
@@ -849,6 +1279,13 @@ export function migrateDeathScreenConfig(rawScreen: any, mode?: Partial<Experien
 		}
 	}
 
+	const allowedPresets: DeathScreenAnimationPreset[] = [
+		"none", "subtle", "dramatic", "arcade", "cinematic", "tactical", "speed", "minimalist"
+	];
+	const preset: DeathScreenAnimationPreset = allowedPresets.includes(rawScreen?.animations?.preset)
+		? rawScreen.animations.preset
+		: "subtle";
+
 	return {
 		version: 2,
 		enabled: rawScreen?.enabled !== false,
@@ -857,6 +1294,7 @@ export function migrateDeathScreenConfig(rawScreen: any, mode?: Partial<Experien
 		backgroundColor,
 		accentColor,
 		backgroundImage,
+		background,
 		screenBlur,
 		buttons,
 		transitions: {
@@ -870,6 +1308,25 @@ export function migrateDeathScreenConfig(rawScreen: any, mode?: Partial<Experien
 			reduceMotion: Boolean(rawScreen?.accessibility?.reduceMotion),
 			highContrast: Boolean(rawScreen?.accessibility?.highContrast),
 			ariaLive: rawScreen?.accessibility?.ariaLive === "assertive" ? "assertive" : "polite",
+		},
+		animations: {
+			enabled: rawScreen?.animations?.enabled !== false,
+			preset,
+			stagger: typeof rawScreen?.animations?.stagger === "number" ? Math.max(0, rawScreen.animations.stagger) : 60,
+			duration: typeof rawScreen?.animations?.duration === "number" ? Math.max(50, rawScreen.animations.duration) : 350,
+			easing: (["linear", "easeInQuad", "easeOutQuad", "easeInOutQuad", "easeOutCubic", "easeOutBack", "easeOutElastic"].includes(rawScreen?.animations?.easing)
+				? rawScreen.animations.easing
+				: "easeOutCubic") as DeathScreenEasing,
+			exitAnimation: (["none", "fade", "scale_down", "slide_down"].includes(rawScreen?.animations?.exitAnimation)
+				? rawScreen.animations.exitAnimation
+				: "fade") as "none" | "fade" | "scale_down" | "slide_down",
+			spectatorTransition: {
+				enabled: rawScreen?.animations?.spectatorTransition?.enabled !== false,
+				duration: typeof rawScreen?.animations?.spectatorTransition?.duration === "number" ? Math.max(50, rawScreen.animations.spectatorTransition.duration) : 400,
+				style: (["smooth", "cinematic", "instant"].includes(rawScreen?.animations?.spectatorTransition?.style)
+					? rawScreen.animations.spectatorTransition.style
+					: "smooth") as "smooth" | "cinematic" | "instant",
+			},
 		},
 		elements,
 	};
@@ -932,8 +1389,17 @@ export function createDefaultExperienceModes(): ExperienceModesData {
 		},
 		respawnPolicy: "start",
 		respawnDelay: undefined, // Inherits from player profile
+		respawnDelayBehavior: "auto",
+		allowSkipRespawnDelay: true,
 		respawns: undefined, // Inherits from player profile
 		explodeOnDeath: undefined, // Inherits from player profile
+		respawnProtection: {
+			enabled: false,
+			duration: 3,
+			type: "invulnerability",
+			showVisual: true,
+			cancelOnAttack: false,
+		},
 		deathScreen: migrateDeathScreenConfig({
 			enabled: true,
 			title: "HAS MUERTO",
@@ -958,8 +1424,17 @@ export function createDefaultExperienceModes(): ExperienceModesData {
 		},
 		respawnPolicy: "checkpoint",
 		respawnDelay: 0.8,
+		respawnDelayBehavior: "auto",
+		allowSkipRespawnDelay: true,
 		respawns: -1,
 		explodeOnDeath: false,
+		respawnProtection: {
+			enabled: false,
+			duration: 1.5,
+			type: "invulnerability",
+			showVisual: true,
+			cancelOnAttack: false,
+		},
 		deathScreen: migrateDeathScreenConfig({
 			enabled: true,
 			title: "FUERA DE PISTA",
@@ -984,8 +1459,13 @@ export function createDefaultExperienceModes(): ExperienceModesData {
 		},
 		respawnPolicy: "spectator",
 		respawnDelay: 0,
+		respawnDelayBehavior: "auto",
+		allowSkipRespawnDelay: false,
 		respawns: 0,
 		explodeOnDeath: true,
+		respawnProtection: {
+			enabled: false,
+		},
 		spectator: {
 			enabled: true,
 			allowFollow: true,
@@ -1050,6 +1530,9 @@ export function normalizeExperienceModesConfig(rawConfig: any): ExperienceModesD
 			? Math.max(0, m.respawnDelay)
 			: (m.respawnDelay === null ? null : undefined);
 
+		const respawnDelayBehavior: RespawnDelayBehavior = m.respawnDelayBehavior === "button" ? "button" : "auto";
+		const allowSkipRespawnDelay: boolean = m.allowSkipRespawnDelay !== false;
+
 		const respawns = typeof m.respawns === "number" && !isNaN(m.respawns)
 			? m.respawns
 			: (m.respawns === null ? null : undefined);
@@ -1057,6 +1540,24 @@ export function normalizeExperienceModesConfig(rawConfig: any): ExperienceModesD
 		const explodeOnDeath = typeof m.explodeOnDeath === "boolean"
 			? m.explodeOnDeath
 			: (m.explodeOnDeath === null ? null : undefined);
+		const protectionType: RespawnProtectionType = ["invulnerability", "shield", "damage_reduction"].includes(m.respawnProtection?.type)
+			? m.respawnProtection.type
+			: "invulnerability";
+		const respawnProtection: RespawnProtectionConfig = {
+			enabled: m.respawnProtection?.enabled === true,
+			duration: typeof m.respawnProtection?.duration === "number" && Number.isFinite(m.respawnProtection.duration)
+				? Math.min(30, Math.max(0, m.respawnProtection.duration))
+				: 3,
+			type: protectionType,
+			shieldPoints: typeof m.respawnProtection?.shieldPoints === "number" && Number.isFinite(m.respawnProtection.shieldPoints)
+				? Math.min(10000, Math.max(0, m.respawnProtection.shieldPoints))
+				: 50,
+			damageMultiplier: typeof m.respawnProtection?.damageMultiplier === "number" && Number.isFinite(m.respawnProtection.damageMultiplier)
+				? Math.min(1, Math.max(0, m.respawnProtection.damageMultiplier))
+				: 0.25,
+			showVisual: m.respawnProtection?.showVisual !== false,
+			cancelOnAttack: m.respawnProtection?.cancelOnAttack === true,
+		};
 
 		const deathScreen = migrateDeathScreenConfig(m.deathScreen, { id });
 
@@ -1067,8 +1568,11 @@ export function normalizeExperienceModesConfig(rawConfig: any): ExperienceModesD
 			enabledCauses,
 			respawnPolicy,
 			respawnDelay,
+			respawnDelayBehavior,
+			allowSkipRespawnDelay,
 			respawns,
 			explodeOnDeath,
+			respawnProtection,
 			roleModeAssignments: m.roleModeAssignments && typeof m.roleModeAssignments === "object" ? { ...m.roleModeAssignments } : {},
 			spectator: {
 				enabled: m.spectator?.enabled !== false,
@@ -1078,6 +1582,13 @@ export function normalizeExperienceModesConfig(rawConfig: any): ExperienceModesD
 					: "third_person") as SpectatorPerspective,
 				allowedRoleIds: Array.isArray(m.spectator?.allowedRoleIds) ? m.spectator.allowedRoleIds.filter((id: any) => typeof id === "string") : [],
 				quality: (["full", "balanced", "low"].includes(m.spectator?.quality) ? m.spectator.quality : "balanced") as "full" | "balanced" | "low",
+				transition: {
+					enabled: m.spectator?.transition?.enabled !== false,
+					duration: typeof m.spectator?.transition?.duration === "number" ? Math.max(50, m.spectator.transition.duration) : 400,
+					style: (["smooth", "cinematic", "instant"].includes(m.spectator?.transition?.style)
+						? m.spectator.transition.style
+						: "smooth") as "smooth" | "cinematic" | "instant",
+				},
 			},
 			deathScreen,
 		};

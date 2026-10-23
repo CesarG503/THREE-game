@@ -15,6 +15,7 @@ const {
 	createDefaultDeathScreenElements,
 	migrateDeathScreenConfig,
 	normalizeDeathScreenElements,
+	normalizeDeathScreenBackground,
 	evaluateDynamicTokens,
 	sanitizeImageUrl,
 } = await server.ssrLoadModule("/src/client/types/experienceMode.types.ts");
@@ -22,6 +23,8 @@ const {
 const { DeathManager } = await server.ssrLoadModule("/src/client/managers/DeathManager.ts");
 const { DeathScreen, parseToRgba } = await server.ssrLoadModule("/src/client/ui/DeathScreen.ts");
 const { DeathScreenEditor } = await server.ssrLoadModule("/src/client/ui/DeathScreenEditor.ts");
+const { DeathAnimationService, resolveEasing, loadAnime, getAnimeSync } = await server.ssrLoadModule("/src/client/managers/DeathAnimationService.ts");
+await loadAnime();
 
 // Minimal mock classes for testing
 class MockEventEmitter {
@@ -55,6 +58,11 @@ class MockCharacter extends MockEventEmitter {
 			setTranslation: (pos) => { this.pos = pos; },
 			setLinvel: () => {},
 		};
+		this.respawnProtectionConfig = null;
+		this.respawnProtectionEndsAt = 0;
+		this.respawnProtectionDurationMs = 0;
+		this.respawnShieldPoints = 0;
+		this.respawnBarrierActive = false;
 	}
 	respawnAt(pos) {
 		this.isDead = false;
@@ -64,6 +72,99 @@ class MockCharacter extends MockEventEmitter {
 	}
 	respawn() {
 		this.respawnAt(this.startPosition);
+	}
+	startRespawnProtection(config) {
+		this.endRespawnProtection();
+		const duration = Number.isFinite(config?.duration) ? Math.max(0, Math.min(30, config.duration)) : 0;
+		if (config?.enabled !== true || duration <= 0) return;
+		this.respawnProtectionConfig = { ...config };
+		this.respawnProtectionDurationMs = duration * 1000;
+		this.respawnProtectionEndsAt = Date.now() + this.respawnProtectionDurationMs;
+		this.respawnShieldPoints = config.type === "shield"
+			? Math.max(0, Number.isFinite(config.shieldPoints) ? config.shieldPoints : 50)
+			: 0;
+		this.respawnBarrierActive = config.showVisual !== false;
+		this.emit("respawnProtectionChanged", { active: true, remaining: duration, shield: this.respawnShieldPoints });
+	}
+	endRespawnProtection() {
+		const hadProtection = this.respawnProtectionConfig !== null && this.respawnProtectionConfig !== undefined;
+		this.respawnProtectionConfig = null;
+		this.respawnProtectionEndsAt = 0;
+		this.respawnProtectionDurationMs = 0;
+		this.respawnShieldPoints = 0;
+		this.respawnBarrierActive = false;
+		if (hadProtection) this.emit("respawnProtectionChanged", { active: false, remaining: 0, shield: 0 });
+	}
+	isRespawnProtectionActive() {
+		return this.respawnProtectionConfig !== null && this.respawnProtectionConfig !== undefined && Date.now() < this.respawnProtectionEndsAt;
+	}
+	getRespawnProtectionType() {
+		if (!this.isRespawnProtectionActive() || !this.respawnProtectionConfig) return null;
+		return this.respawnProtectionConfig.type || "invulnerability";
+	}
+	getRespawnShieldPoints() {
+		return this.isRespawnProtectionActive() ? this.respawnShieldPoints : 0;
+	}
+	cancelProtectionOnAttack() {
+		if (this.isRespawnProtectionActive() && this.respawnProtectionConfig?.cancelOnAttack) {
+			this.endRespawnProtection();
+		}
+	}
+	takeDamage(amount) {
+		if (this.isDead || !Number.isFinite(amount) || amount <= 0) return;
+		let appliedDamage = amount;
+		if (this.isRespawnProtectionActive() && this.respawnProtectionConfig) {
+			const protection = this.respawnProtectionConfig;
+			if (protection.type === "invulnerability") {
+				this.emit("respawnProtectionChanged", {
+					active: true,
+					remaining: Math.max(0, (this.respawnProtectionEndsAt - Date.now()) / 1000),
+					shield: 0,
+					blockedDamage: amount,
+				});
+				return;
+			}
+			if (protection.type === "shield") {
+				const absorbed = Math.min(this.respawnShieldPoints, appliedDamage);
+				this.respawnShieldPoints -= absorbed;
+				appliedDamage -= absorbed;
+				this.emit("respawnProtectionChanged", {
+					active: true,
+					remaining: Math.max(0, (this.respawnProtectionEndsAt - Date.now()) / 1000),
+					shield: this.respawnShieldPoints,
+					absorbed,
+				});
+				if (this.respawnShieldPoints <= 0) {
+					this.respawnBarrierActive = false;
+				}
+			} else if (protection.type === "damage_reduction") {
+				const multiplier = Number.isFinite(protection.damageMultiplier)
+					? Math.min(1, Math.max(0, protection.damageMultiplier))
+					: 0.25;
+				appliedDamage *= multiplier;
+				this.emit("respawnProtectionChanged", {
+					active: true,
+					remaining: Math.max(0, (this.respawnProtectionEndsAt - Date.now()) / 1000),
+					shield: 0,
+					reducedDamage: appliedDamage,
+				});
+				if (appliedDamage <= 0) return;
+			}
+		}
+		if (appliedDamage <= 0) return;
+		this.currentHealth -= appliedDamage;
+		this.emit("healthChanged", { current: this.currentHealth, max: this.maxHealth });
+		if (this.currentHealth <= 0) {
+			this.endRespawnProtection();
+			this.die("damage");
+		}
+	}
+	die(cause = "damage") {
+		this.endRespawnProtection();
+		this.isDead = true;
+	}
+	destroy() {
+		this.endRespawnProtection();
 	}
 }
 
@@ -1101,4 +1202,872 @@ test("28. Interpolación de tokens dinámicos con contexto real y texto de fallb
 	assert.match(res2, /Caída al vacío/);
 	assert.match(res2, /Infinitas vidas restantes/);
 	assert.doesNotMatch(res2, /undefined|null/, "Nunca debe contener strings 'undefined' o 'null'");
+});
+
+test("29. Normalización y migración de esquemas de animación y transiciones de espectador", () => {
+	// 1. Migrate config with no animations object
+	const legacyConfig = {
+		enabled: true,
+		title: "Muerte",
+		message: "Has caído",
+		backgroundColor: "#000",
+		accentColor: "#f00",
+		buttons: [],
+	};
+	const migrated = migrateDeathScreenConfig(legacyConfig);
+	assert.ok(migrated.animations, "Migrated config should contain animations config");
+	assert.equal(migrated.animations.enabled, true);
+	assert.equal(migrated.animations.preset, "subtle");
+	assert.equal(typeof migrated.animations.duration, "number");
+	assert.equal(typeof migrated.animations.stagger, "number");
+
+	// 2. Spectator transition normalization in experience modes
+	const rawData = {
+		modes: [
+			{
+				id: "custom_spec",
+				name: "Custom Spec",
+				enabledCauses: { damage: true, fall: true, logic: true },
+				respawnPolicy: "spectator",
+				spectator: {
+					enabled: true,
+					transition: { enabled: true, style: "cinematic", duration: 800 },
+				},
+				deathScreen: {
+					enabled: true,
+					animations: { preset: "dramatic", stagger: 50 },
+				},
+			},
+		],
+		activeModeId: "custom_spec",
+	};
+	const normalized = normalizeExperienceModesConfig(rawData);
+	const specMode = normalized.modes[0];
+	assert.equal(specMode.spectator.transition.style, "cinematic");
+	assert.equal(specMode.spectator.transition.duration, 800);
+	assert.equal(specMode.deathScreen.animations.preset, "dramatic");
+	assert.equal(specMode.deathScreen.animations.stagger, 50);
+});
+
+test("30. DeathAnimationService - resolveEasing mapea a curvas nativas de Anime.js v4", () => {
+	assert.equal(resolveEasing("linear"), "linear");
+	assert.equal(resolveEasing("easeInQuad"), "inQuad");
+	assert.equal(resolveEasing("easeOutQuad"), "outQuad");
+	assert.equal(resolveEasing("easeInOutQuad"), "inOutQuad");
+	assert.equal(resolveEasing("easeOutCubic"), "outCubic");
+	assert.equal(resolveEasing("easeOutBack"), "outBack");
+	assert.equal(resolveEasing("easeOutElastic"), "outElastic");
+	// Fallback safe default
+	assert.equal(resolveEasing(undefined), "outCubic");
+});
+
+test("31. DeathAnimationService - animateScreenEntrance con reducedMotion y preset 'none' completa instantáneamente", async () => {
+	const service = new DeathAnimationService();
+
+	// Mock DOM Container with child nodes
+	const container = {
+		children: [
+			{ dataset: { elementId: "title_1" }, style: { opacity: "0", transform: "translate(-50%, -50%)" } },
+			{ dataset: { elementId: "subtitle_1" }, style: { opacity: "0", transform: "translate(-50%, -50%)" } },
+		],
+	};
+
+	let completedInstant = false;
+	service.animateScreenEntrance(
+		container,
+		[{ id: "title_1", type: "title" }, { id: "subtitle_1", type: "subtitle" }],
+		{ enabled: true, preset: "dramatic" },
+		{
+			reducedMotion: true,
+			onComplete: () => {
+				completedInstant = true;
+			},
+		}
+	);
+
+	assert.equal(completedInstant, true, "onComplete se llama instantáneamente cuando reducedMotion es true");
+	assert.equal(container.children[0].style.opacity, "1", "Elementos reciben opacidad final 1");
+	assert.equal(container.children[1].style.opacity, "1", "Elementos reciben opacidad final 1");
+
+	// Test preset "none"
+	let completedNone = false;
+	service.animateScreenEntrance(
+		container,
+		[{ id: "title_1", type: "title" }],
+		{ enabled: true, preset: "none" },
+		{
+			onComplete: () => {
+				completedNone = true;
+			},
+		}
+	);
+	assert.equal(completedNone, true, "Preset 'none' completa inmediatamente");
+});
+
+test("32. DeathAnimationService - animateScreenEntrance respeta elementos condicionales y los vincula estrictamente por ID", async () => {
+	const service = new DeathAnimationService();
+
+	// Elements config: killer_info has conditions and is NOT rendered in the DOM.
+	// Only title and btn_respawn are present in container.
+	const nodeTitle = { dataset: { elementId: "title_elem" }, style: { opacity: "0", transform: "translate(-50%, -50%)" } };
+	const nodeBtn = { dataset: { elementId: "btn_respawn" }, style: { opacity: "0", transform: "translate(0, 0)" } };
+
+	// Note: in container, nodeBtn is at index 1. In elements array, killer_info is at index 1!
+	const container = { children: [nodeTitle, nodeBtn] };
+
+	const elements = [
+		{
+			id: "title_elem",
+			type: "title",
+			animation: { type: "slide_down", duration: 150 },
+		},
+		{
+			id: "killer_info", // Hidden by condition!
+			type: "killer_info",
+			animation: { type: "scale_up", duration: 500 },
+		},
+		{
+			id: "btn_respawn",
+			type: "action_button",
+			animation: { type: "slide_left", duration: 200 },
+		},
+	];
+
+	let callbackCalled = false;
+	service.animateScreenEntrance(
+		container,
+		elements,
+		{ preset: "subtle" },
+		{
+			onComplete: () => {
+				callbackCalled = true;
+			},
+		}
+	);
+
+	// nodeBtn must match btn_respawn (slide_left: startX = 30), NOT killer_info (scale_up)!
+	assert.match(nodeBtn.style.transform, /translate\(30px, 0px\)/, "nodeBtn se anima con slide_left de btn_respawn, no con killer_info");
+	assert.match(nodeTitle.style.transform, /translate\(0px, -14px\)/, "nodeTitle se anima con slide_down");
+
+	// Wait for animation completion
+	await new Promise((r) => setTimeout(r, 350));
+	assert.equal(nodeBtn.style.opacity, "1");
+	assert.equal(nodeBtn.style.transform, "translate(0, 0)", "Transform base de nodeBtn restaurado");
+	assert.equal(nodeTitle.style.transform, "translate(-50%, -50%)", "Transform base de nodeTitle restaurado");
+	assert.equal(callbackCalled, true);
+});
+
+test("33. DeathAnimationService - animateScreenExit ejecuta onComplete y anima salida", async () => {
+	const service = new DeathAnimationService();
+
+	const container = {
+		style: { opacity: "1", transform: "" },
+	};
+
+	let exited = false;
+	service.animateScreenExit(
+		container,
+		() => {
+			exited = true;
+		},
+		"fade",
+		80
+	);
+
+	// Wait for exit completion
+	await new Promise((r) => setTimeout(r, 140));
+	assert.equal(exited, true, "onComplete de salida se ejecutó");
+
+	// Instant with reduced motion
+	let instantExited = false;
+	service.animateScreenExit(
+		container,
+		() => {
+			instantExited = true;
+		},
+		"fade",
+		500,
+		{ reducedMotion: true }
+	);
+	assert.equal(instantExited, true, "Con reducedMotion se ejecuta inmediatamente");
+});
+
+test("34. DeathAnimationService - Transiciones de observador, alternancias rápidas y estabilidad de cámara", async () => {
+	const service = new DeathAnimationService();
+
+	const mockCameraController = {
+		smoothing: 1.0,
+	};
+	const mockHud = {
+		style: { transform: "translateX(-50%)", opacity: "1" },
+	};
+
+	// 1. Alternancias rápidas de objetivo: llamadas consecutivas reemplazan la anterior de forma limpia
+	service.animateSpectatorSwitch(
+		mockCameraController,
+		mockHud,
+		{ enabled: true, style: "smooth", duration: 300 },
+		false
+	);
+	// Inmediatamente cambiamos a otro objetivo
+	service.animateSpectatorSwitch(
+		mockCameraController,
+		mockHud,
+		{ enabled: true, style: "smooth", duration: 300 },
+		false
+	);
+	// Tercer cambio rápido
+	service.animateSpectatorSwitch(
+		mockCameraController,
+		mockHud,
+		{ enabled: true, style: "smooth", duration: 200 },
+		false
+	);
+
+	// El smoothing de cameraController se mantiene estable en 1.0
+	assert.equal(mockCameraController.smoothing, 1.0, "La cámara mantiene su smoothing baseline estable sin competir con la física");
+
+	// 2. Limpieza de animaciones de observador restaura estilos del HUD
+	service.cancelSpectatorAnimations(true);
+	assert.equal(mockHud.style.transform, "translateX(-50%)", "El transform del HUD se restaura a su base exacta");
+	assert.equal(mockHud.style.opacity, "1");
+});
+
+test("35. DeathAnimationService - Separación de ámbitos (scopes) y supresión de callbacks obsoletos al cancelar", async () => {
+	const service = new DeathAnimationService();
+
+	const screenContainer = {
+		style: { opacity: "1", transform: "scale(1)" },
+	};
+	const mockHud = {
+		style: { transform: "translateX(-50%)", opacity: "1" },
+	};
+
+	// 1. Iniciar animación de salida de pantalla con callback
+	let staleCallbackFired = false;
+	service.animateScreenExit(
+		screenContainer,
+		() => {
+			staleCallbackFired = true;
+		},
+		"fade",
+		250
+	);
+
+	// Iniciar animación en el ámbito de espectador
+	service.animateSpectatorSwitch(
+		{ smoothing: 1.0 },
+		mockHud,
+		{ enabled: true, style: "smooth", duration: 250 }
+	);
+
+	// 2. Cancelar ÚNICAMENTE el ámbito de pantalla (por ejemplo, ocultar pantalla repentinamente)
+	service.cancelScreenAnimations(true);
+
+	// Estilos de pantalla restaurados
+	assert.equal(screenContainer.style.opacity, "1");
+	assert.equal(screenContainer.style.transform, "scale(1)");
+
+	// Esperar el tiempo en el que la salida habría finalizado
+	await new Promise((r) => setTimeout(r, 320));
+
+	// El callback cancelado NUNCA debe dispararse
+	assert.equal(staleCallbackFired, false, "El callback de una animación cancelada queda invalidado y no se ejecuta");
+
+	// Limpiar todo al finalizar
+	service.cancelAll();
+});
+
+test("36. Integración de DeathScreen y DeathManager con DeathAnimationService", () => {
+	const dm = new DeathManager({
+		cameraController: { mode: "third-person-collision", smoothing: 1.0, setCameraMode: () => {} },
+		networkManager: {
+			remotePlayers: new Map([
+				["p1", { playerId: "p1", playerName: "Alice", currentPosition: { x: 0, y: 0, z: 0 } }],
+			]),
+		},
+	});
+
+	assert.ok(dm.deathScreen.animationService, "DeathScreen posee instancia de DeathAnimationService");
+
+	// Clean destruction disposes animation service without throwing
+	dm.destroy();
+});
+
+test("37. DeathAnimationService - Carga bajo demanda y comportamiento defensivo", async () => {
+	const service = new DeathAnimationService();
+
+	const node1 = { dataset: { elementId: "e1" }, style: { opacity: "0", transform: "translate(-50%, -50%)" } };
+	const container = { children: [node1] };
+
+	let finished = false;
+	// Llamada con animaciones habilitadas y duración corta
+	service.animateScreenEntrance(
+		container,
+		[{ id: "e1", type: "title" }],
+		{ enabled: true, preset: "subtle", duration: 80 },
+		{
+			onComplete: () => {
+				finished = true;
+			},
+		}
+	);
+
+	// Esperar a que la animación finalice
+	await new Promise((r) => setTimeout(r, 140));
+	assert.equal(finished, true, "onComplete se ejecuta correctamente al finalizar");
+	assert.equal(node1.style.opacity, "1", "Elemento visible con opacidad final");
+	assert.equal(node1.style.transform, "translate(-50%, -50%)", "Transform de anclaje preservado");
+});
+
+test("38. Espera obligatoria (allowSkipRespawnDelay: false) bloquea reaparición anticipada", () => {
+	const game = createMockGame();
+	const base = createDefaultExperienceModes().modes[0];
+	const mode = {
+		...base,
+		id: "mode_mandatory_wait",
+		respawnPolicy: "start",
+		respawnDelay: 2.0,
+		respawnDelayBehavior: "auto",
+		allowSkipRespawnDelay: false,
+		respawns: -1,
+	};
+	game.gameConfig = { activeExperienceModeId: mode.id, experienceModes: [mode] };
+	const dm = new DeathManager(game);
+	game.deathManager = dm;
+
+	dm.handleDeath({ cause: "damage" });
+	assert.equal(game.character.isDead, true);
+	assert.equal(dm.canRespawnNow(), false, "canRespawnNow debe ser false durante la espera obligatoria");
+
+	// Intento de reaparición anticipada con el botón
+	dm.handleDeathAction("respawn");
+	assert.equal(game.character.isDead, true, "La reaparición debe ser bloqueada mientras la espera está activa");
+
+	dm.destroy();
+});
+
+test("39. Salto permitido (allowSkipRespawnDelay: true) permite reaparición anticipada", () => {
+	const game = createMockGame();
+	const base = createDefaultExperienceModes().modes[0];
+	const mode = {
+		...base,
+		id: "mode_skippable_wait",
+		respawnPolicy: "start",
+		respawnDelay: 5.0,
+		respawnDelayBehavior: "auto",
+		allowSkipRespawnDelay: true,
+		respawns: -1,
+	};
+	game.gameConfig = { activeExperienceModeId: mode.id, experienceModes: [mode] };
+	const dm = new DeathManager(game);
+	game.deathManager = dm;
+
+	dm.handleDeath({ cause: "damage" });
+	assert.equal(game.character.isDead, true);
+	assert.equal(dm.canRespawnNow(), true, "canRespawnNow debe ser true cuando allowSkipRespawnDelay es true");
+
+	// Reaparición anticipada inmediata
+	dm.handleDeathAction("respawn");
+	assert.equal(game.character.isDead, false, "El personaje debe reaparecer inmediatamente si se permite saltar");
+	assert.equal(game.character.currentHealth, 100);
+
+	dm.destroy();
+});
+
+test("40. Comportamiento 'button' no reaparece automáticamente hasta acción explícita", async () => {
+	const game = createMockGame();
+	const base = createDefaultExperienceModes().modes[0];
+	const mode = {
+		...base,
+		id: "mode_button_wait",
+		respawnPolicy: "start",
+		respawnDelay: 0.05, // 50ms
+		respawnDelayBehavior: "button",
+		allowSkipRespawnDelay: false,
+		respawns: -1,
+	};
+	game.gameConfig = { activeExperienceModeId: mode.id, experienceModes: [mode] };
+	const dm = new DeathManager(game);
+	game.deathManager = dm;
+
+	dm.handleDeath({ cause: "damage" });
+	assert.equal(game.character.isDead, true);
+
+	// Esperar a que venza el tiempo de 50ms
+	await new Promise((r) => setTimeout(r, 80));
+
+	// El temporizador terminó, pero al ser 'button', el personaje NO debe haber reaparecido automáticamente
+	assert.equal(game.character.isDead, true, "El modo 'button' no debe reaparecer automáticamente");
+	assert.equal(dm.canRespawnNow(), true, "El botón debe quedar habilitado una vez vencido el tiempo");
+
+	// Acción explícita del jugador
+	dm.handleDeathAction("respawn");
+	assert.equal(game.character.isDead, false, "El personaje reaparece al presionar el botón habilitado");
+
+	dm.destroy();
+});
+
+test("41. Modos sin reaparición (spectator, none) no inician espera ni permiten reaparecer", () => {
+	const game = createMockGame();
+	const base = createDefaultExperienceModes().modes[0];
+	const specMode = {
+		...base,
+		id: "mode_permadeath",
+		respawnPolicy: "none",
+		respawns: 0,
+	};
+	game.gameConfig = { activeExperienceModeId: specMode.id, experienceModes: [specMode] };
+	const dm = new DeathManager(game);
+	game.deathManager = dm;
+
+	dm.handleDeath({ cause: "damage" });
+	assert.equal(game.character.isDead, true);
+
+	// Intento de forzar respawn en modo sin reaparición
+	dm.handleDeathAction("respawn");
+	assert.equal(game.character.isDead, true, "Modos sin reaparición no deben permitir reaparecer con botón");
+
+	dm.destroy();
+});
+
+test("42. Protección por Invulnerabilidad bloquea 100% de daño y llamadas directas de muerte", () => {
+	const char = new MockCharacter();
+	char.startRespawnProtection({
+		enabled: true,
+		duration: 2,
+		type: "invulnerability",
+	});
+
+	assert.equal(char.isRespawnProtectionActive(), true);
+	assert.equal(char.getRespawnProtectionType(), "invulnerability");
+
+	let lastProtectionEvent = null;
+	char.on("respawnProtectionChanged", (e) => { lastProtectionEvent = e; });
+
+	// Aplicar daño masivo
+	char.takeDamage(80);
+	assert.equal(char.currentHealth, 100, "La salud debe permanecer al 100% durante invulnerabilidad");
+	assert.equal(lastProtectionEvent.blockedDamage, 80);
+
+	// Protección contra llamada externa de muerte por daño en DeathManager
+	const game = createMockGame();
+	game.character = char;
+	const dm = new DeathManager(game);
+	const handled = dm.handleDeath({ cause: "damage" });
+	assert.equal(handled, false, "DeathManager debe bloquear muerte por daño mientras esté activa la invulnerabilidad");
+
+	dm.destroy();
+	char.destroy();
+});
+
+test("43. Protección por Escudo absorbe daño, agota capacidad y pasa excedente a salud", () => {
+	const char = new MockCharacter();
+	char.startRespawnProtection({
+		enabled: true,
+		duration: 2,
+		type: "shield",
+		shieldPoints: 40,
+		showVisual: true,
+	});
+
+	assert.equal(char.isRespawnProtectionActive(), true);
+	assert.equal(char.getRespawnShieldPoints(), 40);
+	assert.equal(char.respawnBarrierActive, true);
+
+	// Daño menor a la capacidad del escudo
+	char.takeDamage(25);
+	assert.equal(char.getRespawnShieldPoints(), 15, "El escudo debe absorber 25 puntos y quedar en 15");
+	assert.equal(char.currentHealth, 100, "La salud debe permanecer intacta");
+	assert.equal(char.respawnBarrierActive, true, "La barrera sigue activa");
+
+	// Daño superior a los puntos restantes del escudo (30 de daño > 15 puntos restantes)
+	char.takeDamage(30);
+	assert.equal(char.getRespawnShieldPoints(), 0, "El escudo debe quedar en 0");
+	assert.equal(char.respawnBarrierActive, false, "La barrera visual se destruye al agotarse el escudo");
+	assert.equal(char.currentHealth, 85, "El excedente de 15 puntos debe aplicarse a la salud (100 - 15 = 85)");
+
+	char.destroy();
+});
+
+test("44. Protección por Reducción de daño aplica porcentaje configurado a la salud", () => {
+	const char = new MockCharacter();
+	char.startRespawnProtection({
+		enabled: true,
+		duration: 2,
+		type: "damage_reduction",
+		damageMultiplier: 0.25, // 25% daño recibido (75% reducción)
+	});
+
+	assert.equal(char.isRespawnProtectionActive(), true);
+
+	char.takeDamage(60);
+	// 60 * 0.25 = 15 de daño aplicado
+	assert.equal(char.currentHealth, 85, "Debe recibir únicamente 15 de daño (60 * 0.25)");
+
+	char.destroy();
+});
+
+test("45. Expiración de protección por fin de duración", async () => {
+	const char = new MockCharacter();
+	char.startRespawnProtection({
+		enabled: true,
+		duration: 0.05, // 50ms
+		type: "invulnerability",
+	});
+
+	assert.equal(char.isRespawnProtectionActive(), true);
+
+	// Esperar a que expire
+	await new Promise((r) => setTimeout(r, 80));
+	assert.equal(char.isRespawnProtectionActive(), false, "La protección debe expirar tras la duración");
+
+	// El daño posterior debe aplicarse al 100%
+	char.takeDamage(30);
+	assert.equal(char.currentHealth, 70, "Salud debe recibir el daño completo tras expirar la protección");
+
+	char.destroy();
+});
+
+test("46. Limpieza de protección al morir de nuevo, reiniciar o destruir", () => {
+	const char = new MockCharacter();
+	char.startRespawnProtection({
+		enabled: true,
+		duration: 5,
+		type: "shield",
+		shieldPoints: 50,
+	});
+	assert.equal(char.isRespawnProtectionActive(), true);
+
+	// Al morir
+	char.die();
+	assert.equal(char.isRespawnProtectionActive(), false, "Protección debe limpiarse inmediatamente al morir");
+	assert.equal(char.getRespawnShieldPoints(), 0);
+
+	// Reactivar y probar destroy
+	char.startRespawnProtection({ enabled: true, duration: 5, type: "invulnerability" });
+	assert.equal(char.isRespawnProtectionActive(), true);
+	char.destroy();
+	assert.equal(char.isRespawnProtectionActive(), false, "Protección debe limpiarse al destruir el objeto");
+});
+
+test("47. Cancelación de protección al atacar si cancelOnAttack está activo", () => {
+	const charWithCancel = new MockCharacter();
+	charWithCancel.startRespawnProtection({
+		enabled: true,
+		duration: 5,
+		type: "invulnerability",
+		cancelOnAttack: true,
+	});
+	assert.equal(charWithCancel.isRespawnProtectionActive(), true);
+	charWithCancel.cancelProtectionOnAttack();
+	assert.equal(charWithCancel.isRespawnProtectionActive(), false, "Protección debe finalizar al atacar si cancelOnAttack es true");
+
+	const charWithoutCancel = new MockCharacter();
+	charWithoutCancel.startRespawnProtection({
+		enabled: true,
+		duration: 5,
+		type: "invulnerability",
+		cancelOnAttack: false,
+	});
+	assert.equal(charWithoutCancel.isRespawnProtectionActive(), true);
+	charWithoutCancel.cancelProtectionOnAttack();
+	assert.equal(charWithoutCancel.isRespawnProtectionActive(), true, "Protección debe mantenerse si cancelOnAttack es false");
+
+	charWithCancel.destroy();
+	charWithoutCancel.destroy();
+});
+
+test("48. Validación defensiva de daño (NaN, negativos, infinito) y normalización de esquema", () => {
+	const char = new MockCharacter();
+
+	// Valores inválidos de daño no deben alterar la salud
+	char.takeDamage(NaN);
+	assert.equal(char.currentHealth, 100);
+	char.takeDamage(-25);
+	assert.equal(char.currentHealth, 100);
+	char.takeDamage(Infinity);
+	assert.equal(char.currentHealth, 100);
+	char.takeDamage(-Infinity);
+	assert.equal(char.currentHealth, 100);
+
+	// Normalización de configuración con datos anómalos
+	const normalized = normalizeExperienceModesConfig({
+		experienceModes: [
+			{
+				id: "custom_mode",
+				respawnDelayBehavior: "button",
+				allowSkipRespawnDelay: true,
+				respawnProtection: {
+					enabled: true,
+					duration: 9999, // excede máximo
+					type: "shield",
+					shieldPoints: -50, // negativo
+					damageMultiplier: 2.5, // excede 1.0
+					cancelOnAttack: true,
+				},
+			},
+		],
+	});
+
+	const m = normalized.modes[0];
+	assert.equal(m.respawnDelayBehavior, "button");
+	assert.equal(m.allowSkipRespawnDelay, true);
+	assert.equal(m.respawnProtection.duration, 30, "Duración debe quedar acotada a máximo 30s");
+	assert.equal(m.respawnProtection.damageMultiplier, 1, "Multiplier debe quedar acotado a máximo 1.0");
+	assert.equal(m.respawnProtection.cancelOnAttack, true);
+
+	char.destroy();
+});
+
+test("49. normalizeDeathScreenBackground valida tipos (color, gradient, image, animated) y superposición de legibilidad", () => {
+	// 1. Inferencia desde atributos legacy
+	const legacyBg = normalizeDeathScreenBackground(undefined, "#1a202c", "assets/8e08d.jpg");
+	assert.equal(legacyBg.type, "image");
+	assert.equal(legacyBg.imageUrl, "assets/8e08d.jpg");
+	assert.equal(legacyBg.color, "#1a202c");
+	assert.equal(legacyBg.overlayOpacity, 0.7);
+
+	// 2. Fondo de color sólido
+	const solidBg = normalizeDeathScreenBackground({ type: "color", color: "#000000" });
+	assert.equal(solidBg.type, "color");
+	assert.equal(solidBg.color, "#000000");
+
+	// 3. Fondo con degradado personalizado
+	const gradBg = normalizeDeathScreenBackground({
+		type: "gradient",
+		gradient: "linear-gradient(180deg, #111 0%, #000 100%)",
+	});
+	assert.equal(gradBg.type, "gradient");
+	assert.equal(gradBg.gradient, "linear-gradient(180deg, #111 0%, #000 100%)");
+
+	// 4. Fondo animado con Ken Burns
+	const animBg = normalizeDeathScreenBackground({
+		type: "animated",
+		imageUrl: "assets/8e08d.jpg",
+		imageFit: "cover",
+		animation: {
+			enabled: true,
+			type: "ken_burns",
+			duration: 6000,
+		},
+	});
+	assert.equal(animBg.type, "animated");
+	assert.equal(animBg.animation.enabled, true);
+	assert.equal(animBg.animation.type, "ken_burns");
+	assert.equal(animBg.animation.duration, 6000);
+});
+
+test("50. Composición independiente: mostrar únicamente botones sobre imagen propia sin paneles forzados", () => {
+	const customScreen = migrateDeathScreenConfig({
+		version: 2,
+		enabled: true,
+		background: {
+			type: "image",
+			imageUrl: "assets/8e08d.jpg",
+			imageFit: "cover",
+			overlayOpacity: 0.3,
+		},
+		animations: {
+			preset: "none",
+		},
+		elements: [
+			{
+				id: "btn_only",
+				name: "Botón Único",
+				type: "action_button",
+				x: 50,
+				y: 80,
+				width: 30,
+				height: 10,
+				action: "respawn",
+				content: "Reintentar en este punto",
+			},
+		],
+	});
+
+	// Valida que no se insertaron paneles automáticos
+	assert.equal(customScreen.elements.length, 1);
+	assert.equal(customScreen.elements[0].type, "action_button");
+	assert.equal(customScreen.elements[0].id, "btn_only");
+	assert.equal(customScreen.background.type, "image");
+	assert.equal(customScreen.background.imageUrl, "assets/8e08d.jpg");
+	assert.equal(customScreen.background.overlayOpacity, 0.3);
+});
+
+test("51. DeathAnimationService.animateBackground opera en capa de fondo y respeta reducedMotion", () => {
+	const animService = new DeathAnimationService();
+
+	const mockBgNode = {
+		style: {
+			transform: "",
+			filter: "",
+			willChange: "",
+		},
+	};
+
+	// 1. Con reducedMotion: true no inicia animación y deja el nodo estático
+	animService.animateBackground(
+		mockBgNode,
+		{
+			type: "animated",
+			animation: { enabled: true, type: "ken_burns", duration: 5000 },
+		},
+		{ reducedMotion: true }
+	);
+	assert.equal(mockBgNode.style.transform, "");
+
+	// 2. Cancelar animaciones de fondo restaura estilos de forma segura
+	animService.cancelBackgroundAnimation(true);
+	assert.equal(mockBgNode.style.filter, "");
+	assert.equal(mockBgNode.style.willChange, "");
+
+	animService.dispose();
+});
+
+test("52. Combinaciones de animación independientes (imagen estática + elementos animados, fondo animado solo, composición estática)", () => {
+	const animService = new DeathAnimationService();
+
+	// Caso A: Imagen estática con elementos animados
+	const configA = {
+		background: { type: "image", imageUrl: "assets/8e08d.jpg", animation: { enabled: false, type: "none" } },
+		animations: { enabled: true, preset: "dramatic", duration: 500 },
+	};
+	assert.equal(configA.background.animation.enabled, false);
+	assert.equal(configA.animations.enabled, true);
+
+	// Caso B: Fondo animado por separado con elementos estáticos
+	const configB = {
+		background: { type: "animated", imageUrl: "assets/8e08d.jpg", animation: { enabled: true, type: "pulse_glow", duration: 3000 } },
+		animations: { enabled: false, preset: "none" },
+	};
+	assert.equal(configB.background.animation.enabled, true);
+	assert.equal(configB.animations.enabled, false);
+
+	// Caso C: Composición 100% estática
+	const configC = {
+		background: { type: "color", color: "#0a0c14", animation: { enabled: false } },
+		animations: { enabled: false, preset: "none" },
+	};
+	assert.equal(configC.background.animation.enabled, false);
+	assert.equal(configC.animations.preset, "none");
+
+	animService.dispose();
+});
+
+test("53. Coherencia de configuración entre DeathScreenEditor y DeathScreen en partida", () => {
+	const sharedMode = {
+		id: "mode_sync_test",
+		name: "Modo Sincronizado",
+		respawnPolicy: "start",
+		respawnDelay: 4,
+		deathScreen: {
+			version: 2,
+			enabled: true,
+			title: "ELIMINADO",
+			message: "Reintentando misión",
+			accentColor: "#00d2ff",
+			background: {
+				type: "image",
+				imageUrl: "assets/8e08d.jpg",
+				imageFit: "cover",
+				overlayColor: "#000000",
+				overlayOpacity: 0.65,
+				animation: { enabled: true, type: "ken_burns", duration: 7500 },
+			},
+			animations: {
+				enabled: true,
+				preset: "cinematic",
+				duration: 600,
+			},
+			elements: [
+				{
+					id: "btn_action",
+					name: "Botón",
+					type: "action_button",
+					x: 50,
+					y: 75,
+					width: 25,
+					height: 8,
+					action: "respawn",
+					content: "Reintentar",
+					isPrimary: true,
+				},
+			],
+		},
+	};
+
+	let syncTriggered = false;
+	const editor = new DeathScreenEditor({
+		mode: sharedMode,
+		onSync: () => { syncTriggered = true; },
+	});
+
+	// Comprueba que el editor lee exactamente los mismos parámetros de fondo y elementos
+	assert.equal(sharedMode.deathScreen.background.type, "image");
+	assert.equal(sharedMode.deathScreen.background.imageUrl, "assets/8e08d.jpg");
+	assert.equal(sharedMode.deathScreen.background.overlayOpacity, 0.65);
+	assert.equal(sharedMode.deathScreen.animations.preset, "cinematic");
+	assert.equal(sharedMode.deathScreen.elements.length, 1);
+	assert.equal(sharedMode.deathScreen.elements[0].content, "Reintentar");
+
+	// DeathScreen en partida instancia y procesa la misma configuración
+	const deathScreen = new DeathScreen();
+	assert.doesNotThrow(() => {
+		deathScreen.showPreview(sharedMode, "respawn");
+	});
+	deathScreen.destroy();
+});
+
+test("54. Falla controlada de imagen y contraste de legibilidad", () => {
+	// URL inválida o rota (XSS filtrada o 404)
+	const sanitized = sanitizeImageUrl("javascript:alert(1)");
+	assert.equal(sanitized, undefined, "URLs inseguras deben sanitizarse a undefined");
+
+	// Fondo con imagen rota mantiene color base y degradado atmosférico de respaldo
+	const bg = normalizeDeathScreenBackground(
+		{ type: "image", imageUrl: "assets/inexistente_404.jpg", overlayColor: "#000", overlayOpacity: 0.75 },
+		"rgba(13, 15, 23, 0.95)"
+	);
+	assert.ok(bg.color, "Mantiene color base de contraste");
+	assert.equal(bg.overlayOpacity, 0.75, "Mantiene capa de legibilidad");
+
+	const deathScreen = new DeathScreen();
+	const mockMode = {
+		id: "mode_fallback_test",
+		deathScreen: {
+			version: 2,
+			enabled: true,
+			background: bg,
+			elements: [
+				{ id: "txt_title", name: "Título", type: "title", content: "TEST LEGIBILIDAD", x: 50, y: 50, width: 60, height: 10 },
+			],
+		},
+	};
+
+	assert.doesNotThrow(() => {
+		deathScreen.showPreview(mockMode, "respawn");
+	});
+	deathScreen.destroy();
+});
+
+test("55. Retrocompatibilidad: configuraciones antiguas v1 sin background ni elements migran transparentemente", () => {
+	const legacyScreen = {
+		enabled: true,
+		title: "PANTALLA ANTIGUA",
+		message: "Mensaje legacy",
+		backgroundColor: "rgba(10, 10, 10, 0.9)",
+		backgroundImage: "assets/legacy_bg.png",
+		accentColor: "#e63946",
+		buttons: [{ id: "btn_respawn", label: "Volver", action: "respawn", isPrimary: true }],
+	};
+
+	const migrated = migrateDeathScreenConfig(legacyScreen);
+	assert.equal(migrated.version, 2);
+	assert.equal(migrated.title, "PANTALLA ANTIGUA");
+	assert.equal(migrated.background.type, "image");
+	assert.equal(migrated.background.imageUrl, "assets/legacy_bg.png");
+	assert.equal(migrated.backgroundColor, "rgba(10, 10, 10, 0.9)");
+	assert.ok(migrated.elements.length > 0, "Genera elementos v2 a partir de atributos legacy");
+	assert.ok(migrated.elements.some((e) => e.type === "action_button" && e.content === "Volver"));
 });

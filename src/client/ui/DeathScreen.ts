@@ -8,7 +8,9 @@ import type {
 import {
 	evaluateDynamicTokens,
 	sanitizeImageUrl,
+	normalizeDeathScreenBackground,
 } from "../types/experienceMode.types";
+import { DeathAnimationService } from "../managers/DeathAnimationService";
 
 export type DeathScreenActionCallback = (action: DeathActionButtonType) => void;
 
@@ -48,6 +50,7 @@ export function parseToRgba(colorStr: string, fallbackAlpha = 0.9): string {
 
 export class DeathScreen {
 	private element: HTMLDivElement;
+	private bgLayer: HTMLDivElement;
 	private card: HTMLDivElement;
 	private visualContainer: HTMLDivElement;
 	private titleEl: HTMLHeadingElement;
@@ -64,9 +67,11 @@ export class DeathScreen {
 	private currentButtons: Array<{ button: HTMLButtonElement; action: DeathActionButtonType; isPrimary?: boolean }> = [];
 	private countdownElements: Array<{ el: HTMLElement; template: string; fallback?: string }> = [];
 	private lastDeathState: DeathState | null = null;
+	public animationService: DeathAnimationService;
 
 	constructor(onAction?: DeathScreenActionCallback) {
 		this.onActionCallback = onAction || null;
+		this.animationService = new DeathAnimationService();
 
 		if (typeof document === "undefined") {
 			const dummy: any = {
@@ -78,6 +83,7 @@ export class DeathScreen {
 				setAttribute: () => {},
 			};
 			this.element = dummy;
+			this.bgLayer = dummy;
 			this.card = dummy;
 			this.visualContainer = dummy;
 			this.titleEl = dummy;
@@ -147,6 +153,20 @@ export class DeathScreen {
 		closePreviewBtn.onclick = () => this.hide();
 		this.previewBanner.append(bannerText, closePreviewBtn);
 		this.element.appendChild(this.previewBanner);
+
+		// Dedicated Background Layer (isolated from UI elements and element animations)
+		this.bgLayer = document.createElement("div");
+		this.bgLayer.id = "viper-death-bg-layer";
+		this.bgLayer.style.cssText = `
+			position: absolute;
+			inset: -5%;
+			width: 110%;
+			height: 110%;
+			overflow: hidden;
+			pointer-events: none;
+			z-index: 0;
+		`;
+		this.element.appendChild(this.bgLayer);
 
 		// Visual Layout Viewport Container (for v2 schema)
 		this.visualContainer = document.createElement("div");
@@ -258,7 +278,7 @@ export class DeathScreen {
 		this.applyVisualStyles(config);
 
 		// Check if v2 visual elements layout is present
-		if (Array.isArray(config.elements) && config.elements.length > 0) {
+		if (Array.isArray(config.elements) && (config.version === 2 || config.elements.length > 0)) {
 			this.card.style.display = "none";
 			this.visualContainer.style.display = "block";
 			this.renderVisualElements(config, state);
@@ -291,13 +311,25 @@ export class DeathScreen {
 				this.updateCountdown();
 				this.intervalId = setInterval(() => this.updateCountdown(), 100) as any;
 			} else if (state.willRespawn && state.respawnDelay === 0) {
-				this.countdownEl.textContent = "Reaparición inmediata disponible";
+				this.countdownEl.textContent = state.respawnDelayBehavior === "button"
+					? "¡Listo para reaparecer!"
+					: "Reaparición inmediata disponible";
 			} else {
 				this.countdownEl.textContent = "";
 			}
 		}
 
+		this.updateRespawnButtonState();
+
 		this.element.style.display = "flex";
+
+		// Trigger entrance animations via DeathAnimationService
+		const isReducedMotion = config.accessibility?.reduceMotion || this.animationService.isReducedMotion();
+		if (Array.isArray(config.elements) && (config.version === 2 || config.elements.length > 0)) {
+			this.animationService.animateScreenEntrance(this.visualContainer, config.elements, config.animations, { reducedMotion: isReducedMotion });
+		} else {
+			this.animationService.animateScreenEntrance(this.card, [], config.animations, { reducedMotion: isReducedMotion });
+		}
 
 		// Auto-focus primary button for screen-readers and gamepad/keyboard navigation
 		setTimeout(() => {
@@ -340,7 +372,7 @@ export class DeathScreen {
 		const config = mode.deathScreen;
 		this.applyVisualStyles(config);
 
-		if (Array.isArray(config.elements) && config.elements.length > 0) {
+		if (Array.isArray(config.elements) && (config.version === 2 || config.elements.length > 0)) {
 			this.card.style.display = "none";
 			this.visualContainer.style.display = "block";
 			this.renderVisualElements(config, mockState);
@@ -368,11 +400,22 @@ export class DeathScreen {
 			this.renderButtons(config, isRespawn);
 		}
 
+		this.updateRespawnButtonState();
+
 		this.element.style.display = "flex";
+
+		// Trigger entrance animations in preview mode too
+		const isReducedMotion = config.accessibility?.reduceMotion || this.animationService.isReducedMotion();
+		if (Array.isArray(config.elements) && (config.version === 2 || config.elements.length > 0)) {
+			this.animationService.animateScreenEntrance(this.visualContainer, config.elements, config.animations, { reducedMotion: isReducedMotion });
+		} else {
+			this.animationService.animateScreenEntrance(this.card, [], config.animations, { reducedMotion: isReducedMotion });
+		}
 	}
 
 	hide() {
 		this.clearCountdown();
+		this.animationService.cancelScreenAnimations(true);
 		if (this.element && this.element.style) {
 			this.element.style.display = "none";
 		}
@@ -384,6 +427,7 @@ export class DeathScreen {
 
 	destroy() {
 		this.clearCountdown();
+		this.animationService.dispose();
 		if (typeof window !== "undefined") {
 			window.removeEventListener("keydown", this.handleKeyDown);
 		}
@@ -513,7 +557,15 @@ export class DeathScreen {
 					img.style.maxHeight = "100%";
 					img.style.objectFit = "contain";
 					img.style.pointerEvents = "none";
+					img.onerror = () => {
+						img.style.display = "none";
+						if (elem.fallbackContent || elem.content) {
+							el.textContent = elem.fallbackContent || elem.content || "";
+						}
+					};
 					el.appendChild(img);
+				} else if (elem.fallbackContent || elem.content) {
+					el.textContent = elem.fallbackContent || elem.content || "";
 				}
 			} else {
 				el.textContent = resolvedText;
@@ -572,7 +624,8 @@ export class DeathScreen {
 	}
 
 	private applyVisualStyles(config: DeathScreenConfig) {
-		const rawBg = config.backgroundColor || "rgba(13, 15, 23, 0.92)";
+		const bg = normalizeDeathScreenBackground(config.background, config.backgroundColor, config.backgroundImage);
+		const rawBg = bg.color || config.backgroundColor || "rgba(13, 15, 23, 0.92)";
 		const accent = config.accentColor || "#ff3b47";
 		const blur = typeof config.transitions?.blur === "number"
 			? config.transitions.blur
@@ -588,13 +641,90 @@ export class DeathScreen {
 		const duration = isReducedMotion ? 0 : (config.transitions?.duration ?? 0.25);
 		this.element.style.transition = `opacity ${duration}s ease`;
 
-		this.element.style.backgroundColor = "rgba(5, 7, 12, 0.90)";
-		const bgImg = sanitizeImageUrl(config.backgroundImage);
-		if (bgImg) {
-			this.element.style.background = `linear-gradient(rgba(0, 0, 0, 0.65), rgba(0, 0, 0, 0.85)), url("${bgImg}") center/cover no-repeat`;
-		} else {
-			this.element.style.background = `radial-gradient(ellipse at center, ${overlayCenterBg}, rgba(5, 7, 12, 0.97) 80%)`;
+		// Compose background layers inside dedicated bgLayer container
+		if (this.bgLayer && this.bgLayer.style) {
+			this.bgLayer.innerHTML = "";
+			this.bgLayer.style.background = "";
+			this.bgLayer.style.filter = "";
+
+			const bgType = bg.type || (bg.imageUrl ? "image" : "gradient");
+
+			if (bgType === "color") {
+				// Pure solid color without forced gradients
+				this.bgLayer.style.backgroundColor = bg.color || rawBg;
+			} else if (bgType === "gradient") {
+				// Custom or preset gradient
+				if (bg.gradient) {
+					this.bgLayer.style.background = bg.gradient;
+				} else {
+					this.bgLayer.style.background = `radial-gradient(ellipse at center, ${overlayCenterBg}, rgba(5, 7, 12, 0.97) 80%)`;
+				}
+			} else if (bgType === "image" || bgType === "animated") {
+				// Base backdrop color and gradient fallback for robustness if image fails or is loading
+				this.bgLayer.style.backgroundColor = bg.color || "#05070c";
+				this.bgLayer.style.background = bg.gradient || `radial-gradient(ellipse at center, ${overlayCenterBg}, rgba(5, 7, 12, 0.97) 80%)`;
+
+				const imgUrl = bg.imageUrl;
+				if (imgUrl) {
+					const imgEl = document.createElement("div");
+					imgEl.className = "viper-death-bg-image";
+					imgEl.style.cssText = `
+						position: absolute;
+						inset: 0;
+						width: 100%;
+						height: 100%;
+						background-image: url("${imgUrl}");
+						background-size: ${bg.imageFit || "cover"};
+						background-position: ${bg.imagePosition || "center"};
+						background-repeat: no-repeat;
+						pointer-events: none;
+					`;
+					this.bgLayer.appendChild(imgEl);
+				}
+
+				// Readability overlay layer on top of image
+				const overlayOpacity = bg.overlayOpacity ?? 0.7;
+				if (overlayOpacity > 0) {
+					const overlayEl = document.createElement("div");
+					overlayEl.className = "viper-death-bg-overlay";
+					overlayEl.style.cssText = `
+						position: absolute;
+						inset: 0;
+						width: 100%;
+						height: 100%;
+						background-color: ${bg.overlayColor || "rgba(0, 0, 0, 0.7)"};
+						opacity: ${overlayOpacity};
+						pointer-events: none;
+					`;
+					this.bgLayer.appendChild(overlayEl);
+				}
+
+				// Scanline decorative layer if requested
+				if (bg.animation?.type === "scanlines" && !isReducedMotion) {
+					const scanlinesEl = document.createElement("div");
+					scanlinesEl.className = "viper-death-bg-scanlines";
+					scanlinesEl.style.cssText = `
+						position: absolute;
+						inset: 0;
+						width: 100%;
+						height: 100%;
+						background: repeating-linear-gradient(0deg, rgba(0,0,0,0.15) 0px, rgba(0,0,0,0.15) 1px, transparent 1px, transparent 3px);
+						pointer-events: none;
+						opacity: 0.8;
+					`;
+					this.bgLayer.appendChild(scanlinesEl);
+				}
+
+				// Trigger independent background animation
+				if ((bgType === "animated" || bg.animation?.enabled) && !isReducedMotion) {
+					this.animationService.animateBackground(this.bgLayer, bg, { reducedMotion: isReducedMotion });
+				} else {
+					this.animationService.cancelBackgroundAnimation(true);
+				}
+			}
 		}
+
+		this.element.style.background = "transparent";
 
 		if (!isReducedMotion && blur > 0) {
 			this.element.style.backdropFilter = `blur(${blur}px)`;
@@ -669,14 +799,59 @@ export class DeathScreen {
 		});
 	}
 
+	public canRespawnNow(): boolean {
+		if (this.isPreviewing) return true;
+		if (!this.lastDeathState || !this.lastDeathState.willRespawn) return false;
+		if (this.lastDeathState.allowSkipRespawnDelay === true) return true;
+		return Date.now() >= this.respawnAt;
+	}
+
+	private updateRespawnButtonState() {
+		const canRespawn = this.canRespawnNow();
+		for (const b of this.currentButtons) {
+			if (b.action === "respawn") {
+				b.button.disabled = !canRespawn;
+				b.button.style.opacity = canRespawn ? "1" : "0.5";
+				b.button.style.cursor = canRespawn ? "pointer" : "not-allowed";
+				if (canRespawn) {
+					b.button.removeAttribute("aria-disabled");
+				} else {
+					b.button.setAttribute("aria-disabled", "true");
+				}
+			}
+		}
+	}
+
 	private triggerAction(action: DeathActionButtonType) {
 		if (this.isPreviewing) {
 			this.hide();
 			return;
 		}
 
-		if (this.onActionCallback) {
-			this.onActionCallback(action);
+		if (action === "respawn" && !this.canRespawnNow()) {
+			return;
+		}
+
+		const config = this.lastDeathState?.activeMode?.deathScreen;
+		const exitType = config?.animations?.exitAnimation || "none";
+		const isReduced = config?.accessibility?.reduceMotion || this.animationService.isReducedMotion();
+
+		if (exitType !== "none" && !isReduced && this.element?.style?.display === "flex") {
+			this.animationService.animateScreenExit(
+				this.element,
+				() => {
+					this.hide();
+					if (this.onActionCallback) {
+						this.onActionCallback(action);
+					}
+				},
+				exitType
+			);
+		} else {
+			this.hide();
+			if (this.onActionCallback) {
+				this.onActionCallback(action);
+			}
 		}
 	}
 
@@ -713,6 +888,7 @@ export class DeathScreen {
 			const focusedBtn = this.currentButtons.find((b) => b.button === document.activeElement);
 			if (focusedBtn) {
 				e.preventDefault();
+				if (focusedBtn.action === "respawn" && !this.canRespawnNow()) return;
 				this.triggerAction(focusedBtn.action);
 				return;
 			}
@@ -721,6 +897,7 @@ export class DeathScreen {
 			const primary = this.currentButtons.find((b) => b.isPrimary) || this.currentButtons[0];
 			if (primary) {
 				e.preventDefault();
+				if (primary.action === "respawn" && !this.canRespawnNow()) return;
 				this.triggerAction(primary.action);
 			}
 		}
@@ -728,19 +905,27 @@ export class DeathScreen {
 
 	private updateCountdown() {
 		const seconds = Math.max(0, (this.respawnAt - Date.now()) / 1000);
+		const behavior = this.lastDeathState?.activeMode?.respawnDelayBehavior || "auto";
+
 		if (seconds > 0) {
-			this.countdownEl.textContent = `Reapareciendo en ${seconds.toFixed(1)} s…`;
+			this.countdownEl.textContent = behavior === "button"
+				? `Espera obligatoria: ${seconds.toFixed(1)} s…`
+				: `Reapareciendo en ${seconds.toFixed(1)} s…`;
 			if (this.countdownElements.length > 0 && this.lastDeathState) {
 				const tempState = { ...this.lastDeathState, respawnDelay: seconds };
 				this.countdownElements.forEach((item) => {
 					item.el.textContent = evaluateDynamicTokens(item.template, tempState, item.fallback || "");
 				});
 			}
+			this.updateRespawnButtonState();
 		} else {
-			this.countdownEl.textContent = "¡Listo para reaparecer!";
+			this.countdownEl.textContent = behavior === "button"
+				? "¡Listo para reaparecer!"
+				: "Reapareciendo…";
 			this.countdownElements.forEach((item) => {
 				item.el.textContent = item.fallback || "¡Listo para reaparecer!";
 			});
+			this.updateRespawnButtonState();
 			this.clearCountdown();
 		}
 	}

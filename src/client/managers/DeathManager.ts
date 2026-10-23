@@ -53,6 +53,8 @@ export class DeathManager {
 	};
 
 	private respawnTimer: number | null = null;
+	private respawnAvailableAt = 0;
+	private lastDeathState: DeathState | null = null;
 
 	constructor(game: any) {
 		this.game = game;
@@ -112,8 +114,13 @@ export class DeathManager {
 		const mode = this.getActiveMode();
 
 		// Check if cause is enabled in the active experience mode
-		if (context.cause === "damage" && !mode.enabledCauses.damage) {
-			return false;
+		if (context.cause === "damage") {
+			if (character.isRespawnProtectionActive?.() && character.getRespawnProtectionType?.() === "invulnerability") {
+				return false;
+			}
+			if (!mode.enabledCauses.damage) {
+				return false;
+			}
 		}
 
 		if (context.cause === "fall") {
@@ -131,6 +138,7 @@ export class DeathManager {
 		}
 
 		this.isProcessingDeath = true;
+		character.endRespawnProtection?.();
 		character.isDead = true;
 		character.currentHealth = 0;
 		character.emit("healthChanged", { current: 0, max: character.maxHealth });
@@ -190,34 +198,47 @@ export class DeathManager {
 			this.game.constructionMenu.logicSystem.emitSignal("player_death");
 		}
 
+		this.clearTimer();
+
 		const delay = (typeof mode.respawnDelay === "number" && !isNaN(mode.respawnDelay))
 			? Math.max(0, mode.respawnDelay)
 			: (typeof character.respawnDelay === "number" && !isNaN(character.respawnDelay))
 				? Math.max(0, character.respawnDelay)
 				: 2.0;
 
+		const behavior = mode.respawnDelayBehavior || "auto";
+		const allowSkip = mode.allowSkipRespawnDelay === true;
+		this.respawnAvailableAt = (willRespawn && delay > 0) ? Date.now() + delay * 1000 : 0;
+
 		const deathState: DeathState = {
 			cause: context.cause,
 			willRespawn,
 			respawnDelay: delay,
+			respawnDelayBehavior: behavior,
+			allowSkipRespawnDelay: allowSkip,
 			remainingRespawns: this.remainingLives,
 			activeMode: mode,
 			context,
 		};
+		this.lastDeathState = deathState;
 
 		// Show custom death screen
 		this.deathScreen.show(deathState);
 
 		// Schedule respawn if applicable
-		this.clearTimer();
 		if (willRespawn) {
 			if (delay > 0) {
-				this.respawnTimer = setTimeout(() => {
-					this.executeRespawn();
-				}, delay * 1000) as any;
+				if (behavior === "auto") {
+					this.respawnTimer = setTimeout(() => {
+						this.executeRespawn({ fromTimer: true });
+					}, delay * 1000) as any;
+				}
+				// If behavior === "button", button enables when countdown reaches zero without auto-respawn
 			} else {
-				// Immediate respawn (no delay): execute immediately so player doesn't get stuck
-				this.executeRespawn();
+				// Immediate respawn (no delay): execute immediately if auto
+				if (behavior === "auto") {
+					this.executeRespawn({ fromTimer: true });
+				}
 			}
 		} else if (!willRespawn && mode.respawnPolicy === "spectator") {
 			// Auto transition to spectator after short moment if desired
@@ -228,23 +249,46 @@ export class DeathManager {
 	}
 
 	/**
+	 * Returns true if the player is allowed to respawn right now, based on mode settings and countdown.
+	 */
+	public canRespawnNow(): boolean {
+		const mode = this.getActiveMode();
+		if (mode.respawnPolicy === "none" || mode.respawnPolicy === "spectator") {
+			return false;
+		}
+		if (this.lastDeathState && !this.lastDeathState.willRespawn) {
+			return false;
+		}
+		if (mode.allowSkipRespawnDelay === true) return true;
+		if (this.respawnAvailableAt <= 0) return true;
+		return Date.now() >= this.respawnAvailableAt;
+	}
+
+	/**
 	 * Handles actions triggered by the death screen buttons.
 	 */
 	public handleDeathAction(action: DeathActionButtonType) {
 		switch (action) {
 			case "respawn":
+				if (!this.canRespawnNow()) {
+					console.warn("[DeathManager] Reaparición bloqueada: espera obligatoria activa.");
+					return;
+				}
 				this.executeRespawn();
 				break;
 			case "spectate":
+				this.clearTimer();
 				this.enterSpectator();
 				this.deathScreen.hide();
 				break;
 			case "restart":
+				this.clearTimer();
 				const mode = this.getActiveMode();
 				this.remainingLives = mode.respawns;
 				this.executeRespawn({ forceStart: true });
 				break;
 			case "lobby":
+				this.clearTimer();
 				this.deathScreen.hide();
 				if (this.game.router) {
 					this.game.router.navigate("/");
@@ -258,12 +302,21 @@ export class DeathManager {
 	/**
 	 * Respawns the player according to policy and checkpoint.
 	 */
-	public executeRespawn(options?: { forceStart?: boolean }) {
+	public executeRespawn(options?: { forceStart?: boolean; force?: boolean; fromTimer?: boolean }) {
+		if (!options?.forceStart && !options?.force && !options?.fromTimer && !this.canRespawnNow()) {
+			return;
+		}
+		const mode = this.getActiveMode();
+		if (!options?.forceStart && !options?.force && (mode.respawnPolicy === "none" || mode.respawnPolicy === "spectator")) {
+			return;
+		}
+		if (!options?.forceStart && !options?.force && this.lastDeathState && !this.lastDeathState.willRespawn) {
+			return;
+		}
 		this.clearTimer();
+		this.lastDeathState = null;
 		const character = this.game?.character;
 		if (!character) return;
-
-		const mode = this.getBaseActiveMode();
 
 		let targetPos: THREE.Vector3;
 		if (options?.forceStart || mode.respawnPolicy === "start") {
@@ -275,7 +328,9 @@ export class DeathManager {
 		}
 
 		// Respawn character at determined coordinates
+		let respawned = false;
 		if (typeof character.respawnAt === "function") {
+			respawned = Boolean(character.rigidBody);
 			character.respawnAt(targetPos);
 		} else {
 			character.isDead = false;
@@ -287,7 +342,9 @@ export class DeathManager {
 				character.rigidBody.setTranslation({ x: targetPos.x, y: targetPos.y, z: targetPos.z }, true);
 				character.rigidBody.setLinvel({ x: 0, y: 0, z: 0 }, true);
 			}
+			respawned = true;
 		}
+		if (respawned) character.startRespawnProtection?.(mode.respawnProtection);
 
 		this.cleanupSpectator();
 		this.isProcessingDeath = false;
@@ -339,6 +396,12 @@ export class DeathManager {
 			window.addEventListener("keydown", this.spectatorKeyHandler);
 		}
 		this.cycleSpectatorTarget(1);
+		this.deathScreen.animationService.animateSpectatorSwitch(
+			this.game?.cameraController,
+			this.spectatorHud,
+			spectator.transition,
+			mode.deathScreen?.accessibility?.reduceMotion
+		);
 	}
 
 	/**
@@ -350,6 +413,12 @@ export class DeathManager {
 		this.currentSpectatorPerspective = this.currentSpectatorPerspective === "first_person" ? "third_person" : "first_person";
 		this.applySpectatorPerspective();
 		this.updateSpectatorHud();
+		this.deathScreen.animationService.animateSpectatorSwitch(
+			this.game?.cameraController,
+			this.spectatorHud,
+			mode.spectator?.transition,
+			mode.deathScreen?.accessibility?.reduceMotion
+		);
 	}
 
 	/**
@@ -438,6 +507,12 @@ export class DeathManager {
 		}
 		this.spectatorTargetId = peers[index].playerId;
 		this.updateSpectatorHud();
+		this.deathScreen.animationService.animateSpectatorSwitch(
+			this.game?.cameraController,
+			this.spectatorHud,
+			mode.spectator?.transition,
+			mode.deathScreen?.accessibility?.reduceMotion
+		);
 	}
 
 	public getSpectatorQuality(): "full" | "balanced" | "low" {
@@ -447,8 +522,9 @@ export class DeathManager {
 	private ensureSpectatorHud() {
 		if (typeof document === "undefined" || this.spectatorHud) return;
 		const hud = document.createElement("div");
-		hud.style.cssText = "position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:10001;padding:10px 16px;border-radius:10px;background:rgba(8,12,20,.82);color:#fff;font:600 13px system-ui;pointer-events:none;text-align:center;backdrop-filter:blur(8px);";
+		hud.style.cssText = "position:fixed;left:50%;bottom:max(16px, env(safe-area-inset-bottom));transform:translateX(-50%);z-index:10001;display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:8px;max-width:calc(100vw - 24px);box-sizing:border-box;padding:10px 14px;border:1px solid rgba(255,255,255,.14);border-radius:10px;background:rgba(8,12,20,.9);color:#fff;font:600 13px/1.35 system-ui;pointer-events:auto;text-align:center;backdrop-filter:blur(8px);";
 		hud.setAttribute("aria-live", "polite");
+		hud.setAttribute("aria-label", "Controles del modo observador");
 		document.body.appendChild(hud);
 		this.spectatorHud = hud;
 		this.updateSpectatorHud();
@@ -458,29 +534,76 @@ export class DeathManager {
 		if (!this.spectatorHud) return;
 		const mode = this.spectatorMode || this.getBaseActiveMode();
 		const spectator = mode.spectator || {};
+		const hud = this.spectatorHud;
+
+		if (typeof document === "undefined") {
+			if (spectator.allowFollow === false) {
+				hud.textContent = "Modo observador (Cámara libre) · WASD / Espacio para desplazarse";
+				return;
+			}
+			const peers = this.getAvailableSpectatorPeers(mode);
+			const target = this.spectatorTargetId ? this.game?.networkManager?.remotePlayers?.get(this.spectatorTargetId) : null;
+			if (!target || peers.length === 0) {
+				hud.textContent = "Modo observador · No hay jugadores disponibles para observar";
+				return;
+			}
+			const perspectiveLabel = this.currentSpectatorPerspective === "first_person" ? "1ª persona" : "3ª persona";
+			const cyclePrompt = peers.length > 1 ? " · Q/E o ←/→ para cambiar objetivo" : "";
+			const switchPrompt = spectator.perspective === "switchable" ? " · V: Cambiar vista" : "";
+			hud.textContent = `Observando a ${target.playerName || "Jugador"} (${perspectiveLabel})${cyclePrompt}${switchPrompt}`;
+			return;
+		}
+
+		if (typeof (hud as any).replaceChildren === "function") {
+			(hud as any).replaceChildren();
+		} else {
+			hud.innerHTML = "";
+		}
+		const message = document.createElement("span");
+		message.style.cssText = "min-width:0;overflow-wrap:anywhere;";
 
 		if (spectator.allowFollow === false) {
-			this.spectatorHud.textContent = "Modo observador (Cámara libre)  ·  WASD / Espacio para desplazarse";
+			message.textContent = "Modo observador (Cámara libre) · WASD / Espacio para desplazarse";
+			hud.appendChild(message);
 			return;
 		}
 
 		const peers = this.getAvailableSpectatorPeers(mode);
 		const target = this.spectatorTargetId ? this.game?.networkManager?.remotePlayers?.get(this.spectatorTargetId) : null;
 		if (!target || peers.length === 0) {
-			this.spectatorHud.textContent = "Modo observador  ·  No hay jugadores disponibles para observar";
+			message.textContent = "Modo observador · No hay jugadores disponibles para observar";
+			hud.appendChild(message);
 			return;
 		}
 
 		const perspectiveLabel = this.currentSpectatorPerspective === "first_person" ? "1ª persona" : "3ª persona";
-		const cyclePrompt = peers.length > 1 ? "  ·  Q/E o ←/→ para cambiar objetivo" : "";
-		const switchPrompt = spectator.perspective === "switchable" ? "  ·  V: Cambiar vista" : "";
-		this.spectatorHud.textContent = `Observando a ${target.playerName || "Jugador"} (${perspectiveLabel})${cyclePrompt}${switchPrompt}`;
+		const cyclePrompt = peers.length > 1 ? " · Q/E o ←/→ para cambiar objetivo" : "";
+		message.textContent = `Observando a ${target.playerName || "Jugador"} (${perspectiveLabel})${cyclePrompt}`;
+		hud.appendChild(message);
+
+		if (spectator.perspective === "switchable") {
+			const switchButton = document.createElement("button");
+			switchButton.type = "button";
+			switchButton.textContent = this.currentSpectatorPerspective === "first_person" ? "Cambiar a 3ª persona" : "Cambiar a 1ª persona";
+			switchButton.setAttribute("aria-label", `Cambiar a ${this.currentSpectatorPerspective === "first_person" ? "tercera" : "primera"} persona`);
+			switchButton.title = "También puedes usar V";
+			switchButton.style.cssText = "flex:0 0 auto;max-width:100%;padding:7px 10px;border:1px solid #5d6a84;border-radius:7px;background:#263248;color:#fff;font:600 12px system-ui;cursor:pointer;touch-action:manipulation;";
+			switchButton.onclick = (event) => {
+				event.preventDefault();
+				event.stopPropagation();
+				this.toggleSpectatorPerspective();
+			};
+			hud.appendChild(switchButton);
+		}
 	}
 
 	private cleanupSpectator() {
 		this.isSpectator = false;
 		this.spectatorMode = null;
 		this.spectatorTargetId = null;
+		if (this.deathScreen?.animationService) {
+			this.deathScreen.animationService.cancelSpectatorAnimations(true);
+		}
 		if (typeof window !== "undefined") {
 			window.removeEventListener("keydown", this.spectatorKeyHandler);
 		}
@@ -549,5 +672,6 @@ export class DeathManager {
 			clearTimeout(this.respawnTimer);
 			this.respawnTimer = null;
 		}
+		this.respawnAvailableAt = 0;
 	}
 }

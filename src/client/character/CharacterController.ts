@@ -6,6 +6,7 @@ import { PolygonModelSkin } from "./models/polygon/PolygonModelSkin";
 import { ParticleSystem } from "../effects/ParticleSystem";
 import { InputManager } from "../input/InputManager";
 import type { CharacterStats, JumpConfig, FlightConfig, PlayerCollisionMode, RemotePlayerState } from "../types";
+import type { RespawnProtectionConfig, RespawnProtectionType } from "../types/experienceMode.types";
 import {
   getGravityQuaternion,
   normalizeGravityOrientation,
@@ -87,6 +88,11 @@ export class CharacterController {
   damageFlashIntensity: number;
   game: any;
   currentCheckpoint: THREE.Vector3 | null;
+  private respawnProtectionConfig: RespawnProtectionConfig | null = null;
+  private respawnProtectionEndsAt = 0;
+  private respawnProtectionDurationMs = 0;
+  private respawnShieldPoints = 0;
+  private respawnBarrier: THREE.Mesh | null = null;
 
 
   constructor(scene: THREE.Scene, world: RAPIER.World, camera: THREE.Camera, cameraController: any) {
@@ -502,6 +508,7 @@ export class CharacterController {
   }
 
   update(dt: number, input: InputManager, remotePlayers: any[]) {
+    this.updateRespawnProtection();
     if (!this.rigidBody) return;
 
     if (this.cameraController && this.cameraController.mode === 'free-fly') {
@@ -1229,10 +1236,151 @@ export class CharacterController {
     }
   }
 
-  takeDamage(amount: number) {
-    if (this.isDead || this.noClip) return;
+  startRespawnProtection(config?: RespawnProtectionConfig) {
+    this.endRespawnProtection();
+    const duration = Number.isFinite(config?.duration) ? Math.max(0, Math.min(30, config!.duration!)) : 0;
+    if (config?.enabled !== true || duration <= 0) return;
 
-    this.currentHealth -= amount;
+    this.respawnProtectionConfig = { ...config };
+    this.respawnProtectionDurationMs = duration * 1000;
+    this.respawnProtectionEndsAt = Date.now() + this.respawnProtectionDurationMs;
+    this.respawnShieldPoints = config.type === "shield"
+      ? Math.max(0, Number.isFinite(config.shieldPoints) ? config.shieldPoints! : 50)
+      : 0;
+    if (config.showVisual !== false && (config.type !== "shield" || this.respawnShieldPoints > 0)) {
+      const material = new THREE.MeshBasicMaterial({
+        color: config.type === "damage_reduction" ? 0x8e9bff : 0x55e7ff,
+        wireframe: true,
+        transparent: true,
+        opacity: 0.28,
+        depthWrite: false,
+      });
+      this.respawnBarrier = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 12), material);
+      this.respawnBarrier.renderOrder = 10;
+      this.respawnBarrier.frustumCulled = false;
+      this.scene.add(this.respawnBarrier);
+      this.updateRespawnProtectionVisual();
+    }
+    this.emit("respawnProtectionChanged", { active: true, remaining: duration, shield: this.respawnShieldPoints });
+  }
+
+  endRespawnProtection() {
+    const hadProtection = this.respawnProtectionConfig !== null;
+    this.respawnProtectionConfig = null;
+    this.respawnProtectionEndsAt = 0;
+    this.respawnProtectionDurationMs = 0;
+    this.respawnShieldPoints = 0;
+    if (this.respawnBarrier) {
+      this.scene.remove(this.respawnBarrier);
+      this.respawnBarrier.geometry.dispose();
+      const material = this.respawnBarrier.material;
+      if (Array.isArray(material)) material.forEach((part) => part.dispose());
+      else material.dispose();
+      this.respawnBarrier = null;
+    }
+    if (hadProtection) this.emit("respawnProtectionChanged", { active: false, remaining: 0, shield: 0 });
+  }
+
+  isRespawnProtectionActive(): boolean {
+    return this.respawnProtectionConfig !== null && Date.now() < this.respawnProtectionEndsAt;
+  }
+
+  getRespawnProtectionType(): RespawnProtectionType | null {
+    if (!this.isRespawnProtectionActive() || !this.respawnProtectionConfig) return null;
+    return this.respawnProtectionConfig.type || "invulnerability";
+  }
+
+  getRespawnShieldPoints(): number {
+    return this.isRespawnProtectionActive() ? this.respawnShieldPoints : 0;
+  }
+
+  cancelProtectionOnAttack() {
+    if (this.isRespawnProtectionActive() && this.respawnProtectionConfig?.cancelOnAttack) {
+      this.endRespawnProtection();
+    }
+  }
+
+  private updateRespawnProtection() {
+    if (!this.respawnProtectionConfig) return;
+    if (Date.now() >= this.respawnProtectionEndsAt) {
+      this.endRespawnProtection();
+      return;
+    }
+    if (this.respawnBarrier && this.rigidBody) this.updateRespawnProtectionVisual();
+  }
+
+  private updateRespawnProtectionVisual() {
+    if (!this.respawnBarrier || !this.rigidBody) return;
+    const up = this.getGravityUpVector();
+    const position = this.getPosition();
+    this.respawnBarrier.position.copy(position).addScaledVector(up, this.capsuleHalfHeight * 0.25);
+    this.respawnBarrier.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), up);
+    const radius = Math.max(0.45, this.capsuleRadius * 2.25);
+    this.respawnBarrier.scale.set(radius, Math.max(radius, this.capsuleHalfHeight + this.capsuleRadius), radius);
+
+    const isReducedMotion = typeof window !== "undefined" &&
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    const material = this.respawnBarrier.material as THREE.MeshBasicMaterial;
+    if (isReducedMotion) {
+      material.opacity = 0.28;
+    } else {
+      const remainingRatio = Math.max(0, Math.min(1, (this.respawnProtectionEndsAt - Date.now()) / this.respawnProtectionDurationMs));
+      material.opacity = remainingRatio < 0.25 ? 0.28 * (remainingRatio / 0.25) : 0.28;
+    }
+  }
+
+  takeDamage(amount: number) {
+    if (this.isDead || this.noClip || !Number.isFinite(amount) || amount <= 0) return;
+
+    let appliedDamage = amount;
+    if (this.isRespawnProtectionActive() && this.respawnProtectionConfig) {
+      const protection = this.respawnProtectionConfig;
+      if (protection.type === "invulnerability") {
+        this.emit("respawnProtectionChanged", {
+          active: true,
+          remaining: Math.max(0, (this.respawnProtectionEndsAt - Date.now()) / 1000),
+          shield: 0,
+          blockedDamage: amount,
+        });
+        return;
+      }
+      if (protection.type === "shield") {
+        const absorbed = Math.min(this.respawnShieldPoints, appliedDamage);
+        this.respawnShieldPoints -= absorbed;
+        appliedDamage -= absorbed;
+        this.emit("respawnProtectionChanged", {
+          active: true,
+          remaining: Math.max(0, (this.respawnProtectionEndsAt - Date.now()) / 1000),
+          shield: this.respawnShieldPoints,
+          absorbed,
+        });
+        if (this.respawnShieldPoints <= 0 && this.respawnBarrier) {
+          this.scene.remove(this.respawnBarrier);
+          this.respawnBarrier.geometry.dispose();
+          const material = this.respawnBarrier.material;
+          if (Array.isArray(material)) material.forEach((part) => part.dispose());
+          else material.dispose();
+          this.respawnBarrier = null;
+        }
+      } else if (protection.type === "damage_reduction") {
+        const multiplier = Number.isFinite(protection.damageMultiplier)
+          ? Math.min(1, Math.max(0, protection.damageMultiplier!))
+          : 0.25;
+        appliedDamage *= multiplier;
+        this.emit("respawnProtectionChanged", {
+          active: true,
+          remaining: Math.max(0, (this.respawnProtectionEndsAt - Date.now()) / 1000),
+          shield: 0,
+          reducedDamage: appliedDamage,
+        });
+        if (appliedDamage <= 0) return;
+      }
+    }
+
+    if (appliedDamage <= 0) return;
+    this.currentHealth -= appliedDamage;
     console.log(`Player Health: ${this.currentHealth}/${this.maxHealth}`);
 
     this.emit("healthChanged", { current: this.currentHealth, max: this.maxHealth });
@@ -1242,6 +1390,7 @@ export class CharacterController {
     }
 
     if (this.currentHealth <= 0) {
+      this.endRespawnProtection();
       if (this.game && this.game.deathManager) {
         this.game.deathManager.handleDeath({ cause: "damage" });
       } else {
@@ -1309,6 +1458,7 @@ export class CharacterController {
   }
 
   die(cause = "damage") {
+    this.endRespawnProtection();
     if (this.isDead) return;
     if (this.game && this.game.deathManager && !this.game.deathManager.isProcessingDeath) {
       this.game.deathManager.handleDeath({ cause: cause as any });
@@ -1360,5 +1510,13 @@ export class CharacterController {
 
   respawn() {
     this.respawnAt(this.startPosition);
+  }
+
+  destroy() {
+    this.endRespawnProtection();
+    if (this.glbModel) (this.glbModel as any).destroy?.();
+    if (this.polygonModel) (this.polygonModel as any).destroy?.();
+    if (this.polygonModelSkin) (this.polygonModelSkin as any).destroy?.();
+    this.removeAllListeners?.();
   }
 }

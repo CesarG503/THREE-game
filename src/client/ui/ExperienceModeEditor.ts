@@ -8,7 +8,7 @@ import {
 	createDefaultExperienceModes,
 	normalizeExperienceModesConfig,
 } from "../types/experienceMode.types";
-import { DeathScreenEditor } from "./DeathScreenEditor";
+import type { DeathScreenEditor } from "./DeathScreenEditor";
 
 export class ExperienceModeEditor {
 	private game: any;
@@ -478,7 +478,45 @@ export class ExperienceModeEditor {
 		};
 
 		delayControlsRow.append(delaySelect, delaySlider);
-		delayCol.append(delayRow, delayControlsRow);
+
+		// Behavior & skip controls
+		const delayExtraRow = document.createElement("div");
+		delayExtraRow.style.cssText = "display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-top: 6px;";
+
+		const behaviorLabel = document.createElement("label");
+		behaviorLabel.style.cssText = "display: flex; gap: 6px; align-items: center; color: #ddd; font-size: 12px;";
+		behaviorLabel.textContent = "Al llegar a cero:";
+		const behaviorSelect = document.createElement("select");
+		behaviorSelect.style.cssText = "background: #111; color: white; border: 1px solid #555; padding: 4px 8px; border-radius: 4px; font-size: 12px;";
+		[
+			["auto", "Reaparecer automáticamente"],
+			["button", "Habilitar botón de reaparición"],
+		].forEach(([v, t]) => {
+			const opt = document.createElement("option");
+			opt.value = v;
+			opt.textContent = t;
+			if ((mode.respawnDelayBehavior || "auto") === v) opt.selected = true;
+			behaviorSelect.appendChild(opt);
+		});
+		behaviorSelect.onchange = () => {
+			mode.respawnDelayBehavior = behaviorSelect.value as any;
+			this.sync();
+		};
+		behaviorLabel.appendChild(behaviorSelect);
+
+		const skipLabel = document.createElement("label");
+		skipLabel.style.cssText = "display: flex; gap: 6px; align-items: center; color: #ddd; font-size: 12px; cursor: pointer;";
+		const skipCheckbox = document.createElement("input");
+		skipCheckbox.type = "checkbox";
+		skipCheckbox.checked = mode.allowSkipRespawnDelay === true;
+		skipCheckbox.onchange = () => {
+			mode.allowSkipRespawnDelay = skipCheckbox.checked;
+			this.sync();
+		};
+		skipLabel.append(skipCheckbox, document.createTextNode("Permitir saltar la espera (reaparición anticipada)"));
+
+		delayExtraRow.append(behaviorLabel, skipLabel);
+		delayCol.append(delayRow, delayControlsRow, delayExtraRow);
 
 		// Explode
 		const explodeCol = document.createElement("div");
@@ -519,6 +557,144 @@ export class ExperienceModeEditor {
 
 		grid.append(policyCol, livesCol, delayCol, explodeCol);
 		section.appendChild(grid);
+
+		const protection = mode.respawnProtection ||= {
+			enabled: false,
+			duration: 3,
+		type: "invulnerability",
+			shieldPoints: 50,
+			damageMultiplier: 0.25,
+			showVisual: true,
+		};
+		const protectionBox = document.createElement("div");
+		protectionBox.style.cssText = "display:flex;flex-direction:column;gap:10px;margin-top:12px;padding:12px;background:#20242f;border:1px solid #353c4e;border-radius:8px;min-width:0;";
+		const protectionTitle = document.createElement("strong");
+		protectionTitle.textContent = "Protección después de reaparecer";
+		protectionTitle.style.color = "#68d9ff";
+		const protectionHint = document.createElement("small");
+		protectionHint.textContent = "Es independiente del tiempo de espera previo. La protección se aplica al daño recibido después del respawn.";
+		protectionHint.style.cssText = "color:#aeb6c8;line-height:1.4;";
+		const protectionEnabled = document.createElement("label");
+		protectionEnabled.style.cssText = "display:flex;gap:8px;align-items:center;color:#eee;";
+		const protectionCheckbox = document.createElement("input");
+		protectionCheckbox.type = "checkbox";
+		protectionCheckbox.checked = protection.enabled === true;
+		protectionCheckbox.onchange = () => { protection.enabled = protectionCheckbox.checked; this.sync(); };
+		protectionEnabled.append(protectionCheckbox, document.createTextNode("Activar protección temporal"));
+
+		const protectionFields = document.createElement("div");
+		protectionFields.style.cssText = "display:grid;grid-template-columns:repeat(auto-fit,minmax(min(220px,100%),1fr));gap:10px;min-width:0;";
+		const protectionModeLabel = document.createElement("label");
+		protectionModeLabel.style.cssText = "display:flex;flex-direction:column;gap:5px;color:#ddd;min-width:0;";
+		protectionModeLabel.appendChild(document.createTextNode("Tipo de protección"));
+		const protectionMode = document.createElement("select");
+		protectionMode.style.cssText = "background:#111;color:#fff;border:1px solid #555;padding:7px;border-radius:5px;max-width:100%;";
+		[
+			["invulnerability", "Invulnerabilidad"],
+			["shield", "Escudo que absorbe daño"],
+			["damage_reduction", "Reducción de daño"],
+		].forEach(([value, label]) => {
+			const option = document.createElement("option");
+			option.value = value;
+			option.textContent = label;
+			protectionMode.appendChild(option);
+		});
+		protectionMode.value = protection.type || "invulnerability";
+		protectionModeLabel.appendChild(protectionMode);
+
+		const durationLabel = document.createElement("label");
+		durationLabel.style.cssText = "display:flex;flex-direction:column;gap:5px;color:#ddd;min-width:0;";
+		durationLabel.appendChild(document.createTextNode("Duración de la protección (segundos)"));
+		const durationInput = document.createElement("input");
+		durationInput.type = "number";
+		durationInput.min = "0";
+		durationInput.max = "30";
+		durationInput.step = "0.5";
+		durationInput.value = String(protection.duration ?? 3);
+		durationInput.style.cssText = "background:#111;color:#fff;border:1px solid #555;padding:7px;border-radius:5px;max-width:100%;box-sizing:border-box;";
+		durationInput.onchange = () => {
+			protection.duration = Math.min(30, Math.max(0, Number(durationInput.value) || 0));
+			durationInput.value = String(protection.duration);
+			this.sync();
+		};
+		durationLabel.appendChild(durationInput);
+
+		const shieldLabel = document.createElement("label");
+		shieldLabel.style.cssText = "display:flex;flex-direction:column;gap:5px;color:#ddd;min-width:0;";
+		shieldLabel.appendChild(document.createTextNode("Puntos que absorbe el escudo"));
+		const shieldInput = document.createElement("input");
+		shieldInput.type = "number";
+		shieldInput.min = "1";
+		shieldInput.max = "10000";
+		shieldInput.step = "5";
+		shieldInput.value = String(protection.shieldPoints ?? 50);
+		shieldInput.style.cssText = "background:#111;color:#fff;border:1px solid #555;padding:7px;border-radius:5px;max-width:100%;box-sizing:border-box;";
+		shieldInput.onchange = () => {
+			protection.shieldPoints = Math.min(10000, Math.max(1, Number(shieldInput.value) || 1));
+			shieldInput.value = String(protection.shieldPoints);
+			this.sync();
+		};
+		shieldLabel.appendChild(shieldInput);
+
+		const reductionLabel = document.createElement("label");
+		reductionLabel.style.cssText = "display:flex;flex-direction:column;gap:5px;color:#ddd;min-width:0;";
+		const reductionTitle = document.createElement("span");
+		const reductionInput = document.createElement("input");
+		reductionInput.type = "range";
+		reductionInput.min = "0";
+		reductionInput.max = "100";
+		reductionInput.step = "5";
+		reductionInput.value = String(Math.round((protection.damageMultiplier ?? 0.25) * 100));
+		reductionInput.oninput = () => {
+			const receivedPercent = Number(reductionInput.value);
+			reductionTitle.textContent = `Daño recibido durante la protección: ${receivedPercent}%`;
+			protection.damageMultiplier = receivedPercent / 100;
+			this.sync();
+		};
+		reductionTitle.textContent = `Daño recibido durante la protección: ${reductionInput.value}%`;
+		reductionLabel.append(reductionTitle, reductionInput);
+
+		const visualLabel = document.createElement("label");
+		visualLabel.style.cssText = "display:flex;gap:8px;align-items:center;color:#ddd;";
+		const visualCheckbox = document.createElement("input");
+		visualCheckbox.type = "checkbox";
+		visualCheckbox.checked = protection.showVisual !== false;
+		visualCheckbox.onchange = () => { protection.showVisual = visualCheckbox.checked; this.sync(); };
+		visualLabel.append(visualCheckbox, document.createTextNode("Mostrar barrera visual mientras dure"));
+
+		const cancelAttackLabel = document.createElement("label");
+		cancelAttackLabel.style.cssText = "display:flex;gap:8px;align-items:center;color:#ddd;";
+		const cancelAttackCheckbox = document.createElement("input");
+		cancelAttackCheckbox.type = "checkbox";
+		cancelAttackCheckbox.checked = protection.cancelOnAttack === true;
+		cancelAttackCheckbox.onchange = () => { protection.cancelOnAttack = cancelAttackCheckbox.checked; this.sync(); };
+		cancelAttackLabel.append(cancelAttackCheckbox, document.createTextNode("Cancelar protección al disparar/atacar"));
+
+		const updateProtectionFields = () => {
+			const active = protection.enabled === true;
+			protectionFields.style.opacity = active ? "1" : "0.5";
+			protectionMode.disabled = !active;
+			durationInput.disabled = !active;
+			visualCheckbox.disabled = !active;
+			cancelAttackCheckbox.disabled = !active;
+			shieldLabel.style.display = active && protectionMode.value === "shield" ? "flex" : "none";
+			reductionLabel.style.display = active && protectionMode.value === "damage_reduction" ? "flex" : "none";
+		};
+		protectionCheckbox.addEventListener("change", updateProtectionFields);
+		protectionMode.onchange = () => {
+			protection.type = protectionMode.value as "invulnerability" | "shield" | "damage_reduction";
+			updateProtectionFields();
+			this.sync();
+		};
+		protectionFields.append(protectionModeLabel, durationLabel, shieldLabel, reductionLabel, visualLabel, cancelAttackLabel);
+		updateProtectionFields();
+
+		const protectionNotice = document.createElement("div");
+		protectionNotice.style.cssText = "font-size: 11px; color: #8899aa; background: #181c25; padding: 6px 10px; border-radius: 4px; border-left: 3px solid #68d9ff; line-height: 1.4;";
+		protectionNotice.textContent = "🛡️ La protección se activa únicamente al revivir en el mundo y cubre daños de proyectiles, trampas y vehículos. Las caídas al abismo fuera del mapa eliminan inmediatamente.";
+
+		protectionBox.append(protectionTitle, protectionHint, protectionEnabled, protectionFields, protectionNotice);
+		section.appendChild(protectionBox);
 		return section;
 	}
 
@@ -540,12 +716,12 @@ export class ExperienceModeEditor {
 		} else {
 			roles.forEach((role) => {
 				const row = document.createElement("div");
-				row.style.cssText = "display:flex;gap:10px;align-items:center;margin:6px 0;";
+			row.style.cssText = "display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:6px 0;min-width:0;";
 				const label = document.createElement("label");
 				label.textContent = role.name || role.id;
-				label.style.cssText = "flex:1;color:#ddd;";
+			label.style.cssText = "flex:1 1 120px;color:#ddd;min-width:0;";
 				const select = document.createElement("select");
-				select.style.cssText = "background:#111;color:#fff;border:1px solid #555;padding:6px;border-radius:4px;min-width:190px;";
+			select.style.cssText = "background:#111;color:#fff;border:1px solid #555;padding:6px;border-radius:4px;flex:1 1 170px;min-width:min(170px, 100%);max-width:100%;";
 				const inherit = document.createElement("option");
 				inherit.value = "";
 				inherit.textContent = "Usar modo seleccionado";
@@ -599,7 +775,29 @@ export class ExperienceModeEditor {
 		});
 		quality.value = mode.spectator.quality || "balanced";
 		quality.onchange = () => { mode.spectator!.quality = quality.value as "full" | "balanced" | "low"; this.sync(); };
-		options.append(enabledLabel, followLabel, perspectiveSelect, quality);
+
+		const transitionSelect = document.createElement("select");
+		transitionSelect.title = "Transición de cámara al cambiar objetivo";
+		transitionSelect.style.cssText = "background:#111;color:#fff;border:1px solid #555;padding:6px;border-radius:4px;";
+		[
+			["smooth", "Cámara suave (500ms)"],
+			["cinematic", "Cámara cinemática (850ms)"],
+			["instant", "Cámara instantánea"],
+		].forEach(([value, label]) => {
+			const option = document.createElement("option");
+			option.value = value;
+			option.textContent = label;
+			transitionSelect.appendChild(option);
+		});
+		transitionSelect.value = mode.spectator.transition?.style || "smooth";
+		transitionSelect.onchange = () => {
+			mode.spectator!.transition ||= {};
+			mode.spectator!.transition.style = transitionSelect.value as any;
+			mode.spectator!.transition.enabled = transitionSelect.value !== "instant";
+			this.sync();
+		};
+
+		options.append(enabledLabel, followLabel, perspectiveSelect, quality, transitionSelect);
 		section.appendChild(options);
 		if (roles.length) {
 			const filterTitle = document.createElement("div");
@@ -666,7 +864,7 @@ export class ExperienceModeEditor {
 
 		// Header for Visual Designer
 		const visualHeader = document.createElement("div");
-		visualHeader.style.cssText = "display: flex; justify-content: space-between; align-items: center; margin: 4px 0 10px;";
+		visualHeader.style.cssText = "display: flex; flex-wrap: wrap; gap: 8px; justify-content: space-between; align-items: center; margin: 4px 0 10px; min-width: 0;";
 		const visualTitle = document.createElement("strong");
 		visualTitle.innerHTML = "🎨 Editor Visual de Diseño, Lienzo y Reglas";
 		visualTitle.style.color = "#00d2ff";
@@ -677,6 +875,7 @@ export class ExperienceModeEditor {
 		toggleVisualBtn.style.cssText = "background: #232734; border: 1px solid #3d445c; color: #eee; font-size: 11px; padding: 4px 10px; border-radius: 4px; cursor: pointer;";
 		toggleVisualBtn.onclick = () => {
 			this.showVisualEditor = !this.showVisualEditor;
+			if (!this.showVisualEditor) this.visualEditor = null;
 			if (this.container) this.render(this.container);
 		};
 		visualHeader.append(visualTitle, toggleVisualBtn);
@@ -684,34 +883,39 @@ export class ExperienceModeEditor {
 
 		if (this.showVisualEditor) {
 			const editorContainer = document.createElement("div");
-			editorContainer.style.cssText = "margin-bottom: 12px;";
-			this.visualEditor = new DeathScreenEditor({
-				mode,
-				onSync: () => {
-					// Synchronize primary title and action buttons
-					const titleElem = mode.deathScreen.elements?.find((e) => e.type === "title");
-					if (titleElem && titleElem.content) {
-						mode.deathScreen.title = titleElem.content;
-					}
-					const btnElems = mode.deathScreen.elements?.filter((e) => e.type === "action_button") || [];
-					if (btnElems.length > 0) {
-						mode.deathScreen.buttons = btnElems.map((b, idx) => ({
-							id: b.id || `btn_${idx}`,
-							label: b.content || "Aceptar",
-							action: b.action || "respawn",
-							isPrimary: b.isPrimary,
-						}));
-					}
-					this.sync();
-				},
-				onPreviewFullscreen: (previewState) => {
-					if (this.game?.deathManager?.deathScreen) {
-						this.game.deathManager.deathScreen.showPreview(mode, previewState);
-					}
-				},
-			});
-			this.visualEditor.render(editorContainer);
+			editorContainer.style.cssText = "margin-bottom: 12px; width: 100%; max-width: 100%; min-width: 0;";
+			editorContainer.textContent = "Cargando editor visual…";
 			section.appendChild(editorContainer);
+			// Load the designer only when the creator opens this section, keeping it out of the initial editor bundle.
+			import("./DeathScreenEditor").then(({ DeathScreenEditor: Editor }) => {
+				if (!editorContainer.isConnected) return;
+				const editor = new Editor({
+					mode,
+					onSync: () => {
+						// Synchronize primary title and action buttons
+						const titleElem = mode.deathScreen.elements?.find((e) => e.type === "title");
+						if (titleElem && titleElem.content) mode.deathScreen.title = titleElem.content;
+						const btnElems = mode.deathScreen.elements?.filter((e) => e.type === "action_button") || [];
+						if (btnElems.length > 0) {
+							mode.deathScreen.buttons = btnElems.map((b, idx) => ({
+								id: b.id || `btn_${idx}`,
+								label: b.content || "Aceptar",
+								action: b.action || "respawn",
+								isPrimary: b.isPrimary,
+							}));
+						}
+						this.sync();
+					},
+					onPreviewFullscreen: (previewState) => {
+						if (this.game?.deathManager?.deathScreen) this.game.deathManager.deathScreen.showPreview(mode, previewState);
+					},
+				});
+				this.visualEditor = editor;
+				editor.render(editorContainer);
+			}).catch((error) => {
+				console.error("No se pudo cargar el editor visual de muerte:", error);
+				if (editorContainer.isConnected) editorContainer.textContent = "No se pudo cargar el editor visual. Vuelve a abrir esta sección.";
+			});
 		}
 
 		// Quick basic fields
@@ -800,7 +1004,23 @@ export class ExperienceModeEditor {
 		};
 		bgCol.appendChild(bgSelect);
 
-		formGrid.append(titleCol, msgCol, colorCol1, bgCol);
+		// Background Image URL quick field
+		const bgImgCol = document.createElement("div");
+		bgImgCol.style.cssText = "display: flex; flex-direction: column; gap: 4px; grid-column: span 2;";
+		bgImgCol.innerHTML = "<label style='font-weight:600;'>Imagen de Fondo (URL o Ruta)</label>";
+		const bgImgInput = document.createElement("input");
+		bgImgInput.type = "text";
+		bgImgInput.placeholder = "https://... o assets/... (opcional)";
+		bgImgInput.value = screen.backgroundImage || "";
+		bgImgInput.style.cssText = "background: #111; color: white; border: 1px solid #555; padding: 6px; border-radius: 4px;";
+		bgImgInput.onchange = () => {
+			screen.backgroundImage = sanitizeImageUrl(bgImgInput.value) || "";
+			this.sync();
+			if (this.visualEditor) this.visualEditor.setMode(mode);
+		};
+		bgImgCol.appendChild(bgImgInput);
+
+		formGrid.append(titleCol, msgCol, colorCol1, bgCol, bgImgCol);
 		section.appendChild(formGrid);
 
 		// Buttons configuration section

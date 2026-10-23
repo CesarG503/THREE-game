@@ -16,7 +16,14 @@ export default defineConfig({
     outDir: 'dist',
     emptyOutDir: true,
     rollupOptions: {
-      input: fileURLToPath(new URL('./index.html', import.meta.url))
+      input: fileURLToPath(new URL('./index.html', import.meta.url)),
+      output: {
+        manualChunks(id) {
+          if (id.includes('animejs')) {
+            return 'animejs';
+          }
+        }
+      }
     }
   },
   server: {

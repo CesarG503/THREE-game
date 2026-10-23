@@ -3,6 +3,11 @@ import type {
 	DeathState,
 	DeathActionButtonType,
 	ExperienceModeProfile,
+	DeathContext,
+} from "../types/experienceMode.types";
+import {
+	evaluateDynamicTokens,
+	sanitizeImageUrl,
 } from "../types/experienceMode.types";
 
 export type DeathScreenActionCallback = (action: DeathActionButtonType) => void;
@@ -44,6 +49,7 @@ export function parseToRgba(colorStr: string, fallbackAlpha = 0.9): string {
 export class DeathScreen {
 	private element: HTMLDivElement;
 	private card: HTMLDivElement;
+	private visualContainer: HTMLDivElement;
 	private titleEl: HTMLHeadingElement;
 	private messageEl: HTMLParagraphElement;
 	private statusEl: HTMLParagraphElement;
@@ -56,6 +62,8 @@ export class DeathScreen {
 	private onActionCallback: DeathScreenActionCallback | null = null;
 	private isPreviewing = false;
 	private currentButtons: Array<{ button: HTMLButtonElement; action: DeathActionButtonType; isPrimary?: boolean }> = [];
+	private countdownElements: Array<{ el: HTMLElement; template: string; fallback?: string }> = [];
+	private lastDeathState: DeathState | null = null;
 
 	constructor(onAction?: DeathScreenActionCallback) {
 		this.onActionCallback = onAction || null;
@@ -67,9 +75,11 @@ export class DeathScreen {
 				appendChild: () => {},
 				remove: () => {},
 				dataset: {},
+				setAttribute: () => {},
 			};
 			this.element = dummy;
 			this.card = dummy;
+			this.visualContainer = dummy;
 			this.titleEl = dummy;
 			this.messageEl = dummy;
 			this.statusEl = dummy;
@@ -81,6 +91,9 @@ export class DeathScreen {
 
 		this.element = document.createElement("div");
 		this.element.id = "viper-death-screen";
+		this.element.setAttribute("role", "alertdialog");
+		this.element.setAttribute("aria-modal", "true");
+		this.element.setAttribute("aria-label", "Pantalla de muerte");
 		this.element.style.cssText = `
 			position: fixed;
 			inset: 0;
@@ -88,7 +101,7 @@ export class DeathScreen {
 			display: none;
 			align-items: center;
 			justify-content: center;
-			padding: 24px;
+			padding: 0;
 			box-sizing: border-box;
 			font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 			user-select: none;
@@ -119,6 +132,7 @@ export class DeathScreen {
 		const bannerText = document.createElement("span");
 		bannerText.textContent = "👁 MODO PREVISUALIZACIÓN DE PANTALLA";
 		const closePreviewBtn = document.createElement("button");
+		closePreviewBtn.type = "button";
 		closePreviewBtn.textContent = "Cerrar Vista Previa";
 		closePreviewBtn.style.cssText = `
 			background: #e63946;
@@ -134,7 +148,21 @@ export class DeathScreen {
 		this.previewBanner.append(bannerText, closePreviewBtn);
 		this.element.appendChild(this.previewBanner);
 
-		// Central Card
+		// Visual Layout Viewport Container (for v2 schema)
+		this.visualContainer = document.createElement("div");
+		this.visualContainer.id = "viper-death-visual-viewport";
+		this.visualContainer.style.cssText = `
+			position: absolute;
+			inset: 0;
+			width: 100%;
+			height: 100%;
+			overflow: hidden;
+			display: none;
+			pointer-events: auto;
+		`;
+		this.element.appendChild(this.visualContainer);
+
+		// Central Card (for legacy v1 fallback)
 		this.card = document.createElement("div");
 		this.card.style.cssText = `
 			width: min(480px, 92vw);
@@ -177,6 +205,7 @@ export class DeathScreen {
 		`;
 
 		this.countdownEl = document.createElement("p");
+		this.countdownEl.setAttribute("aria-live", "polite");
 		this.countdownEl.style.cssText = `
 			min-height: 22px;
 			margin: 0;
@@ -199,7 +228,7 @@ export class DeathScreen {
 		this.element.appendChild(this.card);
 		document.body.appendChild(this.element);
 
-		// Handle keydown for quick primary action (e.g. Enter or Space)
+		// Handle keyboard navigation (Enter, Space, Escape, Tab focus loop)
 		if (typeof window !== "undefined") {
 			window.addEventListener("keydown", this.handleKeyDown);
 		}
@@ -212,6 +241,7 @@ export class DeathScreen {
 	show(state: DeathState) {
 		this.clearCountdown();
 		this.isPreviewing = false;
+		this.lastDeathState = state;
 		if (typeof document === "undefined") {
 			return;
 		}
@@ -227,43 +257,62 @@ export class DeathScreen {
 
 		this.applyVisualStyles(config);
 
-		// Set text content
-		this.titleEl.textContent = config.title || "HAS MUERTO";
-
-		// Context-sensitive subtitle
-		if (state.cause === "fall") {
-			this.messageEl.textContent = state.context?.details || config.message || "Has caído al vacío.";
+		// Check if v2 visual elements layout is present
+		if (Array.isArray(config.elements) && config.elements.length > 0) {
+			this.card.style.display = "none";
+			this.visualContainer.style.display = "block";
+			this.renderVisualElements(config, state);
 		} else {
-			this.messageEl.textContent = config.message || "Has sido eliminado de la partida.";
-		}
+			// Legacy fallback
+			this.visualContainer.style.display = "none";
+			this.card.style.display = "flex";
 
-		// Lives status
-		if (state.remainingRespawns === -1) {
-			this.statusEl.textContent = "Vidas: Infinitas";
-		} else if (state.remainingRespawns > 0) {
-			this.statusEl.textContent = `Vidas restantes: ${state.remainingRespawns}`;
-		} else {
-			this.statusEl.textContent = "No te quedan más vidas.";
-		}
+			// Set text content
+			this.titleEl.textContent = config.title || "HAS MUERTO";
 
-		// Render action buttons
-		this.renderButtons(config, state.willRespawn);
+			if (state.cause === "fall") {
+				this.messageEl.textContent = state.context?.details || config.message || "Has caído al vacío.";
+			} else {
+				this.messageEl.textContent = config.message || "Has sido eliminado de la partida.";
+			}
 
-		// Handle respawn countdown
-		if (state.willRespawn && state.respawnDelay > 0) {
-			this.respawnAt = Date.now() + state.respawnDelay * 1000;
-			this.updateCountdown();
-			this.intervalId = setInterval(() => this.updateCountdown(), 100) as any;
-		} else if (state.willRespawn && state.respawnDelay === 0) {
-			this.countdownEl.textContent = "Reaparición inmediata disponible";
-		} else {
-			this.countdownEl.textContent = "";
+			if (state.remainingRespawns === -1) {
+				this.statusEl.textContent = "Vidas: Infinitas";
+			} else if (state.remainingRespawns > 0) {
+				this.statusEl.textContent = `Vidas restantes: ${state.remainingRespawns}`;
+			} else {
+				this.statusEl.textContent = "No te quedan más vidas.";
+			}
+
+			this.renderButtons(config, state.willRespawn);
+
+			if (state.willRespawn && state.respawnDelay > 0) {
+				this.respawnAt = Date.now() + state.respawnDelay * 1000;
+				this.updateCountdown();
+				this.intervalId = setInterval(() => this.updateCountdown(), 100) as any;
+			} else if (state.willRespawn && state.respawnDelay === 0) {
+				this.countdownEl.textContent = "Reaparición inmediata disponible";
+			} else {
+				this.countdownEl.textContent = "";
+			}
 		}
 
 		this.element.style.display = "flex";
+
+		// Auto-focus primary button for screen-readers and gamepad/keyboard navigation
+		setTimeout(() => {
+			const primary = this.currentButtons.find((b) => b.isPrimary) || this.currentButtons[0];
+			if (primary && primary.button && typeof primary.button.focus === "function") {
+				primary.button.focus();
+			}
+		}, 50);
 	}
 
-	showPreview(mode: ExperienceModeProfile, previewState: "respawn" | "last_life" | "game_over" = "respawn") {
+	showPreview(
+		mode: ExperienceModeProfile,
+		previewState: "respawn" | "last_life" | "game_over" | "spectator" = "respawn",
+		previewContext?: Partial<DeathContext>
+	) {
 		this.clearCountdown();
 		this.isPreviewing = true;
 		if (typeof document === "undefined") {
@@ -271,30 +320,54 @@ export class DeathScreen {
 		}
 		this.previewBanner.style.display = "flex";
 
+		const isRespawn = previewState === "respawn" || previewState === "last_life";
+		const mockState: DeathState = {
+			cause: previewContext?.cause || "damage",
+			willRespawn: isRespawn,
+			respawnDelay: isRespawn ? Math.max(1, mode.respawnDelay ?? 3) : 0,
+			remainingRespawns: previewState === "last_life" ? 1 : (previewState === "game_over" ? 0 : (mode.respawns ?? 3)),
+			activeMode: mode,
+			context: {
+				cause: previewContext?.cause || "damage",
+				killerName: previewContext?.killerName ?? "Fantasma_99",
+				killerWeapon: previewContext?.killerWeapon ?? "Rifle de Plasma",
+				details: previewContext?.details ?? "Eliminado en sector central",
+				...previewContext,
+			},
+		};
+
+		this.lastDeathState = mockState;
 		const config = mode.deathScreen;
 		this.applyVisualStyles(config);
 
-		this.titleEl.textContent = config.title || "HAS MUERTO";
-		this.messageEl.textContent = config.message || "Has sido eliminado de la partida.";
-
-		let willRespawn = true;
-		if (previewState === "respawn") {
-			this.statusEl.textContent = mode.respawns === -1 ? "Vidas: Infinitas" : `Vidas restantes: ${mode.respawns > 1 ? mode.respawns : 3}`;
-			this.respawnAt = Date.now() + Math.max(1, mode.respawnDelay) * 1000;
-			this.updateCountdown();
-			this.intervalId = setInterval(() => this.updateCountdown(), 100) as any;
-		} else if (previewState === "last_life") {
-			this.statusEl.textContent = "¡ÚLTIMA VIDA RESTANTE! (1 vida restante)";
-			this.respawnAt = Date.now() + Math.max(1, mode.respawnDelay) * 1000;
-			this.updateCountdown();
-			this.intervalId = setInterval(() => this.updateCountdown(), 100) as any;
+		if (Array.isArray(config.elements) && config.elements.length > 0) {
+			this.card.style.display = "none";
+			this.visualContainer.style.display = "block";
+			this.renderVisualElements(config, mockState);
 		} else {
-			willRespawn = false;
-			this.statusEl.textContent = "No te quedan más vidas. Fin de la partida.";
-			this.countdownEl.textContent = "Estado: Partida Finalizada";
+			this.visualContainer.style.display = "none";
+			this.card.style.display = "flex";
+			this.titleEl.textContent = config.title || "HAS MUERTO";
+			this.messageEl.textContent = config.message || "Has sido eliminado de la partida.";
+
+			if (previewState === "respawn") {
+				this.statusEl.textContent = mode.respawns === -1 ? "Vidas: Infinitas" : `Vidas restantes: ${mode.respawns ?? 3}`;
+				this.respawnAt = Date.now() + Math.max(1, mode.respawnDelay ?? 3) * 1000;
+				this.updateCountdown();
+				this.intervalId = setInterval(() => this.updateCountdown(), 100) as any;
+			} else if (previewState === "last_life") {
+				this.statusEl.textContent = "¡ÚLTIMA VIDA RESTANTE! (1 vida restante)";
+				this.respawnAt = Date.now() + Math.max(1, mode.respawnDelay ?? 3) * 1000;
+				this.updateCountdown();
+				this.intervalId = setInterval(() => this.updateCountdown(), 100) as any;
+			} else {
+				this.statusEl.textContent = "No te quedan más vidas. Fin de la partida.";
+				this.countdownEl.textContent = "Estado: Partida Finalizada";
+			}
+
+			this.renderButtons(config, isRespawn);
 		}
 
-		this.renderButtons(config, willRespawn);
 		this.element.style.display = "flex";
 	}
 
@@ -319,23 +392,217 @@ export class DeathScreen {
 		}
 	}
 
+	private renderVisualElements(config: DeathScreenConfig, state: DeathState) {
+		this.visualContainer.innerHTML = "";
+		this.countdownElements = [];
+		this.currentButtons = [];
+
+		const willRespawn = state.willRespawn;
+		const remainingLives = state.remainingRespawns;
+		const isLastLife = remainingLives === 1;
+		const isGameOver = !willRespawn && remainingLives === 0;
+		const isSpectator = state.activeMode?.respawnPolicy === "spectator";
+
+		const currentStateType: "respawn" | "last_life" | "game_over" | "spectator" = isSpectator
+			? "spectator"
+			: (isGameOver ? "game_over" : (isLastLife ? "last_life" : "respawn"));
+
+		const elements = config.elements || [];
+		elements.forEach((elem) => {
+			if (elem.visible === false) return;
+
+			// Condition Checks
+			const cond = elem.conditions;
+			if (cond) {
+				if (cond.causes && cond.causes.length > 0 && !cond.causes.includes(state.cause)) {
+					return;
+				}
+				if (cond.roles && cond.roles.length > 0) {
+					const playerRole = (state as any).playerRoleId;
+					if (playerRole && !cond.roles.includes(playerRole)) return;
+				}
+				if (cond.states && cond.states.length > 0 && !cond.states.includes(currentStateType)) {
+					return;
+				}
+				if (cond.requireData && cond.requireData.length > 0) {
+					if (cond.requireData.includes("killer") && !state.context?.killerName) {
+						return;
+					}
+					if (cond.requireData.includes("countdown") && (!willRespawn || state.respawnDelay <= 0)) {
+						return;
+					}
+				}
+			}
+
+			// Cause Overrides
+			const override = elem.causeOverrides?.[state.cause];
+			const contentTemplate = override?.content || elem.content || "";
+			const elemColor = override?.color || elem.style?.color;
+
+			// Token Evaluation with fallback
+			const resolvedText = evaluateDynamicTokens(contentTemplate, state, elem.fallbackContent || "");
+
+			// Hide if missing required data flag
+			if (cond?.hideWhenMissingData && contentTemplate.includes("{killer_name}") && !state.context?.killerName) {
+				return;
+			}
+
+			// If action button is respawn and player will not respawn:
+			if (elem.type === "action_button" && elem.action === "respawn" && !willRespawn) {
+				return;
+			}
+
+			const tagName = elem.type === "action_button"
+				? "button"
+				: (elem.type === "title" ? "h1" : (elem.type === "subtitle" ? "p" : "div"));
+			const el = document.createElement(tagName);
+			el.className = `viper-death-element viper-death-${elem.type}`;
+			el.dataset.elementId = elem.id;
+
+			// Positioning & Anchors
+			el.style.position = "absolute";
+			el.style.left = `${elem.x}%`;
+			el.style.top = `${elem.y}%`;
+			el.style.width = `${elem.width}%`;
+			el.style.minHeight = `${elem.height}%`;
+			el.style.boxSizing = "border-box";
+			el.style.zIndex = String(elem.zIndex ?? 1);
+
+			let transformStr = "translate(-50%, -50%)";
+			switch (elem.anchor) {
+				case "top-left": transformStr = "translate(0, 0)"; break;
+				case "top-center": transformStr = "translate(-50%, 0)"; break;
+				case "top-right": transformStr = "translate(-100%, 0)"; break;
+				case "center-left": transformStr = "translate(0, -50%)"; break;
+				case "center": transformStr = "translate(-50%, -50%)"; break;
+				case "center-right": transformStr = "translate(-100%, -50%)"; break;
+				case "bottom-left": transformStr = "translate(0, -100%)"; break;
+				case "bottom-center": transformStr = "translate(-50%, -100%)"; break;
+				case "bottom-right": transformStr = "translate(-100%, -100%)"; break;
+			}
+			el.style.transform = transformStr;
+
+			// Styling
+			const s = elem.style || {};
+			if (s.fontSize) el.style.fontSize = `${s.fontSize}px`;
+			if (s.fontWeight) el.style.fontWeight = s.fontWeight;
+			if (s.fontFamily) el.style.fontFamily = s.fontFamily;
+			if (elemColor) el.style.color = elemColor;
+			if (s.textAlign) el.style.textAlign = s.textAlign;
+			if (s.textTransform) el.style.textTransform = s.textTransform;
+			if (s.letterSpacing) el.style.letterSpacing = s.letterSpacing;
+			if (s.backgroundColor) el.style.backgroundColor = s.backgroundColor;
+			if (s.borderColor) el.style.borderColor = s.borderColor;
+			if (s.borderWidth) el.style.borderWidth = `${s.borderWidth}px`;
+			if (s.borderStyle) el.style.borderStyle = s.borderStyle;
+			if (s.borderRadius) el.style.borderRadius = `${s.borderRadius}px`;
+			if (s.opacity !== undefined) el.style.opacity = String(s.opacity);
+			if (s.backdropBlur) el.style.backdropFilter = `blur(${s.backdropBlur}px)`;
+			if (s.padding) el.style.padding = typeof s.padding === "number" ? `${s.padding}px` : s.padding;
+			if (s.boxShadow) el.style.boxShadow = s.boxShadow;
+			if (s.textShadow) el.style.textShadow = s.textShadow;
+
+			// Content injection (strict textContent to prevent XSS)
+			if (elem.type === "image") {
+				const sanitizedSrc = sanitizeImageUrl(elem.imageUrl);
+				if (sanitizedSrc) {
+					const img = document.createElement("img");
+					img.src = sanitizedSrc;
+					img.alt = elem.name || "Imagen de muerte";
+					img.style.maxWidth = "100%";
+					img.style.maxHeight = "100%";
+					img.style.objectFit = "contain";
+					img.style.pointerEvents = "none";
+					el.appendChild(img);
+				}
+			} else {
+				el.textContent = resolvedText;
+			}
+
+			// Action Button Handling
+			if (elem.type === "action_button") {
+				const btn = el as HTMLButtonElement;
+				btn.type = "button";
+				btn.dataset.action = elem.action || "respawn";
+				btn.tabIndex = 0;
+				btn.style.cursor = "pointer";
+				btn.style.userSelect = "none";
+				btn.style.transition = "transform 0.15s ease, filter 0.15s ease";
+
+				btn.onmouseenter = () => {
+					btn.style.transform = `${transformStr} scale(1.03)`;
+					btn.style.filter = "brightness(1.15)";
+				};
+				btn.onmouseleave = () => {
+					btn.style.transform = transformStr;
+					btn.style.filter = "none";
+				};
+
+				btn.onclick = (e) => {
+					e.stopPropagation();
+					this.triggerAction(elem.action || "respawn");
+				};
+
+				this.currentButtons.push({
+					button: btn,
+					action: elem.action || "respawn",
+					isPrimary: elem.isPrimary,
+				});
+			}
+
+			// Countdown tracking
+			if (elem.type === "respawn_countdown") {
+				el.setAttribute("aria-live", "polite");
+				this.countdownElements.push({
+					el,
+					template: contentTemplate,
+					fallback: elem.fallbackContent,
+				});
+			}
+
+			this.visualContainer.appendChild(el);
+		});
+
+		// Start ticker if willRespawn and delay > 0
+		if (willRespawn && state.respawnDelay > 0) {
+			this.respawnAt = Date.now() + state.respawnDelay * 1000;
+			this.updateCountdown();
+			this.intervalId = setInterval(() => this.updateCountdown(), 100) as any;
+		}
+	}
+
 	private applyVisualStyles(config: DeathScreenConfig) {
 		const rawBg = config.backgroundColor || "rgba(13, 15, 23, 0.92)";
 		const accent = config.accentColor || "#ff3b47";
-		const blur = typeof config.screenBlur === "number" ? config.screenBlur : 12;
+		const blur = typeof config.transitions?.blur === "number"
+			? config.transitions.blur
+			: (typeof config.screenBlur === "number" ? config.screenBlur : 12);
 
 		const cardBg = parseToRgba(rawBg, 0.94);
 		const overlayCenterBg = parseToRgba(rawBg, 0.85);
 
+		// Accessibility check for reduced motion
+		const prefersReducedMotion = typeof window !== "undefined" && window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+		const isReducedMotion = config.accessibility?.reduceMotion || prefersReducedMotion;
+
+		const duration = isReducedMotion ? 0 : (config.transitions?.duration ?? 0.25);
+		this.element.style.transition = `opacity ${duration}s ease`;
+
 		this.element.style.backgroundColor = "rgba(5, 7, 12, 0.90)";
-		if (config.backgroundImage) {
-			this.element.style.background = `linear-gradient(rgba(0, 0, 0, 0.65), rgba(0, 0, 0, 0.85)), url("${config.backgroundImage}") center/cover no-repeat`;
+		const bgImg = sanitizeImageUrl(config.backgroundImage);
+		if (bgImg) {
+			this.element.style.background = `linear-gradient(rgba(0, 0, 0, 0.65), rgba(0, 0, 0, 0.85)), url("${bgImg}") center/cover no-repeat`;
 		} else {
 			this.element.style.background = `radial-gradient(ellipse at center, ${overlayCenterBg}, rgba(5, 7, 12, 0.97) 80%)`;
 		}
 
-		this.element.style.backdropFilter = blur > 0 ? `blur(${blur}px)` : "none";
-		(this.element.style as any).webkitBackdropFilter = blur > 0 ? `blur(${blur}px)` : "none";
+		if (!isReducedMotion && blur > 0) {
+			this.element.style.backdropFilter = `blur(${blur}px)`;
+			(this.element.style as any).webkitBackdropFilter = `blur(${blur}px)`;
+		} else {
+			this.element.style.backdropFilter = "none";
+			(this.element.style as any).webkitBackdropFilter = "none";
+		}
 
 		this.card.style.background = cardBg;
 		this.card.style.border = `1px solid ${accent}55`;
@@ -356,14 +623,15 @@ export class DeathScreen {
 			: [{ id: "btn_respawn", label: "Reaparecer", action: "respawn" as DeathActionButtonType, isPrimary: true }];
 
 		buttons.forEach((btnData) => {
-			// If won't respawn and button is respawn, adapt or disable unless restart
 			if (!willRespawn && btnData.action === "respawn") {
 				return;
 			}
 
 			const btn = document.createElement("button");
+			btn.type = "button";
 			btn.textContent = btnData.label;
 			btn.dataset.action = btnData.action;
+			btn.tabIndex = 0;
 
 			const isPrimary = btnData.isPrimary;
 			btn.style.cssText = `
@@ -420,7 +688,36 @@ export class DeathScreen {
 			return;
 		}
 
+		// Tab navigation trap for accessibility
+		if (e.key === "Tab" && this.currentButtons.length > 0) {
+			const activeEl = document.activeElement;
+			const buttons = this.currentButtons.map((b) => b.button);
+			const idx = buttons.indexOf(activeEl as any);
+
+			if (e.shiftKey) {
+				if (idx <= 0) {
+					e.preventDefault();
+					buttons[buttons.length - 1].focus();
+				}
+			} else {
+				if (idx === -1 || idx >= buttons.length - 1) {
+					e.preventDefault();
+					buttons[0].focus();
+				}
+			}
+			return;
+		}
+
 		if (e.key === " " || e.key === "Enter") {
+			// If focused on a specific button, activate that button
+			const focusedBtn = this.currentButtons.find((b) => b.button === document.activeElement);
+			if (focusedBtn) {
+				e.preventDefault();
+				this.triggerAction(focusedBtn.action);
+				return;
+			}
+
+			// Otherwise activate primary
 			const primary = this.currentButtons.find((b) => b.isPrimary) || this.currentButtons[0];
 			if (primary) {
 				e.preventDefault();
@@ -433,8 +730,17 @@ export class DeathScreen {
 		const seconds = Math.max(0, (this.respawnAt - Date.now()) / 1000);
 		if (seconds > 0) {
 			this.countdownEl.textContent = `Reapareciendo en ${seconds.toFixed(1)} s…`;
+			if (this.countdownElements.length > 0 && this.lastDeathState) {
+				const tempState = { ...this.lastDeathState, respawnDelay: seconds };
+				this.countdownElements.forEach((item) => {
+					item.el.textContent = evaluateDynamicTokens(item.template, tempState, item.fallback || "");
+				});
+			}
 		} else {
 			this.countdownEl.textContent = "¡Listo para reaparecer!";
+			this.countdownElements.forEach((item) => {
+				item.el.textContent = item.fallback || "¡Listo para reaparecer!";
+			});
 			this.clearCountdown();
 		}
 	}

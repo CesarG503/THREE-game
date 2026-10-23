@@ -12,10 +12,16 @@ after(() => server.close());
 const {
 	createDefaultExperienceModes,
 	normalizeExperienceModesConfig,
+	createDefaultDeathScreenElements,
+	migrateDeathScreenConfig,
+	normalizeDeathScreenElements,
+	evaluateDynamicTokens,
+	sanitizeImageUrl,
 } = await server.ssrLoadModule("/src/client/types/experienceMode.types.ts");
 
 const { DeathManager } = await server.ssrLoadModule("/src/client/managers/DeathManager.ts");
-const { parseToRgba } = await server.ssrLoadModule("/src/client/ui/DeathScreen.ts");
+const { DeathScreen, parseToRgba } = await server.ssrLoadModule("/src/client/ui/DeathScreen.ts");
+const { DeathScreenEditor } = await server.ssrLoadModule("/src/client/ui/DeathScreenEditor.ts");
 
 // Minimal mock classes for testing
 class MockEventEmitter {
@@ -834,4 +840,265 @@ test("22. HUD del observador solo anuncia controles aplicables según perspectiv
 	assert.doesNotMatch(dm.spectatorHud.textContent, /V:/);
 
 	dm.destroy();
+});
+test("23. Migración de pantallas antiguas v1 a diseño visual v2 con elementos equivalentes", () => {
+	const legacyScreen = {
+		enabled: true,
+		title: "¡HAS CAÍDO!",
+		message: "Demasiado daño recibido en combate.",
+		backgroundColor: "rgba(30, 10, 15, 0.95)",
+		accentColor: "#ff0055",
+		screenBlur: 14,
+		buttons: [
+			{ id: "b1", label: "Reintentar ahora", action: "respawn", isPrimary: true },
+			{ id: "b2", label: "Salir", action: "lobby", isPrimary: false },
+		],
+	};
+
+	const migrated = migrateDeathScreenConfig(legacyScreen, { id: "mode_survival" });
+	assert.equal(migrated.version, 2, "Debe versionar el esquema a v2");
+	assert.equal(migrated.title, "¡HAS CAÍDO!");
+	assert.equal(migrated.accentColor, "#ff0055");
+	assert.ok(Array.isArray(migrated.elements), "Debe generar la lista de elementos");
+	assert.ok(migrated.elements.length >= 4, "Debe tener panel, título, botones, etc.");
+
+	// Title element must match legacy title
+	const titleElem = migrated.elements.find((e) => e.type === "title");
+	assert.ok(titleElem);
+	assert.equal(titleElem.content, "¡HAS CAÍDO!");
+
+	// Button elements must match legacy buttons
+	const btnElems = migrated.elements.filter((e) => e.type === "action_button");
+	assert.equal(btnElems.length, 2);
+	assert.equal(btnElems[0].content, "Reintentar ahora");
+	assert.equal(btnElems[0].action, "respawn");
+	assert.equal(btnElems[1].content, "Salir");
+	assert.equal(btnElems[1].action, "lobby");
+});
+
+test("24. Normalización defensiva de elementos, anclajes y sanitización de URLs de imagen", () => {
+	// Test malicious URLs and safe URLs
+	assert.equal(sanitizeImageUrl("javascript:alert(1)"), undefined, "Bloquea javascript: URI");
+	assert.equal(sanitizeImageUrl("vbscript:test"), undefined, "Bloquea vbscript: URI");
+	assert.equal(sanitizeImageUrl("https://example.com/death.png"), "https://example.com/death.png", "Permite HTTPS");
+	assert.equal(sanitizeImageUrl("/assets/icons/skull.svg"), "/assets/icons/skull.svg", "Permite ruta relativa local");
+	assert.equal(sanitizeImageUrl("data:image/png;base64,iVBORw0KGgoAAA"), "data:image/png;base64,iVBORw0KGgoAAA", "Permite data:image/png base64");
+
+	// Test element bounding clamping
+	const rawElements = [
+		{
+			id: "out_of_bounds",
+			type: "title",
+			x: -50,
+			y: 150,
+			width: 200,
+			height: -10,
+			anchor: "invalid_anchor",
+			action: "malicious_action",
+		},
+		{
+			id: "invalid_type",
+			type: "script_tag",
+		},
+	];
+
+	const normalized = normalizeDeathScreenElements(rawElements);
+	assert.equal(normalized.length, 1, "Descarta tipos de elementos no permitidos");
+	assert.equal(normalized[0].x, 0, "Acota X mínimo a 0%");
+	assert.equal(normalized[0].y, 100, "Acota Y máximo a 100%");
+	assert.equal(normalized[0].width, 100, "Acota ancho máximo a 100%");
+	assert.equal(normalized[0].height, 1, "Acota alto mínimo a 1%");
+	assert.equal(normalized[0].anchor, "center", "Anclaje inválido cae a 'center'");
+	assert.equal(normalized[0].action, "respawn", "Acción inválida cae a 'respawn'");
+});
+
+test("25. Editor visual: agregar, duplicar, reordenar capas y eliminar componentes", () => {
+	const mockMode = {
+		id: "mode_custom",
+		name: "Modo Personalizado",
+		deathScreen: {
+			enabled: true,
+			title: "HAS MUERTO",
+			message: "Fin",
+			backgroundColor: "#111",
+			accentColor: "#ff0000",
+			buttons: [],
+			elements: [],
+		},
+	};
+
+	let syncCount = 0;
+	const editor = new DeathScreenEditor({
+		mode: mockMode,
+		onSync: () => { syncCount++; },
+	});
+
+	// Initially ensures starter elements
+	assert.ok(mockMode.deathScreen.elements.length > 0);
+
+	// 1. Add element
+	const prevLen = mockMode.deathScreen.elements.length;
+	const newElem = editor.addElement("killer_info", "Info del Asesino");
+	assert.equal(mockMode.deathScreen.elements.length, prevLen + 1);
+	assert.equal(newElem.type, "killer_info");
+	assert.ok(syncCount > 0);
+
+	// 2. Duplicate element
+	editor.duplicateElement(newElem.id);
+	assert.equal(mockMode.deathScreen.elements.length, prevLen + 2);
+	const duplicated = mockMode.deathScreen.elements[mockMode.deathScreen.elements.length - 1];
+	assert.match(duplicated.name, /Copia/);
+
+	// 3. Move layer
+	const lastIdx = mockMode.deathScreen.elements.length - 1;
+	const elemToMove = mockMode.deathScreen.elements[lastIdx].id;
+	editor.moveLayer(elemToMove, -1);
+	assert.equal(mockMode.deathScreen.elements[lastIdx - 1].id, elemToMove, "Elemento se movió una posición hacia abajo");
+
+	// 4. Remove element
+	editor.removeElement(newElem.id);
+	assert.ok(!mockMode.deathScreen.elements.some((e) => e.id === newElem.id));
+});
+
+test("26. Deshacer y rehacer (Undo / Redo) en el editor visual de pantalla de muerte", () => {
+	const mockMode = {
+		id: "mode_undo_test",
+		name: "Modo Undo",
+		deathScreen: {
+			enabled: true,
+			title: "ESTADO INICIAL",
+			message: "Mensaje",
+			backgroundColor: "#111",
+			accentColor: "#ff0000",
+			buttons: [],
+			elements: [],
+		},
+	};
+
+	const editor = new DeathScreenEditor({
+		mode: mockMode,
+		onSync: () => {},
+	});
+
+	const initialCount = mockMode.deathScreen.elements.length;
+
+	// Add element 1
+	const elem1 = editor.addElement("title", "Título Nuevo");
+	assert.equal(mockMode.deathScreen.elements.length, initialCount + 1);
+
+	// Add element 2
+	const elem2 = editor.addElement("action_button", "Botón Extra");
+	assert.equal(mockMode.deathScreen.elements.length, initialCount + 2);
+
+	// Undo once -> element 2 removed
+	editor.undo();
+	assert.equal(mockMode.deathScreen.elements.length, initialCount + 1);
+	assert.ok(!mockMode.deathScreen.elements.some((e) => e.id === elem2.id));
+
+	// Undo again -> element 1 removed
+	editor.undo();
+	assert.equal(mockMode.deathScreen.elements.length, initialCount);
+	assert.ok(!mockMode.deathScreen.elements.some((e) => e.id === elem1.id));
+
+	// Redo once -> element 1 restored
+	editor.redo();
+	assert.equal(mockMode.deathScreen.elements.length, initialCount + 1);
+
+	// Redo twice -> element 2 restored
+	editor.redo();
+	assert.equal(mockMode.deathScreen.elements.length, initialCount + 2);
+});
+
+test("27. Evaluación de condiciones de visibilidad (causas, estados, roles, datos ausentes)", () => {
+	const elements = [
+		{
+			id: "elem_fall_only",
+			type: "subtitle",
+			x: 50, y: 50, width: 40, height: 10,
+			content: "Caíste al vacío",
+			conditions: {
+				causes: ["fall"],
+			},
+		},
+		{
+			id: "elem_killer_only",
+			type: "killer_info",
+			x: 50, y: 40, width: 40, height: 10,
+			content: "Asesino: {killer_name}",
+			conditions: {
+				requireData: ["killer"],
+			},
+		},
+		{
+			id: "elem_game_over_only",
+			type: "title",
+			x: 50, y: 30, width: 40, height: 10,
+			content: "FIN DE LA PARTIDA",
+			conditions: {
+				states: ["game_over"],
+			},
+		},
+	];
+
+	// Scenario A: Damage death with killer, lives remaining
+	const stateA = {
+		cause: "damage",
+		willRespawn: true,
+		respawnDelay: 2.0,
+		remainingRespawns: 3,
+		context: { killerName: "Francotirador_01", killerWeapon: "Sniper" },
+	};
+
+	// Element fall_only must not be shown on damage
+	const fallVisibleInA = elements[0].conditions.causes.includes(stateA.cause);
+	assert.equal(fallVisibleInA, false, "elem_fall_only se oculta ante causa 'damage'");
+
+	// Element killer_only must be shown because killerName exists
+	const killerVisibleInA = Boolean(stateA.context?.killerName);
+	assert.equal(killerVisibleInA, true, "elem_killer_only se muestra si hay asesino");
+
+	// Scenario B: Fall death without killer, 0 lives
+	const stateB = {
+		cause: "fall",
+		willRespawn: false,
+		respawnDelay: 0,
+		remainingRespawns: 0,
+		context: { details: "Te resbalaste" },
+	};
+
+	const fallVisibleInB = elements[0].conditions.causes.includes(stateB.cause);
+	assert.equal(fallVisibleInB, true, "elem_fall_only se muestra ante causa 'fall'");
+
+	const killerVisibleInB = Boolean(stateB.context?.killerName);
+	assert.equal(killerVisibleInB, false, "elem_killer_only se oculta si falta killerName");
+});
+
+test("28. Interpolación de tokens dinámicos con contexto real y texto de fallback", () => {
+	const template = "Eliminado por {killer_name} usando {killer_weapon} ({cause}) - {remaining_lives} vidas restantes.";
+
+	// 1. With complete context
+	const stateWithData = {
+		cause: "damage",
+		remainingRespawns: 2,
+		respawnDelay: 1.5,
+		context: {
+			killerName: "ShadowNinja",
+			killerWeapon: "Katana Láser",
+		},
+	};
+	const res1 = evaluateDynamicTokens(template, stateWithData, "Sin datos");
+	assert.equal(res1, "Eliminado por ShadowNinja usando Katana Láser (Daño de combate) - 2 vidas restantes.");
+
+	// 2. With missing killer name (uses fallback)
+	const stateWithoutData = {
+		cause: "fall",
+		remainingRespawns: -1, // Infinite
+		respawnDelay: 0.5,
+		context: {},
+	};
+	const res2 = evaluateDynamicTokens(template, stateWithoutData, "Entorno");
+	assert.match(res2, /Eliminado por Entorno/);
+	assert.match(res2, /Caída al vacío/);
+	assert.match(res2, /Infinitas vidas restantes/);
+	assert.doesNotMatch(res2, /undefined|null/, "Nunca debe contener strings 'undefined' o 'null'");
 });

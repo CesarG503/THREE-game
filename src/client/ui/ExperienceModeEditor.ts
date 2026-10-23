@@ -8,13 +8,16 @@ import {
 	createDefaultExperienceModes,
 	normalizeExperienceModesConfig,
 } from "../types/experienceMode.types";
+import { DeathScreenEditor } from "./DeathScreenEditor";
 
 export class ExperienceModeEditor {
 	private game: any;
 	private gameConfigPanel: any;
 	private container: HTMLElement | null = null;
 	private selectedModeId: string | null = null;
-	private previewState: "respawn" | "last_life" | "game_over" = "respawn";
+	private previewState: "respawn" | "last_life" | "game_over" | "spectator" = "respawn";
+	private visualEditor: DeathScreenEditor | null = null;
+	private showVisualEditor = true;
 
 	constructor(game: any, gameConfigPanel: any) {
 		this.game = game;
@@ -661,6 +664,62 @@ export class ExperienceModeEditor {
 			return section;
 		}
 
+		// Header for Visual Designer
+		const visualHeader = document.createElement("div");
+		visualHeader.style.cssText = "display: flex; justify-content: space-between; align-items: center; margin: 4px 0 10px;";
+		const visualTitle = document.createElement("strong");
+		visualTitle.innerHTML = "🎨 Editor Visual de Diseño, Lienzo y Reglas";
+		visualTitle.style.color = "#00d2ff";
+
+		const toggleVisualBtn = document.createElement("button");
+		toggleVisualBtn.type = "button";
+		toggleVisualBtn.textContent = this.showVisualEditor ? "▲ Ocultar Diseñador Visual" : "▼ Mostrar Diseñador Visual";
+		toggleVisualBtn.style.cssText = "background: #232734; border: 1px solid #3d445c; color: #eee; font-size: 11px; padding: 4px 10px; border-radius: 4px; cursor: pointer;";
+		toggleVisualBtn.onclick = () => {
+			this.showVisualEditor = !this.showVisualEditor;
+			if (this.container) this.render(this.container);
+		};
+		visualHeader.append(visualTitle, toggleVisualBtn);
+		section.appendChild(visualHeader);
+
+		if (this.showVisualEditor) {
+			const editorContainer = document.createElement("div");
+			editorContainer.style.cssText = "margin-bottom: 12px;";
+			this.visualEditor = new DeathScreenEditor({
+				mode,
+				onSync: () => {
+					// Synchronize primary title and action buttons
+					const titleElem = mode.deathScreen.elements?.find((e) => e.type === "title");
+					if (titleElem && titleElem.content) {
+						mode.deathScreen.title = titleElem.content;
+					}
+					const btnElems = mode.deathScreen.elements?.filter((e) => e.type === "action_button") || [];
+					if (btnElems.length > 0) {
+						mode.deathScreen.buttons = btnElems.map((b, idx) => ({
+							id: b.id || `btn_${idx}`,
+							label: b.content || "Aceptar",
+							action: b.action || "respawn",
+							isPrimary: b.isPrimary,
+						}));
+					}
+					this.sync();
+				},
+				onPreviewFullscreen: (previewState) => {
+					if (this.game?.deathManager?.deathScreen) {
+						this.game.deathManager.deathScreen.showPreview(mode, previewState);
+					}
+				},
+			});
+			this.visualEditor.render(editorContainer);
+			section.appendChild(editorContainer);
+		}
+
+		// Quick basic fields
+		const quickTitle = document.createElement("div");
+		quickTitle.textContent = "Campos Rápidos de Compatibilidad:";
+		quickTitle.style.cssText = "font-size: 11px; color: #888; font-weight: 600; margin-top: 6px;";
+		section.appendChild(quickTitle);
+
 		const formGrid = document.createElement("div");
 		formGrid.style.cssText = "display: grid; grid-template-columns: 1fr 1fr; gap: 12px;";
 
@@ -674,7 +733,10 @@ export class ExperienceModeEditor {
 		titleInput.style.cssText = "background: #111; color: white; border: 1px solid #555; padding: 6px; border-radius: 4px;";
 		titleInput.onchange = () => {
 			screen.title = titleInput.value.trim() || "HAS MUERTO";
+			const titleElem = screen.elements?.find((e) => e.type === "title");
+			if (titleElem) titleElem.content = screen.title;
 			this.sync();
+			if (this.visualEditor) this.visualEditor.setMode(mode);
 		};
 		titleCol.appendChild(titleInput);
 
@@ -689,11 +751,14 @@ export class ExperienceModeEditor {
 		msgInput.style.cssText = "background: #111; color: white; border: 1px solid #555; padding: 6px; border-radius: 4px;";
 		msgInput.onchange = () => {
 			screen.message = msgInput.value.trim();
+			const subElem = screen.elements?.find((e) => e.type === "subtitle");
+			if (subElem) subElem.content = screen.message;
 			this.sync();
+			if (this.visualEditor) this.visualEditor.setMode(mode);
 		};
 		msgCol.appendChild(msgInput);
 
-		// Colors
+		// Accent Color
 		const colorCol1 = document.createElement("div");
 		colorCol1.style.cssText = "display: flex; flex-direction: column; gap: 4px;";
 		colorCol1.innerHTML = "<label style='font-weight:600;'>Color de Acento</label>";
@@ -704,6 +769,7 @@ export class ExperienceModeEditor {
 		accentInput.onchange = () => {
 			screen.accentColor = accentInput.value;
 			this.sync();
+			if (this.visualEditor) this.visualEditor.setMode(mode);
 		};
 		colorCol1.appendChild(accentInput);
 
@@ -730,6 +796,7 @@ export class ExperienceModeEditor {
 		bgSelect.onchange = () => {
 			screen.backgroundColor = bgSelect.value;
 			this.sync();
+			if (this.visualEditor) this.visualEditor.setMode(mode);
 		};
 		bgCol.appendChild(bgSelect);
 
@@ -742,6 +809,7 @@ export class ExperienceModeEditor {
 		const btnTitle = document.createElement("strong");
 		btnTitle.textContent = "Botones de Acción en Pantalla";
 		const addBtn = document.createElement("button");
+		addBtn.type = "button";
 		addBtn.textContent = "+ Añadir Botón";
 		addBtn.style.cssText = "background: #2a9d8f; color: white; border: none; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 12px;";
 		addBtn.onclick = () => {
@@ -815,6 +883,7 @@ export class ExperienceModeEditor {
 
 			// Delete button
 			const delBtn = document.createElement("button");
+			delBtn.type = "button";
 			delBtn.textContent = "✕";
 			delBtn.title = "Eliminar botón";
 			delBtn.style.cssText = "background: #8b0000; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer;";
@@ -850,10 +919,11 @@ export class ExperienceModeEditor {
 
 		const stateSelect = document.createElement("select");
 		stateSelect.style.cssText = "background: #111; color: white; border: 1px solid #555; padding: 6px 10px; border-radius: 4px;";
-		const states: Array<{ v: "respawn" | "last_life" | "game_over"; t: string }> = [
+		const states: Array<{ v: "respawn" | "last_life" | "game_over" | "spectator"; t: string }> = [
 			{ v: "respawn", t: "Reaparición normal (con cuenta regresiva)" },
 			{ v: "last_life", t: "Última vida restante" },
 			{ v: "game_over", t: "Fin de partida (0 vidas restantes)" },
+			{ v: "spectator", t: "Transición a modo observador" },
 		];
 		states.forEach((st) => {
 			const opt = document.createElement("option");
@@ -868,6 +938,7 @@ export class ExperienceModeEditor {
 		stateSelectWrap.append(stateLabel, stateSelect);
 
 		const previewBtn = document.createElement("button");
+		previewBtn.type = "button";
 		previewBtn.textContent = "▶ Previsualizar Pantalla de Muerte";
 		previewBtn.style.cssText = `
 			background: linear-gradient(135deg, #e63946, #d90429);

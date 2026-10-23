@@ -186,3 +186,85 @@ Durante la auditoría del código previa a la consolidación, se detectaron los 
 3. **Prevención de Pérdida de Objetivo Sin Ciclos**:
    - *Problema previo*: Al morir o desconectarse un jugador observado, la validación no debía entrar en recursión infinita si todos los jugadores habían muerto.
    - *Regla unificada*: Se realiza un escaneo de una sola pasada sobre los jugadores remotos disponibles. Si la lista filtrada queda vacía, se limpia `spectatorTargetId` inmediatamente y se informa al usuario.
+
+---
+
+## 4. Arquitectura del Editor Visual de Pantalla de Muerte
+
+### 4.1 Diagrama del Editor Visual (UI, Canvas, Biblioteca, Propiedades y Estado)
+
+```mermaid
+flowchart TD
+    subgraph EditorWrapper ["Editor Visual de Pantalla de Muerte (ExperienceModeEditor / DeathScreenEditor)"]
+        TopBar["Barra Superior:<br/>- Plantillas (Clásica, Táctica, Parkour, Minimalista)<br/>- Restaurar Plantilla<br/>- Deshacer / Rehacer (Ctrl+Z / Ctrl+Y)<br/>- Selector de Estado de Prueba (Normal, Última Vida, Fin de Partida, Espectador)<br/>- Selector de Causa de Prueba (Daño/Asesino, Caída, Lógica)<br/>- Dispositivo (Desktop 16:9, Tablet 4:3, Móvil 9:16)"]
+
+        subgraph LeftPanel ["Panel Izquierdo: Biblioteca y Capas"]
+            AddBtn["+ Añadir Componente<br/>(Título, Descripción, Panel, Separador, Imagen, Vidas, Cuenta Regresiva, Info Asesino, Estadísticas, Botón)"]
+            LayerTree["Árbol de Capas / Elementos:<br/>- Reordenar (Z-Index / Subir / Bajar)<br/>- Visibilidad (Ojo)<br/>- Duplicar<br/>- Eliminar"]
+        end
+
+        subgraph CenterCanvas ["Lienzo de Diseño Adaptativo (Canvas)"]
+            Viewport["Viewport con Proporción y Fondo del Modo"]
+            Elements["Elementos Renderizados con Posición y Tamaño Normalizados (%)"]
+            Gizmo["Manipulador de Selección:<br/>- Bounding Box<br/>- Puntos de Redimensionamiento (Resize Handles)<br/>- Arrastre para Posicionar (Drag & Drop)<br/>- Nudge con Teclas de Flecha (1% / 5%)"]
+        end
+
+        subgraph RightPanel ["Panel Derecho: Inspector de Propiedades"]
+            ElementProps["Propiedades del Elemento Seleccionado:<br/>- Contenido y Tokens Dinámicos ({killer_name}, {cause}, {remaining_lives}, etc.)<br/>- Fallback si faltan datos<br/>- Geometría: X, Y, Ancho, Alto, Anclaje (Top, Center, Bottom)<br/>- Tipografía: Fuente, Tamaño, Color, Alineación, Peso<br/>- Estilo: Fondo, Bordes, Opacidad, Desenfoque, Padding<br/>- Acciones de Botón (Reaparecer, Observar, Reiniciar, Lobby)<br/>- Condiciones de Visibilidad (Causas, Roles, Estados, Requerimientos de datos)"]
+            ScreenProps["Propiedades Globales de Pantalla:<br/>- Fondo, Acento, Desenfoque de Pantalla, Imagen<br/>- Efectos y Transición: Duración, Fundido, Cámara Lenta, Congelación<br/>- Accesibilidad: Movimiento Reducido, Contraste, Lector de Pantalla"]
+        end
+    end
+
+    TopBar --> Viewport
+    LeftPanel --> CenterCanvas
+    CenterCanvas --> RightPanel
+    RightPanel --> SyncConfig["Sincronización con gameConfig.experienceModes[].deathScreen"]
+```
+
+### 4.2 Flujo de Configuración a Renderizado en Tiempo de Ejecución
+
+```mermaid
+flowchart TD
+    A["JSON del Mapa (gameConfig.experienceModes[].deathScreen)"] --> B{"¿Versión de Esquema?<br/>(v1 Legacy vs v2 Visual Layout)"}
+    
+    B -- "v1 Legacy (título, mensaje, colores, botones)" --> C["migrateDeathScreenConfig()<br/>Convierte a plantilla visual con elementos equivalentes"]
+    B -- "v2 Visual (elements list)" --> D["normalizeDeathScreenConfig()<br/>Valida dimensiones, tipos de componentes y URLs seguras"]
+
+    C --> E["Configuración Lista en Memoria"]
+    D --> E
+
+    E --> F["Evento de Muerte en Partida (DeathManager.handleDeath)"]
+    F --> G["Construir DeathState & DeathContext<br/>(cause, killerName, killerWeapon, remainingRespawns, willRespawn)"]
+
+    G --> H["DeathScreen.show(deathState)"]
+
+    subgraph RuntimeRenderEngine ["Motor de Renderizado Seguro en Runtime"]
+        H --> I["Aplicar Efectos Globales y Transición:<br/>- Fundido de entrada (CSS fade-in)<br/>- Desenfoque de fondo (backdrop-filter)<br/>- Detección de 'prefers-reduced-motion'<br/>- Pausa breve / Slow motion si está habilitado"]
+
+        I --> J["Iterar Elementos de Pantalla (elements)"]
+
+        J --> K{"Evaluar Condiciones de Visibilidad:<br/>- ¿Causa coincide? (causes)<br/>- ¿Rol coincide? (roles)<br/>- ¿Estado coincide? (willRespawn, lastLife, gameOver, spectator)<br/>- ¿Existen datos requeridos? (killer, stats)"}
+
+        K -- "Condición Falsa" --> L["Omitir / Ocultar Elemento"]
+        K -- "Condición Verdadera" --> M["Resolver Tokens Dinámicos en Contenido:<br/>{killer_name} -> state.context.killerName || fallback<br/>{cause} -> Etiqueta localizada de causa<br/>{remaining_lives} -> Vidas calculadas<br/>{countdown} -> Tiempo de demora"]
+
+        M --> N["Sanitizar y Crear DOM Seguro:<br/>- textContent puro (prevención estricta de XSS)<br/>- Validación de protocolo en imágenes (http, https, data)<br/>- Cálculo de posición adaptativa con anclajes (%)<br/>- Atributos ARIA (role='alertdialog', aria-live)"]
+
+        N --> O{"¿Es Botón de Acción?"}
+        O -- "Sí" --> P["Enlazar acción de juego:<br/>'respawn' -> executeRespawn()<br/>'spectate' -> enterSpectator()<br/>'restart' -> reiniciar partida<br/>'lobby' -> volver al lobby<br/>Navegación por teclado (Enter, Espacio, Tab)"]
+        O -- "No" --> Q["Añadir elemento al contenedor de pantalla"]
+    end
+```
+
+### 4.3 Principios de Seguridad y Accesibilidad
+
+1. **Seguridad contra Inyección**:
+   - Queda terminantemente prohibido el uso de `innerHTML` o evaluación de scripts (`eval`, `Function`, `javascript:`) a partir de cadenas almacenadas en el mapa.
+   - Las imágenes e iconos solo admiten esquemas seguros (`http:`, `https:`, `data:image/`, o rutas relativas locales).
+   - Los botones de acción solo pueden ejecutar una lista cerrada de acciones del juego (`respawn`, `spectate`, `restart`, `lobby`).
+2. **Accesibilidad Integral**:
+   - `prefers-reduced-motion`: Si el sistema del usuario tiene activada la reducción de movimiento, las transiciones de fundido y desenfoque dinámico se simplifican instantáneamente sin animaciones bruscas.
+   - Navegación por teclado: Los botones reciben foco secuencial mediante `tabindex="0"`; `Enter` o `Espacio` activa el botón con foco o el botón primario por defecto; `Escape` permite cerrar en modo previsualización.
+   - Roles ARIA: El contenedor utiliza `role="alertdialog"`, `aria-modal="true"`, y la cuenta regresiva o mensajes dinámicos se anuncian con `aria-live="polite"`.
+3. **Resiliencia ante Datos Faltantes**:
+   - Si una plantilla hace referencia a `{killer_name}` pero la muerte fue por caída o trampa ambiental, se utiliza el texto de reemplazo configurado por el creador o se oculta el elemento sin romper el layout ni lanzar excepciones de JavaScript.

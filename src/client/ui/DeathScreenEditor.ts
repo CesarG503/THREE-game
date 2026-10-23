@@ -18,8 +18,8 @@ import {
 	normalizeDeathScreenBackground,
 	evaluateDynamicTokens,
 	sanitizeImageUrl,
+	DEFAULT_DEATH_SCREEN_VIGNETTE,
 } from "../types/experienceMode.types";
-import { parseToRgba } from "./DeathScreen";
 import { DeathAnimationService } from "../managers/DeathAnimationService";
 
 export interface DeathScreenEditorOptions {
@@ -92,7 +92,7 @@ export class DeathScreenEditor {
 				backgroundColor: "rgba(13, 15, 23, 0.92)",
 				accentColor: "#ff3b47",
 				background: normalizeDeathScreenBackground(undefined, "rgba(13, 15, 23, 0.92)"),
-				screenBlur: 12,
+				screenBlur: 4,
 				buttons: [{ id: "btn_respawn", label: "Reaparecer", action: "respawn", isPrimary: true }],
 				elements: createDefaultDeathScreenElements("classic", "#ff3b47", "rgba(13, 15, 23, 0.92)"),
 			};
@@ -796,7 +796,6 @@ export class DeathScreenEditor {
 
 		const bg = normalizeDeathScreenBackground(this.screen.background, this.screen.backgroundColor, this.screen.backgroundImage);
 		const rawBg = bg.color || this.screen.backgroundColor || "rgba(13, 15, 23, 0.94)";
-		const overlayCenterBg = parseToRgba(rawBg, 0.88);
 		const bgType = bg.type || (bg.imageUrl ? "image" : "gradient");
 
 		if (bgType === "color") {
@@ -805,11 +804,11 @@ export class DeathScreenEditor {
 			if (bg.gradient) {
 				this.canvasBgLayer.style.background = bg.gradient;
 			} else {
-				this.canvasBgLayer.style.background = `radial-gradient(ellipse at center, ${overlayCenterBg}, rgba(5, 7, 12, 0.97) 80%)`;
+				this.canvasBgLayer.style.background = DEFAULT_DEATH_SCREEN_VIGNETTE;
 			}
 		} else if (bgType === "image" || bgType === "animated") {
 			this.canvasBgLayer.style.backgroundColor = bg.color || "#05070c";
-			this.canvasBgLayer.style.background = bg.gradient || `radial-gradient(ellipse at center, ${overlayCenterBg}, rgba(5, 7, 12, 0.97) 80%)`;
+			this.canvasBgLayer.style.background = bg.gradient || DEFAULT_DEATH_SCREEN_VIGNETTE;
 
 			const imgUrl = bg.imageUrl;
 			if (imgUrl) {

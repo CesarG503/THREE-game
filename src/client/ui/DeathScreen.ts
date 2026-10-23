@@ -9,6 +9,7 @@ import {
 	evaluateDynamicTokens,
 	sanitizeImageUrl,
 	normalizeDeathScreenBackground,
+	DEFAULT_DEATH_SCREEN_VIGNETTE,
 } from "../types/experienceMode.types";
 import { DeathAnimationService } from "../managers/DeathAnimationService";
 
@@ -632,8 +633,6 @@ export class DeathScreen {
 			: (typeof config.screenBlur === "number" ? config.screenBlur : 12);
 
 		const cardBg = parseToRgba(rawBg, 0.94);
-		const overlayCenterBg = parseToRgba(rawBg, 0.85);
-
 		// Accessibility check for reduced motion
 		const prefersReducedMotion = typeof window !== "undefined" && window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 		const isReducedMotion = config.accessibility?.reduceMotion || prefersReducedMotion;
@@ -657,12 +656,12 @@ export class DeathScreen {
 				if (bg.gradient) {
 					this.bgLayer.style.background = bg.gradient;
 				} else {
-					this.bgLayer.style.background = `radial-gradient(ellipse at center, ${overlayCenterBg}, rgba(5, 7, 12, 0.97) 80%)`;
+					this.bgLayer.style.background = DEFAULT_DEATH_SCREEN_VIGNETTE;
 				}
 			} else if (bgType === "image" || bgType === "animated") {
 				// Base backdrop color and gradient fallback for robustness if image fails or is loading
 				this.bgLayer.style.backgroundColor = bg.color || "#05070c";
-				this.bgLayer.style.background = bg.gradient || `radial-gradient(ellipse at center, ${overlayCenterBg}, rgba(5, 7, 12, 0.97) 80%)`;
+				this.bgLayer.style.background = bg.gradient || DEFAULT_DEATH_SCREEN_VIGNETTE;
 
 				const imgUrl = bg.imageUrl;
 				if (imgUrl) {

@@ -4,6 +4,7 @@ import RAPIER from "@dimforge/rapier3d-compat";
 import { animate } from "animejs";
 import { MapObjectItem } from "../items/MapObjectItem";
 import { normalizeSolarVisualTimeline } from "../platform/solarVisualTimeline";
+import { normalizeExperienceModesConfig } from "../types/experienceMode.types";
 import {
 	applyAnimatedObjectScale,
 	getWaypointPosition,
@@ -66,7 +67,7 @@ export function saveMap(this: any) {
 		hierarchy: this.editorHierarchy ? this.editorHierarchy.serialize() : [],
 		gameConfig: (this.constructionMenu && this.constructionMenu.logicSystem)
 			? this.constructionMenu.logicSystem.gameConfig
-			: null,
+			: (this.gameConfig || null),
 		environmentConfig: this.environmentConfig,
 		playerConfig: this.playerConfigManager ? this.playerConfigManager.saveData() : null
 	};
@@ -88,11 +89,23 @@ export function loadMap(this: any, jsonData: any) {
 		}
 	}
 
-	if (jsonData.hasOwnProperty("gameConfig") && this.constructionMenu && this.constructionMenu.logicSystem) {
-		this.constructionMenu.logicSystem.gameConfig = jsonData.gameConfig || { sequences: [] };
-		console.log("Global Game Config Loaded", this.constructionMenu.logicSystem.gameConfig);
+	if (jsonData.hasOwnProperty("gameConfig")) {
+		const rawConfig = jsonData.gameConfig || { sequences: [] };
+		const normalized = normalizeExperienceModesConfig(rawConfig);
+		rawConfig.experienceModes = normalized.modes;
+		rawConfig.activeExperienceModeId = normalized.activeModeId;
+		this.gameConfig = rawConfig;
 
-		if (this.constructionMenu.gameConfigPanel) {
+		if (this.constructionMenu && this.constructionMenu.logicSystem) {
+			this.constructionMenu.logicSystem.gameConfig = rawConfig;
+		}
+		console.log("Global Game Config Loaded", this.gameConfig);
+
+		if (this.deathManager) {
+			this.deathManager.reset();
+		}
+
+		if (this.constructionMenu && this.constructionMenu.gameConfigPanel) {
 			this.constructionMenu.gameConfigPanel.render();
 		}
 	}
@@ -756,6 +769,16 @@ export function updateButtonInteraction(this: any, dt: number) {
 export function emitSignal(this: any, signalId: string) {
 	console.log("Emitting Signal:", signalId);
 
+	if (signalId === "kill_player" || signalId === "trap_kill") {
+		if (this.deathManager && this.character && !this.character.isDead) {
+			this.deathManager.handleDeath({ cause: "logic", details: "Eliminado por señal lógica" });
+		}
+	} else if (signalId === "checkpoint" || signalId === "set_checkpoint") {
+		if (this.deathManager && this.character) {
+			this.deathManager.setCheckpoint(this.character.getPosition());
+		}
+	}
+
 	if (this.sceneManager && this.sceneManager.scene) {
 		this.sceneManager.scene.traverse((obj: any) => {
 			if (obj.userData.logicProperties && obj.userData.logicProperties.sequences) {
@@ -881,12 +904,41 @@ export function updateCollisionLogic(this: any, dt: number) {
 
 			if (intersects && !props._isInside) {
 				props._isInside = true;
+
+				// Checkpoint registration
+				if (props.isCheckpoint || props.action === "checkpoint") {
+					if (this.deathManager) {
+						const cpPos = obj.position.clone();
+						cpPos.y += 0.5;
+						this.deathManager.setCheckpoint(cpPos);
+					}
+				}
+
+				// Trap / logic death
+				if (props.killPlayer || props.isTrap || props.action === "kill_player") {
+					if (this.deathManager && this.character && !this.character.isDead) {
+						this.deathManager.handleDeath({
+							cause: "logic",
+							details: props.trapMessage || "Eliminado por trampa",
+						});
+					}
+				}
+
 				if (props.triggerOnEnter || props.triggerOnTouch) {
 					console.log("Interactive Collision Triggered:", obj.userData.uuid);
 					this.emitSignal(obj.userData.uuid);
 				}
 			} else if (!intersects && props._isInside) {
 				props._isInside = false;
+			}
+
+			if (intersects && (props.killPlayer || props.isTrap || props.action === "kill_player")) {
+				if (this.deathManager && this.character && !this.character.isDead) {
+					this.deathManager.handleDeath({
+						cause: "logic",
+						details: props.trapMessage || "Eliminado por trampa",
+					});
+				}
 			}
 		}
 

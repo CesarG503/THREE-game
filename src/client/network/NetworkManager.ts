@@ -332,9 +332,19 @@ export class NetworkManager {
         return true;
     }
 
-    update(dt: number) {
+    update(dt: number, spectatorOptions?: { cameraPosition?: { x: number; y: number; z: number }; quality?: "full" | "balanced" | "low"; targetPlayerId?: string | null }) {
         this.remotePlayers.forEach((player) => {
-            player.update(dt);
+            let skipDetailedAnimation = false;
+            const isObservedTarget = Boolean(spectatorOptions?.targetPlayerId && player.playerId === spectatorOptions.targetPlayerId);
+            if (!isObservedTarget && spectatorOptions?.cameraPosition && spectatorOptions.quality !== "full") {
+                const dx = player.currentPosition.x - spectatorOptions.cameraPosition.x;
+                const dy = player.currentPosition.y - spectatorOptions.cameraPosition.y;
+                const dz = player.currentPosition.z - spectatorOptions.cameraPosition.z;
+                const distanceSq = dx * dx + dy * dy + dz * dz;
+                const animationRange = spectatorOptions.quality === "low" ? 28 : 55;
+                skipDetailedAnimation = distanceSq > animationRange * animationRange;
+            }
+            player.update(dt, skipDetailedAnimation);
         });
     }
 

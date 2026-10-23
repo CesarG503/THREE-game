@@ -6829,6 +6829,8 @@ export class ConstructionMenu {
             this.createLogicDraftInput(this.editorLogicControlsContainer, "Travesable (Sin colisión):", "isTraversable", "boolean", false);
             this.createLogicDraftInput(this.editorLogicControlsContainer, "Disparar al Tocar:", "triggerOnTouch", "boolean", false);
             this.createLogicDraftInput(this.editorLogicControlsContainer, "Disparar al Entrar:", "triggerOnEnter", "boolean", false);
+            this.createLogicDraftInput(this.editorLogicControlsContainer, "Actuar como Checkpoint:", "isCheckpoint", "boolean", false);
+            this.createLogicDraftInput(this.editorLogicControlsContainer, "Trampa Mortal (Kill Player):", "killPlayer", "boolean", false);
         } else if (type === "target") {
             this.createLogicDraftInput(this.editorLogicControlsContainer, "Anillos:", "rings", "number", 3);
             this.createLogicDraftInput(this.editorLogicControlsContainer, "Daño Base:", "baseDamage", "number", 10);

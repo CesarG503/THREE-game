@@ -27,6 +27,8 @@ import { MapObjectItem } from "./items/MapObjectItem";
 import { PlayerConfigManager } from "./managers/PlayerConfigManager";
 import { LogicCameraSystem } from "./managers/LogicCameraSystem";
 import { FloatingTextManager } from "./ui/FloatingTextManager";
+import { DeathManager } from "./managers/DeathManager";
+import { createDefaultExperienceModes, normalizeExperienceModesConfig } from "./types/experienceMode.types";
 import { Projectile } from "./weapons/Projectile";
 import { BlasterSystem } from "./fx/BlasterSystem";
 import { Router } from "./routing/Router";
@@ -61,6 +63,8 @@ export class Game {
 	gameMode: any;
 	roomId: any;
 	character: any;
+	deathManager: DeathManager | null;
+	gameConfig: any;
 	vehicleSystem: VehicleSystem;
 	fuelZoneSystem: FuelZoneSystem;
 	playerConfigManager: any;
@@ -224,6 +228,10 @@ export class Game {
 			this.sceneManager.camera,
 			null
 		);
+		this.character.game = this;
+		const defaultModes = createDefaultExperienceModes();
+		this.gameConfig = { sequences: [], experienceModes: defaultModes.modes, activeExperienceModeId: defaultModes.activeModeId };
+		this.deathManager = new DeathManager(this);
 		if (this.gameMode === "editor") {
 			this.character.canFly = true;
 			console.log("Editor Mode Enabled: Flight Active");
@@ -317,21 +325,25 @@ export class Game {
 		};
 
 		this.networkManager.onMapSyncData = (mapData: any) => {
-			if (this.gameMode !== "editor") return;
-			console.log("[Collab] Recibiendo estado de mapa completo (Late Joiner/Broadcast Sync)...");
+			console.log("[Network] Recibiendo estado de mapa completo...");
 			try {
 				const mapJson = typeof mapData === "string" ? JSON.parse(mapData) : mapData;
 				this._isApplyingRemoteEdit = true;
 				this.loadMap(mapJson);
 				this._isApplyingRemoteEdit = false;
-				console.log("[Collab] Mapa sincronizado exitosamente.");
+				console.log("[Network] Mapa sincronizado exitosamente.");
 			} catch (e) {
-				console.error("[Collab] Error parseando mapa recibido:", e);
+				console.error("[Network] Error parseando mapa recibido:", e);
 			}
 		};
 
 		this.networkManager.onGameConfigUpdate = (configData: any) => {
-			console.log("[Collab] Actualización de configuración global recibida", configData);
+			console.log("[Network] Actualización de configuración global recibida", configData);
+			const normalized = normalizeExperienceModesConfig(configData);
+			configData.experienceModes = normalized.modes;
+			configData.activeExperienceModeId = normalized.activeModeId;
+			this.gameConfig = configData;
+
 			if (this.constructionMenu && this.constructionMenu.logicSystem) {
 				this.constructionMenu.logicSystem.gameConfig = configData;
 
@@ -340,7 +352,14 @@ export class Game {
 					if (this.constructionMenu.gameConfigPanel.contentServerSettings.style.display !== "none") {
 						this.constructionMenu.gameConfigPanel.renderServerSettings();
 					}
+					if (this.constructionMenu.gameConfigPanel.contentModes && this.constructionMenu.gameConfigPanel.contentModes.style.display !== "none") {
+						this.constructionMenu.gameConfigPanel.renderExperienceModes();
+					}
 				}
+			}
+
+			if (this.deathManager) {
+				this.deathManager.reset();
 			}
 		};
 
@@ -1078,6 +1097,8 @@ export class Game {
 		this.vehicleSystem?.dispose();
 		this.fuelZoneSystem?.dispose();
 		this.character?.dispose?.();
+		this.deathManager?.destroy?.();
+		this.deathManager = null;
 			this.hud?.destroy?.();
 			this.objectInspector?.destroy?.();
 			this.editorExplorer?.dispose?.();

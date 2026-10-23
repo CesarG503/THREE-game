@@ -720,6 +720,23 @@ export class LogicSystem {
 				this.configRuntime.timer = 0;
 				this.hud.hideTimer(); // Clean up when done
 			}
+		} else if (block.type === "kill_player" || block.type === "trap_kill") {
+			console.log("Kill player triggered by sequence logic");
+			if (this.game?.deathManager && this.game?.character && !this.game.character.isDead) {
+				this.game.deathManager.handleDeath({
+					cause: "logic",
+					details: block.message || "Eliminado por lógica de mapa"
+				});
+			}
+			this.configRuntime.currentIndex++;
+			this.configRuntime.timer = 0;
+		} else if (block.type === "checkpoint" || block.type === "set_checkpoint") {
+			console.log("Checkpoint triggered by sequence logic");
+			if (this.game?.deathManager && this.game?.character) {
+				this.game.deathManager.setCheckpoint(this.game.character.getPosition());
+			}
+			this.configRuntime.currentIndex++;
+			this.configRuntime.timer = 0;
 		} else if (block.type === "end_game") {
 			console.log("Game Over Triggered by Logic");
 			this.configRuntime.isPlaying = false;

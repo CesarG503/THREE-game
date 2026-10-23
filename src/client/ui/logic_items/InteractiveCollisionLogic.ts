@@ -18,6 +18,9 @@ export class InteractiveCollisionLogic extends LogicItem {
         if (props.isTraversable === undefined) props.isTraversable = false;
         if (props.triggerOnTouch === undefined) props.triggerOnTouch = false;
         if (props.triggerOnEnter === undefined) props.triggerOnEnter = false;
+        if (props.isCheckpoint === undefined) props.isCheckpoint = false;
+        if (props.killPlayer === undefined) props.killPlayer = false;
+        if (props.trapMessage === undefined) props.trapMessage = "Eliminado por trampa";
 
         // Name
         if (props.name !== undefined) {
@@ -97,6 +100,69 @@ export class InteractiveCollisionLogic extends LogicItem {
 
             row.appendChild(chk)
             row.appendChild(label)
+            container.appendChild(row)
+        }
+
+        // Checkpoint
+        if (props.isCheckpoint !== undefined) {
+            const row = document.createElement('div')
+            row.style.cssText = "display: flex; align-items: center; gap: 8px; margin-top: 10px;"
+
+            const chk = document.createElement('input')
+            chk.type = 'checkbox'
+            chk.checked = props.isCheckpoint
+            chk.onchange = (e) => updateCallback('isCheckpoint', e.target.checked)
+
+            const label = document.createElement('label')
+            label.textContent = "Actuar como Checkpoint (Punto de Reaparición)"
+            label.style.color = "#00d2ff"
+            label.style.fontSize = "11px"
+            label.style.fontWeight = "bold"
+
+            row.appendChild(chk)
+            row.appendChild(label)
+            container.appendChild(row)
+        }
+
+        // Kill Player / Trampa mortal
+        if (props.killPlayer !== undefined) {
+            const row = document.createElement('div')
+            row.style.cssText = "display: flex; align-items: center; gap: 8px; margin-top: 10px;"
+
+            const chk = document.createElement('input')
+            chk.type = 'checkbox'
+            chk.checked = props.killPlayer
+            chk.onchange = (e) => updateCallback('killPlayer', e.target.checked)
+
+            const label = document.createElement('label')
+            label.textContent = "Trampa Mortal (Eliminar Jugador - Causa Lógica)"
+            label.style.color = "#ff4d4d"
+            label.style.fontSize = "11px"
+            label.style.fontWeight = "bold"
+
+            row.appendChild(chk)
+            row.appendChild(label)
+            container.appendChild(row)
+        }
+
+        // Trap Message
+        if (props.killPlayer && props.trapMessage !== undefined) {
+            const row = document.createElement('div')
+            row.style.cssText = "display: flex; flex-direction: column; gap: 5px; margin-top: 6px; padding-left: 20px;"
+
+            const label = document.createElement('label')
+            label.textContent = "Mensaje de la Trampa"
+            label.style.color = "#aaa"
+            label.style.fontSize = "10px"
+            row.appendChild(label)
+
+            const input = document.createElement('input')
+            input.type = 'text'
+            input.value = props.trapMessage
+            input.style.cssText = "background: #222; border: 1px solid #555; color: white; padding: 4px; font-size: 11px;"
+            input.onchange = (e) => updateCallback('trapMessage', e.target.value)
+            row.appendChild(input)
+
             container.appendChild(row)
         }
 

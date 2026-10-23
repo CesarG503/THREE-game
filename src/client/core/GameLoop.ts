@@ -539,18 +539,58 @@ export function animate(this: any) {
 
 	// Finish vehicle interpolation and anchor both riders before sampling the camera target.
 	// Otherwise a passenger sees the new bike/driver from the previous frame's seat position.
-	this.networkManager?.update(dt);
+	const isSpectator = Boolean(this.deathManager?.isSpectator);
+	const spectatorTarget = isSpectator ? this.deathManager.getSpectatorTarget?.() : null;
+	const spectatorCameraPosition = this.sceneManager?.camera?.position
+		|| spectatorTarget?.currentPosition
+		|| this.character?.getPosition?.();
+	const spectatorQuality = isSpectator
+		? (this.deathManager.getSpectatorQuality?.() || "balanced")
+		: undefined;
+	this.networkManager?.update(dt, isSpectator
+		? {
+			cameraPosition: spectatorCameraPosition,
+			quality: spectatorQuality,
+			targetPlayerId: this.deathManager?.spectatorTargetId || null,
+		}
+		: undefined);
 	this.vehicleSystem?.syncRemote(dt);
 
 		// Camera Update
 		if (this.logicCameraSystem?.isViewingLogicCamera) {
 			this.logicCameraSystem.update(dt);
 		} else {
+			const isFirstPersonSpec = isSpectator && this.deathManager.currentSpectatorPerspective === "first_person";
+
+			const trackedPosition = isSpectator && spectatorTarget
+				? spectatorTarget.currentPosition
+				: this.character.getPosition();
+
+			const trackedRotation = isSpectator && spectatorTarget
+				? spectatorTarget.currentRotation
+				: this.character.getRotation();
+
+			const trackedGravity = isSpectator && spectatorTarget
+				? spectatorTarget.currentGravityQuaternion
+				: (this.character.getGravityQuaternion ? this.character.getGravityQuaternion() : (this.character.getGravityUpVector ? this.character.getGravityUpVector() : null));
+
+			if (isSpectator && spectatorTarget && this.cameraController) {
+				if (isFirstPersonSpec) {
+					this.cameraController.isFirstPerson = true;
+					this.cameraController.fpYaw = spectatorTarget.currentRotation;
+					if (spectatorTarget.state?.headPitch !== undefined) {
+						this.cameraController.fpPitch = spectatorTarget.state.headPitch;
+					}
+				} else if (this.cameraController.mode !== "free-fly") {
+					this.cameraController.isFirstPerson = false;
+				}
+			}
+
 			this.cameraController.update(
-				this.character.getPosition(),
-				this.character.getRotation(),
+				trackedPosition,
+				trackedRotation,
 				dt,
-				this.character.getGravityQuaternion ? this.character.getGravityQuaternion() : (this.character.getGravityUpVector ? this.character.getGravityUpVector() : null),
+				trackedGravity,
 				this.sceneManager.scene,
 				this.inputManager
 			);
@@ -559,10 +599,14 @@ export function animate(this: any) {
 	// Fall Death Logic
 	if (this.environmentConfig && this.environmentConfig.fallDeath && this.character.getPosition().y < this.environmentConfig.fallDeathY) {
 		if (!this.character.isDead) {
-			console.log("Player fell off the map! Instant respawn.");
-			this.character.currentHealth = 0;
-			this.character.emit("healthChanged", { current: 0, max: this.character.maxHealth });
-			this.character.respawn();
+			if (this.deathManager) {
+				this.deathManager.handleDeath({ cause: "fall", position: this.character.getPosition() });
+			} else {
+				console.log("Player fell off the map! Instant respawn.");
+				this.character.currentHealth = 0;
+				this.character.emit("healthChanged", { current: 0, max: this.character.maxHealth });
+				this.character.respawn();
+			}
 		}
 	}
 

@@ -1,4 +1,5 @@
 import { normalizeSolarVisualTimeline } from "./solarVisualTimeline";
+import { createDefaultExperienceModes } from "../types/experienceMode.types";
 
 export interface SavedMapData {
 	gameVersion: string;
@@ -6,6 +7,9 @@ export interface SavedMapData {
 	objects: unknown[];
 	gameConfig: {
 		sequences: unknown[];
+		experienceModes?: unknown[];
+		activeExperienceModeId?: string;
+		[key: string]: unknown;
 	};
 	environmentConfig: {
 		mapSizeX: number;
@@ -79,12 +83,15 @@ export interface SavedMapData {
 export const DEFAULT_SKYBOX_TYPE = "skybox:/assets/skybox/Cubemap/Cubemap_Sky_04-512x512.png";
 
 export function createEmptyMapData(): SavedMapData {
+	const defaultModes = createDefaultExperienceModes();
 	return {
 		gameVersion: "1.0",
 		timestamp: Date.now(),
 		objects: [],
 		gameConfig: {
 			sequences: [],
+			experienceModes: defaultModes.modes,
+			activeExperienceModeId: defaultModes.activeModeId,
 		},
 		environmentConfig: {
 			mapSizeX: 100,

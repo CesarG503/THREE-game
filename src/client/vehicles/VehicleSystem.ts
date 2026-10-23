@@ -1098,9 +1098,13 @@ Durabilidad ${Math.ceil(props.durability)} / ${props.maxDurability}${isMotorbike
     if (this.mounted === bike) {
       this.dismount(true);
       if (!this.game.character.isDead) {
-        this.game.character.currentHealth = 0;
-        this.game.character.emit("healthChanged", { current: 0, max: this.game.character.maxHealth });
-        this.game.character.respawn();
+        if (this.game.deathManager) {
+          this.game.deathManager.handleDeath({ cause: "fall", details: "Caída de vehículo" });
+        } else {
+          this.game.character.currentHealth = 0;
+          this.game.character.emit("healthChanged", { current: 0, max: this.game.character.maxHealth });
+          this.game.character.respawn();
+        }
       }
     }
 

@@ -85,6 +85,8 @@ export class CharacterController {
   explodeOnDeath: boolean;
   bodyPartsDuration: number;
   damageFlashIntensity: number;
+  game: any;
+  currentCheckpoint: THREE.Vector3 | null;
 
 
   constructor(scene: THREE.Scene, world: RAPIER.World, camera: THREE.Camera, cameraController: any) {
@@ -168,6 +170,8 @@ export class CharacterController {
     this.flashOnDamage = false;
     this.respawnDelay = 2.0;
     this.explodeOnDeath = false;
+    this.game = null;
+    this.currentCheckpoint = null;
     this.bodyPartsDuration = 5.0;
     this.damageFlashIntensity = 0.8;
 
@@ -1238,7 +1242,11 @@ export class CharacterController {
     }
 
     if (this.currentHealth <= 0) {
-      this.die();
+      if (this.game && this.game.deathManager) {
+        this.game.deathManager.handleDeath({ cause: "damage" });
+      } else {
+        this.die();
+      }
     }
   }
 
@@ -1300,8 +1308,12 @@ export class CharacterController {
     }, flashDuration);
   }
 
-  die() {
+  die(cause = "damage") {
     if (this.isDead) return;
+    if (this.game && this.game.deathManager && !this.game.deathManager.isProcessingDeath) {
+      this.game.deathManager.handleDeath({ cause: cause as any });
+      return;
+    }
     this.isDead = true;
     console.log("Player Died!");
 
@@ -1322,7 +1334,7 @@ export class CharacterController {
     }
   }
 
-  respawn() {
+  respawnAt(targetPos: THREE.Vector3) {
     if (!this.rigidBody) return;
 
     this.isDead = false;
@@ -1331,9 +1343,7 @@ export class CharacterController {
     this.emit("healthChanged", { current: this.currentHealth, max: this.maxHealth });
     this.emit("jumpChanged", { current: this.maxMultiJumps, max: this.maxMultiJumps });
 
-    const respawnPos = this.startPosition;
-
-    this.rigidBody.setTranslation({ x: respawnPos.x, y: respawnPos.y, z: respawnPos.z }, true);
+    this.rigidBody.setTranslation({ x: targetPos.x, y: targetPos.y, z: targetPos.z }, true);
     this.rigidBody.setLinvel({ x: 0, y: 0, z: 0 }, true);
 
     // Restore visual model visibility
@@ -1345,6 +1355,10 @@ export class CharacterController {
       this.polygonModelSkin.setVisible(true);
     }
 
-    console.log("Respawned at", respawnPos);
+    console.log("Respawned at", targetPos);
+  }
+
+  respawn() {
+    this.respawnAt(this.startPosition);
   }
 }

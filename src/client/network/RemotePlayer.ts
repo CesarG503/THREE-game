@@ -343,7 +343,7 @@ export class RemotePlayer {
         modelController.model.quaternion.copy(this.currentGravityQuaternion).multiply(yaw);
     }
 
-    update(dt: number) {
+    update(dt: number, skipDetailedAnimation = false) {
         const ride = this.state.motorbike;
         const isRiding = Boolean(ride && [ride.speed, ride.steering, ride.lean, ride.riderLean].every(Number.isFinite));
 
@@ -400,8 +400,10 @@ export class RemotePlayer {
 
         const effectivelyAttacking = this.state.isAttacking || (Date.now() < this.attackEndTime);
 
-        this.glbModel.update(dt, hasInput);
-        this.polygonModel.update(dt, hasInput);
+        if (!skipDetailedAnimation) {
+            this.glbModel.update(dt, hasInput);
+            this.polygonModel.update(dt, hasInput);
+        }
         const isUsingJetpack = this.state.equippedWeapon && (this.state.equippedWeapon === "jetpack" || this.state.equippedWeapon.startsWith("jetpack"));
         const isSuperman = this.state.isSuperman !== undefined ? !!this.state.isSuperman : !!(isUsingJetpack && this.state.isCrouching && !this.state.isGrounded);
         const noPitchTilt = this.state.noPitchTilt !== undefined ? !!this.state.noPitchTilt : !!(isUsingJetpack && 
@@ -411,7 +413,7 @@ export class RemotePlayer {
         const visualCrouch = !!(this.state.isCrouching && !isSuperman);
         const isRunning = !!this.state.isRunning;
 
-        this.polygonModelSkin.update(
+        if (!skipDetailedAnimation) this.polygonModelSkin.update(
             dt,
             hasInput,
             visualCrouch,

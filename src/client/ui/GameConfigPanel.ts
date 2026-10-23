@@ -1,6 +1,8 @@
 // @ts-nocheck
 
 import { UIPositionSelector } from "./UIPositionSelector"
+import { ExperienceModeEditor } from "./ExperienceModeEditor"
+import { normalizeExperienceModesConfig } from "../types/experienceMode.types"
 
 export class GameConfigPanel {
     constructor(game, logicSystem) {
@@ -35,6 +37,11 @@ export class GameConfigPanel {
                 globalGravity: 9.8
              }
         }
+
+        const normalizedModes = normalizeExperienceModesConfig(this.logicSystem.gameConfig);
+        this.logicSystem.gameConfig.experienceModes = normalizedModes.modes;
+        this.logicSystem.gameConfig.activeExperienceModeId = normalizedModes.activeModeId;
+        this.experienceModeEditor = new ExperienceModeEditor(this.game, this);
     }
 
     syncConfig() {
@@ -115,9 +122,14 @@ export class GameConfigPanel {
         const tabServer = document.createElement('button')
         tabServer.textContent = "Ajustes de Servidor"
         tabServer.style.cssText = "background: none; border: none; color: #888; font-size: 16px; cursor: pointer; padding: 5px;"
+
+        const tabModes = document.createElement('button')
+        tabModes.textContent = "Modos y Muerte"
+        tabModes.style.cssText = "background: none; border: none; color: #888; font-size: 16px; cursor: pointer; padding: 5px;"
         
         tabContainer.appendChild(tabSeq)
         tabContainer.appendChild(tabServer)
+        tabContainer.appendChild(tabModes)
         this.container.appendChild(tabContainer)
 
         // Content Containers
@@ -126,23 +138,40 @@ export class GameConfigPanel {
 
         this.contentServerSettings = document.createElement('div')
         this.contentServerSettings.style.cssText = "display: none; flex-direction: column; gap: 15px; flex: 1; overflow-y: auto; padding: 10px; background: #1a1a1a; border-radius: 8px; border: 1px solid #333;"
+
+        this.contentModes = document.createElement('div')
+        this.contentModes.style.cssText = "display: none; flex-direction: column; gap: 10px; flex: 1; min-height: 0; overflow-y: auto;"
         
         this.container.appendChild(this.contentSequences)
         this.container.appendChild(this.contentServerSettings)
+        this.container.appendChild(this.contentModes)
 
         // Tab Switching Logic
         tabSeq.onclick = () => {
             tabSeq.style.color = "white"; tabSeq.style.fontWeight = "bold"; tabSeq.style.borderBottom = "2px solid white";
             tabServer.style.color = "#888"; tabServer.style.fontWeight = "normal"; tabServer.style.borderBottom = "none";
+            tabModes.style.color = "#888"; tabModes.style.fontWeight = "normal"; tabModes.style.borderBottom = "none";
             this.contentSequences.style.display = "flex";
             this.contentServerSettings.style.display = "none";
+            this.contentModes.style.display = "none";
         }
         tabServer.onclick = () => {
             tabServer.style.color = "white"; tabServer.style.fontWeight = "bold"; tabServer.style.borderBottom = "2px solid white";
             tabSeq.style.color = "#888"; tabSeq.style.fontWeight = "normal"; tabSeq.style.borderBottom = "none";
+            tabModes.style.color = "#888"; tabModes.style.fontWeight = "normal"; tabModes.style.borderBottom = "none";
             this.contentSequences.style.display = "none";
             this.contentServerSettings.style.display = "flex";
+            this.contentModes.style.display = "none";
             this.renderServerSettings();
+        }
+        tabModes.onclick = () => {
+            tabModes.style.color = "white"; tabModes.style.fontWeight = "bold"; tabModes.style.borderBottom = "2px solid white";
+            tabSeq.style.color = "#888"; tabSeq.style.fontWeight = "normal"; tabSeq.style.borderBottom = "none";
+            tabServer.style.color = "#888"; tabServer.style.fontWeight = "normal"; tabServer.style.borderBottom = "none";
+            this.contentSequences.style.display = "none";
+            this.contentServerSettings.style.display = "none";
+            this.contentModes.style.display = "flex";
+            this.renderExperienceModes();
         }
 
         // Toolbar (Add Blocks)
@@ -153,6 +182,8 @@ export class GameConfigPanel {
         this.createAddBtn(toolbar, "+ Tiempo", "#4444ff", () => this.addBlock('time_wait'))
         // Loop and End are still useful structure blocks
         this.createAddBtn(toolbar, "+ Fin Partida", "#aa0000", () => this.addBlock('end_game'))
+        this.createAddBtn(toolbar, "+ Trampa Mortal", "#cc2222", () => this.addBlock('kill_player'))
+        this.createAddBtn(toolbar, "+ Checkpoint", "#0088cc", () => this.addBlock('checkpoint'))
         this.createAddBtn(toolbar, "+ Loop (Reiniciar)", "#880088", () => this.addBlock('loop_game'))
 
         this.contentSequences.appendChild(toolbar)
@@ -496,6 +527,12 @@ export class GameConfigPanel {
         this.serverSettingsControls[key] = input
     }
 
+    renderExperienceModes() {
+        if (this.contentModes && this.experienceModeEditor) {
+            this.experienceModeEditor.render(this.contentModes);
+        }
+    }
+
     renderServerSettings() {
         if (!this.statsPanel) return
         
@@ -650,6 +687,11 @@ export class GameConfigPanel {
         // Init Defaults
         const generateUUID = () => (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16); });
         block.uuid = generateUUID()
+        if (type === 'kill_player') {
+            block.message = "Eliminado por trampa";
+        } else if (type === 'checkpoint') {
+            block.name = "Checkpoint";
+        }
         if (type === 'emit_signal') {
             block.signalName = "game_event"
         } else if (type === 'time_wait') {
@@ -668,6 +710,13 @@ export class GameConfigPanel {
     }
 
     render() {
+        if (this.contentModes && this.contentModes.style.display !== "none") {
+            this.renderExperienceModes();
+        }
+        if (this.contentServerSettings && this.contentServerSettings.style.display !== "none") {
+            this.renderServerSettings();
+        }
+        if (!this.sequenceList) return;
         this.sequenceList.innerHTML = ""
         const seq = this.logicSystem.gameConfig.sequences
 
@@ -858,6 +907,14 @@ export class GameConfigPanel {
 
                 content.appendChild(optionsRow)
 
+            } else if (block.type === 'kill_player') {
+                item.style.borderLeftColor = "#cc2222";
+                content.innerHTML = "<strong>Eliminar Jugador (Trampa/Lógica):</strong> ";
+                const input = this.createTextInput(block.message || "Eliminado por trampa", (val) => { block.message = val; this.syncConfig(); });
+                content.appendChild(input);
+            } else if (block.type === 'checkpoint') {
+                item.style.borderLeftColor = "#0088cc";
+                content.innerHTML = "<strong>Guardar Checkpoint en Posición Actual</strong>";
             } else if (block.type === 'end_game') {
                 content.innerHTML = `<strong>Fin de Partida</strong>`
             } else if (block.type === 'loop_game') {

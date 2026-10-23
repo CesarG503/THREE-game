@@ -401,7 +401,24 @@ export function useCurrentItem(this: any, isRightClickOrItem: any = false) {
 		isRightClick: isRightClick
 	};
 
+	let projectileRegistered = false;
+	context.registerProjectile = (proj) => {
+		projectileRegistered = true;
+		this.projectiles.push(proj);
+	};
+
 	const consumed = item.use(context);
+
+	const isOffensiveItem = item.type === "weapon" ||
+		(this.GunItemClass && item instanceof this.GunItemClass) ||
+		(this.PelotaItemClass && item instanceof this.PelotaItemClass) ||
+		item.projectileType !== undefined;
+
+	if (isOffensiveItem && (consumed || projectileRegistered)) {
+		if (this.character && typeof this.character.cancelProtectionOnAttack === "function") {
+			this.character.cancelProtectionOnAttack();
+		}
+	}
 
 	if (consumed) {
 		const newObject = this.sceneManager.scene.children[this.sceneManager.scene.children.length - 1];

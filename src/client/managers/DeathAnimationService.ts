@@ -41,6 +41,14 @@ export function getAnimeSync(): AnimeModule | null {
 }
 
 /**
+ * Resets the cached Anime.js module for testing lazy loading behavior.
+ */
+export function _resetAnimeModuleForTesting(): void {
+	animeModule = null;
+	animeModulePromise = null;
+}
+
+/**
  * Maps DeathScreenEasing enum to Anime.js v4 easing names.
  */
 export function resolveEasing(easing?: DeathScreenEasing): string {
@@ -91,6 +99,9 @@ export class DeathAnimationService {
 	private spectatorAnimatedNodes: Map<HTMLElement, AnimatedNodeMeta> = new Map();
 	private bgAnimatedNode: HTMLElement | null = null;
 	private bgOriginalTransform = "";
+	private bgOriginalOpacity = "";
+	private bgOriginalFilter = "";
+	private scanlinesAnimatedNode: HTMLElement | null = null;
 
 	// Invalidation tokens to prevent cancelled callbacks from executing stale actions
 	private screenCallbackToken = 0;
@@ -198,14 +209,32 @@ export class DeathAnimationService {
 
 		const anime = getAnimeSync();
 		if (!anime) {
-			// If Anime.js is not yet loaded, reveal instantly without delaying gameplay
-			targets.forEach(({ node }) => {
-				if (node.style) {
-					node.style.opacity = "1";
-				}
-			});
-			options?.onComplete?.();
-			loadAnime().catch(() => {});
+			const runToken = ++this.screenCallbackToken;
+			loadAnime()
+				.then((loaded) => {
+					if (this.screenCallbackToken !== runToken) return;
+					if (loaded) {
+						this.animateScreenEntrance(container, elements, config, options);
+					} else {
+						targets.forEach(({ node }) => {
+							if (node.style) node.style.opacity = "1";
+						});
+						childNodes.forEach((node) => {
+							if (node.style) node.style.opacity = "1";
+						});
+						options?.onComplete?.();
+					}
+				})
+				.catch(() => {
+					if (this.screenCallbackToken !== runToken) return;
+					targets.forEach(({ node }) => {
+						if (node.style) node.style.opacity = "1";
+					});
+					childNodes.forEach((node) => {
+						if (node.style) node.style.opacity = "1";
+					});
+					options?.onComplete?.();
+				});
 			return;
 		}
 
@@ -593,12 +622,22 @@ export class DeathAnimationService {
 
 		const anime = getAnimeSync();
 		if (!anime) {
-			loadAnime().catch(() => {});
+			const runToken = ++this.backgroundCallbackToken;
+			loadAnime()
+				.then((loaded) => {
+					if (this.backgroundCallbackToken !== runToken) return;
+					if (loaded) {
+						this.animateBackground(bgLayer, config, options);
+					}
+				})
+				.catch(() => {});
 			return;
 		}
 
 		this.bgAnimatedNode = bgLayer;
 		this.bgOriginalTransform = bgLayer.style.transform || "";
+		this.bgOriginalOpacity = bgLayer.style.opacity || "";
+		this.bgOriginalFilter = bgLayer.style.filter || "";
 		bgLayer.style.willChange = "transform, opacity, filter";
 
 		const runToken = ++this.backgroundCallbackToken;
@@ -654,17 +693,28 @@ export class DeathAnimationService {
 			});
 			this.backgroundAnimations.add(animInstance);
 		} else if (animType === "scanlines") {
-			// Scanline pulse
-			const proxy = { opacity: 0.85 };
+			const scanlinesEl = bgLayer.querySelector(
+				".viper-death-bg-scanlines, .viper-death-canvas-bg-scanlines, [class*='scanlines']"
+			) as HTMLElement | null;
+			const targetNode = scanlinesEl || bgLayer;
+			this.scanlinesAnimatedNode = scanlinesEl;
+
+			const proxy = { y: 0, opacity: 0.75 };
 			const animInstance = anime.animate(proxy, {
-				opacity: 1.0,
-				duration: 800,
+				y: 24,
+				opacity: 0.9,
+				duration: 1200,
 				ease: "linear",
-				alternate: true,
 				loop: true,
+				alternate: true,
 				onUpdate: () => {
-					if (this.backgroundCallbackToken !== runToken || !bgLayer.style) return;
-					bgLayer.style.opacity = String(proxy.opacity);
+					if (this.backgroundCallbackToken !== runToken || !targetNode.style) return;
+					if (scanlinesEl) {
+						scanlinesEl.style.backgroundPositionY = `${proxy.y}px`;
+						scanlinesEl.style.opacity = String(proxy.opacity);
+					} else {
+						targetNode.style.opacity = String(proxy.opacity);
+					}
 				},
 			});
 			this.backgroundAnimations.add(animInstance);
@@ -687,11 +737,19 @@ export class DeathAnimationService {
 
 		if (restoreStyles && this.bgAnimatedNode && this.bgAnimatedNode.style) {
 			this.bgAnimatedNode.style.transform = this.bgOriginalTransform;
-			this.bgAnimatedNode.style.filter = "";
+			this.bgAnimatedNode.style.filter = this.bgOriginalFilter;
+			this.bgAnimatedNode.style.opacity = this.bgOriginalOpacity;
 			this.bgAnimatedNode.style.willChange = "";
 		}
+		if (restoreStyles && this.scanlinesAnimatedNode && this.scanlinesAnimatedNode.style) {
+			this.scanlinesAnimatedNode.style.backgroundPositionY = "";
+			this.scanlinesAnimatedNode.style.opacity = "";
+		}
+		this.scanlinesAnimatedNode = null;
 		this.bgAnimatedNode = null;
 		this.bgOriginalTransform = "";
+		this.bgOriginalOpacity = "";
+		this.bgOriginalFilter = "";
 	}
 
 	/**
@@ -708,6 +766,10 @@ export class DeathAnimationService {
 	 */
 	public dispose(): void {
 		this.cancelAll(true);
+	}
+
+	public destroy(): void {
+		this.dispose();
 	}
 
 	private applyTransformWithBase(

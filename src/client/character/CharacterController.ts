@@ -509,6 +509,13 @@ export class CharacterController {
 
   update(dt: number, input: InputManager, remotePlayers: any[]) {
     this.updateRespawnProtection();
+    if (input && (input as any).keys && (input as any).keys.attack) {
+      // Unarmed melee attack or holding a weapon. Utility/building items do not cancel protection.
+      const isHoldingUtility = this.equippedItem && this.equippedItem.type !== "weapon";
+      if (!isHoldingUtility) {
+        this.cancelProtectionOnAttack();
+      }
+    }
     if (!this.rigidBody) return;
 
     if (this.cameraController && this.cameraController.mode === 'free-fly') {
@@ -1380,7 +1387,15 @@ export class CharacterController {
     }
 
     if (appliedDamage <= 0) return;
-    this.currentHealth -= appliedDamage;
+
+    const mode = this.game?.deathManager?.getActiveMode?.();
+    const damageDeathEnabled = mode?.enabledCauses ? mode.enabledCauses.damage !== false : true;
+
+    if (!damageDeathEnabled) {
+      this.currentHealth = Math.max(1, this.currentHealth - appliedDamage);
+    } else {
+      this.currentHealth -= appliedDamage;
+    }
     console.log(`Player Health: ${this.currentHealth}/${this.maxHealth}`);
 
     this.emit("healthChanged", { current: this.currentHealth, max: this.maxHealth });
@@ -1390,9 +1405,13 @@ export class CharacterController {
     }
 
     if (this.currentHealth <= 0) {
-      this.endRespawnProtection();
       if (this.game && this.game.deathManager) {
-        this.game.deathManager.handleDeath({ cause: "damage" });
+        const handled = this.game.deathManager.handleDeath({ cause: "damage" });
+        if (!handled) {
+          this.currentHealth = 1;
+          this.emit("healthChanged", { current: this.currentHealth, max: this.maxHealth });
+          return;
+        }
       } else {
         this.die();
       }
@@ -1458,12 +1477,16 @@ export class CharacterController {
   }
 
   die(cause = "damage") {
-    this.endRespawnProtection();
     if (this.isDead) return;
     if (this.game && this.game.deathManager && !this.game.deathManager.isProcessingDeath) {
-      this.game.deathManager.handleDeath({ cause: cause as any });
+      const handled = this.game.deathManager.handleDeath({ cause: cause as any });
+      if (!handled) return;
       return;
     }
+    if (cause === "damage" && this.isRespawnProtectionActive() && this.getRespawnProtectionType() === "invulnerability") {
+      return;
+    }
+    this.endRespawnProtection();
     this.isDead = true;
     console.log("Player Died!");
 

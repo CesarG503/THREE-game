@@ -600,7 +600,29 @@ export function animate(this: any) {
 	if (this.environmentConfig && this.environmentConfig.fallDeath && this.character.getPosition().y < this.environmentConfig.fallDeathY) {
 		if (!this.character.isDead) {
 			if (this.deathManager) {
-				this.deathManager.handleDeath({ cause: "fall", position: this.character.getPosition() });
+				const handled = this.deathManager.handleDeath({ cause: "fall", position: this.character.getPosition() });
+				if (!handled) {
+					// Fall death rejected by active mode or environment
+					// Teleport player back to a guaranteed safe position above the fall death threshold
+					const fallDeathThreshold = (typeof this.environmentConfig.fallDeathY === "number" && !isNaN(this.environmentConfig.fallDeathY))
+						? this.environmentConfig.fallDeathY
+						: -20;
+					const safeY = Math.max(fallDeathThreshold + 15, 5);
+					let spawnPos = this.character.currentCheckpoint || this.character.startPosition;
+					if (spawnPos && typeof spawnPos.clone === "function") {
+						spawnPos = spawnPos.clone();
+					} else if (spawnPos && typeof spawnPos.x === "number") {
+						spawnPos = { x: spawnPos.x, y: spawnPos.y, z: spawnPos.z };
+					} else {
+						spawnPos = new THREE.Vector3(0, safeY, 0);
+					}
+					if (typeof spawnPos.y !== "number" || isNaN(spawnPos.y) || spawnPos.y <= fallDeathThreshold) {
+						spawnPos.y = safeY;
+					}
+					if (typeof this.character.respawnAt === "function") {
+						this.character.respawnAt(spawnPos);
+					}
+				}
 			} else {
 				console.log("Player fell off the map! Instant respawn.");
 				this.character.currentHealth = 0;

@@ -21,9 +21,12 @@ const {
 } = await server.ssrLoadModule("/src/client/types/experienceMode.types.ts");
 
 const { DeathManager } = await server.ssrLoadModule("/src/client/managers/DeathManager.ts");
+const { CharacterController } = await server.ssrLoadModule("/src/client/character/CharacterController.ts");
 const { DeathScreen, parseToRgba } = await server.ssrLoadModule("/src/client/ui/DeathScreen.ts");
 const { DeathScreenEditor } = await server.ssrLoadModule("/src/client/ui/DeathScreenEditor.ts");
-const { DeathAnimationService, resolveEasing, loadAnime, getAnimeSync } = await server.ssrLoadModule("/src/client/managers/DeathAnimationService.ts");
+const { DeathAnimationService, resolveEasing, loadAnime, getAnimeSync, _resetAnimeModuleForTesting } = await server.ssrLoadModule("/src/client/managers/DeathAnimationService.ts");
+const { animate: gameLoopAnimate } = await server.ssrLoadModule("/src/client/core/GameLoop.ts");
+const { useCurrentItem } = await server.ssrLoadModule("/src/client/core/GameEditor.ts");
 await loadAnime();
 
 // Minimal mock classes for testing
@@ -239,6 +242,7 @@ function createMockGame(initialGameConfig = null) {
 				p.skippedAnimation = skip;
 			});
 		},
+		sendPlayerUpdate: () => {},
 	};
 	const playerConfigManager = {
 		profiles: [
@@ -255,6 +259,27 @@ function createMockGame(initialGameConfig = null) {
 	character.getPosition = () => character.startPosition;
 	character.game = game;
 	return game;
+}
+
+function createRealCharacterController(game = null) {
+	const char = Object.create(CharacterController.prototype);
+	char.maxHealth = 100;
+	char.currentHealth = 100;
+	char.isDead = false;
+	char.noClip = false;
+	char.listeners = {};
+	char.scene = { add: () => {}, remove: () => {} };
+	char.glbModel = { setVisible: () => {} };
+	char.polygonModel = { setVisible: () => {} };
+	char.polygonModelSkin = { setVisible: () => {} };
+	char.currentType = "skin";
+	char.currentGravityQuaternion = { clone: () => ({ x: 0, y: 0, z: 0, w: 1 }) };
+	char.targetGravityQuaternion = { clone: () => ({ x: 0, y: 0, z: 0, w: 1 }) };
+	char.startPosition = { x: 0, y: 5, z: 0, clone: () => ({ x: 0, y: 5, z: 0 }) };
+	char.getPosition = () => char.startPosition;
+	char.getRotation = () => 0;
+	char.game = game;
+	return char;
 }
 
 test("1. createDefaultExperienceModes genera modos predeterminados coherentes", () => {
@@ -2070,4 +2095,298 @@ test("55. Retrocompatibilidad: configuraciones antiguas v1 sin background ni ele
 	assert.equal(migrated.backgroundColor, "rgba(10, 10, 10, 0.9)");
 	assert.ok(migrated.elements.length > 0, "Genera elementos v2 a partir de atributos legacy");
 	assert.ok(migrated.elements.some((e) => e.type === "action_button" && e.content === "Volver"));
+});
+
+test("56. CharacterController real: cancelación de protección al atacar vía update(dt, input) o useCurrentItem", () => {
+	// Caso A: Ataque cuerpo a cuerpo desarmado con cancelOnAttack: true
+	const unarmedChar = createRealCharacterController();
+	unarmedChar.equippedItem = null;
+	unarmedChar.startRespawnProtection({
+		enabled: true,
+		duration: 5,
+		type: "invulnerability",
+		cancelOnAttack: true,
+		showVisual: false,
+	});
+	assert.equal(unarmedChar.isRespawnProtectionActive(), true);
+	unarmedChar.update(0.016, { keys: { attack: true } });
+	assert.equal(unarmedChar.isRespawnProtectionActive(), false, "Ataque desarmado real debe cancelar protección si cancelOnAttack es true");
+
+	// Caso B: Ataque con arma ofensiva equipada (type: 'weapon')
+	const armedChar = createRealCharacterController();
+	armedChar.equippedItem = { type: "weapon", name: "Pistola Láser" };
+	armedChar.startRespawnProtection({
+		enabled: true,
+		duration: 5,
+		type: "invulnerability",
+		cancelOnAttack: true,
+		showVisual: false,
+	});
+	assert.equal(armedChar.isRespawnProtectionActive(), true);
+	armedChar.update(0.016, { keys: { attack: true } });
+	assert.equal(armedChar.isRespawnProtectionActive(), false, "Disparar un arma debe cancelar protección");
+
+	// Caso C: Clic con ítem utilitario / bloque equipado (type: 'cube' o 'movement_controller')
+	const utilityChar = createRealCharacterController();
+	utilityChar.equippedItem = { type: "cube", name: "Bloque de Construcción" };
+	utilityChar.startRespawnProtection({
+		enabled: true,
+		duration: 5,
+		type: "invulnerability",
+		cancelOnAttack: true,
+		showVisual: false,
+	});
+	assert.equal(utilityChar.isRespawnProtectionActive(), true);
+	utilityChar.update(0.016, { keys: { attack: true } });
+	assert.equal(utilityChar.isRespawnProtectionActive(), true, "Usar o hacer clic con un ítem utilitario NO debe quitar la protección por error");
+
+	// Caso D: useCurrentItem en GameEditor con ítem utilitario no cancela protección
+	const editorGame = {
+		character: utilityChar,
+		inventoryManager: {
+			getCurrentItem: () => ({ type: "ladder", use: () => true })
+		},
+		sceneManager: { scene: { children: [] }, camera: { getWorldDirection: () => ({}) } },
+		projectiles: [],
+	};
+	useCurrentItem.call(editorGame, false);
+	assert.equal(utilityChar.isRespawnProtectionActive(), true, "useCurrentItem con escalera o ítem utilitario no cancela protección");
+
+	// Caso E: useCurrentItem en GameEditor con arma ofensiva sí cancela protección
+	const weaponEditorGame = {
+		character: utilityChar,
+		inventoryManager: {
+			getCurrentItem: () => ({ type: "weapon", use: () => true })
+		},
+		sceneManager: { scene: { children: [] }, camera: { getWorldDirection: () => ({}) } },
+		projectiles: [],
+	};
+	useCurrentItem.call(weaponEditorGame, false);
+	assert.equal(utilityChar.isRespawnProtectionActive(), false, "useCurrentItem con arma ofensiva cancela la protección");
+
+	unarmedChar.destroy();
+	armedChar.destroy();
+	utilityChar.destroy();
+});
+
+test("57. CharacterController real: die() directo respeta la invulnerabilidad y delega a DeathManager sin terminar protección prematuramente", () => {
+	const modesData = createDefaultExperienceModes();
+	const game = createMockGame({ experienceModes: modesData.modes, activeExperienceModeId: modesData.activeModeId });
+	const realChar = createRealCharacterController(game);
+	game.character = realChar;
+	const dm = new DeathManager(game);
+	game.deathManager = dm;
+
+	realChar.startRespawnProtection({
+		enabled: true,
+		duration: 5,
+		type: "invulnerability",
+		cancelOnAttack: false,
+		showVisual: false,
+	});
+	assert.equal(realChar.isRespawnProtectionActive(), true);
+
+	// Llamada directa a character.die()
+	realChar.die("damage");
+	assert.equal(realChar.isDead, false, "El personaje real no debe morir mientras esté invulnerable");
+	assert.equal(realChar.isRespawnProtectionActive(), true, "La protección no debe haberse terminado prematuramente");
+
+	// Al expirar o cuando no es invulnerable, die() sí procede
+	realChar.endRespawnProtection();
+	realChar.die("damage");
+	assert.equal(realChar.isDead, true, "Tras finalizar protección, die() procede normalmente");
+
+	dm.destroy();
+	realChar.destroy();
+});
+
+test("58. CharacterController real: takeDamage con enabledCauses.damage = false no reduce salud a <= 0 ni entra en estado zombie", () => {
+	const modesData = createDefaultExperienceModes();
+	modesData.modes[0].enabledCauses.damage = false;
+	const game = createMockGame({ experienceModes: modesData.modes, activeExperienceModeId: modesData.activeModeId });
+	const realChar = createRealCharacterController(game);
+	game.character = realChar;
+	const dm = new DeathManager(game);
+	game.deathManager = dm;
+
+	assert.equal(dm.getActiveMode().enabledCauses.damage, false);
+	assert.equal(realChar.currentHealth, 100);
+
+	// Daño masivo de 500 puntos
+	realChar.takeDamage(500);
+
+	// La salud se preserva en mínimo 1 HP, el jugador sigue vivo y no se convierte en zombie
+	assert.equal(realChar.currentHealth, 1, "Salud no debe caer a <= 0 cuando daño no es causa de muerte habilitada");
+	assert.equal(realChar.isDead, false, "El jugador no debe morir");
+
+	dm.destroy();
+	realChar.destroy();
+});
+
+test("59. GameLoop real: ejecución completa de animate() con prevención de ciclo infinito y validación de punto seguro", () => {
+	const modesData = createDefaultExperienceModes();
+	modesData.modes[0].enabledCauses.fall = false;
+	const game = createMockGame({ experienceModes: modesData.modes, activeExperienceModeId: modesData.activeModeId });
+	game.environmentConfig = { fallDeath: true, fallDeathY: -50 };
+	game.clock = { getDelta: () => 0.016, getElapsedTime: () => 1.0 };
+	game.world = { step: () => {} };
+	game.eventQueue = { drainCollisionEvents: () => {} };
+	game.cameraController = { update: () => {}, setCameraMode: () => {} };
+	game.updateMovementLogic = () => {};
+	game.updateCollisionLogic = () => {};
+	game.updateButtonInteraction = () => {};
+	game.updateDebugRender = () => {};
+	game.renderOrientationGizmo = () => {};
+	game.sceneManager = {
+		scene: { children: [] },
+		camera: { position: { x: 0, y: 0, z: 0 } },
+		renderer: { clear: () => {} },
+		update: () => {},
+	};
+
+	let currentY = -60;
+	const realChar = createRealCharacterController(game);
+	realChar.startPosition = { x: 0, y: 5, z: 0, clone: () => ({ x: 0, y: 5, z: 0 }) };
+	realChar.getPosition = () => ({ x: 0, y: currentY, z: 0 });
+	realChar.respawnAt = (target) => {
+		currentY = target.y;
+		realChar.currentHealth = 100;
+		realChar.isDead = false;
+	};
+	game.character = realChar;
+	const dm = new DeathManager(game);
+	game.deathManager = dm;
+
+	let handleDeathCalls = 0;
+	const origHandleDeath = dm.handleDeath.bind(dm);
+	dm.handleDeath = (ctx) => {
+		handleDeathCalls++;
+		return origHandleDeath(ctx);
+	};
+
+	// Mock global requestAnimationFrame for GameLoop.animate
+	const origRAF = globalThis.requestAnimationFrame;
+	globalThis.requestAnimationFrame = () => 0;
+
+	try {
+		// Frame 1: Invocar el método real animate() de GameLoop.ts
+		gameLoopAnimate.call(game);
+
+		assert.equal(handleDeathCalls, 1, "GameLoop real debe haber evaluado la caída y delegado en deathManager");
+		assert.ok(currentY > game.environmentConfig.fallDeathY, "El jugador debe haber sido reposicionado por encima de fallDeathY");
+		assert.equal(realChar.isDead, false);
+
+		// Frame 2: Invocar nuevamente el método real animate() de GameLoop.ts
+		gameLoopAnimate.call(game);
+		assert.equal(handleDeathCalls, 1, "Frame 2 de GameLoop real NO debe llamar a handleDeath (ciclo infinito prevenido en el bucle real)");
+
+		// Caso de borde: startPosition configurado por error por debajo de fallDeathY (-80 < -50)
+		currentY = -70;
+		realChar.startPosition = { x: 0, y: -80, z: 0, clone: () => ({ x: 0, y: -80, z: 0 }) };
+		gameLoopAnimate.call(game);
+		assert.ok(currentY > game.environmentConfig.fallDeathY, "Incluso si startPosition era inseguro (-80 < -50), GameLoop calcula una altura segura (> -50) y evita caer inmediatamente");
+	} finally {
+		globalThis.requestAnimationFrame = origRAF;
+		dm.destroy();
+		realChar.destroy();
+	}
+});
+
+test("60. DeathAnimationService: primera animación demuestra carga diferida real y animación activa en progreso", async () => {
+	// 1. Demostrar estado inicial frío (Anime.js no cargado en memoria)
+	_resetAnimeModuleForTesting();
+	assert.equal(getAnimeSync(), null, "Al inicio del test, Anime.js debe estar en estado frío (null)");
+
+	const service = new DeathAnimationService();
+	let currentTransform = "";
+	let currentOpacity = "0";
+
+	const elemNode = {
+		dataset: { elementId: "btn_respawn" },
+		style: {
+			get transform() { return currentTransform; },
+			set transform(v) { currentTransform = v; },
+			get opacity() { return currentOpacity; },
+			set opacity(v) { currentOpacity = v; },
+		},
+	};
+	const container = {
+		children: [elemNode],
+		childNodes: [elemNode],
+		querySelectorAll: () => [elemNode],
+	};
+
+	let completed = false;
+	service.animateScreenEntrance(
+		container,
+		[{ id: "btn_respawn", name: "Respawn", type: "action_button", x: 50, y: 50, width: 20, height: 10, animation: { type: "slide_up", duration: 150 } }],
+		{ preset: "subtle", duration: 150 },
+		{ onComplete: () => { completed = true; } }
+	);
+
+	// 2. Esperar 30ms para que se resuelva la carga diferida e inicie la animación
+	await new Promise((r) => setTimeout(r, 40));
+
+	// Demostrar que loadAnime() fue invocado bajo demanda por la animación
+	assert.ok(getAnimeSync() !== null, "Anime.js debe haberse descargado e instanciado bajo demanda");
+
+	// Demostrar que la animación está ACTIVAMENTE ejecutándose en un valor intermedio
+	assert.equal(completed, false, "La animación debe estar aún en progreso a los 40ms de 150ms");
+	assert.ok(currentTransform.includes("translate") || currentTransform.includes("matrix") || parseFloat(currentOpacity) > 0, "Debe haber transformación activa en progreso durante la animación");
+
+	// 3. Esperar al término de la animación
+	await new Promise((r) => setTimeout(r, 160));
+	assert.equal(completed, true, "onComplete debe ser invocado tras completarse la animación");
+	assert.equal(currentOpacity, "1", "La opacidad final debe ser 1");
+
+	service.dispose();
+});
+
+test("61. DeathAnimationService: Scanlines demuestra movimiento activo de backgroundPositionY antes de limpieza", async () => {
+	const service = new DeathAnimationService();
+	let currentBgY = "0px";
+	let currentOpacity = "0.8";
+
+	const scanlinesEl = {
+		className: "viper-death-bg-scanlines",
+		style: {
+			get backgroundPositionY() { return currentBgY; },
+			set backgroundPositionY(v) { currentBgY = v; },
+			get opacity() { return currentOpacity; },
+			set opacity(v) { currentOpacity = v; },
+		},
+	};
+
+	let bgLayerOpacity = "1";
+	let bgLayerTransform = "";
+	const bgLayer = {
+		style: {
+			get opacity() { return bgLayerOpacity; },
+			set opacity(v) { bgLayerOpacity = v; },
+			get transform() { return bgLayerTransform; },
+			set transform(v) { bgLayerTransform = v; },
+			filter: "",
+			willChange: "",
+		},
+		querySelector: (sel) => sel.includes("scanlines") ? scanlinesEl : null,
+	};
+
+	service.animateBackground(bgLayer, {
+		type: "animated",
+		animation: { enabled: true, type: "scanlines", duration: 400 },
+	});
+
+	// Esperar 60ms para que Anime.js avance los frames de scanline
+	await new Promise((r) => setTimeout(r, 80));
+
+	// Demostrar que scanlines se movió activamente
+	assert.ok(currentBgY !== "0px" && currentBgY !== "", `backgroundPositionY debe haber cambiado durante la animación (actual: ${currentBgY})`);
+
+	// Cancelar animación y comprobar restauración
+	service.cancelBackgroundAnimation(true);
+
+	assert.equal(bgLayerOpacity, "1", "La opacidad del fondo principal debe restaurarse a 1");
+	assert.equal(currentBgY, "", "El backgroundPositionY de scanlines debe limpiarse a cadena vacía");
+
+	service.dispose();
 });

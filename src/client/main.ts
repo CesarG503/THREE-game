@@ -9,6 +9,7 @@ let game: Game | null = null;
 let activeGameKey: string | null = null;
 let cleanupAuth: (() => void) | null = null;
 let cleanupLobby: (() => void) | null = null;
+let cleanupDeathLab: (() => void) | null = null;
 
 const cleanupLobbyScreen = () => {
 	if (cleanupLobby) {
@@ -21,6 +22,10 @@ const cleanupLobbyScreen = () => {
 const getGameKey = () => `${router.getMode()}:${router.getRoomId() || ""}`;
 
 const stopGame = () => {
+	if (cleanupDeathLab) {
+		cleanupDeathLab();
+		cleanupDeathLab = null;
+	}
 	if (game) {
 		game.dispose();
 		game = null;
@@ -44,6 +49,17 @@ const handleRoute = (mode: GameMode) => {
 	if (cleanupAuth && mode !== "editor") {
 		cleanupAuth();
 		cleanupAuth = null;
+	}
+
+	if (mode === "death-lab") {
+		stopGame();
+		cleanupLobbyScreen();
+		import("./dev/death-lab/DeathLabApp").then((module) => {
+			cleanupDeathLab = module.startDeathLab(router);
+		}).catch((err) => {
+			console.error("[DeathLab] Failed to load DeathLabApp:", err);
+		});
+		return;
 	}
 
 	if (mode === "lobby") {

@@ -337,6 +337,12 @@ export class DeathAnimationService {
 				case "scale_up":
 					startScale = preset === "arcade" ? 0.4 : 0.8;
 					break;
+				case "pop":
+					startScale = 0.2;
+					break;
+				case "rotate_in":
+					startScale = 0.6;
+					break;
 				case "blur_in":
 					startBlur = 6;
 					break;

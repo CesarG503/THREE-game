@@ -11,6 +11,11 @@ import type {
 	DeathScreenBackgroundType,
 	DeathScreenBgAnimationType,
 	DeathScreenAnimationPreset,
+	DeathScreenShapeType,
+	DeathScreenAnimationType,
+	DeathScreenEasing,
+	DeathScreenKeyframe,
+	DeathScreenCustomComponent,
 } from "../types/experienceMode.types";
 import {
 	createDefaultDeathScreenElements,
@@ -20,7 +25,10 @@ import {
 	sanitizeImageUrl,
 	DEFAULT_DEATH_SCREEN_VIGNETTE,
 } from "../types/experienceMode.types";
-import { DeathAnimationService } from "../managers/DeathAnimationService";
+import { DeathAnimationService, resolveEasing } from "../managers/DeathAnimationService";
+import { StudioTokens } from "./studio/StudioTokens";
+import { renderStudioIcon } from "./studio/StudioIcons";
+import { StudioBackgroundManager } from "./studio/StudioBackgroundManager";
 
 export interface DeathScreenEditorOptions {
 	mode: ExperienceModeProfile;
@@ -28,97 +36,472 @@ export interface DeathScreenEditorOptions {
 	onPreviewFullscreen?: (previewState: "respawn" | "last_life" | "game_over" | "spectator") => void;
 }
 
+export type StudioWorkspaceMode = "design" | "animate" | "test";
+export type StudioLeftTab = "layers" | "elements" | "backgrounds" | "assets";
+
 export class DeathScreenEditor {
-	private mode: ExperienceModeProfile;
+	public mode: ExperienceModeProfile;
 	private onSync: () => void;
 	private onPreviewFullscreen?: (previewState: "respawn" | "last_life" | "game_over" | "spectator") => void;
 
-	private container: HTMLElement | null = null;
+	// Containers
+	public container: HTMLElement | null = null;
+	private embeddedContainer: HTMLElement | null = null;
+	public studioOverlayEl: HTMLElement | null = null;
 	private canvasWrapper: HTMLElement | null = null;
-	private canvasEl: HTMLElement | null = null;
+	private canvasViewport: HTMLElement | null = null;
+	public canvasEl: HTMLElement | null = null;
 	private canvasBgLayer: HTMLElement | null = null;
+	private guidesOverlayEl: HTMLElement | null = null;
+	private gridOverlayEl: HTMLElement | null = null;
+	private safeAreaEl: HTMLElement | null = null;
 	private propertiesPanelEl: HTMLElement | null = null;
 	private layersListEl: HTMLElement | null = null;
+	private timelineDockEl: HTMLElement | null = null;
+	private statusBarEl: HTMLElement | null = null;
 
-	private selectedElementId: string | null = null;
+	// Studio Workspace States
+	public isStudioExpanded = false;
+	public activeWorkspaceMode: StudioWorkspaceMode = "design";
+	public activeLeftTab: StudioLeftTab = "layers";
+	private layerSearchQuery = "";
+	private elementSearchQuery = "";
+	private hasUnsavedChanges = false;
+
+	// Multi-selection & Layers
+	public selectedElementIds: Set<string> = new Set();
 	private previewState: "respawn" | "last_life" | "game_over" | "spectator" = "respawn";
 	private previewCause: DeathCause = "damage";
-	private previewDevice: "desktop" | "tablet" | "mobile" = "desktop";
+	private previewDevice: "desktop" | "ultrawide" | "tablet" | "mobile" | "mobile_land" = "desktop";
+
+	// Snapping, Grid, Zoom & Pan
+	private smartSnappingEnabled = true;
+	private showGrid = false;
+	private showSafeArea = true;
+	private zoomLevel = 1.0;
+	public activeCanvasTool: "select" | "hand" = "select";
+	public canvasPanX = 0;
+	public canvasPanY = 0;
+	private isPanning = false;
+	private panStartX = 0;
+	private panStartY = 0;
+	public canvasBackdropMode: "dark" | "checker" | "cyberpunk" | "hangar" = "dark";
+
+	// Resizable & Collapsible Panels
+	public leftPanelWidth = 280;
+	public rightPanelWidth = 340;
+	public timelineHeight = 220;
+	public isLeftPanelCollapsed = false;
+	public isRightPanelCollapsed = false;
+	public isTimelineCollapsed = false;
+
+	// Marquee Selection & Context Menu
+	private isMarqueeSelecting = false;
+	private marqueeStartX = 0;
+	private marqueeStartY = 0;
+	private marqueeEl: HTMLElement | null = null;
+	private contextMenuEl: HTMLElement | null = null;
+	private clipboardElement: DeathScreenElement | null = null;
 
 	// Undo / Redo history stacks
 	private undoStack: string[] = [];
 	private redoStack: string[] = [];
-	private maxHistory = 30;
+	private maxHistory = 40;
 
-	// Dragging & Resizing state
+	// Dragging, Resizing & Rotating state
 	private isDragging = false;
 	private isResizing = false;
+	private isRotating = false;
 	private resizeHandle: string | null = null;
 	private animationService = new DeathAnimationService();
 	private dragStartX = 0;
 	private dragStartY = 0;
 	private elementStartPos = { x: 0, y: 0, width: 0, height: 0 };
+	private multiDragStartPositions: Map<string, { x: number; y: number }> = new Map();
+	private rotationCenter = { x: 0, y: 0 };
+	private elementStartRotation = 0;
+
+	// Timeline & Keyframe State
+	public isPlayingSequence = false;
+	public timelineCurrentTime = 0; // ms
+	public timelineTotalDuration = 3000; // ms
+	private timelineTimerId: number | null = null;
+	public playbackSpeed: 0.5 | 1 | 2 = 1;
+	public isLooping = false;
+	public autoKeyEnabled = true;
+	public expandedTracks: Set<string> = new Set();
+	private selectedKeyframeInfo: { elemId: string; keyframeIdx: number } | null = null;
+
+	// Custom Components Library
+	public customComponents: DeathScreenCustomComponent[] = [];
+
+	// Background Manager Premium
+	public backgroundManager: StudioBackgroundManager;
 
 	constructor(options: DeathScreenEditorOptions) {
 		this.mode = options.mode;
 		this.onSync = options.onSync;
 		this.onPreviewFullscreen = options.onPreviewFullscreen;
 
+		this.backgroundManager = new StudioBackgroundManager((bg) => {
+			this.recordHistory();
+			this.mode.deathScreen.background = bg;
+			this.hasUnsavedChanges = true;
+			this.onSync();
+			this.updateCanvas();
+			this.updatePropertiesPanel();
+		});
+
 		this.ensureConfig();
+		this.loadCustomComponents();
 	}
 
 	public setMode(mode: ExperienceModeProfile) {
 		this.mode = mode;
-		this.selectedElementId = null;
+		this.selectedElementIds.clear();
 		this.undoStack = [];
 		this.redoStack = [];
+		this.hasUnsavedChanges = false;
+		this.stopTimelineSequence();
 		this.ensureConfig();
 		if (this.container) {
 			this.render(this.container);
 		}
 	}
 
+	public getScreenConfig(): DeathScreenConfig {
+		return this.mode.deathScreen;
+	}
+
 	private get screen(): DeathScreenConfig {
 		return this.mode.deathScreen;
 	}
 
+	public get selectedElementId(): string | null {
+		if (this.selectedElementIds.size === 0) return null;
+		return Array.from(this.selectedElementIds)[0];
+	}
+
+	public set selectedElementId(id: string | null) {
+		this.selectedElementIds.clear();
+		if (id) this.selectedElementIds.add(id);
+	}
+
+	public getWorkspaceMode(): StudioWorkspaceMode {
+		return this.activeWorkspaceMode;
+	}
+
+	public isExpanded(): boolean {
+		return this.isStudioExpanded;
+	}
+
+	public setLeftTab(tab: StudioLeftTab) {
+		this.activeLeftTab = tab;
+		this.updateLayersList();
+	}
+
+	public setWorkspaceMode(mode: StudioWorkspaceMode) {
+		this.activeWorkspaceMode = mode;
+		if (mode === "animate") {
+			this.isTimelineCollapsed = false;
+			if (this.timelineHeight < 240) this.timelineHeight = 280;
+		}
+		if (this.container) {
+			this.render(this.container);
+		}
+	}
+
+	public selectElement(id: string | null, multi = false) {
+		if (!id) {
+			this.selectedElementIds.clear();
+		} else {
+			if (!multi) {
+				this.selectedElementIds.clear();
+				this.selectedElementIds.add(id);
+			} else {
+				if (this.selectedElementIds.has(id)) {
+					this.selectedElementIds.delete(id);
+				} else {
+					this.selectedElementIds.add(id);
+				}
+			}
+		}
+		this.updateLayersList();
+		this.updateCanvas();
+		this.updatePropertiesPanel();
+		this.updateTimelineDock();
+		this.updateStatusBar();
+	}
+
+	public getSelectedElements(): DeathScreenElement[] {
+		if (!this.screen.elements) return [];
+		return this.screen.elements.filter((e) => this.selectedElementIds.has(e.id));
+	}
+
 	private ensureConfig() {
-		if (!this.screen) {
+		if (!this.mode.deathScreen) {
 			this.mode.deathScreen = {
-				version: 2,
 				enabled: true,
 				title: "HAS MUERTO",
-				message: "Volviendo al punto de inicio...",
-				backgroundColor: "rgba(13, 15, 23, 0.92)",
-				accentColor: "#ff3b47",
-				background: normalizeDeathScreenBackground(undefined, "rgba(13, 15, 23, 0.92)"),
-				screenBlur: 4,
-				buttons: [{ id: "btn_respawn", label: "Reaparecer", action: "respawn", isPrimary: true }],
-				elements: createDefaultDeathScreenElements("classic", "#ff3b47", "rgba(13, 15, 23, 0.92)"),
+				subtitle: "Volviendo al punto de inicio...",
+				accentColor: "#00d2ff",
+				backgroundColor: "#090b0e",
+				buttons: [{ id: "btn_respawn", action: "respawn", label: "Reaparecer", isPrimary: true }],
+				elements: createDefaultDeathScreenElements(),
 			};
-		} else if (!Array.isArray(this.screen.elements) || (this.screen.version !== 2 && this.screen.elements.length === 0)) {
-			this.screen.elements = createDefaultDeathScreenElements(
-				this.mode.id === "mode_racing" ? "racing" : (this.mode.id === "mode_elimination" ? "tactical" : "classic"),
-				this.screen.accentColor,
-				this.screen.backgroundColor,
-				this.screen.title,
-				this.screen.message
-			);
 		}
-		if (this.screen && !this.screen.background) {
-			this.screen.background = normalizeDeathScreenBackground(
+		if (!this.mode.deathScreen.elements || this.mode.deathScreen.elements.length === 0) {
+			this.mode.deathScreen.elements = createDefaultDeathScreenElements();
+		}
+		this.mode.deathScreen.elements = normalizeDeathScreenElements(this.mode.deathScreen.elements);
+		if (!this.mode.deathScreen.background) {
+			this.mode.deathScreen.background = normalizeDeathScreenBackground(
 				undefined,
-				this.screen.backgroundColor,
-				this.screen.backgroundImage
+				this.mode.deathScreen.backgroundColor
 			);
 		}
 	}
 
-	private recordHistory() {
-		const snapshot = JSON.stringify(this.screen);
-		if (this.undoStack.length > 0 && this.undoStack[this.undoStack.length - 1] === snapshot) {
+	// --- CUSTOM COMPONENTS SYSTEM ---
+	public loadCustomComponents(): DeathScreenCustomComponent[] {
+		try {
+			if (typeof localStorage !== "undefined") {
+				const saved = localStorage.getItem("viper_death_custom_components");
+				if (saved) {
+					this.customComponents = JSON.parse(saved);
+				}
+			}
+		} catch (e) {
+			console.warn("Could not load custom components:", e);
+		}
+		if (!Array.isArray(this.customComponents) || this.customComponents.length === 0) {
+			this.customComponents = this.getDefaultCustomComponents();
+		}
+		return this.customComponents;
+	}
+
+	public getCustomComponents(): DeathScreenCustomComponent[] {
+		return this.customComponents;
+	}
+
+	private saveCustomComponentsToStorage() {
+		try {
+			if (typeof localStorage !== "undefined") {
+				localStorage.setItem("viper_death_custom_components", JSON.stringify(this.customComponents));
+			}
+		} catch (e) {
+			console.warn("Could not save custom components to storage:", e);
+		}
+	}
+
+	private getDefaultCustomComponents(): DeathScreenCustomComponent[] {
+		return [
+			{
+				id: "comp_killer_card",
+				name: "Ficha Asesino VIPER",
+				category: "Gameplay",
+				icon: "crosshair",
+				description: "Tarjeta con avatar, nombre de asesino, clan y arma",
+				elements: [
+					{
+						id: "comp_k_card",
+						name: "Contenedor Asesino",
+						type: "container",
+						x: 50,
+						y: 60,
+						width: 44,
+						height: 14,
+						style: {
+							backgroundColor: "rgba(10, 14, 22, 0.85)",
+							borderColor: "#00d2ff88",
+							borderWidth: 1,
+							borderRadius: 6,
+							backdropBlur: 8,
+							boxShadow: "0 8px 24px rgba(0,0,0,0.5)",
+						},
+					},
+					{
+						id: "comp_k_name",
+						name: "Nombre Asesino",
+						type: "title",
+						x: 50,
+						y: 57,
+						width: 40,
+						height: 6,
+						text: "ELIMINADO POR: {killer_name}",
+						style: {
+							color: "#ffffff",
+							fontSize: 16,
+							fontWeight: "bold",
+							textAlign: "center",
+						},
+					},
+					{
+						id: "comp_k_meta",
+						name: "Meta Asesino",
+						type: "badge",
+						x: 50,
+						y: 63,
+						width: 36,
+						height: 4,
+						text: "CLAN: [{killer_clan}]  |  ARMA: {killer_weapon}",
+						style: {
+							color: "#00d2ff",
+							backgroundColor: "rgba(0, 210, 255, 0.12)",
+							borderColor: "#00d2ff55",
+							borderWidth: 1,
+							borderRadius: 4,
+							fontSize: 11,
+							textAlign: "center",
+						},
+					},
+				],
+			},
+			{
+				id: "comp_headshot_badge",
+				name: "Insignia Headshot Pro",
+				category: "Insignias",
+				icon: "crosshair",
+				description: "Insignia circular dorada con aviso de impacto crítico",
+				elements: [
+					{
+						id: "comp_hs_badge",
+						name: "Insignia Crítico",
+						type: "badge",
+						x: 50,
+						y: 35,
+						width: 24,
+						height: 5,
+						text: "IMPACTO CRÍTICO EN CABEZA",
+						style: {
+							backgroundColor: "rgba(255, 184, 48, 0.15)",
+							borderColor: "#ffb830",
+							borderWidth: 1,
+							borderRadius: 9999,
+							color: "#ffb830",
+							fontSize: 11,
+							fontWeight: "bold",
+							textAlign: "center",
+							boxShadow: "0 0 12px rgba(255, 184, 48, 0.3)",
+						},
+					},
+				],
+			},
+			{
+				id: "comp_squad_banner",
+				name: "Banner Reaparición Squad",
+				category: "HUD",
+				icon: "shield",
+				description: "Aviso de cuenta regresiva con barra de refuerzos",
+				elements: [
+					{
+						id: "comp_sq_bg",
+						name: "Fondo Banner Squad",
+						type: "panel",
+						x: 50,
+						y: 78,
+						width: 38,
+						height: 10,
+						style: {
+							backgroundColor: "rgba(16, 20, 28, 0.9)",
+							borderColor: "#00d2ff44",
+							borderWidth: 1,
+							borderRadius: 4,
+						},
+					},
+					{
+						id: "comp_sq_bar",
+						name: "Barra Squad",
+						type: "progress_bar",
+						x: 50,
+						y: 81,
+						width: 32,
+						height: 3,
+						style: {
+							color: "#00d2ff",
+							backgroundColor: "rgba(0, 210, 255, 0.15)",
+							borderColor: "#00d2ff88",
+							borderRadius: 3,
+						},
+					},
+				],
+			},
+		];
+	}
+
+	public createCustomComponentFromSelection(name?: string) {
+		const sel = this.getSelectedElements();
+		if (sel.length === 0) {
+			alert("Selecciona al menos un elemento para crear un componente reutilizable.");
 			return;
 		}
+
+		const compName = name || prompt("Nombre del componente:", "Nuevo Componente");
+		if (!compName) return;
+
+		const minX = Math.min(...sel.map((e) => e.x));
+		const minY = Math.min(...sel.map((e) => e.y));
+
+		const clonedElements: DeathScreenElement[] = JSON.parse(JSON.stringify(sel)).map((e: DeathScreenElement) => {
+			return {
+				...e,
+				id: `comp_sub_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+				x: e.x - minX + 50,
+				y: e.y - minY + 50,
+			};
+		});
+
+		const newComp: DeathScreenCustomComponent = {
+			id: `comp_${Date.now()}`,
+			name: compName,
+			category: "Personalizados",
+			icon: "component",
+			description: `Componente compuesto por ${sel.length} elemento(s)`,
+			elements: clonedElements,
+		};
+
+		this.customComponents.push(newComp);
+		this.saveCustomComponentsToStorage();
+		this.activeLeftTab = "assets";
+		this.updateLayersList();
+	}
+
+	public instantiateCustomComponent(compId: string, targetX = 50, targetY = 50) {
+		const comp = this.customComponents.find((c) => c.id === compId);
+		if (!comp || !comp.elements || comp.elements.length === 0) return;
+
+		this.recordHistory();
+		if (!this.screen.elements) this.screen.elements = [];
+
+		const originX = comp.elements[0].x || 50;
+		const originY = comp.elements[0].y || 50;
+		const deltaX = targetX - originX;
+		const deltaY = targetY - originY;
+
+		const newIds: string[] = [];
+		const baseZ = this.screen.elements.length + 1;
+
+		comp.elements.forEach((srcElem, idx) => {
+			const clone: DeathScreenElement = JSON.parse(JSON.stringify(srcElem));
+			clone.id = `elem_${Date.now()}_${Math.floor(Math.random() * 1000)}_${idx}`;
+			clone.name = `${srcElem.name || "Elemento"}`;
+			clone.x = Math.max(5, Math.min(95, (clone.x || 50) + deltaX));
+			clone.y = Math.max(5, Math.min(95, (clone.y || 50) + deltaY));
+			clone.zIndex = baseZ + idx;
+			this.screen.elements!.push(clone);
+			newIds.push(clone.id);
+		});
+
+		this.selectedElementIds.clear();
+		newIds.forEach((id) => this.selectedElementIds.add(id));
+		this.hasUnsavedChanges = true;
+		this.onSync();
+		this.updateAll();
+	}
+
+	// --- HISTORY MANAGEMENT ---
+	public recordHistory() {
+		const snapshot = JSON.stringify(this.screen);
 		this.undoStack.push(snapshot);
 		if (this.undoStack.length > this.maxHistory) {
 			this.undoStack.shift();
@@ -128,1040 +511,2080 @@ export class DeathScreenEditor {
 
 	public undo() {
 		if (this.undoStack.length === 0) return;
-		const current = JSON.stringify(this.screen);
-		this.redoStack.push(current);
-		const previous = this.undoStack.pop()!;
-		this.mode.deathScreen = JSON.parse(previous);
-		this.onSync();
-		this.updateAll();
+		const currentSnapshot = JSON.stringify(this.screen);
+		this.redoStack.push(currentSnapshot);
+		const previousSnapshot = this.undoStack.pop();
+		if (previousSnapshot) {
+			try {
+				const restored = JSON.parse(previousSnapshot);
+				this.mode.deathScreen = restored;
+				this.hasUnsavedChanges = true;
+				this.onSync();
+				this.updateAll();
+			} catch (e) {
+				console.error("Failed to restore undo state", e);
+			}
+		}
 	}
 
 	public redo() {
 		if (this.redoStack.length === 0) return;
-		const current = JSON.stringify(this.screen);
-		this.undoStack.push(current);
-		const next = this.redoStack.pop()!;
-		this.mode.deathScreen = JSON.parse(next);
-		this.onSync();
+		const currentSnapshot = JSON.stringify(this.screen);
+		this.undoStack.push(currentSnapshot);
+		const nextSnapshot = this.redoStack.pop();
+		if (nextSnapshot) {
+			try {
+				const restored = JSON.parse(nextSnapshot);
+				this.mode.deathScreen = restored;
+				this.hasUnsavedChanges = true;
+				this.onSync();
+				this.updateAll();
+			} catch (e) {
+				console.error("Failed to restore redo state", e);
+			}
+		}
+	}
+
+	// --- EXPAND / COLLAPSE STUDIO WORKSPACE ---
+	public expandStudio() {
+		this.isStudioExpanded = true;
+		if (typeof document === "undefined") return;
+		if (!this.studioOverlayEl) {
+			this.studioOverlayEl = document.createElement("div");
+			this.studioOverlayEl.id = "viper-studio-fullscreen-overlay";
+			this.studioOverlayEl.style.cssText = `
+				position: fixed;
+				inset: 0;
+				width: 100vw;
+				height: 100vh;
+				z-index: 999999;
+				background: ${StudioTokens.colors.surfaceBase};
+				display: flex;
+				flex-direction: column;
+				overflow: hidden;
+				font-family: ${StudioTokens.typography.fontFamily};
+				color: ${StudioTokens.colors.textPrimary};
+			`;
+			document.body.appendChild(this.studioOverlayEl);
+		}
+		this.studioOverlayEl.style.display = "flex";
+		this.render(this.studioOverlayEl);
+	}
+
+	public collapseStudio() {
+		this.isStudioExpanded = false;
+		if (typeof document === "undefined") return;
+		if (this.studioOverlayEl) {
+			this.studioOverlayEl.style.display = "none";
+		}
+		if (this.embeddedContainer) {
+			this.render(this.embeddedContainer);
+		}
+	}
+
+	public setLayoutPreset(preset: "design" | "timeline" | "canvas") {
+		if (preset === "design") {
+			this.isLeftPanelCollapsed = false;
+			this.isRightPanelCollapsed = false;
+			this.isTimelineCollapsed = false;
+			this.leftPanelWidth = 280;
+			this.rightPanelWidth = 340;
+			this.timelineHeight = 180;
+			this.activeWorkspaceMode = "design";
+		} else if (preset === "timeline") {
+			this.isLeftPanelCollapsed = false;
+			this.isRightPanelCollapsed = false;
+			this.isTimelineCollapsed = false;
+			this.leftPanelWidth = 240;
+			this.rightPanelWidth = 320;
+			this.timelineHeight = 320;
+			this.activeWorkspaceMode = "animate";
+		} else if (preset === "canvas") {
+			this.isLeftPanelCollapsed = true;
+			this.isRightPanelCollapsed = true;
+			this.isTimelineCollapsed = true;
+		}
+		if (this.container) {
+			this.render(this.container);
+		}
+	}
+
+	public startResizeLeftPanel(e: MouseEvent) {
+		e.preventDefault();
+		const startX = e.clientX;
+		const startW = this.leftPanelWidth;
+
+		const onMove = (ev: MouseEvent) => {
+			const delta = ev.clientX - startX;
+			this.leftPanelWidth = Math.max(180, Math.min(480, startW + delta));
+			if (this.container) {
+				const leftEl = this.container.querySelector(".death-screen-editor-left-sidebar") as HTMLElement;
+				if (leftEl) leftEl.style.width = `${this.leftPanelWidth}px`;
+				this.recalculateCanvasFit();
+			}
+		};
+
+		const onUp = () => {
+			window.removeEventListener("mousemove", onMove);
+			window.removeEventListener("mouseup", onUp);
+			this.recalculateCanvasFit();
+		};
+
+		window.addEventListener("mousemove", onMove);
+		window.addEventListener("mouseup", onUp);
+	}
+
+	public startResizeRightPanel(e: MouseEvent) {
+		e.preventDefault();
+		const startX = e.clientX;
+		const startW = this.rightPanelWidth;
+
+		const onMove = (ev: MouseEvent) => {
+			const delta = startX - ev.clientX;
+			this.rightPanelWidth = Math.max(240, Math.min(520, startW + delta));
+			if (this.container) {
+				const rightEl = this.container.querySelector(".death-screen-editor-inspector") as HTMLElement;
+				if (rightEl) rightEl.style.width = `${this.rightPanelWidth}px`;
+				this.recalculateCanvasFit();
+			}
+		};
+
+		const onUp = () => {
+			window.removeEventListener("mousemove", onMove);
+			window.removeEventListener("mouseup", onUp);
+			this.recalculateCanvasFit();
+		};
+
+		window.addEventListener("mousemove", onMove);
+		window.addEventListener("mouseup", onUp);
+	}
+
+	public startResizeTimeline(e: MouseEvent) {
+		e.preventDefault();
+		const startY = e.clientY;
+		const startH = this.timelineHeight;
+
+		const onMove = (ev: MouseEvent) => {
+			const delta = startY - ev.clientY;
+			this.timelineHeight = Math.max(120, Math.min(550, startH + delta));
+			if (this.container) {
+				const timeEl = this.container.querySelector(".death-screen-editor-timeline-dock") as HTMLElement;
+				if (timeEl) timeEl.style.height = `${this.timelineHeight}px`;
+				this.recalculateCanvasFit();
+			}
+		};
+
+		const onUp = () => {
+			window.removeEventListener("mousemove", onMove);
+			window.removeEventListener("mouseup", onUp);
+			this.recalculateCanvasFit();
+		};
+
+		window.addEventListener("mousemove", onMove);
+		window.addEventListener("mouseup", onUp);
+	}
+
+	// --- RENDER MAIN INTERFACE ---
+	public render(container: HTMLElement) {
+		this.container = container;
+		if (!this.isStudioExpanded) {
+			this.embeddedContainer = container;
+		}
+		this.container.innerHTML = "";
+
+		const shell = document.createElement("div");
+		shell.className = "viper-death-studio-shell";
+		shell.style.cssText = `
+			display: flex;
+			flex-direction: column;
+			width: 100%;
+			height: 100%;
+			background: ${StudioTokens.colors.surfaceBase};
+			overflow: hidden;
+			position: relative;
+			font-family: ${StudioTokens.typography.fontFamily};
+		`;
+
+		// Global styles
+		const styleEl = document.createElement("style");
+		styleEl.textContent = `
+			.viper-death-studio-shell * { box-sizing: border-box; }
+			.viper-studio-splitter-v {
+				width: 4px;
+				cursor: col-resize;
+				background: ${StudioTokens.colors.borderSubtle};
+				transition: background 0.15s ease;
+				z-index: 20;
+				position: relative;
+			}
+			.viper-studio-splitter-v:hover, .viper-studio-splitter-v:active {
+				background: ${StudioTokens.colors.accent};
+			}
+			.viper-studio-splitter-h {
+				height: 4px;
+				cursor: row-resize;
+				background: ${StudioTokens.colors.borderSubtle};
+				transition: background 0.15s ease;
+				z-index: 20;
+				position: relative;
+			}
+			.viper-studio-splitter-h:hover, .viper-studio-splitter-h:active {
+				background: ${StudioTokens.colors.accent};
+			}
+			.custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+			.custom-scrollbar::-webkit-scrollbar-track { background: ${StudioTokens.colors.surface1}; }
+			.custom-scrollbar::-webkit-scrollbar-thumb { background: ${StudioTokens.colors.borderNormal}; border-radius: 3px; }
+			.custom-scrollbar::-webkit-scrollbar-thumb:hover { background: ${StudioTokens.colors.borderStrong}; }
+			@keyframes studioFadeIn { from { opacity: 0; } to { opacity: 1; } }
+		`;
+		shell.appendChild(styleEl);
+
+		// 1. Top Bar
+		shell.appendChild(this.createTopBar());
+
+		// 2. Middle Row (Left Panel, Center Canvas, Right Inspector)
+		const workArea = document.createElement("div");
+		workArea.className = "death-screen-editor-work-area";
+		workArea.style.cssText = "flex: 1; display: flex; flex-direction: row; overflow: hidden; position: relative;";
+
+		// Left Panel
+		const leftCol = this.createLeftPanel();
+		workArea.appendChild(leftCol);
+
+		// Left Splitter
+		if (!this.isLeftPanelCollapsed) {
+			const leftSplitter = document.createElement("div");
+			leftSplitter.className = "viper-studio-splitter-v";
+			leftSplitter.onmousedown = (e) => this.startResizeLeftPanel(e);
+			workArea.appendChild(leftSplitter);
+		}
+
+		// Center Canvas Column
+		const centerCol = document.createElement("div");
+		centerCol.className = "death-screen-editor-center-column";
+		centerCol.style.cssText = "flex: 1; display: flex; flex-direction: column; overflow: hidden; background: #07090c; position: relative;";
+		centerCol.appendChild(this.createCanvasColumn());
+		workArea.appendChild(centerCol);
+
+		// Right Splitter
+		if (!this.isRightPanelCollapsed) {
+			const rightSplitter = document.createElement("div");
+			rightSplitter.className = "viper-studio-splitter-v";
+			rightSplitter.onmousedown = (e) => this.startResizeRightPanel(e);
+			workArea.appendChild(rightSplitter);
+		}
+
+		// Right Inspector Panel
+		const rightCol = this.createPropertiesPanel();
+		workArea.appendChild(rightCol);
+
+		shell.appendChild(workArea);
+
+		// 3. Timeline Horizontal Splitter
+		if (!this.isTimelineCollapsed) {
+			const timeSplitter = document.createElement("div");
+			timeSplitter.className = "viper-studio-splitter-h";
+			timeSplitter.onmousedown = (e) => this.startResizeTimeline(e);
+			shell.appendChild(timeSplitter);
+		}
+
+		// 4. Timeline Dock
+		shell.appendChild(this.createTimelineDock());
+
+		// 5. Status Bar
+		shell.appendChild(this.createStatusBar());
+
+		this.container.appendChild(shell);
+
+		// Initialize resize observer for auto-fit
+		requestAnimationFrame(() => {
+			this.recalculateCanvasFit();
+			window.addEventListener("resize", () => this.recalculateCanvasFit(), { passive: true });
+		});
+
 		this.updateAll();
 	}
 
-	public render(container: HTMLElement) {
-		this.container = container;
-		container.innerHTML = "";
-
-		const root = document.createElement("div");
-		root.className = "death-screen-editor-root";
-		root.style.cssText = `
+	// --- 1. TOP BAR PREMIUM ---
+	private createTopBar(): HTMLElement {
+		const bar = document.createElement("div");
+		bar.className = "studio-top-bar";
+		bar.style.cssText = `
+			height: 44px;
+			background: ${StudioTokens.colors.surface1};
+			border-bottom: 1px solid ${StudioTokens.colors.borderSubtle};
 			display: flex;
-			flex-direction: column;
-			gap: 10px;
-			background: #14161d;
-			border: 1px solid #282c38;
-			border-radius: 8px;
-			padding: 12px;
-			color: #eee;
-			font-family: inherit;
-			font-size: 13px;
-			box-sizing: border-box;
-		`;
-
-		// 1. Top Toolbar (Templates, Undo/Redo, States, Device, Fullscreen Preview)
-		root.appendChild(this.createToolbar());
-
-		// 2. Main Work Area: Layers Left | Canvas Center | Properties Right
-		const workArea = document.createElement("div");
-		workArea.className = "death-screen-editor-work-area";
-		workArea.style.cssText = `
-			gap: 12px;
-			align-items: stretch;
-		`;
-
-		// Left Panel: Elements Library and Layer List
-		const leftPanel = this.createLayersPanel();
-		leftPanel.classList.add("death-screen-editor-layers");
-		workArea.appendChild(leftPanel);
-
-		// Center Panel: Interactive Canvas Viewport
-		const centerPanel = this.createCanvasPanel();
-		centerPanel.classList.add("death-screen-editor-canvas-panel");
-		workArea.appendChild(centerPanel);
-
-		// Right Panel: Inspector Properties
-		const rightPanel = this.createPropertiesPanel();
-		rightPanel.classList.add("death-screen-editor-properties");
-		workArea.appendChild(rightPanel);
-
-		root.appendChild(workArea);
-		container.appendChild(root);
-		this.ensureResponsiveStyles();
-
-		// Global key listeners for canvas editing (nudge, delete, undo)
-		root.tabIndex = 0;
-		root.onkeydown = (e) => this.handleRootKeyDown(e);
-
-		this.updateCanvas();
-	}
-
-	private ensureResponsiveStyles() {
-		const styleId = "viper-death-screen-editor-responsive-styles";
-		if (document.getElementById(styleId)) return;
-		const style = document.createElement("style");
-		style.id = styleId;
-		style.textContent = `
-			.death-screen-editor-root { width: 100%; max-width: 100%; min-width: 0; container-type: inline-size; }
-			.death-screen-editor-work-area { display: grid; grid-template-columns: minmax(170px, 240px) minmax(0, 1fr) minmax(220px, 310px); gap: 12px; min-height: 520px; align-items: stretch; min-width: 0; }
-			.death-screen-editor-work-area > * { min-width: 0; }
-			.death-screen-editor-canvas-panel { min-width: 0; }
-			.death-screen-editor-canvas-panel #viper-death-editor-canvas { width: 100%; max-width: 100% !important; }
-			@container (max-width: 1050px) {
-				.death-screen-editor-work-area { grid-template-columns: minmax(170px, 0.75fr) minmax(0, 1.25fr); }
-				.death-screen-editor-properties { grid-column: 1 / -1; max-height: 360px; }
-			}
-			@container (max-width: 650px) {
-				.death-screen-editor-root { padding: 8px !important; }
-				.death-screen-editor-work-area { grid-template-columns: minmax(0, 1fr); min-height: 0; gap: 8px; }
-				.death-screen-editor-canvas-panel { grid-row: 1; padding: 8px !important; }
-				.death-screen-editor-layers { grid-row: 2; max-height: 280px; }
-				.death-screen-editor-properties { grid-row: 3; grid-column: 1; max-height: 420px; }
-			}
-		`;
-		document.head.appendChild(style);
-	}
-
-	private createToolbar(): HTMLElement {
-		const toolbar = document.createElement("div");
-		toolbar.style.cssText = `
-			display: flex;
-			flex-wrap: wrap;
 			align-items: center;
 			justify-content: space-between;
+			padding: 0 12px;
+			user-select: none;
 			gap: 8px;
-			padding: 8px 12px;
-			background: #1b1e28;
-			border: 1px solid #2b3040;
-			border-radius: 6px;
+			z-index: 30;
 		`;
 
-		const leftGroup = document.createElement("div");
-		leftGroup.style.cssText = "display: flex; align-items: center; gap: 8px; flex-wrap: wrap;";
+		// LEFT SECTION: Mode switch & Breadcrumbs
+		const leftSec = document.createElement("div");
+		leftSec.style.cssText = "display: flex; align-items: center; gap: 8px;";
 
-		// Template selector
-		const tplLabel = document.createElement("strong");
-		tplLabel.textContent = "Plantilla:";
-		tplLabel.style.color = "#aaa";
+		const modeToggleBtn = document.createElement("button");
+		modeToggleBtn.type = "button";
+		modeToggleBtn.title = this.isStudioExpanded ? "Volver al modo integrado" : "Expandir Studio a pantalla completa";
+		modeToggleBtn.style.cssText = `
+			background: ${StudioTokens.colors.surface2};
+			color: ${StudioTokens.colors.textSecondary};
+			border: 1px solid ${StudioTokens.colors.borderNormal};
+			padding: 4px 8px;
+			border-radius: ${StudioTokens.radii.sm};
+			cursor: pointer;
+			display: flex;
+			align-items: center;
+			gap: 6px;
+			font-size: ${StudioTokens.typography.sizeSm};
+			font-weight: 500;
+			transition: ${StudioTokens.transitions.fast};
+		`;
+		modeToggleBtn.innerHTML = `${renderStudioIcon(this.isStudioExpanded ? "minimize" : "maximize", 13)} <span>${this.isStudioExpanded ? "Integrado" : "Expandir"}</span>`;
+		modeToggleBtn.onclick = () => {
+			if (this.isStudioExpanded) this.collapseStudio();
+			else this.expandStudio();
+		};
+		leftSec.appendChild(modeToggleBtn);
 
-		const tplSelect = document.createElement("select");
-		tplSelect.style.cssText = "background: #111; color: #fff; border: 1px solid #444; padding: 4px 8px; border-radius: 4px; font-size: 12px;";
-		[
-			{ v: "classic", t: "Clásica (Card Central)" },
-			{ v: "tactical", t: "Táctica (Alerta & Asesino)" },
-			{ v: "racing", t: "Carreras (Fuera de Pista)" },
-			{ v: "minimal", t: "Minimalista (Tipografía limpia)" },
-			{ v: "arcade", t: "Arcade (Neón y dinamismo)" },
-			{ v: "cinematic", t: "Cinemática (Elegante y panorámica)" },
-			{ v: "speed", t: "Velocidad (Impacto lateral)" },
-		].forEach((tpl) => {
-			const opt = document.createElement("option");
-			opt.value = tpl.v;
-			opt.textContent = tpl.t;
-			tplSelect.appendChild(opt);
+		const titleBadge = document.createElement("div");
+		titleBadge.style.cssText = "display: flex; align-items: center; gap: 6px;";
+		titleBadge.innerHTML = `
+			<span style="font-size:${StudioTokens.typography.sizeSm}; font-weight:700; color:${StudioTokens.colors.accent}; letter-spacing:0.5px;">VIPER STUDIO</span>
+			<span style="font-size:9px; font-weight:700; background:${StudioTokens.colors.accentMuted}; color:${StudioTokens.colors.accent}; padding:1px 5px; border-radius:3px; border:1px solid ${StudioTokens.colors.accentBorder};">PREMIUM</span>
+		`;
+		leftSec.appendChild(titleBadge);
+
+		const modePill = document.createElement("span");
+		modePill.style.cssText = `
+			font-size: ${StudioTokens.typography.sizeXs};
+			color: ${StudioTokens.colors.textSecondary};
+			background: ${StudioTokens.colors.surface2};
+			border: 1px solid ${StudioTokens.colors.borderSubtle};
+			padding: 3px 8px;
+			border-radius: ${StudioTokens.radii.pill};
+			max-width: 150px;
+			white-space: nowrap;
+			overflow: hidden;
+			text-overflow: ellipsis;
+		`;
+		modePill.textContent = this.mode.name || "Modo Sin Nombre";
+		leftSec.appendChild(modePill);
+
+		const saveStatePill = document.createElement("div");
+		saveStatePill.className = "studio-save-indicator";
+		saveStatePill.style.cssText = `
+			display: flex;
+			align-items: center;
+			gap: 5px;
+			font-size: ${StudioTokens.typography.sizeXs};
+			color: ${this.hasUnsavedChanges ? StudioTokens.colors.warning : StudioTokens.colors.success};
+			padding: 2px 6px;
+		`;
+		saveStatePill.innerHTML = this.hasUnsavedChanges
+			? `<span style="width:6px; height:6px; border-radius:50%; background:${StudioTokens.colors.warning};"></span> Modificado`
+			: `${renderStudioIcon("check", 12, StudioTokens.colors.success)} Guardado`;
+		leftSec.appendChild(saveStatePill);
+
+		const saveBtn = document.createElement("button");
+		saveBtn.type = "button";
+		saveBtn.title = "Guardar cambios en el modo";
+		saveBtn.style.cssText = `
+			background: ${StudioTokens.colors.accent};
+			color: #090b0e;
+			border: none;
+			padding: 4px 10px;
+			border-radius: ${StudioTokens.radii.sm};
+			font-size: ${StudioTokens.typography.sizeSm};
+			font-weight: 600;
+			cursor: pointer;
+			display: flex;
+			align-items: center;
+			gap: 5px;
+			transition: ${StudioTokens.transitions.fast};
+		`;
+		saveBtn.innerHTML = `${renderStudioIcon("save", 13, "#090b0e")} <span>Guardar</span>`;
+		saveBtn.onclick = () => {
+			this.hasUnsavedChanges = false;
+			this.onSync();
+			this.updateSaveIndicator();
+		};
+		leftSec.appendChild(saveBtn);
+
+		bar.appendChild(leftSec);
+
+		// CENTER SECTION: Direct Tools & Layout Presets
+		const centerSec = document.createElement("div");
+		centerSec.style.cssText = "display: flex; align-items: center; gap: 8px;";
+
+		// Layout presets
+		const layoutGroup = document.createElement("div");
+		layoutGroup.style.cssText = `display: flex; background: ${StudioTokens.colors.surface2}; border: 1px solid ${StudioTokens.colors.borderSubtle}; border-radius: ${StudioTokens.radii.sm}; padding: 2px;`;
+
+		const layouts = [
+			{ id: "design", label: "Diseño", icon: "layout" },
+			{ id: "timeline", label: "Timeline", icon: "timeline" },
+			{ id: "canvas", label: "Canvas Full", icon: "maximize" },
+		];
+
+		layouts.forEach((lay) => {
+			const b = document.createElement("button");
+			b.type = "button";
+			b.title = `Distribución ${lay.label}`;
+			b.style.cssText = `
+				background: transparent;
+				border: none;
+				color: ${StudioTokens.colors.textSecondary};
+				padding: 3px 8px;
+				font-size: ${StudioTokens.typography.sizeSm};
+				border-radius: ${StudioTokens.radii.xs};
+				cursor: pointer;
+				display: flex;
+				align-items: center;
+				gap: 5px;
+				transition: ${StudioTokens.transitions.fast};
+			`;
+			b.innerHTML = `${renderStudioIcon(lay.icon as any, 13)} <span>${lay.label}</span>`;
+			b.onmouseenter = () => (b.style.color = StudioTokens.colors.textPrimary);
+			b.onmouseleave = () => (b.style.color = StudioTokens.colors.textSecondary);
+			b.onclick = () => this.setLayoutPreset(lay.id as any);
+			layoutGroup.appendChild(b);
 		});
-		tplSelect.onchange = () => {
-			if (confirm("¿Aplicar plantilla? Se reemplazarán los elementos actuales.")) {
-				this.recordHistory();
-				this.screen.elements = createDefaultDeathScreenElements(
-					tplSelect.value as any,
-					this.screen.accentColor,
-					this.screen.backgroundColor,
-					this.screen.title,
-					this.screen.message
-				);
-				this.onSync();
-				this.updateAll();
-			}
+		centerSec.appendChild(layoutGroup);
+
+		// Canvas Tools (Select, Pan)
+		const toolGroup = document.createElement("div");
+		toolGroup.style.cssText = `display: flex; background: ${StudioTokens.colors.surface2}; border: 1px solid ${StudioTokens.colors.borderSubtle}; border-radius: ${StudioTokens.radii.sm}; padding: 2px;`;
+
+		const selectToolBtn = document.createElement("button");
+		selectToolBtn.type = "button";
+		selectToolBtn.title = "Herramienta Selección (V)";
+		selectToolBtn.style.cssText = `
+			background: ${this.activeCanvasTool === "select" ? StudioTokens.colors.surfaceActive : "transparent"};
+			border: 1px solid ${this.activeCanvasTool === "select" ? StudioTokens.colors.accent : "transparent"};
+			color: ${this.activeCanvasTool === "select" ? StudioTokens.colors.accent : StudioTokens.colors.textSecondary};
+			padding: 3px 8px;
+			border-radius: ${StudioTokens.radii.xs};
+			cursor: pointer;
+			display: flex;
+			align-items: center;
+			gap: 4px;
+			font-size: ${StudioTokens.typography.sizeSm};
+		`;
+		selectToolBtn.innerHTML = `${renderStudioIcon("cursor", 13)} <span>Seleccionar</span>`;
+		selectToolBtn.onclick = () => {
+			this.activeCanvasTool = "select";
+			this.updateCanvasToolUI();
 		};
 
-		// Reset template button
-		const resetBtn = document.createElement("button");
-		resetBtn.type = "button";
-		resetBtn.textContent = "↺ Restaurar";
-		resetBtn.title = "Restaurar elementos por defecto del modo";
-		resetBtn.style.cssText = "background: #333; color: #ddd; border: 1px solid #555; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 12px;";
-		resetBtn.onclick = () => {
-			if (confirm("¿Restaurar plantilla inicial del modo?")) {
-				this.recordHistory();
-				const defTpl = this.mode.id === "mode_racing" ? "racing" : (this.mode.id === "mode_elimination" ? "tactical" : "classic");
-				this.screen.elements = createDefaultDeathScreenElements(defTpl, this.screen.accentColor, this.screen.backgroundColor);
-				this.onSync();
-				this.updateAll();
-			}
+		const handToolBtn = document.createElement("button");
+		handToolBtn.type = "button";
+		handToolBtn.title = "Herramienta Mano / Desplazar (H / Espacio)";
+		handToolBtn.style.cssText = `
+			background: ${this.activeCanvasTool === "hand" ? StudioTokens.colors.surfaceActive : "transparent"};
+			border: 1px solid ${this.activeCanvasTool === "hand" ? StudioTokens.colors.accent : "transparent"};
+			color: ${this.activeCanvasTool === "hand" ? StudioTokens.colors.accent : StudioTokens.colors.textSecondary};
+			padding: 3px 8px;
+			border-radius: ${StudioTokens.radii.xs};
+			cursor: pointer;
+			display: flex;
+			align-items: center;
+			gap: 4px;
+			font-size: ${StudioTokens.typography.sizeSm};
+		`;
+		handToolBtn.innerHTML = `${renderStudioIcon("hand", 13)} <span>Mover</span>`;
+		handToolBtn.onclick = () => {
+			this.activeCanvasTool = "hand";
+			this.updateCanvasToolUI();
 		};
 
-		// Undo / Redo buttons
+		toolGroup.append(selectToolBtn, handToolBtn);
+		centerSec.appendChild(toolGroup);
+
+		bar.appendChild(centerSec);
+
+		// RIGHT SECTION: Fast Add + Undo/Redo
+		const rightSec = document.createElement("div");
+		rightSec.style.cssText = "display: flex; align-items: center; gap: 6px;";
+
+		const makeQuickAddBtn = (iconName: any, label: string, type: DeathScreenElementType, shapeType?: DeathScreenShapeType) => {
+			const b = document.createElement("button");
+			b.type = "button";
+			b.title = `Añadir ${label}`;
+			b.style.cssText = `
+				background: ${StudioTokens.colors.surface2};
+				border: 1px solid ${StudioTokens.colors.borderSubtle};
+				color: ${StudioTokens.colors.textSecondary};
+				padding: 3px 7px;
+				border-radius: ${StudioTokens.radii.sm};
+				font-size: ${StudioTokens.typography.sizeSm};
+				cursor: pointer;
+				display: flex;
+				align-items: center;
+				gap: 4px;
+				transition: ${StudioTokens.transitions.fast};
+			`;
+			b.innerHTML = `${renderStudioIcon(iconName, 13)} <span>${label}</span>`;
+			b.onmouseenter = () => {
+				b.style.color = StudioTokens.colors.textPrimary;
+				b.style.borderColor = StudioTokens.colors.borderNormal;
+			};
+			b.onmouseleave = () => {
+				b.style.color = StudioTokens.colors.textSecondary;
+				b.style.borderColor = StudioTokens.colors.borderSubtle;
+			};
+			b.onclick = () => {
+				this.addElement(type, `Nuevo ${label}`, shapeType);
+			};
+			return b;
+		};
+
+		rightSec.appendChild(makeQuickAddBtn("type", "Texto", "title"));
+		rightSec.appendChild(makeQuickAddBtn("square", "Forma", "shape", "rectangle"));
+		rightSec.appendChild(makeQuickAddBtn("crosshair", "Killfeed", "killfeed"));
+		rightSec.appendChild(makeQuickAddBtn("loader", "Respawn", "progress_bar"));
+
+		// Undo / Redo
 		const undoBtn = document.createElement("button");
 		undoBtn.type = "button";
-		undoBtn.textContent = "↶ Deshacer";
-		undoBtn.title = "Deshacer cambio (Ctrl+Z)";
-		undoBtn.style.cssText = "background: #222; color: #ccc; border: 1px solid #444; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 12px;";
+		undoBtn.title = "Deshacer (Ctrl+Z)";
+		undoBtn.style.cssText = `background: ${StudioTokens.colors.surface2}; border: 1px solid ${StudioTokens.colors.borderSubtle}; color: ${StudioTokens.colors.textSecondary}; padding: 4px 7px; border-radius: ${StudioTokens.radii.sm}; cursor: pointer;`;
+		undoBtn.innerHTML = renderStudioIcon("undo", 13);
 		undoBtn.onclick = () => this.undo();
 
 		const redoBtn = document.createElement("button");
 		redoBtn.type = "button";
-		redoBtn.textContent = "↷ Rehacer";
-		redoBtn.title = "Rehacer cambio (Ctrl+Y)";
-		redoBtn.style.cssText = "background: #222; color: #ccc; border: 1px solid #444; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 12px;";
+		redoBtn.title = "Rehacer (Ctrl+Y)";
+		redoBtn.style.cssText = `background: ${StudioTokens.colors.surface2}; border: 1px solid ${StudioTokens.colors.borderSubtle}; color: ${StudioTokens.colors.textSecondary}; padding: 4px 7px; border-radius: ${StudioTokens.radii.sm}; cursor: pointer;`;
+		redoBtn.innerHTML = renderStudioIcon("redo", 13);
 		redoBtn.onclick = () => this.redo();
 
-		leftGroup.append(tplLabel, tplSelect, resetBtn, undoBtn, redoBtn);
+		rightSec.append(undoBtn, redoBtn);
 
-		// Right Group: State Simulation, Device, Fullscreen
-		const rightGroup = document.createElement("div");
-		rightGroup.style.cssText = "display: flex; align-items: center; gap: 8px; flex-wrap: wrap;";
-
-		// State simulator
-		const stateLabel = document.createElement("strong");
-		stateLabel.textContent = "Simular Estado:";
-		stateLabel.style.color = "#aaa";
-
-		const stateSelect = document.createElement("select");
-		stateSelect.style.cssText = "background: #111; color: #fff; border: 1px solid #444; padding: 4px 8px; border-radius: 4px; font-size: 12px;";
-		[
-			{ v: "respawn", t: "Reaparición normal" },
-			{ v: "last_life", t: "Última vida (1 vida)" },
-			{ v: "game_over", t: "Fin de partida (0 vidas)" },
-			{ v: "spectator", t: "Transición observador" },
-		].forEach((st) => {
-			const opt = document.createElement("option");
-			opt.value = st.v;
-			opt.textContent = st.t;
-			if (this.previewState === st.v) opt.selected = true;
-			stateSelect.appendChild(opt);
-		});
-		stateSelect.onchange = () => {
-			this.previewState = stateSelect.value as any;
-			this.updateCanvas();
-		};
-
-		// Cause simulator
-		const causeSelect = document.createElement("select");
-		causeSelect.style.cssText = "background: #111; color: #fff; border: 1px solid #444; padding: 4px 8px; border-radius: 4px; font-size: 12px;";
-		[
-			{ v: "damage", t: "Causa: Daño (Con Asesino)" },
-			{ v: "fall", t: "Causa: Caída al vacío" },
-			{ v: "logic", t: "Causa: Trampa / Lógica" },
-			{ v: "vehicle", t: "Causa: Vehículo" },
-		].forEach((cs) => {
-			const opt = document.createElement("option");
-			opt.value = cs.v;
-			opt.textContent = cs.t;
-			if (this.previewCause === cs.v) opt.selected = true;
-			causeSelect.appendChild(opt);
-		});
-		causeSelect.onchange = () => {
-			this.previewCause = causeSelect.value as DeathCause;
-			this.updateCanvas();
-		};
-
-		// Device view toggle
-		const deviceSelect = document.createElement("select");
-		deviceSelect.style.cssText = "background: #111; color: #fff; border: 1px solid #444; padding: 4px 8px; border-radius: 4px; font-size: 12px;";
-		[
-			{ v: "desktop", t: "🖥 Desktop (16:9)" },
-			{ v: "tablet", t: "📱 Tablet (4:3)" },
-			{ v: "mobile", t: "📱 Móvil (9:16)" },
-		].forEach((dev) => {
-			const opt = document.createElement("option");
-			opt.value = dev.v;
-			opt.textContent = dev.t;
-			if (this.previewDevice === dev.v) opt.selected = true;
-			deviceSelect.appendChild(opt);
-		});
-		deviceSelect.onchange = () => {
-			this.previewDevice = deviceSelect.value as any;
-			this.applyDeviceRatio();
-		};
-
-		// Fullscreen button
-		const previewBtn = document.createElement("button");
-		previewBtn.type = "button";
-		previewBtn.textContent = "▶ Pantalla Completa";
-		previewBtn.style.cssText = "background: #e63946; color: white; border: none; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 12px;";
-		previewBtn.onclick = () => {
-			if (this.onPreviewFullscreen) {
-				this.onPreviewFullscreen(this.previewState);
-			}
-		};
-
-		rightGroup.append(stateLabel, stateSelect, causeSelect, deviceSelect, previewBtn);
-		toolbar.append(leftGroup, rightGroup);
-		return toolbar;
+		bar.appendChild(rightSec);
+		return bar;
 	}
 
-	private createLayersPanel(): HTMLElement {
+	private updateCanvasToolUI() {
+		if (this.canvasWrapper) {
+			this.canvasWrapper.style.cursor = this.activeCanvasTool === "hand" ? "grab" : "default";
+		}
+		if (this.container) {
+			const selectBtn = this.container.querySelector('button[title*="Selección"]') as HTMLElement;
+			const handBtn = this.container.querySelector('button[title*="Mano"]') as HTMLElement;
+			if (selectBtn && handBtn) {
+				const isSel = this.activeCanvasTool === "select";
+				selectBtn.style.borderColor = isSel ? StudioTokens.colors.accent : "transparent";
+				selectBtn.style.background = isSel ? StudioTokens.colors.surfaceActive : "transparent";
+				selectBtn.style.color = isSel ? StudioTokens.colors.accent : StudioTokens.colors.textSecondary;
+
+				handBtn.style.borderColor = !isSel ? StudioTokens.colors.accent : "transparent";
+				handBtn.style.background = !isSel ? StudioTokens.colors.surfaceActive : "transparent";
+				handBtn.style.color = !isSel ? StudioTokens.colors.accent : StudioTokens.colors.textSecondary;
+			}
+		}
+		this.updateStatusBar();
+	}
+
+	// --- 2. LEFT PANEL PREMIUM ---
+	private createLeftPanel(): HTMLElement {
 		const panel = document.createElement("div");
+		panel.className = "death-screen-editor-left-sidebar";
 		panel.style.cssText = `
-			background: #1a1c24;
-			border: 1px solid #2c303d;
-			border-radius: 6px;
-			display: flex;
+			width: ${this.leftPanelWidth}px;
+			background: ${StudioTokens.colors.surface1};
+			border-right: 1px solid ${StudioTokens.colors.borderSubtle};
+			display: ${this.isLeftPanelCollapsed ? "none" : "flex"};
 			flex-direction: column;
 			overflow: hidden;
+			z-index: 10;
 		`;
 
-		const header = document.createElement("div");
-		header.style.cssText = "padding: 10px; background: #222530; border-bottom: 1px solid #2c303d; display: flex; justify-content: space-between; align-items: center;";
-		const title = document.createElement("strong");
-		title.textContent = "Capas y Componentes";
-		title.style.color = "#00d2ff";
-
-		// Add Component dropdown button
-		const addBtn = document.createElement("button");
-		addBtn.type = "button";
-		addBtn.textContent = "+ Añadir";
-		addBtn.style.cssText = "background: #2a9d8f; color: white; border: none; padding: 3px 8px; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: bold;";
-		addBtn.onclick = () => this.showAddComponentMenu(addBtn);
-
-		header.append(title, addBtn);
-		panel.appendChild(header);
-
-		this.layersListEl = document.createElement("div");
-		this.layersListEl.style.cssText = "flex: 1; overflow-y: auto; padding: 6px; display: flex; flex-direction: column; gap: 4px;";
-		panel.appendChild(this.layersListEl);
-
-		this.updateLayersList();
-		return panel;
-	}
-
-	private showAddComponentMenu(targetBtn: HTMLElement) {
-		const menu = document.createElement("div");
-		menu.style.cssText = `
-			position: fixed;
-			z-index: 10005;
-			background: #1e222e;
-			border: 1px solid #3b4154;
-			border-radius: 6px;
-			box-shadow: 0 8px 24px rgba(0,0,0,0.6);
-			padding: 4px;
-			display: flex;
-			flex-direction: column;
-			min-width: 180px;
+		// Tabs (Capas, Elementos, Fondos, Prefabs)
+		const tabsBar = document.createElement("div");
+		tabsBar.style.cssText = `
+			display: grid;
+			grid-template-columns: repeat(4, 1fr);
+			background: ${StudioTokens.colors.surface2};
+			border-bottom: 1px solid ${StudioTokens.colors.borderSubtle};
+			padding: 2px;
+			gap: 2px;
 		`;
 
-		const rect = targetBtn.getBoundingClientRect();
-		menu.style.left = `${rect.left}px`;
-		menu.style.top = `${rect.bottom + 4}px`;
-
-		const types: Array<{ type: DeathScreenElementType; label: string; icon: string }> = [
-			{ type: "title", label: "Título Principal", icon: "🏷" },
-			{ type: "subtitle", label: "Subtítulo / Mensaje", icon: "📝" },
-			{ type: "panel", label: "Tarjeta / Contenedor", icon: "🔲" },
-			{ type: "divider", label: "Línea Separadora", icon: "➖" },
-			{ type: "image", label: "Imagen / Avatar", icon: "🖼" },
-			{ type: "respawn_countdown", label: "Contador Reaparición", icon: "⏱" },
-			{ type: "remaining_lives", label: "Vidas Restantes", icon: "❤️" },
-			{ type: "killer_info", label: "Información de Asesino", icon: "⚔️" },
-			{ type: "stats", label: "Estadísticas / Causa", icon: "📊" },
-			{ type: "action_button", label: "Botón de Acción", icon: "🔘" },
+		const tabs = [
+			{ id: "layers", label: "Capas", icon: "layers" },
+			{ id: "elements", label: "Elementos", icon: "box" },
+			{ id: "backgrounds", label: "Fondos", icon: "palette" },
+			{ id: "assets", label: "Prefabs", icon: "component" },
 		];
 
-		types.forEach((item) => {
-			const btn = document.createElement("button");
-			btn.type = "button";
-			btn.innerHTML = `<span style="margin-right:6px;">${item.icon}</span> ${item.label}`;
-			btn.style.cssText = "background: none; border: none; color: #eee; text-align: left; padding: 6px 10px; cursor: pointer; border-radius: 4px; font-size: 12px;";
-			btn.onmouseenter = () => (btn.style.background = "#2f364a");
-			btn.onmouseleave = () => (btn.style.background = "none");
-			btn.onclick = () => {
-				this.addElement(item.type, item.label);
-				menu.remove();
+		tabs.forEach((t) => {
+			const b = document.createElement("button");
+			b.type = "button";
+			b.title = t.label;
+			const isA = this.activeLeftTab === t.id;
+			b.style.cssText = `
+				padding: 6px 2px;
+				font-size: ${StudioTokens.typography.sizeXs};
+				font-weight: 500;
+				background: ${isA ? StudioTokens.colors.surface3 : "transparent"};
+				color: ${isA ? StudioTokens.colors.accent : StudioTokens.colors.textSecondary};
+				border: 1px solid ${isA ? StudioTokens.colors.borderNormal : "transparent"};
+				border-radius: ${StudioTokens.radii.xs};
+				cursor: pointer;
+				display: flex;
+				flex-direction: column;
+				align-items: center;
+				gap: 3px;
+				transition: ${StudioTokens.transitions.fast};
+			`;
+			b.innerHTML = `${renderStudioIcon(t.icon as any, 14, isA ? StudioTokens.colors.accent : "currentColor")} <span>${t.label}</span>`;
+			b.onclick = () => {
+				this.activeLeftTab = t.id as any;
+				this.updateLayersList();
 			};
-			menu.appendChild(btn);
+			tabsBar.appendChild(b);
 		});
+		panel.appendChild(tabsBar);
 
-		const closeHandler = (e: MouseEvent) => {
-			if (!menu.contains(e.target as Node)) {
-				menu.remove();
-				window.removeEventListener("mousedown", closeHandler);
-			}
-		};
-		setTimeout(() => window.addEventListener("mousedown", closeHandler), 10);
-		document.body.appendChild(menu);
-	}
+		// Dynamic Container
+		this.layersListEl = document.createElement("div");
+		this.layersListEl.className = "custom-scrollbar";
+		this.layersListEl.style.cssText = "flex: 1; overflow-y: auto; display: flex; flex-direction: column;";
+		panel.appendChild(this.layersListEl);
 
-	public addElement(type: DeathScreenElementType, name?: string): DeathScreenElement {
-		this.recordHistory();
-		const idx = (this.screen.elements?.length || 0) + 1;
-		const id = `elem_${Date.now()}_${idx}`;
-		const elemName = name || `Elemento ${idx}`;
-
-		const baseElem: DeathScreenElement = {
-			id,
-			name: elemName,
-			type,
-			visible: true,
-			x: 50,
-			y: 50,
-			width: type === "panel" ? 60 : (type === "title" ? 50 : 35),
-			height: type === "panel" ? 50 : (type === "divider" ? 1 : 8),
-			anchor: "center",
-			zIndex: idx,
-			style: {
-				color: "#ffffff",
-				fontSize: type === "title" ? 28 : (type === "subtitle" ? 14 : 13),
-				fontWeight: type === "title" ? "bold" : "normal",
-				textAlign: "center",
-			},
-		};
-
-		if (type === "title") {
-			baseElem.content = "HAS MUERTO";
-			baseElem.style!.textTransform = "uppercase";
-		} else if (type === "subtitle") {
-			baseElem.content = "Has sido eliminado de la partida.";
-		} else if (type === "panel") {
-			baseElem.style!.backgroundColor = "rgba(13, 15, 23, 0.92)";
-			baseElem.style!.borderRadius = 12;
-			baseElem.style!.borderColor = "rgba(255, 255, 255, 0.15)";
-			baseElem.style!.borderWidth = 1;
-			baseElem.style!.borderStyle = "solid";
-			baseElem.style!.backdropBlur = 12;
-		} else if (type === "divider") {
-			baseElem.style!.backgroundColor = "rgba(255, 255, 255, 0.3)";
-		} else if (type === "respawn_countdown") {
-			baseElem.content = "Reapareciendo en {countdown} s…";
-			baseElem.fallbackContent = "Reaparición disponible";
-			baseElem.style!.color = this.screen.accentColor || "#ff3b47";
-			baseElem.style!.fontWeight = "bold";
-		} else if (type === "remaining_lives") {
-			baseElem.content = "Vidas restantes: {remaining_lives}";
-			baseElem.fallbackContent = "Vidas: Infinitas";
-		} else if (type === "killer_info") {
-			baseElem.content = "Eliminado por: {killer_name}  ·  Arma: {killer_weapon}";
-			baseElem.fallbackContent = "Eliminado por el entorno";
-			baseElem.conditions = { requireData: ["killer"] };
-		} else if (type === "stats") {
-			baseElem.content = "Causa: {cause}";
-		} else if (type === "action_button") {
-			baseElem.content = "Reaparecer";
-			baseElem.action = "respawn";
-			baseElem.isPrimary = true;
-			baseElem.style!.backgroundColor = this.screen.accentColor || "#ff3b47";
-			baseElem.style!.borderRadius = 8;
-			baseElem.style!.fontWeight = "bold";
-		}
-
-		this.screen.elements = this.screen.elements || [];
-		this.screen.elements.push(baseElem);
-		this.selectedElementId = id;
-		this.onSync();
-		this.updateAll();
-		return baseElem;
-	}
-
-	public duplicateElement(elemId: string) {
-		const source = this.screen.elements?.find((e) => e.id === elemId);
-		if (!source) return;
-		this.recordHistory();
-		const clone: DeathScreenElement = JSON.parse(JSON.stringify(source));
-		clone.id = `elem_${Date.now()}`;
-		clone.name = `${source.name} (Copia)`;
-		clone.x = Math.min(95, clone.x + 3);
-		clone.y = Math.min(95, clone.y + 3);
-		clone.zIndex = (this.screen.elements?.length || 0) + 1;
-		this.screen.elements!.push(clone);
-		this.selectedElementId = clone.id;
-		this.onSync();
-		this.updateAll();
-	}
-
-	public removeElement(elemId: string) {
-		if (!this.screen.elements) return;
-		this.recordHistory();
-		this.screen.elements = this.screen.elements.filter((e) => e.id !== elemId);
-		if (this.selectedElementId === elemId) {
-			this.selectedElementId = null;
-		}
-		this.onSync();
-		this.updateAll();
-	}
-
-	public moveLayer(elemId: string, direction: -1 | 1) {
-		const elems = this.screen.elements;
-		if (!elems) return;
-		const idx = elems.findIndex((e) => e.id === elemId);
-		if (idx === -1) return;
-		const targetIdx = idx + direction;
-		if (targetIdx < 0 || targetIdx >= elems.length) return;
-
-		this.recordHistory();
-		const temp = elems[idx];
-		elems[idx] = elems[targetIdx];
-		elems[targetIdx] = temp;
-
-		// Reassign zIndex monotonically
-		elems.forEach((e, i) => (e.zIndex = i + 1));
-		this.onSync();
-		this.updateAll();
+		return panel;
 	}
 
 	private updateLayersList() {
 		if (!this.layersListEl) return;
 		this.layersListEl.innerHTML = "";
 
-		const elems = this.screen.elements || [];
-		if (elems.length === 0) {
-			const empty = document.createElement("div");
-			empty.textContent = "No hay elementos aún. Haz clic en '+ Añadir' arriba.";
-			empty.style.cssText = "color: #777; font-size: 11px; padding: 10px; text-align: center;";
-			this.layersListEl.appendChild(empty);
-			return;
+		if (this.activeLeftTab === "layers") {
+			this.renderLayersTree();
+		} else if (this.activeLeftTab === "elements") {
+			this.renderElementsCatalog();
+		} else if (this.activeLeftTab === "backgrounds") {
+			this.renderBackgroundsManagerTab();
+		} else if (this.activeLeftTab === "assets") {
+			this.renderCustomComponentsTab();
 		}
+	}
 
-		// Show in reverse order (highest z-index on top)
-		[...elems].reverse().forEach((elem) => {
+	private renderLayersTree() {
+		const searchWrap = document.createElement("div");
+		searchWrap.style.cssText = `padding: 8px 10px; background: ${StudioTokens.colors.surface1}; border-bottom: 1px solid ${StudioTokens.colors.borderSubtle};`;
+
+		const searchInput = document.createElement("input");
+		searchInput.type = "text";
+		searchInput.placeholder = "Buscar capa...";
+		searchInput.value = this.layerSearchQuery;
+		searchInput.style.cssText = `
+			width: 100%;
+			background: ${StudioTokens.colors.surface2};
+			color: ${StudioTokens.colors.textPrimary};
+			border: 1px solid ${StudioTokens.colors.borderSubtle};
+			padding: 4px 8px;
+			border-radius: ${StudioTokens.radii.sm};
+			font-size: ${StudioTokens.typography.sizeSm};
+			outline: none;
+		`;
+		searchInput.oninput = () => {
+			this.layerSearchQuery = searchInput.value.toLowerCase();
+			this.renderLayersTree();
+		};
+		searchWrap.appendChild(searchInput);
+		this.layersListEl!.appendChild(searchWrap);
+
+		const list = document.createElement("div");
+		list.style.cssText = "flex: 1; overflow-y: auto; padding: 4px 6px; display: flex; flex-direction: column; gap: 2px;";
+
+		const elems = this.screen.elements || [];
+		const sorted = [...elems].sort((a, b) => (b.zIndex || 0) - (a.zIndex || 0));
+
+		sorted.forEach((elem) => {
+			if (this.layerSearchQuery && !elem.name.toLowerCase().includes(this.layerSearchQuery)) return;
+
+			const isSelected = this.selectedElementIds.has(elem.id);
 			const row = document.createElement("div");
-			const isSelected = elem.id === this.selectedElementId;
 			row.style.cssText = `
+				padding: 5px 8px;
 				display: flex;
 				align-items: center;
 				justify-content: space-between;
-				gap: 6px;
-				padding: 6px 8px;
-				border-radius: 4px;
-				background: ${isSelected ? "#2b3b5c" : "#20242e"};
-				border: 1px solid ${isSelected ? "#00d2ff" : "#2f3545"};
+				background: ${isSelected ? StudioTokens.colors.surfaceActive : "transparent"};
+				border: 1px solid ${isSelected ? StudioTokens.colors.accentBorder : "transparent"};
+				border-radius: ${StudioTokens.radii.sm};
 				cursor: pointer;
-				transition: background 0.15s ease;
+				transition: ${StudioTokens.transitions.fast};
 			`;
+			row.onmouseenter = () => {
+				if (!isSelected) row.style.background = StudioTokens.colors.surface3;
+			};
+			row.onmouseleave = () => {
+				if (!isSelected) row.style.background = "transparent";
+			};
+			row.onclick = (e) => {
+				this.selectElement(elem.id, e.shiftKey || e.ctrlKey);
+			};
 
-			const info = document.createElement("div");
-			info.style.cssText = "display: flex; align-items: center; gap: 6px; overflow: hidden;";
+			const left = document.createElement("div");
+			left.style.cssText = "display: flex; align-items: center; gap: 6px; overflow: hidden;";
+
+			const typeIcon = document.createElement("span");
+			typeIcon.innerHTML = renderStudioIcon(
+				elem.type === "title" ? "type" : (elem.type === "shape" ? "square" : (elem.type === "crosshair" || elem.type === "killfeed" ? "crosshair" : "box")),
+				13,
+				isSelected ? StudioTokens.colors.accent : StudioTokens.colors.textSecondary
+			);
+			left.appendChild(typeIcon);
+
 			const nameSpan = document.createElement("span");
-			nameSpan.textContent = elem.name || elem.type;
-			nameSpan.style.cssText = "font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100px;";
+			nameSpan.textContent = elem.name;
+			nameSpan.style.cssText = `
+				font-size: ${StudioTokens.typography.sizeSm};
+				color: ${isSelected ? StudioTokens.colors.textPrimary : StudioTokens.colors.textSecondary};
+				white-space: nowrap;
+				overflow: hidden;
+				text-overflow: ellipsis;
+			`;
+			left.appendChild(nameSpan);
 
-			const typeBadge = document.createElement("span");
-			typeBadge.textContent = elem.type;
-			typeBadge.style.cssText = "font-size: 9px; padding: 1px 4px; border-radius: 3px; background: rgba(255,255,255,0.1); color: #aaa;";
-			info.append(nameSpan, typeBadge);
-
-			// Controls: visibility eye, move up/down, duplicate, delete
-			const actions = document.createElement("div");
-			actions.style.cssText = "display: flex; align-items: center; gap: 4px;";
+			const right = document.createElement("div");
+			right.style.cssText = "display: flex; align-items: center; gap: 4px;";
 
 			// Visibility toggle
 			const eyeBtn = document.createElement("button");
 			eyeBtn.type = "button";
-			eyeBtn.textContent = elem.visible !== false ? "👁" : "🚫";
-			eyeBtn.title = elem.visible !== false ? "Ocultar" : "Mostrar";
-			eyeBtn.style.cssText = "background: none; border: none; cursor: pointer; font-size: 11px; padding: 2px;";
+			eyeBtn.style.cssText = "background:none; border:none; cursor:pointer; padding:2px; color:#6b7280;";
+			eyeBtn.innerHTML = renderStudioIcon(elem.visible === false ? "eye-off" : "eye", 12);
 			eyeBtn.onclick = (e) => {
 				e.stopPropagation();
 				this.recordHistory();
-				elem.visible = elem.visible === false;
+				elem.visible = elem.visible === false ? true : false;
 				this.onSync();
-				this.updateAll();
+				this.updateCanvas();
+				this.renderLayersTree();
 			};
 
-			// Move layer up
-			const upBtn = document.createElement("button");
-			upBtn.type = "button";
-			upBtn.textContent = "▲";
-			upBtn.title = "Subir capa";
-			upBtn.style.cssText = "background: none; border: none; color: #888; cursor: pointer; font-size: 9px; padding: 2px;";
-			upBtn.onclick = (e) => {
+			// Lock toggle
+			const lockBtn = document.createElement("button");
+			lockBtn.type = "button";
+			lockBtn.style.cssText = "background:none; border:none; cursor:pointer; padding:2px; color:#6b7280;";
+			lockBtn.innerHTML = renderStudioIcon(elem.locked ? "lock" : "unlock", 12);
+			lockBtn.onclick = (e) => {
 				e.stopPropagation();
-				this.moveLayer(elem.id, 1);
-			};
-
-			// Move layer down
-			const downBtn = document.createElement("button");
-			downBtn.type = "button";
-			downBtn.textContent = "▼";
-			downBtn.title = "Bajar capa";
-			downBtn.style.cssText = "background: none; border: none; color: #888; cursor: pointer; font-size: 9px; padding: 2px;";
-			downBtn.onclick = (e) => {
-				e.stopPropagation();
-				this.moveLayer(elem.id, -1);
-			};
-
-			// Duplicate
-			const dupBtn = document.createElement("button");
-			dupBtn.type = "button";
-			dupBtn.textContent = "⧉";
-			dupBtn.title = "Duplicar elemento";
-			dupBtn.style.cssText = "background: none; border: none; color: #00d2ff; cursor: pointer; font-size: 11px; padding: 2px;";
-			dupBtn.onclick = (e) => {
-				e.stopPropagation();
-				this.duplicateElement(elem.id);
+				this.recordHistory();
+				elem.locked = !elem.locked;
+				this.onSync();
+				this.updateCanvas();
+				this.renderLayersTree();
 			};
 
 			// Delete
 			const delBtn = document.createElement("button");
 			delBtn.type = "button";
-			delBtn.textContent = "✕";
-			delBtn.title = "Eliminar elemento";
-			delBtn.style.cssText = "background: none; border: none; color: #e63946; cursor: pointer; font-size: 11px; padding: 2px;";
+			delBtn.style.cssText = "background:none; border:none; cursor:pointer; padding:2px; color:#6b7280;";
+			delBtn.innerHTML = renderStudioIcon("trash", 12);
 			delBtn.onclick = (e) => {
 				e.stopPropagation();
 				this.removeElement(elem.id);
 			};
 
-			actions.append(eyeBtn, upBtn, downBtn, dupBtn, delBtn);
-
-			row.append(info, actions);
-			row.onclick = () => {
-				this.selectedElementId = elem.id;
-				this.updateAll();
-			};
-
-			this.layersListEl!.appendChild(row);
+			right.append(eyeBtn, lockBtn, delBtn);
+			row.append(left, right);
+			list.appendChild(row);
 		});
+
+		this.layersListEl!.appendChild(list);
 	}
 
-	private createCanvasPanel(): HTMLElement {
-		this.canvasWrapper = document.createElement("div");
-		this.canvasWrapper.style.cssText = `
-			background: #0f1015;
-			border: 1px solid #252834;
-			border-radius: 6px;
+	private renderElementsCatalog() {
+		const searchWrap = document.createElement("div");
+		searchWrap.style.cssText = `padding: 8px 10px; background: ${StudioTokens.colors.surface1}; border-bottom: 1px solid ${StudioTokens.colors.borderSubtle};`;
+
+		const searchInput = document.createElement("input");
+		searchInput.type = "text";
+		searchInput.placeholder = "Buscar elemento...";
+		searchInput.value = this.elementSearchQuery;
+		searchInput.style.cssText = `
+			width: 100%;
+			background: ${StudioTokens.colors.surface2};
+			color: ${StudioTokens.colors.textPrimary};
+			border: 1px solid ${StudioTokens.colors.borderSubtle};
+			padding: 4px 8px;
+			border-radius: ${StudioTokens.radii.sm};
+			font-size: ${StudioTokens.typography.sizeSm};
+			outline: none;
+		`;
+		searchInput.oninput = () => {
+			this.elementSearchQuery = searchInput.value.toLowerCase();
+			this.renderElementsCatalog();
+		};
+		searchWrap.appendChild(searchInput);
+		this.layersListEl!.appendChild(searchWrap);
+
+		const scroll = document.createElement("div");
+		scroll.style.cssText = "flex: 1; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 14px;";
+
+		const categories = [
+			{
+				title: "TIPOGRAFÍA Y TEXTOS",
+				items: [
+					{ n: "Título Principal", t: "title", icon: "type" },
+					{ n: "Subtítulo / Mensaje", t: "subtitle", icon: "type" },
+					{ n: "Texto Libre / Lore", t: "text", icon: "type" },
+					{ n: "Insignia / Badge Táctica", t: "badge", icon: "badge" },
+					{ n: "Registro de Bajas (Killfeed)", t: "killfeed", icon: "crosshair" },
+				],
+			},
+			{
+				title: "FORMAS Y MARCOS",
+				items: [
+					{ n: "Tarjeta Contenedor (Glass)", t: "card", icon: "square" },
+					{ n: "Marco Táctico Agrupador", t: "container", icon: "layout" },
+					{ n: "Rectángulo Sólido", t: "shape", s: "rectangle", icon: "square" },
+					{ n: "Círculo / Diana", t: "shape", s: "circle", icon: "circle" },
+					{ n: "Píldora / Tag", t: "shape", s: "pill", icon: "badge" },
+					{ n: "Triángulo Táctico", t: "shape", s: "triangle", icon: "triangle" },
+					{ n: "Hexágono Militar", t: "shape", s: "hexagon", icon: "shield" },
+					{ n: "Estrella de Rango", t: "shape", s: "star", icon: "star" },
+					{ n: "Flecha Direccional", t: "shape", s: "arrow", icon: "arrow-right" },
+					{ n: "Esquina Decorativa", t: "shape", s: "corner", icon: "crop" },
+					{ n: "Línea Separadora", t: "divider", icon: "sliders" },
+				],
+			},
+			{
+				title: "GAMEPLAY Y TELEMETRÍA",
+				items: [
+					{ n: "Ficha del Asesino", t: "killer_info", icon: "crosshair" },
+					{ n: "Estadísticas y Causa", t: "stats", icon: "sliders" },
+					{ n: "Vidas Restantes", t: "lives", icon: "shield" },
+					{ n: "Cuenta Regresiva", t: "countdown", icon: "timeline" },
+					{ n: "Botón de Acción", t: "action_button", icon: "check" },
+					{ n: "Barra de Progreso", t: "progress_bar", icon: "loader" },
+					{ n: "Efecto / Superposición", t: "effect_overlay", icon: "sparkles" },
+				],
+			},
+		];
+
+		categories.forEach((cat) => {
+			const filtered = cat.items.filter((i) => !this.elementSearchQuery || i.n.toLowerCase().includes(this.elementSearchQuery));
+			if (filtered.length === 0) return;
+
+			const section = document.createElement("div");
+			section.style.cssText = "display: flex; flex-direction: column; gap: 6px;";
+
+			const header = document.createElement("span");
+			header.textContent = cat.title;
+			header.style.cssText = `font-size: ${StudioTokens.typography.sizeXs}; font-weight: 700; color: ${StudioTokens.colors.accent}; letter-spacing: 0.5px;`;
+			section.appendChild(header);
+
+			const grid = document.createElement("div");
+			grid.style.cssText = "display: grid; grid-template-columns: repeat(2, 1fr); grid-gap: 6px;";
+
+			filtered.forEach((item) => {
+				const card = document.createElement("div");
+				card.draggable = true;
+				card.style.cssText = `
+					background: ${StudioTokens.colors.surface2};
+					border: 1px solid ${StudioTokens.colors.borderSubtle};
+					border-radius: ${StudioTokens.radii.sm};
+					padding: 8px 6px;
+					display: flex;
+					flex-direction: column;
+					align-items: center;
+					text-align: center;
+					gap: 4px;
+					cursor: grab;
+					transition: ${StudioTokens.transitions.fast};
+				`;
+				card.ondragstart = (e) => {
+					e.dataTransfer?.setData("text/plain", JSON.stringify({ type: item.t, shapeType: item.s, name: item.n }));
+				};
+				card.onmouseenter = () => {
+					card.style.borderColor = StudioTokens.colors.accent;
+					card.style.background = StudioTokens.colors.surface3;
+				};
+				card.onmouseleave = () => {
+					card.style.borderColor = StudioTokens.colors.borderSubtle;
+					card.style.background = StudioTokens.colors.surface2;
+				};
+				card.onclick = () => {
+					this.addElement(item.t as any, item.n, item.s as any);
+				};
+
+				const iconEl = document.createElement("span");
+				iconEl.innerHTML = renderStudioIcon(item.icon as any, 16, StudioTokens.colors.textSecondary);
+
+				const nameEl = document.createElement("span");
+				nameEl.textContent = item.n;
+				nameEl.style.cssText = `font-size: ${StudioTokens.typography.sizeXs}; color: ${StudioTokens.colors.textPrimary}; line-height: 1.2;`;
+
+				card.append(iconEl, nameEl);
+				grid.appendChild(card);
+			});
+
+			section.appendChild(grid);
+			scroll.appendChild(section);
+		});
+
+		this.layersListEl!.appendChild(scroll);
+	}
+
+	private renderBackgroundsManagerTab() {
+		const wrap = document.createElement("div");
+		wrap.style.cssText = "flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 12px;";
+
+		const topActions = document.createElement("div");
+		topActions.style.cssText = "display: flex; gap: 8px;";
+
+		const openGalleryBtn = document.createElement("button");
+		openGalleryBtn.type = "button";
+		openGalleryBtn.style.cssText = `
+			flex: 1;
+			background: ${StudioTokens.colors.surface2};
+			color: ${StudioTokens.colors.textPrimary};
+			border: 1px solid ${StudioTokens.colors.borderNormal};
+			padding: 7px 10px;
+			border-radius: ${StudioTokens.radii.sm};
+			font-size: ${StudioTokens.typography.sizeSm};
+			font-weight: 500;
+			cursor: pointer;
 			display: flex;
 			align-items: center;
 			justify-content: center;
-			padding: 16px;
-			overflow: hidden;
-			position: relative;
+			gap: 6px;
+		`;
+		openGalleryBtn.innerHTML = `${renderStudioIcon("palette", 14, StudioTokens.colors.accent)} <span>Galería Completa</span>`;
+		openGalleryBtn.onclick = () => {
+			this.backgroundManager.openGalleryModal(this.screen.background || {}, (newBg) => {
+				this.recordHistory();
+				this.screen.background = newBg;
+				this.hasUnsavedChanges = true;
+				this.onSync();
+				this.updateCanvas();
+				this.renderBackgroundsManagerTab();
+			});
+		};
+
+		const importBtn = document.createElement("button");
+		importBtn.type = "button";
+		importBtn.style.cssText = `
+			background: ${StudioTokens.colors.accent};
+			color: #090b0e;
+			border: none;
+			padding: 7px 12px;
+			border-radius: ${StudioTokens.radii.sm};
+			font-size: ${StudioTokens.typography.sizeSm};
+			font-weight: 600;
+			cursor: pointer;
+			display: flex;
+			align-items: center;
+			gap: 5px;
+		`;
+		importBtn.innerHTML = `${renderStudioIcon("upload", 13, "#090b0e")} <span>Importar</span>`;
+		importBtn.onclick = () => {
+			this.backgroundManager.importLocalImage((dataUrl) => {
+				this.recordHistory();
+				if (!this.screen.background) this.screen.background = {};
+				this.screen.background.type = "image";
+				this.screen.background.imageUrl = dataUrl;
+				this.screen.background.imageFit = "cover";
+				this.hasUnsavedChanges = true;
+				this.onSync();
+				this.updateCanvas();
+				this.renderBackgroundsManagerTab();
+			});
+		};
+
+		topActions.append(openGalleryBtn, importBtn);
+		wrap.appendChild(topActions);
+
+		// Current Background Quick Controls
+		const curBg = this.screen.background || {};
+		const curBox = document.createElement("div");
+		curBox.style.cssText = `
+			background: ${StudioTokens.colors.surface2};
+			border: 1px solid ${StudioTokens.colors.borderSubtle};
+			border-radius: ${StudioTokens.radii.md};
+			padding: 10px;
+			display: flex;
+			flex-direction: column;
+			gap: 8px;
 		`;
 
-		this.canvasEl = document.createElement("div");
-		this.canvasEl.id = "viper-death-editor-canvas";
-		this.canvasEl.style.cssText = `
-			position: relative;
-			width: 100%;
-			max-width: 680px;
-			aspect-ratio: 16 / 9;
-			border-radius: 8px;
-			box-shadow: 0 16px 48px rgba(0,0,0,0.85);
-			overflow: hidden;
+		const curHeader = document.createElement("div");
+		curHeader.style.cssText = "display: flex; align-items: center; justify-content: space-between;";
+		curHeader.innerHTML = `<span style="font-size:${StudioTokens.typography.sizeXs}; font-weight:700; color:${StudioTokens.colors.textSecondary};">FONDO ACTUAL</span>`;
+		curBox.appendChild(curHeader);
+
+		// Type Select
+		const typeSelect = document.createElement("select");
+		typeSelect.style.cssText = `
+			background: ${StudioTokens.colors.surface1};
+			color: ${StudioTokens.colors.textPrimary};
+			border: 1px solid ${StudioTokens.colors.borderNormal};
+			padding: 5px;
+			border-radius: ${StudioTokens.radii.sm};
+			font-size: ${StudioTokens.typography.sizeSm};
+		`;
+		[
+			{ v: "transparent", t: "Transparente sobre 3D" },
+			{ v: "gradient", t: "Gradiente Dinámico" },
+			{ v: "color", t: "Color Sólido" },
+			{ v: "image", t: "Imagen / Textura" },
+			{ v: "animated", t: "Animado (Ken Burns / Scanlines)" },
+		].forEach((opt) => {
+			const o = document.createElement("option");
+			o.value = opt.v;
+			o.textContent = opt.t;
+			if ((curBg.type || "gradient") === opt.v) o.selected = true;
+			typeSelect.appendChild(o);
+		});
+		typeSelect.onchange = () => {
+			this.recordHistory();
+			if (!this.screen.background) this.screen.background = {};
+			this.screen.background.type = typeSelect.value as any;
+			this.hasUnsavedChanges = true;
+			this.onSync();
+			this.updateCanvas();
+			this.renderBackgroundsManagerTab();
+		};
+		curBox.appendChild(typeSelect);
+
+		// Opacity Overlay slider
+		const opWrap = document.createElement("div");
+		opWrap.style.cssText = "display: flex; flex-direction: column; gap: 4px;";
+		const opLbl = document.createElement("span");
+		opLbl.textContent = `Oscurecimiento Overlay (${Math.round((curBg.overlayOpacity ?? 0.7) * 100)}%)`;
+		opLbl.style.cssText = `font-size: ${StudioTokens.typography.sizeXs}; color: ${StudioTokens.colors.textSecondary};`;
+		const opSlider = document.createElement("input");
+		opSlider.type = "range";
+		opSlider.min = "0";
+		opSlider.max = "1";
+		opSlider.step = "0.05";
+		opSlider.value = String(curBg.overlayOpacity ?? 0.7);
+		opSlider.oninput = () => {
+			if (!this.screen.background) this.screen.background = {};
+			this.screen.background.overlayOpacity = parseFloat(opSlider.value);
+			opLbl.textContent = `Oscurecimiento Overlay (${Math.round(parseFloat(opSlider.value) * 100)}%)`;
+			this.onSync();
+			this.updateCanvas();
+		};
+		opWrap.append(opLbl, opSlider);
+		curBox.appendChild(opWrap);
+
+		wrap.appendChild(curBox);
+
+		// Quick Presets Grid
+		const presetsTitle = document.createElement("span");
+		presetsTitle.textContent = "PRESETS RÁPIDOS";
+		presetsTitle.style.cssText = `font-size: ${StudioTokens.typography.sizeXs}; font-weight: 700; color: ${StudioTokens.colors.accent}; letter-spacing: 0.5px;`;
+		wrap.appendChild(presetsTitle);
+
+		const pGrid = document.createElement("div");
+		pGrid.style.cssText = "display: grid; grid-template-columns: repeat(2, 1fr); grid-gap: 8px;";
+
+		StudioBackgroundManager.PRESETS.forEach((p) => {
+			const pCard = document.createElement("div");
+			pCard.style.cssText = `
+				background: ${StudioTokens.colors.surface2};
+				border: 1px solid ${StudioTokens.colors.borderSubtle};
+				border-radius: ${StudioTokens.radii.sm};
+				overflow: hidden;
+				cursor: pointer;
+				transition: ${StudioTokens.transitions.fast};
+			`;
+			pCard.onmouseenter = () => (pCard.style.borderColor = StudioTokens.colors.accent);
+			pCard.onmouseleave = () => (pCard.style.borderColor = StudioTokens.colors.borderSubtle);
+
+			const pThumb = document.createElement("div");
+			pThumb.style.cssText = `height: 50px; background: ${p.thumbnail}; background-size: cover;`;
+			const pLabel = document.createElement("div");
+			pLabel.textContent = p.name;
+			pLabel.style.cssText = `padding: 4px 6px; font-size: 10px; color: ${StudioTokens.colors.textPrimary}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;`;
+
+			pCard.append(pThumb, pLabel);
+			pCard.onclick = () => {
+				this.recordHistory();
+				this.screen.background = {
+					...this.screen.background,
+					...p.config,
+				};
+				this.hasUnsavedChanges = true;
+				this.onSync();
+				this.updateCanvas();
+				this.renderBackgroundsManagerTab();
+			};
+			pGrid.appendChild(pCard);
+		});
+
+		wrap.appendChild(pGrid);
+		this.layersListEl!.appendChild(wrap);
+	}
+
+	private renderCustomComponentsTab() {
+		const wrap = document.createElement("div");
+		wrap.style.cssText = "flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 12px;";
+
+		const createBtn = document.createElement("button");
+		createBtn.type = "button";
+		createBtn.style.cssText = `
+			background: ${StudioTokens.colors.surface2};
+			border: 1px dashed ${StudioTokens.colors.accent};
+			color: ${StudioTokens.colors.accent};
+			padding: 8px 10px;
+			border-radius: ${StudioTokens.radii.sm};
+			font-size: ${StudioTokens.typography.sizeSm};
+			font-weight: 600;
+			cursor: pointer;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			gap: 6px;
+			transition: ${StudioTokens.transitions.fast};
+		`;
+		createBtn.innerHTML = `${renderStudioIcon("plus", 14, StudioTokens.colors.accent)} <span>Crear desde Selección</span>`;
+		createBtn.onclick = () => this.createCustomComponentFromSelection();
+		wrap.appendChild(createBtn);
+
+		const list = document.createElement("div");
+		list.style.cssText = "display: flex; flex-direction: column; gap: 8px;";
+
+		this.customComponents.forEach((comp) => {
+			const card = document.createElement("div");
+			card.draggable = true;
+			card.style.cssText = `
+				background: ${StudioTokens.colors.surface2};
+				border: 1px solid ${StudioTokens.colors.borderSubtle};
+				border-radius: ${StudioTokens.radii.md};
+				padding: 10px;
+				display: flex;
+				flex-direction: column;
+				gap: 4px;
+				cursor: grab;
+				transition: ${StudioTokens.transitions.fast};
+			`;
+			card.ondragstart = (e) => {
+				e.dataTransfer?.setData("text/plain", JSON.stringify({ customComponentId: comp.id }));
+			};
+			card.onmouseenter = () => (card.style.borderColor = StudioTokens.colors.accent);
+			card.onmouseleave = () => (card.style.borderColor = StudioTokens.colors.borderSubtle);
+			card.onclick = () => this.instantiateCustomComponent(comp.id, 50, 50);
+
+			const top = document.createElement("div");
+			top.style.cssText = "display: flex; align-items: center; justify-content: space-between;";
+			top.innerHTML = `
+				<div style="display:flex; align-items:center; gap:6px;">
+					${renderStudioIcon((comp.icon || "component") as any, 14, StudioTokens.colors.accent)}
+					<strong style="font-size:${StudioTokens.typography.sizeSm}; color:${StudioTokens.colors.textPrimary};">${comp.name}</strong>
+				</div>
+				<span style="font-size:10px; color:${StudioTokens.colors.textMuted};">${comp.elements.length} elems</span>
+			`;
+
+			const desc = document.createElement("span");
+			desc.textContent = comp.description || "Componente reutilizable";
+			desc.style.cssText = `font-size: 11px; color: ${StudioTokens.colors.textSecondary};`;
+
+			card.append(top, desc);
+			list.appendChild(card);
+		});
+
+		wrap.appendChild(list);
+		this.layersListEl!.appendChild(wrap);
+	}
+
+	// --- 3. CENTER CANVAS COLUMN PREMIUM ---
+	private createCanvasColumn(): HTMLElement {
+		const col = document.createElement("div");
+		col.style.cssText = "flex: 1; display: flex; flex-direction: column; overflow: hidden; position: relative;";
+
+		// Secondary Toolbar (Aspect ratio, Zoom, Snapping, Grid, Safe Area, Modes)
+		const subBar = document.createElement("div");
+		subBar.className = "studio-sub-bar";
+		subBar.style.cssText = `
+			height: 36px;
+			background: ${StudioTokens.colors.surface1};
+			border-bottom: 1px solid ${StudioTokens.colors.borderSubtle};
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			padding: 0 12px;
 			user-select: none;
-			transition: aspect-ratio 0.2s ease, max-width 0.2s ease;
+			font-size: ${StudioTokens.typography.sizeSm};
+			color: ${StudioTokens.colors.textSecondary};
+			z-index: 25;
 		`;
 
-		this.applyDeviceRatio();
-		this.canvasWrapper.appendChild(this.canvasEl);
+		// Left Controls: Aspect ratio, Backdrop selector, Zoom
+		const leftC = document.createElement("div");
+		leftC.style.cssText = "display: flex; align-items: center; gap: 8px;";
 
-		// Canvas click to deselect when clicking background
-		this.canvasEl.onmousedown = (e) => {
-			if (e.target === this.canvasEl) {
-				this.selectedElementId = null;
-				this.updateAll();
+		const aspectSelect = document.createElement("select");
+		aspectSelect.style.cssText = `
+			background: ${StudioTokens.colors.surface2};
+			color: ${StudioTokens.colors.textPrimary};
+			border: 1px solid ${StudioTokens.colors.borderNormal};
+			padding: 2px 6px;
+			border-radius: ${StudioTokens.radii.sm};
+			font-size: 11px;
+		`;
+		[
+			{ v: "desktop", t: "16:9 1080p" },
+			{ v: "ultrawide", t: "21:9 Ultrawide" },
+			{ v: "tablet", t: "4:3 Tablet" },
+			{ v: "mobile", t: "9:16 Vertical" },
+		].forEach((opt) => {
+			const o = document.createElement("option");
+			o.value = opt.v;
+			o.textContent = opt.t;
+			if (this.previewDevice === opt.v) o.selected = true;
+			aspectSelect.appendChild(o);
+		});
+		aspectSelect.onchange = () => {
+			this.previewDevice = aspectSelect.value as any;
+			this.recalculateCanvasFit();
+		};
+		leftC.appendChild(aspectSelect);
+
+		// Reference Backdrop selector
+		const bgSelect = document.createElement("select");
+		bgSelect.style.cssText = `
+			background: ${StudioTokens.colors.surface2};
+			color: ${StudioTokens.colors.textPrimary};
+			border: 1px solid ${StudioTokens.colors.borderNormal};
+			padding: 2px 6px;
+			border-radius: ${StudioTokens.radii.sm};
+			font-size: 11px;
+		`;
+		[
+			{ v: "dark", t: "Fondo Oscuro" },
+			{ v: "checker", t: "Transparencia" },
+			{ v: "cyberpunk", t: "Escenario Ciberpunk" },
+			{ v: "hangar", t: "Hangar Espacial" },
+		].forEach((bg) => {
+			const opt = document.createElement("option");
+			opt.value = bg.v;
+			opt.textContent = bg.t;
+			if (this.canvasBackdropMode === bg.v) opt.selected = true;
+			bgSelect.appendChild(opt);
+		});
+		bgSelect.onchange = () => {
+			this.canvasBackdropMode = bgSelect.value as any;
+			this.updateCanvas();
+		};
+		leftC.appendChild(bgSelect);
+
+		// Zoom controls
+		const zoomGroup = document.createElement("div");
+		zoomGroup.style.cssText = `display: flex; align-items: center; background: ${StudioTokens.colors.surface2}; border: 1px solid ${StudioTokens.colors.borderSubtle}; border-radius: ${StudioTokens.radii.sm};`;
+		const zoomOut = document.createElement("button");
+		zoomOut.type = "button";
+		zoomOut.style.cssText = "background:none; border:none; color:#888; padding:2px 6px; cursor:pointer;";
+		zoomOut.innerHTML = renderStudioIcon("zoom-out", 12);
+		zoomOut.onclick = () => {
+			this.zoomLevel = Math.max(0.25, this.zoomLevel - 0.1);
+			this.recalculateCanvasFit();
+		};
+		const zoomFit = document.createElement("button");
+		zoomFit.type = "button";
+		zoomFit.style.cssText = "background:none; border:none; color:#ccc; padding:2px 6px; font-size:10px; cursor:pointer;";
+		zoomFit.textContent = "Fit";
+		zoomFit.onclick = () => {
+			this.zoomLevel = 1.0;
+			this.canvasPanX = 0;
+			this.canvasPanY = 0;
+			this.recalculateCanvasFit();
+		};
+		const zoomIn = document.createElement("button");
+		zoomIn.type = "button";
+		zoomIn.style.cssText = "background:none; border:none; color:#888; padding:2px 6px; cursor:pointer;";
+		zoomIn.innerHTML = renderStudioIcon("zoom-in", 12);
+		zoomIn.onclick = () => {
+			this.zoomLevel = Math.min(3.0, this.zoomLevel + 0.1);
+			this.recalculateCanvasFit();
+		};
+		zoomGroup.append(zoomOut, zoomFit, zoomIn);
+		leftC.appendChild(zoomGroup);
+
+		subBar.appendChild(leftC);
+
+		// Center Controls: Workspace Modes
+		const modeGroup = document.createElement("div");
+		modeGroup.style.cssText = `display: flex; background: ${StudioTokens.colors.surface2}; border: 1px solid ${StudioTokens.colors.borderSubtle}; border-radius: ${StudioTokens.radii.sm}; padding: 2px;`;
+
+		const modes = [
+			{ id: "design", label: "Diseñar", icon: "layout" },
+			{ id: "animate", label: "Animar", icon: "sparkles" },
+			{ id: "test", label: "Probar", icon: "play" },
+		];
+
+		modes.forEach((m) => {
+			const b = document.createElement("button");
+			b.type = "button";
+			const isA = this.activeWorkspaceMode === m.id;
+			b.style.cssText = `
+				background: ${isA ? StudioTokens.colors.accent : "transparent"};
+				color: ${isA ? "#090b0e" : StudioTokens.colors.textSecondary};
+				border: none;
+				padding: 3px 10px;
+				font-size: ${StudioTokens.typography.sizeSm};
+				font-weight: 600;
+				border-radius: ${StudioTokens.radii.xs};
+				cursor: pointer;
+				display: flex;
+				align-items: center;
+				gap: 5px;
+				transition: ${StudioTokens.transitions.fast};
+			`;
+			b.innerHTML = `${renderStudioIcon(m.icon as any, 12, isA ? "#090b0e" : "currentColor")} <span>${m.label}</span>`;
+			b.onclick = () => this.setWorkspaceMode(m.id as any);
+			modeGroup.appendChild(b);
+		});
+		subBar.appendChild(modeGroup);
+
+		// Right Controls: Safe Area, Grid, Snapping
+		const rightC = document.createElement("div");
+		rightC.style.cssText = "display: flex; align-items: center; gap: 8px;";
+
+		const snapBtn = document.createElement("button");
+		snapBtn.type = "button";
+		snapBtn.title = "Ajuste Inteligente (Snapping)";
+		snapBtn.style.cssText = `
+			background: ${this.smartSnappingEnabled ? StudioTokens.colors.surfaceActive : "transparent"};
+			border: 1px solid ${this.smartSnappingEnabled ? StudioTokens.colors.accent : StudioTokens.colors.borderSubtle};
+			color: ${this.smartSnappingEnabled ? StudioTokens.colors.accent : StudioTokens.colors.textSecondary};
+			padding: 3px 6px;
+			border-radius: ${StudioTokens.radii.xs};
+			cursor: pointer;
+			display: flex;
+			align-items: center;
+			gap: 4px;
+			font-size: 11px;
+		`;
+		snapBtn.innerHTML = `${renderStudioIcon("magnet", 12)} <span>Ajuste</span>`;
+		snapBtn.onclick = () => {
+			this.smartSnappingEnabled = !this.smartSnappingEnabled;
+			this.render(this.container!);
+		};
+
+		const gridBtn = document.createElement("button");
+		gridBtn.type = "button";
+		gridBtn.title = "Cuadrícula Guía";
+		gridBtn.style.cssText = `
+			background: ${this.showGrid ? StudioTokens.colors.surfaceActive : "transparent"};
+			border: 1px solid ${this.showGrid ? StudioTokens.colors.accent : StudioTokens.colors.borderSubtle};
+			color: ${this.showGrid ? StudioTokens.colors.accent : StudioTokens.colors.textSecondary};
+			padding: 3px 6px;
+			border-radius: ${StudioTokens.radii.xs};
+			cursor: pointer;
+			display: flex;
+			align-items: center;
+			gap: 4px;
+			font-size: 11px;
+		`;
+		gridBtn.innerHTML = `${renderStudioIcon("grid", 12)} <span>Cuadrícula</span>`;
+		gridBtn.onclick = () => {
+			this.showGrid = !this.showGrid;
+			if (this.gridOverlayEl) this.gridOverlayEl.style.display = this.showGrid ? "block" : "none";
+			gridBtn.style.borderColor = this.showGrid ? StudioTokens.colors.accent : StudioTokens.colors.borderSubtle;
+			gridBtn.style.color = this.showGrid ? StudioTokens.colors.accent : StudioTokens.colors.textSecondary;
+		};
+
+		const safeBtn = document.createElement("button");
+		safeBtn.type = "button";
+		safeBtn.title = "Área Segura 90%";
+		safeBtn.style.cssText = `
+			background: ${this.showSafeArea ? StudioTokens.colors.surfaceActive : "transparent"};
+			border: 1px solid ${this.showSafeArea ? StudioTokens.colors.accent : StudioTokens.colors.borderSubtle};
+			color: ${this.showSafeArea ? StudioTokens.colors.accent : StudioTokens.colors.textSecondary};
+			padding: 3px 6px;
+			border-radius: ${StudioTokens.radii.xs};
+			cursor: pointer;
+			display: flex;
+			align-items: center;
+			gap: 4px;
+			font-size: 11px;
+		`;
+		safeBtn.innerHTML = `${renderStudioIcon("shield", 12)} <span>Safe Area</span>`;
+		safeBtn.onclick = () => {
+			this.showSafeArea = !this.showSafeArea;
+			if (this.safeAreaEl) this.safeAreaEl.style.display = this.showSafeArea ? "block" : "none";
+			safeBtn.style.borderColor = this.showSafeArea ? StudioTokens.colors.accent : StudioTokens.colors.borderSubtle;
+			safeBtn.style.color = this.showSafeArea ? StudioTokens.colors.accent : StudioTokens.colors.textSecondary;
+		};
+
+		rightC.append(snapBtn, gridBtn, safeBtn);
+		subBar.appendChild(rightC);
+
+		col.appendChild(subBar);
+
+		// Canvas Viewport & Wrapper
+		this.canvasViewport = document.createElement("div");
+		this.canvasViewport.className = "studio-canvas-viewport";
+		this.canvasViewport.style.cssText = "flex: 1; position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; background: #07090c;";
+
+		this.canvasWrapper = document.createElement("div");
+		this.canvasWrapper.className = "studio-canvas-wrapper";
+		this.canvasWrapper.style.cssText = "position: relative; transition: transform 0.05s ease-out;";
+
+		// Pan & Zoom events
+		this.canvasViewport.onmousedown = (e) => {
+			if (e.button === 1 || this.activeCanvasTool === "hand" || e.spaceKey) {
+				this.isPanning = true;
+				this.panStartX = e.clientX - this.canvasPanX;
+				this.panStartY = e.clientY - this.canvasPanY;
+				if (this.canvasViewport) this.canvasViewport.style.cursor = "grabbing";
+				e.preventDefault();
+				return;
+			}
+			if (e.target === this.canvasViewport || e.target === this.canvasWrapper) {
+				this.selectElement(null);
+				this.startMarqueeSelection(e);
 			}
 		};
 
-		return this.canvasWrapper;
+		window.addEventListener("mousemove", (e) => {
+			if (this.isPanning && this.canvasWrapper) {
+				this.canvasPanX = e.clientX - this.panStartX;
+				this.canvasPanY = e.clientY - this.panStartY;
+				this.recalculateCanvasFit();
+			}
+		});
+
+		window.addEventListener("mouseup", () => {
+			if (this.isPanning) {
+				this.isPanning = false;
+				if (this.canvasViewport) {
+					this.canvasViewport.style.cursor = this.activeCanvasTool === "hand" ? "grab" : "default";
+				}
+			}
+		});
+
+		// Wheel Zoom
+		this.canvasViewport.onwheel = (e) => {
+			if (e.ctrlKey || e.metaKey) {
+				e.preventDefault();
+				const delta = e.deltaY < 0 ? 0.05 : -0.05;
+				this.zoomLevel = Math.max(0.25, Math.min(3.0, this.zoomLevel + delta));
+				this.recalculateCanvasFit();
+			}
+		};
+
+		// The Core Scaled Canvas
+		this.canvasEl = document.createElement("div");
+		this.canvasEl.id = "viper-studio-canvas";
+		this.canvasEl.style.cssText = `
+			position: relative;
+			background: #090b0e;
+			border: 1px solid #1a2230;
+			box-shadow: 0 12px 40px rgba(0, 0, 0, 0.7);
+			overflow: hidden;
+			user-select: none;
+		`;
+
+		// Drag & Drop onto Canvas
+		this.canvasEl.ondragover = (e) => e.preventDefault();
+		this.canvasEl.ondrop = (e) => this.handleCanvasDrop(e);
+
+		this.canvasWrapper.appendChild(this.canvasEl);
+		this.canvasViewport.appendChild(this.canvasWrapper);
+		col.appendChild(this.canvasViewport);
+
+		return col;
 	}
 
-	private applyDeviceRatio() {
+	private handleCanvasDrop(e: DragEvent) {
+		e.preventDefault();
 		if (!this.canvasEl) return;
-		if (this.previewDevice === "desktop") {
-			this.canvasEl.style.aspectRatio = "16 / 9";
-			this.canvasEl.style.maxWidth = "680px";
-		} else if (this.previewDevice === "tablet") {
-			this.canvasEl.style.aspectRatio = "4 / 3";
-			this.canvasEl.style.maxWidth = "540px";
-		} else {
-			this.canvasEl.style.aspectRatio = "9 / 16";
-			this.canvasEl.style.maxWidth = "320px";
+		const raw = e.dataTransfer?.getData("text/plain");
+		if (!raw) return;
+
+		const rect = this.canvasEl.getBoundingClientRect();
+		const dropX = Math.round(((e.clientX - rect.left) / rect.width) * 100);
+		const dropY = Math.round(((e.clientY - rect.top) / rect.height) * 100);
+
+		try {
+			const data = JSON.parse(raw);
+			if (data.customComponentId) {
+				this.instantiateCustomComponent(data.customComponentId, dropX, dropY);
+				return;
+			}
+			if (data.type) {
+				const elem = this.addElement(data.type, data.name, data.shapeType);
+				elem.x = dropX;
+				elem.y = dropY;
+				this.hasUnsavedChanges = true;
+				this.onSync();
+				this.updateAll();
+			}
+		} catch (err) {
+			console.warn("Could not parse drag drop data", err);
 		}
 	}
 
-	private updateCanvas() {
+	public recalculateCanvasFit() {
+		if (!this.canvasViewport || !this.canvasEl || !this.canvasWrapper) return;
+
+		const viewW = this.canvasViewport.clientWidth;
+		const viewH = this.canvasViewport.clientHeight;
+		if (viewW <= 0 || viewH <= 0) return;
+
+		let targetAspect = 16 / 9;
+		if (this.previewDevice === "ultrawide") targetAspect = 21 / 9;
+		else if (this.previewDevice === "tablet") targetAspect = 4 / 3;
+		else if (this.previewDevice === "mobile") targetAspect = 9 / 16;
+
+		// Maximum utilization of viewport (>88%)
+		const padding = 32;
+		const availW = Math.max(100, viewW - padding * 2);
+		const availH = Math.max(100, viewH - padding * 2);
+
+		let canvasW = availW;
+		let canvasH = canvasW / targetAspect;
+
+		if (canvasH > availH) {
+			canvasH = availH;
+			canvasW = canvasH * targetAspect;
+		}
+
+		canvasW = Math.round(canvasW);
+		canvasH = Math.round(canvasH);
+
+		this.canvasEl.style.width = `${canvasW}px`;
+		this.canvasEl.style.height = `${canvasH}px`;
+
+		this.canvasWrapper.style.transform = `translate(${this.canvasPanX}px, ${this.canvasPanY}px) scale(${this.zoomLevel})`;
+		this.updateStatusBar();
+	}
+
+	// --- 4. UPDATE CANVAS CONTENTS & GIZMOS ---
+	public updateCanvas() {
 		if (!this.canvasEl) return;
 		this.canvasEl.innerHTML = "";
 
-		// Dedicated Background Layer inside Canvas Preview
+		// 1. Reference Backdrop
 		this.canvasBgLayer = document.createElement("div");
-		this.canvasBgLayer.className = "viper-death-canvas-bg-layer";
-		this.canvasBgLayer.style.cssText = `
-			position: absolute;
-			inset: -5%;
-			width: 110%;
-			height: 110%;
-			overflow: hidden;
-			pointer-events: none;
-			z-index: 0;
-		`;
-		this.canvasEl.appendChild(this.canvasBgLayer);
+		this.canvasBgLayer.className = "studio-canvas-backdrop";
+		this.canvasBgLayer.style.cssText = "position: absolute; inset: 0; pointer-events: none; z-index: 0;";
 
-		const bg = normalizeDeathScreenBackground(this.screen.background, this.screen.backgroundColor, this.screen.backgroundImage);
-		const rawBg = bg.color || this.screen.backgroundColor || "rgba(13, 15, 23, 0.94)";
-		const bgType = bg.type || (bg.imageUrl ? "image" : "gradient");
-
-		if (bgType === "color") {
-			this.canvasBgLayer.style.backgroundColor = bg.color || rawBg;
-		} else if (bgType === "gradient") {
-			if (bg.gradient) {
+		if (this.canvasBackdropMode === "checker") {
+			this.canvasBgLayer.style.background = "repeating-conic-gradient(#141824 0% 25%, #0a0d14 0% 50%) 50% / 16px 16px";
+		} else if (this.canvasBackdropMode === "cyberpunk") {
+			this.canvasBgLayer.style.background = "linear-gradient(135deg, #091322 0%, #032030 45%, #2a0822 100%)";
+		} else if (this.canvasBackdropMode === "hangar") {
+			this.canvasBgLayer.style.background = "linear-gradient(180deg, #050b14 0%, #091a30 70%, #152233 100%)";
+		} else {
+			// Dark Studio / Screen Background
+			const bg = this.screen.background;
+			if (bg && bg.type === "image" && bg.imageUrl) {
+				this.canvasBgLayer.style.backgroundImage = `url("${bg.imageUrl}")`;
+				this.canvasBgLayer.style.backgroundSize = bg.imageFit || "cover";
+				this.canvasBgLayer.style.backgroundPosition = bg.imagePosition || "center";
+			} else if (bg && bg.type === "gradient" && bg.gradient) {
 				this.canvasBgLayer.style.background = bg.gradient;
 			} else {
-				this.canvasBgLayer.style.background = DEFAULT_DEATH_SCREEN_VIGNETTE;
-			}
-		} else if (bgType === "image" || bgType === "animated") {
-			this.canvasBgLayer.style.backgroundColor = bg.color || "#05070c";
-			this.canvasBgLayer.style.background = bg.gradient || DEFAULT_DEATH_SCREEN_VIGNETTE;
-
-			const imgUrl = bg.imageUrl;
-			if (imgUrl) {
-				const imgEl = document.createElement("div");
-				imgEl.className = "viper-death-canvas-bg-image";
-				imgEl.style.cssText = `
-					position: absolute;
-					inset: 0;
-					width: 100%;
-					height: 100%;
-					background-image: url("${imgUrl}");
-					background-size: ${bg.imageFit || "cover"};
-					background-position: ${bg.imagePosition || "center"};
-					background-repeat: no-repeat;
-					pointer-events: none;
-				`;
-				this.canvasBgLayer.appendChild(imgEl);
-			}
-
-			const overlayOpacity = bg.overlayOpacity ?? 0.7;
-			if (overlayOpacity > 0) {
-				const overlayEl = document.createElement("div");
-				overlayEl.className = "viper-death-canvas-bg-overlay";
-				overlayEl.style.cssText = `
-					position: absolute;
-					inset: 0;
-					width: 100%;
-					height: 100%;
-					background-color: ${bg.overlayColor || "rgba(0, 0, 0, 0.7)"};
-					opacity: ${overlayOpacity};
-					pointer-events: none;
-				`;
-				this.canvasBgLayer.appendChild(overlayEl);
-			}
-
-			if (bg.animation?.type === "scanlines") {
-				const scanlinesEl = document.createElement("div");
-				scanlinesEl.className = "viper-death-canvas-bg-scanlines";
-				scanlinesEl.style.cssText = `
-					position: absolute;
-					inset: 0;
-					width: 100%;
-					height: 100%;
-					background: repeating-linear-gradient(0deg, rgba(0,0,0,0.15) 0px, rgba(0,0,0,0.15) 1px, transparent 1px, transparent 3px);
-					pointer-events: none;
-					opacity: 0.8;
-				`;
-				this.canvasBgLayer.appendChild(scanlinesEl);
+				this.canvasBgLayer.style.background = this.screen.backgroundColor || "#090b0e";
 			}
 		}
+		this.canvasEl.appendChild(this.canvasBgLayer);
 
-		this.canvasEl.style.background = "transparent";
+		// Background overlay tint for text readability
+		const overlayEl = document.createElement("div");
+		overlayEl.style.cssText = `
+			position: absolute;
+			inset: 0;
+			background: ${this.screen.background?.overlayColor || "rgba(0,0,0,0.4)"};
+			opacity: ${this.screen.background?.overlayOpacity ?? 0.4};
+			pointer-events: none;
+			z-index: 1;
+		`;
+		this.canvasEl.appendChild(overlayEl);
 
-		// Build simulated death state
-		const isRespawn = this.previewState === "respawn" || this.previewState === "last_life";
-		const mockState: DeathState = {
-			cause: this.previewCause,
-			willRespawn: isRespawn,
-			respawnDelay: isRespawn ? Math.max(1, this.mode.respawnDelay ?? 3) : 0,
-			remainingRespawns: this.previewState === "last_life" ? 1 : (this.previewState === "game_over" ? 0 : (this.mode.respawns ?? 3)),
-			activeMode: this.mode,
-			context: {
-				cause: this.previewCause,
-				killerName: this.previewCause === "damage" ? "Fantasma_99" : undefined,
-				killerWeapon: this.previewCause === "damage" ? "Rifle de Plasma" : undefined,
-				details: this.previewCause === "fall" ? "Has caído al vacío." : (this.previewCause === "logic" ? "Activaste una trampa mortal." : "Combate directo"),
-			},
-		};
+		// 2. Safe Area Box
+		this.safeAreaEl = document.createElement("div");
+		this.safeAreaEl.style.cssText = `
+			position: absolute;
+			top: 5%;
+			left: 5%;
+			width: 90%;
+			height: 90%;
+			border: 1px dashed rgba(0, 210, 255, 0.25);
+			pointer-events: none;
+			z-index: 2;
+			display: ${this.showSafeArea ? "block" : "none"};
+		`;
+		this.canvasEl.appendChild(this.safeAreaEl);
 
-		const elems = this.screen.elements || [];
-		elems.forEach((elem) => {
+		// 3. Grid Overlay
+		this.gridOverlayEl = document.createElement("div");
+		this.gridOverlayEl.style.cssText = `
+			position: absolute;
+			inset: 0;
+			background-size: 20px 20px;
+			background-image: linear-gradient(to right, rgba(255, 255, 255, 0.04) 1px, transparent 1px), linear-gradient(to bottom, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+			pointer-events: none;
+			z-index: 3;
+			display: ${this.showGrid ? "block" : "none"};
+		`;
+		this.canvasEl.appendChild(this.gridOverlayEl);
+
+		// 4. Render Death Screen Elements
+		const elements = this.screen.elements || [];
+		const sorted = [...elements].sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0));
+
+		sorted.forEach((elem) => {
 			if (elem.visible === false) return;
 
-			// Condition evaluation against simulated state
-			const cond = elem.conditions;
-			if (cond) {
-				if (cond.causes && cond.causes.length > 0 && !cond.causes.includes(this.previewCause)) {
-					return;
-				}
-				if (cond.states && cond.states.length > 0 && !cond.states.includes(this.previewState)) {
-					return;
-				}
-				if (cond.requireData && cond.requireData.length > 0) {
-					if (cond.requireData.includes("killer") && !mockState.context?.killerName) {
-						return;
-					}
-					if (cond.requireData.includes("countdown") && (!isRespawn || mockState.respawnDelay <= 0)) {
-						return;
-					}
-				}
-			}
-
-			const isSelected = elem.id === this.selectedElementId;
-			const override = elem.causeOverrides?.[this.previewCause];
-			const contentTemplate = override?.content || elem.content || "";
-			const elemColor = override?.color || elem.style?.color;
-			const resolvedText = evaluateDynamicTokens(contentTemplate, mockState, elem.fallbackContent || "");
-
 			const node = document.createElement("div");
-			node.className = `viper-canvas-element ${isSelected ? "selected" : ""}`;
-			node.dataset.elemId = elem.id;
 			node.dataset.elementId = elem.id;
-
-			node.style.position = "absolute";
-			node.style.left = `${elem.x}%`;
-			node.style.top = `${elem.y}%`;
-			node.style.width = `${elem.width}%`;
-			node.style.minHeight = `${elem.height}%`;
-			node.style.boxSizing = "border-box";
-			node.style.zIndex = String(elem.zIndex ?? 1);
-			node.style.cursor = "move";
-
-			// Anchor transform
-			let transformStr = "translate(-50%, -50%)";
-			switch (elem.anchor) {
-				case "top-left": transformStr = "translate(0, 0)"; break;
-				case "top-center": transformStr = "translate(-50%, 0)"; break;
-				case "top-right": transformStr = "translate(-100%, 0)"; break;
-				case "center-left": transformStr = "translate(0, -50%)"; break;
-				case "center": transformStr = "translate(-50%, -50%)"; break;
-				case "center-right": transformStr = "translate(-100%, -50%)"; break;
-				case "bottom-left": transformStr = "translate(0, -100%)"; break;
-				case "bottom-center": transformStr = "translate(-50%, -100%)"; break;
-				case "bottom-right": transformStr = "translate(-100%, -100%)"; break;
-			}
-			node.style.transform = transformStr;
-
-			// Styling
+			const isSelected = this.selectedElementIds.has(elem.id);
 			const s = elem.style || {};
-			if (s.fontSize) node.style.fontSize = `${Math.max(9, Math.round(s.fontSize * 0.85))}px`;
-			if (s.fontWeight) node.style.fontWeight = s.fontWeight;
-			if (s.fontFamily) node.style.fontFamily = s.fontFamily;
-			if (elemColor) node.style.color = elemColor;
-			if (s.textAlign) node.style.textAlign = s.textAlign;
-			if (s.textTransform) node.style.textTransform = s.textTransform;
-			if (s.letterSpacing) node.style.letterSpacing = s.letterSpacing;
+
+			node.style.cssText = `
+				position: absolute;
+				left: ${elem.x}%;
+				top: ${elem.y}%;
+				width: ${elem.width}%;
+				height: ${elem.height}%;
+				transform: translate(-50%, -50%) rotate(${s.rotation || 0}deg) scale(${s.scaleX || 1}, ${s.scaleY || 1});
+				transform-origin: ${s.transformOrigin || "center center"};
+				mix-blend-mode: ${s.blendMode || "normal"};
+				opacity: ${s.opacity ?? 1};
+				z-index: ${elem.zIndex || 10};
+				box-sizing: border-box;
+				cursor: ${this.activeCanvasTool === "hand" ? "grab" : (elem.locked ? "default" : "move")};
+			`;
+
 			if (s.backgroundColor) node.style.backgroundColor = s.backgroundColor;
 			if (s.borderColor) node.style.borderColor = s.borderColor;
 			if (s.borderWidth) node.style.borderWidth = `${s.borderWidth}px`;
 			if (s.borderStyle) node.style.borderStyle = s.borderStyle;
 			if (s.borderRadius) node.style.borderRadius = `${s.borderRadius}px`;
-			if (s.opacity !== undefined) node.style.opacity = String(s.opacity);
-			if (s.backdropBlur) node.style.backdropFilter = `blur(${s.backdropBlur}px)`;
-			if (s.padding) node.style.padding = `${s.padding}px`;
 			if (s.boxShadow) node.style.boxShadow = s.boxShadow;
-			if (s.textShadow) node.style.textShadow = s.textShadow;
+			if (s.backdropBlur) node.style.backdropFilter = `blur(${s.backdropBlur}px)`;
+			if (s.color) node.style.color = s.color;
+			if (s.fontSize) node.style.fontSize = `${s.fontSize}px`;
+			if (s.fontWeight) node.style.fontWeight = String(s.fontWeight);
+			if (s.fontFamily) node.style.fontFamily = s.fontFamily;
+			if (s.textAlign) node.style.textAlign = s.textAlign;
+			if (s.letterSpacing) node.style.letterSpacing = `${s.letterSpacing}px`;
 
-			// Selection outline
-			if (isSelected) {
-				node.style.outline = "2px solid #00d2ff";
-				node.style.outlineOffset = "2px";
-			}
+			// Content evaluation
+			let rawContent = elem.text || elem.content || "";
+			if (!rawContent && elem.type === "title") rawContent = this.screen.title || "HAS MUERTO";
+			if (!rawContent && elem.type === "subtitle") rawContent = this.screen.subtitle || "Volviendo al punto de inicio...";
+			node.textContent = evaluateDynamicTokens(rawContent, {
+				killerName: "Fantasma_99",
+				killerWeapon: "Cañón Riel MK-II",
+				killerClan: "APEX",
+				cause: "Daño letal",
+				countdown: "0.0",
+				headshot: "SÍ",
+				remainingRespawns: 0,
+			});
 
-			// Content
-			if (elem.type === "image") {
-				const src = sanitizeImageUrl(elem.imageUrl);
-				if (src) {
-					const img = document.createElement("img");
-					img.src = src;
-					img.style.maxWidth = "100%";
-					img.style.maxHeight = "100%";
-					img.style.pointerEvents = "none";
-					img.onerror = () => {
-						img.style.display = "none";
-						node.textContent = elem.fallbackContent || elem.content || "[🖼 Imagen no disponible]";
-						node.style.color = "#888";
-					};
-					node.appendChild(img);
-				} else {
-					node.textContent = "[🖼 Imagen]";
-					node.style.color = "#888";
-				}
-			} else {
-				node.textContent = resolvedText;
-			}
-
-			// Drag event setup
+			// Direct Element Interaction Events
 			node.onmousedown = (e) => {
+				if (this.activeCanvasTool === "hand") return;
 				e.stopPropagation();
-				this.selectedElementId = elem.id;
-				this.updateAll();
-				this.startDragging(e, elem);
+				if (!elem.locked) {
+					this.startElementDrag(e, elem);
+				}
 			};
 
-			// Resize handles if selected
-			if (isSelected) {
-				this.attachResizeHandles(node, elem);
-			}
+			node.oncontextmenu = (e) => {
+				e.preventDefault();
+				e.stopPropagation();
+				this.showContextMenu(e.clientX, e.clientY, elem);
+			};
 
-			this.canvasEl.appendChild(node);
+			this.canvasEl!.appendChild(node);
+
+			// Render Selection Gizmo if selected
+			if (isSelected && this.activeWorkspaceMode !== "test") {
+				this.renderElementGizmo(elem);
+			}
 		});
 	}
 
-	private previewAnimationOnCanvas() {
+	private renderElementGizmo(elem: DeathScreenElement) {
 		if (!this.canvasEl) return;
-		this.updateCanvas();
-		if (this.canvasBgLayer) {
-			this.animationService.animateBackground(
-				this.canvasBgLayer,
-				this.screen.background,
-				{ reducedMotion: this.screen.accessibility?.reduceMotion }
-			);
-		}
-		this.animationService.animateScreenEntrance(
-			this.canvasEl,
-			this.screen.elements || [],
-			this.screen.animations,
-			{ reducedMotion: this.screen.accessibility?.reduceMotion }
-		);
+		const s = elem.style || {};
+
+		const gizmo = document.createElement("div");
+		gizmo.className = "studio-element-gizmo";
+		gizmo.style.cssText = `
+			position: absolute;
+			left: ${elem.x}%;
+			top: ${elem.y}%;
+			width: ${elem.width}%;
+			height: ${elem.height}%;
+			transform: translate(-50%, -50%) rotate(${s.rotation || 0}deg);
+			transform-origin: ${s.transformOrigin || "center center"};
+			border: 1px solid ${StudioTokens.colors.accent};
+			box-shadow: 0 0 6px rgba(0, 210, 255, 0.4);
+			pointer-events: none;
+			z-index: 1000;
+		`;
+
+		// 8 Bounding Box Handles
+		const handles = [
+			{ h: "nw", x: 0, y: 0, cur: "nwse-resize" },
+			{ h: "n", x: 50, y: 0, cur: "ns-resize" },
+			{ h: "ne", x: 100, y: 0, cur: "nesw-resize" },
+			{ h: "e", x: 100, y: 50, cur: "ew-resize" },
+			{ h: "se", x: 100, y: 100, cur: "nwse-resize" },
+			{ h: "s", x: 50, y: 100, cur: "ns-resize" },
+			{ h: "sw", x: 0, y: 100, cur: "nesw-resize" },
+			{ h: "w", x: 0, y: 50, cur: "ew-resize" },
+		];
+
+		handles.forEach((hd) => {
+			const dot = document.createElement("div");
+			dot.style.cssText = `
+				position: absolute;
+				left: ${hd.x}%;
+				top: ${hd.y}%;
+				width: 7px;
+				height: 7px;
+				background: #ffffff;
+				border: 1px solid ${StudioTokens.colors.accent};
+				border-radius: 1px;
+				transform: translate(-50%, -50%);
+				pointer-events: auto;
+				cursor: ${hd.cur};
+			`;
+			dot.onmousedown = (e) => {
+				e.stopPropagation();
+				this.startElementResize(e, elem, hd.h);
+			};
+			gizmo.appendChild(dot);
+		});
+
+		// Rotation Handle & Stem
+		const stem = document.createElement("div");
+		stem.style.cssText = `
+			position: absolute;
+			left: 50%;
+			top: -18px;
+			width: 1px;
+			height: 18px;
+			background: ${StudioTokens.colors.accent};
+			pointer-events: none;
+		`;
+		const rotHandle = document.createElement("div");
+		rotHandle.style.cssText = `
+			position: absolute;
+			left: 50%;
+			top: -22px;
+			width: 9px;
+			height: 9px;
+			background: ${StudioTokens.colors.accent};
+			border: 1px solid #ffffff;
+			border-radius: 50%;
+			transform: translate(-50%, -50%);
+			pointer-events: auto;
+			cursor: grab;
+		`;
+		rotHandle.onmousedown = (e) => {
+			e.stopPropagation();
+			this.startElementRotate(e, elem);
+		};
+		gizmo.append(stem, rotHandle);
+
+		this.canvasEl.appendChild(gizmo);
 	}
 
-	private startDragging(e: MouseEvent, elem: DeathScreenElement) {
+	// --- 5. DRAG, RESIZE, ROTATE HANDLERS ---
+	private startElementDrag(e: MouseEvent, elem: DeathScreenElement) {
+		if (e.button !== 0) return;
+		if (!this.selectedElementIds.has(elem.id)) {
+			this.selectElement(elem.id, e.shiftKey || e.ctrlKey);
+		}
+
+		this.recordHistory();
 		this.isDragging = true;
 		this.dragStartX = e.clientX;
 		this.dragStartY = e.clientY;
-		this.elementStartPos = { x: elem.x, y: elem.y, width: elem.width, height: elem.height };
-		const canvasRect = this.canvasEl?.getBoundingClientRect();
-		const node = this.getCanvasElementNode(elem.id);
 
-		this.recordHistory();
-
-		const onMouseMove = (moveEvent: MouseEvent) => {
-			if (!this.isDragging || !this.canvasEl) return;
-			if (!canvasRect || canvasRect.width === 0 || canvasRect.height === 0) return;
-
-			const deltaX = ((moveEvent.clientX - this.dragStartX) / canvasRect.width) * 100;
-			const deltaY = ((moveEvent.clientY - this.dragStartY) / canvasRect.height) * 100;
-
-			elem.x = Math.max(0, Math.min(100, Math.round((this.elementStartPos.x + deltaX) * 10) / 10));
-			elem.y = Math.max(0, Math.min(100, Math.round((this.elementStartPos.y + deltaY) * 10) / 10));
-
-			this.updateElementGeometry(node, elem);
-		};
-
-		const onMouseUp = () => {
-			this.isDragging = false;
-			window.removeEventListener("mousemove", onMouseMove);
-			window.removeEventListener("mouseup", onMouseUp);
-			this.updatePropertiesPanel();
-			this.onSync();
-		};
-
-		window.addEventListener("mousemove", onMouseMove);
-		window.addEventListener("mouseup", onMouseUp);
-	}
-
-	private attachResizeHandles(parentEl: HTMLElement, elem: DeathScreenElement) {
-		const handles = ["nw", "ne", "se", "sw"];
-		handles.forEach((h) => {
-			const handle = document.createElement("div");
-			handle.className = `resize-handle handle-${h}`;
-			handle.style.cssText = `
-				position: absolute;
-				width: 8px;
-				height: 8px;
-				background: #00d2ff;
-				border: 1px solid #ffffff;
-				border-radius: 50%;
-				z-index: 100;
-			`;
-
-			if (h === "nw") { handle.style.left = "-4px"; handle.style.top = "-4px"; handle.style.cursor = "nwse-resize"; }
-			if (h === "ne") { handle.style.right = "-4px"; handle.style.top = "-4px"; handle.style.cursor = "nesw-resize"; }
-			if (h === "se") { handle.style.right = "-4px"; handle.style.bottom = "-4px"; handle.style.cursor = "nwse-resize"; }
-			if (h === "sw") { handle.style.left = "-4px"; handle.style.bottom = "-4px"; handle.style.cursor = "nesw-resize"; }
-
-			handle.onmousedown = (e) => {
-				e.stopPropagation();
-				this.startResizing(e, elem, h);
-			};
-
-			parentEl.appendChild(handle);
+		this.multiDragStartPositions.clear();
+		this.getSelectedElements().forEach((sel) => {
+			this.multiDragStartPositions.set(sel.id, { x: sel.x, y: sel.y });
 		});
+
+		const onMove = (ev: MouseEvent) => {
+			if (!this.isDragging || !this.canvasEl) return;
+			const rect = this.canvasEl.getBoundingClientRect();
+			const deltaXPct = ((ev.clientX - this.dragStartX) / rect.width) * 100;
+			const deltaYPct = ((ev.clientY - this.dragStartY) / rect.height) * 100;
+
+			this.getSelectedElements().forEach((sel) => {
+				const start = this.multiDragStartPositions.get(sel.id);
+				if (start) {
+					sel.x = Math.max(0, Math.min(100, Math.round((start.x + deltaXPct) * 10) / 10));
+					sel.y = Math.max(0, Math.min(100, Math.round((start.y + deltaYPct) * 10) / 10));
+				}
+			});
+
+			this.updateCanvas();
+			this.updatePropertiesPanel();
+		};
+
+		const onUp = () => {
+			this.isDragging = false;
+			window.removeEventListener("mousemove", onMove);
+			window.removeEventListener("mouseup", onUp);
+
+			if (this.autoKeyEnabled) {
+				this.getSelectedElements().forEach((sel) => {
+					this.addKeyframe(sel.id, "x", sel.x);
+					this.addKeyframe(sel.id, "y", sel.y);
+				});
+			}
+
+			this.hasUnsavedChanges = true;
+			this.onSync();
+			this.updateAll();
+		};
+
+		window.addEventListener("mousemove", onMove);
+		window.addEventListener("mouseup", onUp);
 	}
 
-	private getCanvasElementNode(elemId: string): HTMLElement | null {
-		if (!this.canvasEl) return null;
-		return Array.from(this.canvasEl.children).find((child) => (child as HTMLElement).dataset.elemId === elemId) as HTMLElement || null;
-	}
-
-	private updateElementGeometry(node: HTMLElement | null, elem: DeathScreenElement) {
-		if (!node) return;
-		node.style.left = `${elem.x}%`;
-		node.style.top = `${elem.y}%`;
-		node.style.width = `${elem.width}%`;
-		node.style.minHeight = `${elem.height}%`;
-	}
-
-	private startResizing(e: MouseEvent, elem: DeathScreenElement, handle: string) {
+	private startElementResize(e: MouseEvent, elem: DeathScreenElement, handle: string) {
+		this.recordHistory();
 		this.isResizing = true;
 		this.resizeHandle = handle;
 		this.dragStartX = e.clientX;
 		this.dragStartY = e.clientY;
 		this.elementStartPos = { x: elem.x, y: elem.y, width: elem.width, height: elem.height };
-		const canvasRect = this.canvasEl?.getBoundingClientRect();
-		const node = this.getCanvasElementNode(elem.id);
 
-		this.recordHistory();
-
-		const onMouseMove = (moveEvent: MouseEvent) => {
+		const onMove = (ev: MouseEvent) => {
 			if (!this.isResizing || !this.canvasEl) return;
-			if (!canvasRect || canvasRect.width === 0 || canvasRect.height === 0) return;
+			const rect = this.canvasEl.getBoundingClientRect();
+			const deltaXPct = ((ev.clientX - this.dragStartX) / rect.width) * 100;
+			const deltaYPct = ((ev.clientY - this.dragStartY) / rect.height) * 100;
 
-			const deltaX = ((moveEvent.clientX - this.dragStartX) / canvasRect.width) * 100;
-			const deltaY = ((moveEvent.clientY - this.dragStartY) / canvasRect.height) * 100;
-
-			let newWidth = this.elementStartPos.width;
-			let newHeight = this.elementStartPos.height;
-
-			if (handle === "se") {
-				newWidth = Math.max(2, this.elementStartPos.width + deltaX * 2);
-				newHeight = Math.max(2, this.elementStartPos.height + deltaY * 2);
-			} else if (handle === "sw") {
-				newWidth = Math.max(2, this.elementStartPos.width - deltaX * 2);
-				newHeight = Math.max(2, this.elementStartPos.height + deltaY * 2);
-			} else if (handle === "ne") {
-				newWidth = Math.max(2, this.elementStartPos.width + deltaX * 2);
-				newHeight = Math.max(2, this.elementStartPos.height - deltaY * 2);
-			} else if (handle === "nw") {
-				newWidth = Math.max(2, this.elementStartPos.width - deltaX * 2);
-				newHeight = Math.max(2, this.elementStartPos.height - deltaY * 2);
+			if (handle.includes("e")) elem.width = Math.max(4, this.elementStartPos.width + deltaXPct);
+			if (handle.includes("w")) {
+				elem.width = Math.max(4, this.elementStartPos.width - deltaXPct);
+				elem.x = this.elementStartPos.x + deltaXPct / 2;
+			}
+			if (handle.includes("s")) elem.height = Math.max(2, this.elementStartPos.height + deltaYPct);
+			if (handle.includes("n")) {
+				elem.height = Math.max(2, this.elementStartPos.height - deltaYPct);
+				elem.y = this.elementStartPos.y + deltaYPct / 2;
 			}
 
-			elem.width = Math.min(100, Math.round(newWidth * 10) / 10);
-			elem.height = Math.min(100, Math.round(newHeight * 10) / 10);
-
-			this.updateElementGeometry(node, elem);
-		};
-
-		const onMouseUp = () => {
-			this.isResizing = false;
-			this.resizeHandle = null;
-			window.removeEventListener("mousemove", onMouseMove);
-			window.removeEventListener("mouseup", onMouseUp);
+			this.updateCanvas();
 			this.updatePropertiesPanel();
-			this.onSync();
 		};
 
-		window.addEventListener("mousemove", onMouseMove);
-		window.addEventListener("mouseup", onMouseUp);
+		const onUp = () => {
+			this.isResizing = false;
+			window.removeEventListener("mousemove", onMove);
+			window.removeEventListener("mouseup", onUp);
+			this.hasUnsavedChanges = true;
+			this.onSync();
+			this.updateAll();
+		};
+
+		window.addEventListener("mousemove", onMove);
+		window.addEventListener("mouseup", onUp);
 	}
 
-	private createPropertiesPanel(): HTMLElement {
-		this.propertiesPanelEl = document.createElement("div");
-		this.propertiesPanelEl.style.cssText = `
-			background: #1a1c24;
-			border: 1px solid #2c303d;
-			border-radius: 6px;
+	private startElementRotate(e: MouseEvent, elem: DeathScreenElement) {
+		this.recordHistory();
+		this.isRotating = true;
+		if (!this.canvasEl) return;
+
+		const rect = this.canvasEl.getBoundingClientRect();
+		const elemCenterX = rect.left + (elem.x / 100) * rect.width;
+		const elemCenterY = rect.top + (elem.y / 100) * rect.height;
+
+		const onMove = (ev: MouseEvent) => {
+			if (!this.isRotating) return;
+			const rad = Math.atan2(ev.clientY - elemCenterY, ev.clientX - elemCenterX);
+			let deg = Math.round((rad * 180) / Math.PI) + 90;
+			if (deg < 0) deg += 360;
+			if (deg >= 360) deg -= 360;
+
+			if (!elem.style) elem.style = {};
+			elem.style.rotation = deg;
+			this.updateCanvas();
+			this.updatePropertiesPanel();
+		};
+
+		const onUp = () => {
+			this.isRotating = false;
+			window.removeEventListener("mousemove", onMove);
+			window.removeEventListener("mouseup", onUp);
+			if (this.autoKeyEnabled) {
+				this.addKeyframe(elem.id, "rotation", elem.style?.rotation ?? 0);
+			}
+			this.hasUnsavedChanges = true;
+			this.onSync();
+			this.updateAll();
+		};
+
+		window.addEventListener("mousemove", onMove);
+		window.addEventListener("mouseup", onUp);
+	}
+
+	// --- 6. MARQUEE SELECTION & CONTEXT MENU ---
+	private startMarqueeSelection(e: MouseEvent) {
+		this.isMarqueeSelecting = true;
+		this.marqueeStartX = e.clientX;
+		this.marqueeStartY = e.clientY;
+
+		this.marqueeEl = document.createElement("div");
+		this.marqueeEl.style.cssText = `
+			position: fixed;
+			left: ${this.marqueeStartX}px;
+			top: ${this.marqueeStartY}px;
+			width: 0;
+			height: 0;
+			border: 1px dashed ${StudioTokens.colors.accent};
+			background: ${StudioTokens.colors.accentMuted};
+			pointer-events: none;
+			z-index: 10000;
+		`;
+		document.body.appendChild(this.marqueeEl);
+
+		const onMove = (ev: MouseEvent) => {
+			if (!this.isMarqueeSelecting || !this.marqueeEl) return;
+			const curX = ev.clientX;
+			const curY = ev.clientY;
+			const l = Math.min(this.marqueeStartX, curX);
+			const t = Math.min(this.marqueeStartY, curY);
+			const w = Math.abs(curX - this.marqueeStartX);
+			const h = Math.abs(curY - this.marqueeStartY);
+
+			this.marqueeEl.style.left = `${l}px`;
+			this.marqueeEl.style.top = `${t}px`;
+			this.marqueeEl.style.width = `${w}px`;
+			this.marqueeEl.style.height = `${h}px`;
+
+			if (this.canvasEl) {
+				const rect = this.canvasEl.getBoundingClientRect();
+				const elems = this.screen.elements || [];
+				this.selectedElementIds.clear();
+
+				elems.forEach((el) => {
+					const elX = rect.left + (el.x / 100) * rect.width;
+					const elY = rect.top + (el.y / 100) * rect.height;
+					if (elX >= l && elX <= l + w && elY >= t && elY <= t + h) {
+						this.selectedElementIds.add(el.id);
+					}
+				});
+				this.updateCanvas();
+			}
+		};
+
+		const onUp = () => {
+			this.isMarqueeSelecting = false;
+			if (this.marqueeEl) {
+				this.marqueeEl.remove();
+				this.marqueeEl = null;
+			}
+			window.removeEventListener("mousemove", onMove);
+			window.removeEventListener("mouseup", onUp);
+			this.updateLayersList();
+			this.updatePropertiesPanel();
+			this.updateStatusBar();
+		};
+
+		window.addEventListener("mousemove", onMove);
+		window.addEventListener("mouseup", onUp);
+	}
+
+	private showContextMenu(x: number, y: number, elem: DeathScreenElement) {
+		if (this.contextMenuEl) this.contextMenuEl.remove();
+
+		this.contextMenuEl = document.createElement("div");
+		this.contextMenuEl.className = "studio-context-menu";
+		this.contextMenuEl.style.cssText = `
+			position: fixed;
+			left: ${x}px;
+			top: ${y}px;
+			width: 200px;
+			background: ${StudioTokens.colors.surface1};
+			border: 1px solid ${StudioTokens.colors.borderNormal};
+			border-radius: ${StudioTokens.radii.md};
+			box-shadow: ${StudioTokens.shadows.dropdown};
+			padding: 4px;
+			z-index: 100000;
 			display: flex;
 			flex-direction: column;
-			overflow: hidden;
+			gap: 2px;
 		`;
 
+		const items = [
+			{ l: "Duplicar", icon: "copy", action: () => this.duplicateElement(elem.id) },
+			{ l: "Copiar Elemento", icon: "copy", action: () => (this.clipboardElement = JSON.parse(JSON.stringify(elem))) },
+			{ l: elem.locked ? "Desbloquear" : "Bloquear", icon: elem.locked ? "unlock" : "lock", action: () => { elem.locked = !elem.locked; this.updateAll(); } },
+			{ l: elem.visible === false ? "Mostrar" : "Ocultar", icon: elem.visible === false ? "eye" : "eye-off", action: () => { elem.visible = !elem.visible; this.updateAll(); } },
+			{ l: "Traer al Frente", icon: "arrow-up", action: () => { elem.zIndex = (this.screen.elements?.length || 10) + 1; this.updateAll(); } },
+			{ l: "Enviar al Fondo", icon: "arrow-down", action: () => { elem.zIndex = 1; this.updateAll(); } },
+			{ l: "Guardar Prefab", icon: "component", action: () => this.createCustomComponentFromSelection(elem.name) },
+			{ l: "Eliminar", icon: "trash", danger: true, action: () => this.removeElement(elem.id) },
+		];
+
+		items.forEach((it) => {
+			const btn = document.createElement("button");
+			btn.type = "button";
+			btn.style.cssText = `
+				display: flex;
+				align-items: center;
+				gap: 8px;
+				padding: 6px 10px;
+				background: transparent;
+				border: none;
+				border-radius: ${StudioTokens.radii.sm};
+				color: ${it.danger ? StudioTokens.colors.danger : StudioTokens.colors.textPrimary};
+				font-size: ${StudioTokens.typography.sizeSm};
+				cursor: pointer;
+				text-align: left;
+			`;
+			btn.innerHTML = `${renderStudioIcon(it.icon as any, 13, it.danger ? StudioTokens.colors.danger : "currentColor")} <span>${it.l}</span>`;
+			btn.onmouseenter = () => (btn.style.background = StudioTokens.colors.surface3);
+			btn.onmouseleave = () => (btn.style.background = "transparent");
+			btn.onclick = () => {
+				it.action();
+				this.contextMenuEl?.remove();
+			};
+			this.contextMenuEl!.appendChild(btn);
+		});
+
+		const onDocClick = (ev: MouseEvent) => {
+			if (this.contextMenuEl && !this.contextMenuEl.contains(ev.target as Node)) {
+				this.contextMenuEl.remove();
+				this.contextMenuEl = null;
+				document.removeEventListener("mousedown", onDocClick);
+			}
+		};
+		document.addEventListener("mousedown", onDocClick);
+		document.body.appendChild(this.contextMenuEl);
+	}
+
+	// --- 7. RIGHT INSPECTOR PANEL PREMIUM ---
+	private createPropertiesPanel(): HTMLElement {
+		this.propertiesPanelEl = document.createElement("div");
+		this.propertiesPanelEl.className = "death-screen-editor-inspector custom-scrollbar";
+		this.propertiesPanelEl.style.cssText = `
+			width: ${this.rightPanelWidth}px;
+			background: ${StudioTokens.colors.surface1};
+			border-left: 1px solid ${StudioTokens.colors.borderSubtle};
+			display: ${this.isRightPanelCollapsed ? "none" : "flex"};
+			flex-direction: column;
+			overflow-y: auto;
+			z-index: 10;
+		`;
 		this.updatePropertiesPanel();
 		return this.propertiesPanelEl;
 	}
@@ -1170,1020 +2593,864 @@ export class DeathScreenEditor {
 		if (!this.propertiesPanelEl) return;
 		this.propertiesPanelEl.innerHTML = "";
 
-		const selected = this.screen.elements?.find((e) => e.id === this.selectedElementId);
-
-		if (!selected) {
-			this.renderGlobalScreenProperties();
-			return;
+		const selectedCount = this.selectedElementIds.size;
+		if (selectedCount === 0) {
+			this.renderGlobalInspector();
+		} else if (selectedCount > 1) {
+			this.renderMultiSelectInspector();
+		} else {
+			const elem = this.screen.elements?.find((e) => e.id === this.selectedElementId);
+			if (elem) this.renderElementInspector(elem);
+			else this.renderGlobalInspector();
 		}
-
-		this.renderElementProperties(selected);
 	}
 
-	private renderGlobalScreenProperties() {
+	private renderGlobalInspector() {
 		const header = document.createElement("div");
-		header.style.cssText = "padding: 10px; background: #222530; border-bottom: 1px solid #2c303d; display: flex; justify-content: space-between;";
-		header.innerHTML = "<strong style='color:#00d2ff;'>Ajustes Globales de Pantalla</strong>";
+		header.style.cssText = `padding: 10px 12px; background: ${StudioTokens.colors.surface2}; border-bottom: 1px solid ${StudioTokens.colors.borderSubtle};`;
+		header.innerHTML = `<strong style="color:${StudioTokens.colors.accent}; font-size:${StudioTokens.typography.sizeMd};">Ajustes Globales</strong>`;
 		this.propertiesPanelEl!.appendChild(header);
 
 		const scroll = document.createElement("div");
-		scroll.style.cssText = "flex: 1; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 12px;";
+		scroll.style.cssText = "flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 12px;";
 
-		// Accent color
-		scroll.appendChild(this.createColorPicker("Color de Acento", this.screen.accentColor || "#ff3b47", (c) => {
+		scroll.appendChild(this.createTextInput("Título Global", this.screen.title || "HAS MUERTO", "", (v) => {
+			this.recordHistory();
+			this.screen.title = v;
+			this.onSync();
+			this.updateCanvas();
+		}));
+
+		scroll.appendChild(this.createColorPickerInput("Color de Acento", this.screen.accentColor || "#00d2ff", (c) => {
 			this.recordHistory();
 			this.screen.accentColor = c;
 			this.onSync();
 			this.updateCanvas();
 		}));
 
-		// Screen blur
-		scroll.appendChild(this.createNumberSlider("Desenfoque de Fondo (px)", this.screen.screenBlur ?? 12, 0, 30, (v) => {
-			this.recordHistory();
-			this.screen.screenBlur = v;
-			if (this.screen.transitions) this.screen.transitions.blur = v;
-			this.onSync();
-			this.updateCanvas();
-		}));
-
-		// --- SECCIÓN: FONDO DE PANTALLA ---
-		const bgBox = document.createElement("div");
-		bgBox.style.cssText = "display: flex; flex-direction: column; gap: 8px; padding: 10px; background: #20242f; border-radius: 6px; border: 1px solid #32384a;";
-		bgBox.innerHTML = "<strong style='font-size:12px; color:#00d2ff;'>Fondo de Pantalla</strong>";
-
-		const bg = (this.screen.background ||= normalizeDeathScreenBackground(
-			undefined,
-			this.screen.backgroundColor,
-			this.screen.backgroundImage
-		));
-
-		// Background Type selector
-		const bgTypeRow = document.createElement("div");
-		bgTypeRow.style.cssText = "display: flex; flex-direction: column; gap: 3px;";
-		const bgTypeLabel = document.createElement("label");
-		bgTypeLabel.textContent = "Tipo de Fondo";
-		bgTypeLabel.style.cssText = "font-size: 11px; color: #aaa;";
-		const bgTypeSelect = document.createElement("select");
-		bgTypeSelect.style.cssText = "background: #111; color: #fff; border: 1px solid #444; padding: 5px; border-radius: 4px; font-size: 12px;";
-		[
-			["gradient", "Degradado Atmosférico (Gradiente)"],
-			["image", "Imagen Propia (Foto / Textura)"],
-			["color", "Color Sólido Plano"],
-			["animated", "Fondo Animado Dinámico"],
-		].forEach(([v, t]) => {
-			const opt = document.createElement("option");
-			opt.value = v;
-			opt.textContent = t;
-			if ((bg.type || "gradient") === v) opt.selected = true;
-			bgTypeSelect.appendChild(opt);
-		});
-		bgTypeSelect.onchange = () => {
-			this.recordHistory();
-			bg.type = bgTypeSelect.value as DeathScreenBackgroundType;
-			if (bg.type === "animated") {
-				bg.animation ||= {};
-				bg.animation.enabled = true;
-			}
-			this.onSync();
-			this.updateCanvas();
-			this.updatePropertiesPanel();
+		// Background Launcher inside inspector
+		const bgSec = this.createSectionBox("Gestor de Fondos");
+		const launchBgBtn = document.createElement("button");
+		launchBgBtn.type = "button";
+		launchBgBtn.style.cssText = `
+			width: 100%;
+			background: ${StudioTokens.colors.surface3};
+			color: ${StudioTokens.colors.textPrimary};
+			border: 1px solid ${StudioTokens.colors.borderNormal};
+			padding: 7px;
+			border-radius: ${StudioTokens.radii.sm};
+			font-size: ${StudioTokens.typography.sizeSm};
+			cursor: pointer;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			gap: 6px;
+		`;
+		launchBgBtn.innerHTML = `${renderStudioIcon("palette", 14, StudioTokens.colors.accent)} <span>Explorar y Cambiar Fondo</span>`;
+		launchBgBtn.onclick = () => {
+			this.backgroundManager.openGalleryModal(this.screen.background || {}, (newBg) => {
+				this.recordHistory();
+				this.screen.background = newBg;
+				this.hasUnsavedChanges = true;
+				this.onSync();
+				this.updateCanvas();
+			});
 		};
-		bgTypeRow.append(bgTypeLabel, bgTypeSelect);
-		bgBox.appendChild(bgTypeRow);
+		bgSec.appendChild(launchBgBtn);
+		scroll.appendChild(bgSec);
 
-		// Solid/Base Color
-		bgBox.appendChild(this.createColorPicker("Color Base / Fondo", bg.color || this.screen.backgroundColor || "rgba(13, 15, 23, 0.94)", (c) => {
+		this.propertiesPanelEl!.appendChild(scroll);
+	}
+
+	private renderMultiSelectInspector() {
+		const header = document.createElement("div");
+		header.style.cssText = `padding: 10px 12px; background: ${StudioTokens.colors.surface2}; border-bottom: 1px solid ${StudioTokens.colors.borderSubtle};`;
+		header.innerHTML = `<strong style="color:${StudioTokens.colors.accent}; font-size:${StudioTokens.typography.sizeMd};">Selección Múltiple (${this.selectedElementIds.size})</strong>`;
+		this.propertiesPanelEl!.appendChild(header);
+
+		const scroll = document.createElement("div");
+		scroll.style.cssText = "flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 12px;";
+
+		const saveCompBtn = document.createElement("button");
+		saveCompBtn.type = "button";
+		saveCompBtn.style.cssText = `
+			background: ${StudioTokens.colors.accent};
+			color: #090b0e;
+			border: none;
+			padding: 8px;
+			border-radius: ${StudioTokens.radii.sm};
+			font-size: ${StudioTokens.typography.sizeSm};
+			font-weight: 600;
+			cursor: pointer;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			gap: 6px;
+		`;
+		saveCompBtn.innerHTML = `${renderStudioIcon("component", 14, "#090b0e")} <span>Crear Prefab de Selección</span>`;
+		saveCompBtn.onclick = () => this.createCustomComponentFromSelection();
+		scroll.appendChild(saveCompBtn);
+
+		this.propertiesPanelEl!.appendChild(scroll);
+	}
+
+	private renderElementInspector(elem: DeathScreenElement) {
+		const header = document.createElement("div");
+		header.style.cssText = `padding: 10px 12px; background: ${StudioTokens.colors.surface2}; border-bottom: 1px solid ${StudioTokens.colors.borderSubtle}; display: flex; align-items: center; justify-content: space-between;`;
+		header.innerHTML = `
+			<div style="display:flex; align-items:center; gap:6px;">
+				<strong style="color:${StudioTokens.colors.textPrimary}; font-size:${StudioTokens.typography.sizeMd};">${elem.name}</strong>
+				<span style="font-size:9px; color:${StudioTokens.colors.accent}; background:${StudioTokens.colors.accentMuted}; padding:1px 4px; border-radius:2px;">${elem.type}</span>
+			</div>
+		`;
+		this.propertiesPanelEl!.appendChild(header);
+
+		const scroll = document.createElement("div");
+		scroll.style.cssText = "flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 12px;";
+
+		// 1. Text & Name
+		scroll.appendChild(this.createTextInput("Nombre Capa", elem.name, "", (v) => {
 			this.recordHistory();
-			bg.color = c;
-			this.screen.backgroundColor = c;
+			elem.name = v;
 			this.onSync();
-			this.updateCanvas();
+			this.updateLayersList();
 		}));
 
-		// Gradient options (if gradient or animated)
-		if (bg.type === "gradient" || bg.type === "animated") {
-			const gradRow = document.createElement("div");
-			gradRow.style.cssText = "display: flex; flex-direction: column; gap: 3px;";
-			const gradLabel = document.createElement("label");
-			gradLabel.textContent = "Estilo de Degradado";
-			gradLabel.style.cssText = "font-size: 11px; color: #aaa;";
-			const gradSelect = document.createElement("select");
-			gradSelect.style.cssText = "background: #111; color: #fff; border: 1px solid #444; padding: 4px; border-radius: 4px;";
-			[
-				["radial", "Radial Suave Centrado"],
-				["linear_dark", "Lineal Vertical Oscuro (Cine negro)"],
-				["vignette", "Viñeta Intensa de Acento"],
-				["custom", "Personalizado (CSS libre)"],
-			].forEach(([v, t]) => {
-				const opt = document.createElement("option");
-				opt.value = v;
-				opt.textContent = t;
-				if (bg.gradient?.includes("linear-gradient(180deg") && v === "linear_dark") opt.selected = true;
-				else if (bg.gradient?.includes("rgba(0,0,0,0.98)") && v === "vignette") opt.selected = true;
-				else if (!bg.gradient && v === "radial") opt.selected = true;
-				else if (bg.gradient && v === "custom") opt.selected = true;
-				gradSelect.appendChild(opt);
-			});
-			gradSelect.onchange = () => {
+		if (elem.type === "title" || elem.type === "subtitle" || elem.type === "text" || elem.type === "badge" || elem.type === "action_button") {
+			scroll.appendChild(this.createTextInput("Contenido", elem.text || elem.content || "", "", (v) => {
 				this.recordHistory();
-				const v = gradSelect.value;
-				if (v === "radial") {
-					bg.gradient = undefined;
-				} else if (v === "linear_dark") {
-					bg.gradient = "linear-gradient(180deg, rgba(13, 15, 23, 0.85) 0%, rgba(5, 7, 12, 0.98) 100%)";
-				} else if (v === "vignette") {
-					bg.gradient = "radial-gradient(circle at center, rgba(20, 25, 38, 0.7) 0%, rgba(5, 7, 12, 0.98) 75%)";
-				}
-				this.onSync();
-				this.updateCanvas();
-				this.updatePropertiesPanel();
-			};
-			gradRow.append(gradLabel, gradSelect);
-			bgBox.appendChild(gradRow);
-
-			if (gradSelect.value === "custom" || (bg.gradient && !bg.gradient.startsWith("radial-gradient(ellipse"))) {
-				bgBox.appendChild(this.createTextInput("CSS Degradado", bg.gradient || "", "linear-gradient(...)", (g) => {
-					this.recordHistory();
-					bg.gradient = g.trim() || undefined;
-					this.onSync();
-					this.updateCanvas();
-				}));
-			}
-		}
-
-		// Image options (if image or animated or url exists)
-		if (bg.type === "image" || bg.type === "animated" || bg.imageUrl) {
-			const imgInputWrap = this.createTextInput("URL de la Imagen de Fondo", bg.imageUrl || this.screen.backgroundImage || "", "assets/... o https://...", (url) => {
-				this.recordHistory();
-				const sanitized = sanitizeImageUrl(url);
-				bg.imageUrl = sanitized;
-				this.screen.backgroundImage = sanitized;
-				this.onSync();
-				this.updateCanvas();
-			});
-
-			// Asset presets chip bar
-			const assetChips = document.createElement("div");
-			assetChips.style.cssText = "display: flex; gap: 4px; flex-wrap: wrap; margin-top: 4px;";
-			const chipsTitle = document.createElement("span");
-			chipsTitle.textContent = "Activos rápidos:";
-			chipsTitle.style.cssText = "font-size: 10px; color: #888; align-self: center;";
-			assetChips.appendChild(chipsTitle);
-
-			[
-				["assets/8e08d.jpg", "8e08d.jpg"],
-				["assets/8e08d875-3fd2-42a0-8868-d7a1a655014a.jpg", "Fondo Viper"],
-			].forEach(([assetUrl, label]) => {
-				const chipBtn = document.createElement("button");
-				chipBtn.type = "button";
-				chipBtn.textContent = label;
-				chipBtn.style.cssText = "background: #282f42; color: #00d2ff; border: 1px solid #3d4766; font-size: 10px; padding: 2px 6px; border-radius: 4px; cursor: pointer;";
-				chipBtn.onclick = () => {
-					this.recordHistory();
-					bg.imageUrl = assetUrl;
-					this.screen.backgroundImage = assetUrl;
-					this.onSync();
-					this.updateCanvas();
-					this.updatePropertiesPanel();
-				};
-				assetChips.appendChild(chipBtn);
-			});
-			imgInputWrap.appendChild(assetChips);
-			bgBox.appendChild(imgInputWrap);
-
-			// Fit & Position Grid
-			const fitPosGrid = document.createElement("div");
-			fitPosGrid.style.cssText = "display: grid; grid-template-columns: 1fr 1fr; gap: 6px;";
-
-			const fitRow = document.createElement("div");
-			fitRow.style.cssText = "display: flex; flex-direction: column; gap: 2px;";
-			const fitLabel = document.createElement("label"); fitLabel.textContent = "Ajuste (Fit)"; fitLabel.style.cssText = "font-size: 10px; color: #aaa;";
-			const fitSelect = document.createElement("select");
-			fitSelect.style.cssText = "background: #111; color: #fff; border: 1px solid #444; padding: 4px; border-radius: 4px; font-size: 11px;";
-			[["cover", "Cover (Cubrir)"], ["contain", "Contain (Contener)"], ["fill", "Fill (Estirar)"]].forEach(([v, t]) => {
-				const opt = document.createElement("option"); opt.value = v; opt.textContent = t;
-				if ((bg.imageFit || "cover") === v) opt.selected = true;
-				fitSelect.appendChild(opt);
-			});
-			fitSelect.onchange = () => {
-				this.recordHistory();
-				bg.imageFit = fitSelect.value as any;
-				this.onSync();
-				this.updateCanvas();
-			};
-			fitRow.append(fitLabel, fitSelect);
-
-			const posRow = document.createElement("div");
-			posRow.style.cssText = "display: flex; flex-direction: column; gap: 2px;";
-			const posLabel = document.createElement("label"); posLabel.textContent = "Posición"; posLabel.style.cssText = "font-size: 10px; color: #aaa;";
-			const posSelect = document.createElement("select");
-			posSelect.style.cssText = "background: #111; color: #fff; border: 1px solid #444; padding: 4px; border-radius: 4px; font-size: 11px;";
-			[["center", "Centro"], ["top center", "Superior"], ["bottom center", "Inferior"]].forEach(([v, t]) => {
-				const opt = document.createElement("option"); opt.value = v; opt.textContent = t;
-				if ((bg.imagePosition || "center") === v) opt.selected = true;
-				posSelect.appendChild(opt);
-			});
-			posSelect.onchange = () => {
-				this.recordHistory();
-				bg.imagePosition = posSelect.value;
-				this.onSync();
-				this.updateCanvas();
-			};
-			posRow.append(posLabel, posSelect);
-
-			fitPosGrid.append(fitRow, posRow);
-			bgBox.appendChild(fitPosGrid);
-
-			// Overlay / Readability Layer
-			bgBox.appendChild(this.createColorPicker("Capa de Legibilidad (Overlay)", bg.overlayColor || "rgba(0, 0, 0, 0.7)", (c) => {
-				this.recordHistory();
-				bg.overlayColor = c;
+				elem.text = v;
+				elem.content = v;
 				this.onSync();
 				this.updateCanvas();
 			}));
-
-			bgBox.appendChild(this.createNumberSlider("Opacidad de la Capa (%)", Math.round((bg.overlayOpacity ?? 0.7) * 100), 0, 100, (v) => {
-				this.recordHistory();
-				bg.overlayOpacity = v / 100;
-				this.onSync();
-				this.updateCanvas();
-			}, 5));
 		}
 
-		// Background Animation Controls
-		const bgAnimBox = document.createElement("div");
-		bgAnimBox.style.cssText = "display: flex; flex-direction: column; gap: 6px; padding: 8px; background: #161822; border-radius: 4px; border: 1px solid #282d3d;";
-		bgAnimBox.innerHTML = "<strong style='font-size:11px; color:#ffd166;'>Animación de Fondo (Independiente)</strong>";
+		// 2. Transform (X, Y, W, H, Rotation, Anchor Grid)
+		const trBox = this.createSectionBox("Transformación");
+		const trGrid = document.createElement("div");
+		trGrid.style.cssText = "display: grid; grid-template-columns: 1fr 1fr; grid-gap: 8px;";
+		trGrid.appendChild(this.createNumericInput("X (%)", elem.x, 0, 100, (v) => { elem.x = v; this.updateCanvas(); }));
+		trGrid.appendChild(this.createNumericInput("Y (%)", elem.y, 0, 100, (v) => { elem.y = v; this.updateCanvas(); }));
+		trGrid.appendChild(this.createNumericInput("Ancho (%)", elem.width, 1, 100, (v) => { elem.width = v; this.updateCanvas(); }));
+		trGrid.appendChild(this.createNumericInput("Alto (%)", elem.height, 1, 100, (v) => { elem.height = v; this.updateCanvas(); }));
+		trBox.appendChild(trGrid);
 
-		bg.animation ||= {};
-		bgAnimBox.appendChild(this.createCheckbox("Activar animación de fondo", Boolean(bg.animation.enabled || bg.type === "animated"), (checked) => {
+		// Rotation Dial & Slider
+		trBox.appendChild(this.createSliderInput("Rotación", elem.style?.rotation || 0, 0, 360, "°", (v) => {
+			if (!elem.style) elem.style = {};
+			elem.style.rotation = v;
+			this.updateCanvas();
+		}));
+
+		// Visual 3x3 Anchor Grid
+		trBox.appendChild(this.createAnchorPointGrid(elem.style?.transformOrigin || "center center", (orig) => {
 			this.recordHistory();
-			bg.animation ||= {};
-			bg.animation.enabled = checked;
-			if (checked && (!bg.animation.type || bg.animation.type === "none")) {
-				bg.animation.type = "ken_burns";
-			}
+			if (!elem.style) elem.style = {};
+			elem.style.transformOrigin = orig;
 			this.onSync();
 			this.updateCanvas();
-			this.updatePropertiesPanel();
 		}));
+		scroll.appendChild(trBox);
 
-		if (bg.animation?.enabled || bg.type === "animated") {
-			const bAnimRow = document.createElement("div");
-			bAnimRow.style.cssText = "display: flex; flex-direction: column; gap: 2px;";
-			const bAnimLabel = document.createElement("label"); bAnimLabel.textContent = "Efecto de Fondo"; bAnimLabel.style.cssText = "font-size: 10px; color: #aaa;";
-			const bAnimSelect = document.createElement("select");
-			bAnimSelect.style.cssText = "background: #111; color: #fff; border: 1px solid #444; padding: 4px; border-radius: 4px; font-size: 11px;";
-			[
-				["ken_burns", "Ken Burns (Zoom cinematográfico)"],
-				["pulse_glow", "Pulso de Brillo y Contraste"],
-				["pan", "Barrido Panorámico Horizontal"],
-				["scanlines", "Scanlines y Retícula Táctica"],
-				["none", "Estático (Sin animación)"],
-			].forEach(([v, t]) => {
-				const opt = document.createElement("option"); opt.value = v; opt.textContent = t;
-				if ((bg.animation?.type || "ken_burns") === v) opt.selected = true;
-				bAnimSelect.appendChild(opt);
-			});
-			bAnimSelect.onchange = () => {
-				this.recordHistory();
-				bg.animation ||= {};
-				bg.animation.type = bAnimSelect.value as DeathScreenBgAnimationType;
-				this.onSync();
+		// 3. Typography (if applicable)
+		if (elem.type === "title" || elem.type === "subtitle" || elem.type === "text" || elem.type === "badge") {
+			const typoBox = this.createSectionBox("Tipografía");
+			typoBox.appendChild(this.createSliderInput("Tamaño", elem.style?.fontSize || 24, 8, 96, "px", (v) => {
+				if (!elem.style) elem.style = {};
+				elem.style.fontSize = v;
 				this.updateCanvas();
-			};
-			bAnimRow.append(bAnimLabel, bAnimSelect);
-			bgAnimBox.appendChild(bAnimRow);
-
-			bgAnimBox.appendChild(this.createNumberSlider("Duración Ciclo (s)", Math.round((bg.animation.duration ?? 8000) / 1000), 1, 20, (v) => {
-				this.recordHistory();
-				bg.animation ||= {};
-				bg.animation.duration = v * 1000;
-				this.onSync();
-			}, 1));
+			}));
+			typoBox.appendChild(this.createColorPickerInput("Color Texto", elem.style?.color || "#ffffff", (c) => {
+				if (!elem.style) elem.style = {};
+				elem.style.color = c;
+				this.updateCanvas();
+			}));
+			scroll.appendChild(typoBox);
 		}
 
-		bgBox.appendChild(bgAnimBox);
-		scroll.appendChild(bgBox);
-
-		// Transition duration
-		const trans = this.screen.transitions || {};
-		scroll.appendChild(this.createNumberSlider("Duración Transición Pantalla (s)", trans.duration ?? 0.25, 0, 2, (v) => {
-			this.recordHistory();
-			this.screen.transitions ||= {};
-			this.screen.transitions.duration = v;
-			this.onSync();
-		}, 0.05));
-
-		// Slow motion and accessibility
-		const effectsBox = document.createElement("div");
-		effectsBox.style.cssText = "display: flex; flex-direction: column; gap: 6px; padding: 8px; background: #20242f; border-radius: 4px;";
-		effectsBox.appendChild(this.createCheckbox("Fundido de entrada (Fade In)", trans.fadeIn !== false, (checked) => {
-			this.recordHistory();
-			this.screen.transitions ||= {};
-			this.screen.transitions.fadeIn = checked;
-			this.onSync();
+		// 4. Appearance, Borders & Blend Mode
+		const appBox = this.createSectionBox("Apariencia y Bordes");
+		appBox.appendChild(this.createColorPickerInput("Color Fondo", elem.style?.backgroundColor || "transparent", (c) => {
+			if (!elem.style) elem.style = {};
+			elem.style.backgroundColor = c;
+			this.updateCanvas();
 		}));
-		effectsBox.appendChild(this.createCheckbox("Cámara lenta breve (Slow Motion)", Boolean(trans.slowMotion), (checked) => {
-			this.recordHistory();
-			this.screen.transitions ||= {};
-			this.screen.transitions.slowMotion = checked;
-			this.onSync();
+		appBox.appendChild(this.createColorPickerInput("Color Borde", elem.style?.borderColor || "transparent", (c) => {
+			if (!elem.style) elem.style = {};
+			elem.style.borderColor = c;
+			if (!elem.style.borderWidth) elem.style.borderWidth = 1;
+			this.updateCanvas();
 		}));
-		effectsBox.appendChild(this.createCheckbox("Respetar movimiento reducido", Boolean(this.screen.accessibility?.reduceMotion), (checked) => {
-			this.recordHistory();
-			this.screen.accessibility ||= {};
-			this.screen.accessibility.reduceMotion = checked;
-			this.onSync();
-		}));
-		scroll.appendChild(effectsBox);
-
-		// Animation Configuration Box (Anime.js v4)
-		const animBox = document.createElement("div");
-		animBox.style.cssText = "display: flex; flex-direction: column; gap: 8px; padding: 10px; background: #20242f; border-radius: 6px; border: 1px solid #32384a;";
-		animBox.innerHTML = "<strong style='font-size:12px; color:#00d2ff;'>Animaciones de Elementos (Anime.js)</strong>";
-
-		const animConfig = (this.screen.animations ||= { enabled: true, preset: "subtle", stagger: 40, duration: 400, easing: "easeOutCubic", exitAnimation: "fade" });
-
-		animBox.appendChild(this.createCheckbox("Habilitar animaciones dinámicas", animConfig.enabled !== false, (checked) => {
-			this.recordHistory();
-			this.screen.animations ||= {};
-			this.screen.animations.enabled = checked;
-			this.onSync();
+		appBox.appendChild(this.createSliderInput("Radio Borde", elem.style?.borderRadius || 0, 0, 40, "px", (v) => {
+			if (!elem.style) elem.style = {};
+			elem.style.borderRadius = v;
+			this.updateCanvas();
 		}));
 
-		// Expanded Preset Selector
-		const presetRow = document.createElement("div");
-		presetRow.style.cssText = "display: flex; flex-direction: column; gap: 3px;";
-		const pLabel = document.createElement("label");
-		pLabel.textContent = "Preset de Animación de Elementos";
-		pLabel.style.cssText = "font-size: 11px; color: #aaa;";
-		const pSelect = document.createElement("select");
-		pSelect.style.cssText = "background: #111; color: #fff; border: 1px solid #444; padding: 5px; border-radius: 4px; font-size: 12px;";
+		// Blend Mode
+		const bmWrap = document.createElement("div");
+		bmWrap.style.cssText = "display: flex; flex-direction: column; gap: 4px;";
+		const bmLbl = document.createElement("span");
+		bmLbl.textContent = "Modo de Fusión (Blend Mode)";
+		bmLbl.style.cssText = `font-size: ${StudioTokens.typography.sizeXs}; color: ${StudioTokens.colors.textSecondary};`;
+		const bmSelect = document.createElement("select");
+		bmSelect.style.cssText = `
+			background: ${StudioTokens.colors.surface1};
+			color: ${StudioTokens.colors.textPrimary};
+			border: 1px solid ${StudioTokens.colors.borderNormal};
+			padding: 4px;
+			border-radius: ${StudioTokens.radii.sm};
+			font-size: ${StudioTokens.typography.sizeSm};
+		`;
 		[
-			["subtle", "Sutil (Deslizamiento suave y fluido)"],
-			["dramatic", "Dramático (Escala, impacto y anticipación)"],
-			["arcade", "Arcade (Rebote elástico y energía)"],
-			["cinematic", "Cinemático (Desenfoque progresivo y elegancia)"],
-			["tactical", "Táctico (HUD militar y entrada rápida)"],
-			["speed", "Velocidad (Deslizamiento lateral veloz)"],
-			["minimalist", "Minimalista (Fundido limpio)"],
-			["none", "Sin animación (Instantáneo)"],
-		].forEach(([v, t]) => {
-			const opt = document.createElement("option");
-			opt.value = v;
-			opt.textContent = t;
-			if ((animConfig.preset || "subtle") === v) opt.selected = true;
-			pSelect.appendChild(opt);
+			{ v: "normal", t: "Normal" },
+			{ v: "screen", t: "Screen (Trama)" },
+			{ v: "multiply", t: "Multiply (Multiplicar)" },
+			{ v: "overlay", t: "Overlay (Superponer)" },
+			{ v: "difference", t: "Difference (Inversión)" },
+		].forEach((bm) => {
+			const o = document.createElement("option");
+			o.value = bm.v;
+			o.textContent = bm.t;
+			if (elem.style?.blendMode === bm.v) o.selected = true;
+			bmSelect.appendChild(o);
 		});
-		pSelect.onchange = () => {
-			this.recordHistory();
-			this.screen.animations ||= {};
-			this.screen.animations.preset = pSelect.value as any;
-			this.onSync();
+		bmSelect.onchange = () => {
+			if (!elem.style) elem.style = {};
+			elem.style.blendMode = bmSelect.value;
+			this.updateCanvas();
 		};
-		presetRow.append(pLabel, pSelect);
-		animBox.appendChild(presetRow);
+		bmWrap.append(bmLbl, bmSelect);
+		appBox.appendChild(bmWrap);
 
-		// Stagger slider
-		animBox.appendChild(this.createNumberSlider("Escalonamiento / Stagger (ms)", animConfig.stagger ?? 40, 0, 200, (v) => {
-			this.recordHistory();
-			this.screen.animations ||= {};
-			this.screen.animations.stagger = v;
-			this.onSync();
-		}, 10));
+		scroll.appendChild(appBox);
 
-		// Duration slider
-		animBox.appendChild(this.createNumberSlider("Duración (ms)", animConfig.duration ?? 400, 100, 1500, (v) => {
-			this.recordHistory();
-			this.screen.animations ||= {};
-			this.screen.animations.duration = v;
-			this.onSync();
-		}, 50));
-
-		// Exit animation selector
-		const exitRow = document.createElement("div");
-		exitRow.style.cssText = "display: flex; flex-direction: column; gap: 3px;";
-		const eLabel = document.createElement("label");
-		eLabel.textContent = "Animación de Salida / Reaparición";
-		eLabel.style.cssText = "font-size: 11px; color: #aaa;";
-		const eSelect = document.createElement("select");
-		eSelect.style.cssText = "background: #111; color: #fff; border: 1px solid #444; padding: 4px; border-radius: 4px;";
-		[
-			["fade", "Fundido de salida (Fade out)"],
-			["scale_down", "Encogimiento suave (Scale down)"],
-			["slide_down", "Deslizamiento hacia abajo"],
-			["none", "Cierre instantáneo"],
-		].forEach(([v, t]) => {
-			const opt = document.createElement("option");
-			opt.value = v;
-			opt.textContent = t;
-			if ((animConfig.exitAnimation || "fade") === v) opt.selected = true;
-			eSelect.appendChild(opt);
-		});
-		eSelect.onchange = () => {
-			this.recordHistory();
-			this.screen.animations ||= {};
-			this.screen.animations.exitAnimation = eSelect.value as any;
-			this.onSync();
+		// 5. Animation & Keyframe
+		const animBox = this.createSectionBox("Animación Anime.js");
+		animBox.appendChild(this.createNumericInput("Duración (ms)", elem.animation?.duration || 400, 50, 4000, (v) => {
+			if (!elem.animation) elem.animation = {};
+			elem.animation.duration = v;
+			this.updateTimelineDock();
+		}));
+		const addKfBtn = document.createElement("button");
+		addKfBtn.type = "button";
+		addKfBtn.style.cssText = `
+			background: ${StudioTokens.colors.surface3};
+			color: ${StudioTokens.colors.accent};
+			border: 1px solid ${StudioTokens.colors.accentBorder};
+			padding: 5px;
+			border-radius: ${StudioTokens.radii.sm};
+			font-size: ${StudioTokens.typography.sizeSm};
+			cursor: pointer;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			gap: 5px;
+		`;
+		addKfBtn.innerHTML = `${renderStudioIcon("keyframe", 13, StudioTokens.colors.accent)} <span>Añadir Keyframe (${this.timelineCurrentTime}ms)</span>`;
+		addKfBtn.onclick = () => {
+			this.addKeyframe(elem.id, "opacity", elem.style?.opacity ?? 1);
 		};
-		exitRow.append(eLabel, eSelect);
-		animBox.appendChild(exitRow);
-
-		// Test Animations Button
-		const testAnimBtn = document.createElement("button");
-		testAnimBtn.type = "button";
-		testAnimBtn.textContent = "▶ Probar Animaciones en Lienzo (Fondo + Elementos)";
-		testAnimBtn.style.cssText = "margin-top: 4px; background: #00d2ff; color: #000; border: none; padding: 7px 12px; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 11px;";
-		testAnimBtn.onclick = () => this.previewAnimationOnCanvas();
-		animBox.appendChild(testAnimBtn);
-
+		animBox.appendChild(addKfBtn);
 		scroll.appendChild(animBox);
 
 		this.propertiesPanelEl!.appendChild(scroll);
 	}
 
-	private renderElementProperties(elem: DeathScreenElement) {
-		const header = document.createElement("div");
-		header.style.cssText = "padding: 8px 10px; background: #222530; border-bottom: 1px solid #2c303d; display: flex; justify-content: space-between; align-items: center;";
-
-		const titleGroup = document.createElement("div");
-		titleGroup.style.cssText = "display: flex; align-items: center; gap: 6px;";
-		const title = document.createElement("strong");
-		title.textContent = elem.name;
-		title.style.color = "#00d2ff";
-		const badge = document.createElement("span");
-		badge.textContent = elem.type;
-		badge.style.cssText = "font-size: 10px; padding: 1px 4px; background: rgba(0, 210, 255, 0.15); border-radius: 3px; color: #00d2ff;";
-		titleGroup.append(title, badge);
-
-		const deselectBtn = document.createElement("button");
-		deselectBtn.type = "button";
-		deselectBtn.textContent = "✕";
-		deselectBtn.title = "Deseleccionar elemento";
-		deselectBtn.style.cssText = "background: none; border: none; color: #888; cursor: pointer; font-size: 12px;";
-		deselectBtn.onclick = () => {
-			this.selectedElementId = null;
-			this.updateAll();
-		};
-
-		header.append(titleGroup, deselectBtn);
-		this.propertiesPanelEl!.appendChild(header);
-
-		const scroll = document.createElement("div");
-		scroll.style.cssText = "flex: 1; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 12px;";
-
-		// Name input
-		scroll.appendChild(this.createTextInput("Nombre del Elemento", elem.name, "", (v) => {
-			this.recordHistory();
-			elem.name = v.trim() || elem.type;
-			this.onSync();
-			this.updateLayersList();
-		}));
-
-		// Content Template (with dynamic token chips)
-		if (elem.type !== "panel" && elem.type !== "divider") {
-			const contentBox = document.createElement("div");
-			contentBox.style.cssText = "display: flex; flex-direction: column; gap: 4px;";
-			const cLabel = document.createElement("label");
-			cLabel.textContent = "Contenido / Plantilla";
-			cLabel.style.fontWeight = "bold";
-
-			const cInput = document.createElement("input");
-			cInput.type = "text";
-			cInput.value = elem.content || "";
-			cInput.style.cssText = "background: #111; color: #fff; border: 1px solid #444; padding: 6px; border-radius: 4px;";
-			cInput.onchange = () => {
-				this.recordHistory();
-				elem.content = cInput.value;
-				this.onSync();
-				this.updateCanvas();
-			};
-
-			// Dynamic Token Chips
-			const chips = document.createElement("div");
-			chips.style.cssText = "display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px;";
-			[
-				"{killer_name}",
-				"{killer_weapon}",
-				"{cause}",
-				"{remaining_lives}",
-				"{countdown}",
-				"{details}",
-			].forEach((token) => {
-				const chip = document.createElement("button");
-				chip.type = "button";
-				chip.textContent = token;
-				chip.style.cssText = "background: #252a38; border: 1px solid #3d465c; color: #00d2ff; font-size: 10px; border-radius: 3px; padding: 1px 5px; cursor: pointer;";
-				chip.onclick = () => {
-					cInput.value += ` ${token}`;
-					elem.content = cInput.value;
-					this.recordHistory();
-					this.onSync();
-					this.updateCanvas();
-				};
-				chips.appendChild(chip);
-			});
-
-			contentBox.append(cLabel, cInput, chips);
-			scroll.appendChild(contentBox);
-
-			// Fallback content
-			scroll.appendChild(this.createTextInput("Texto Alternativo (Fallback)", elem.fallbackContent || "", "Si faltan datos...", (fb) => {
-				this.recordHistory();
-				elem.fallbackContent = fb;
-				this.onSync();
-				this.updateCanvas();
-			}));
-		}
-
-		// Action Button Specifics
-		if (elem.type === "action_button") {
-			const actionBox = document.createElement("div");
-			actionBox.style.cssText = "display: flex; flex-direction: column; gap: 4px;";
-			const aLabel = document.createElement("label");
-			aLabel.textContent = "Acción de Juego";
-			aLabel.style.fontWeight = "bold";
-
-			const aSelect = document.createElement("select");
-			aSelect.style.cssText = "background: #111; color: #fff; border: 1px solid #444; padding: 6px; border-radius: 4px;";
-			[
-				{ v: "respawn", t: "Reaparecer (Reanudar Partida)" },
-				{ v: "spectate", t: "Observar (Modo Espectador)" },
-				{ v: "restart", t: "Reiniciar Partida" },
-				{ v: "lobby", t: "Volver al Menú Principal / Lobby" },
-			].forEach((act) => {
-				const opt = document.createElement("option");
-				opt.value = act.v;
-				opt.textContent = act.t;
-				if (elem.action === act.v) opt.selected = true;
-				aSelect.appendChild(opt);
-			});
-			aSelect.onchange = () => {
-				this.recordHistory();
-				elem.action = aSelect.value as DeathActionButtonType;
-				this.onSync();
-				this.updateCanvas();
-			};
-
-			const pCheck = this.createCheckbox("Botón Primario (Enter / Espacio)", Boolean(elem.isPrimary), (chk) => {
-				this.recordHistory();
-				elem.isPrimary = chk;
-				this.onSync();
-			});
-
-			actionBox.append(aLabel, aSelect, pCheck);
-			scroll.appendChild(actionBox);
-		}
-
-		// Image Specifics
-		if (elem.type === "image") {
-			scroll.appendChild(this.createTextInput("URL de la Imagen", elem.imageUrl || "", "https://... o assets/...", (url) => {
-				this.recordHistory();
-				elem.imageUrl = sanitizeImageUrl(url);
-				this.onSync();
-				this.updateCanvas();
-			}));
-		}
-
-		// Coordinates and Dimensions Grid
-		const geoBox = document.createElement("div");
-		geoBox.style.cssText = "display: flex; flex-direction: column; gap: 6px; background: #20242f; padding: 8px; border-radius: 4px;";
-		geoBox.innerHTML = "<strong style='font-size:12px; color:#aaa;'>Posición y Tamaño (%)</strong>";
-
-		const row1 = document.createElement("div");
-		row1.style.cssText = "display: grid; grid-template-columns: 1fr 1fr; gap: 6px;";
-		row1.appendChild(this.createNumberInput("X (%)", elem.x, 0, 100, (v) => { elem.x = v; this.onSync(); this.updateCanvas(); }));
-		row1.appendChild(this.createNumberInput("Y (%)", elem.y, 0, 100, (v) => { elem.y = v; this.onSync(); this.updateCanvas(); }));
-
-		const row2 = document.createElement("div");
-		row2.style.cssText = "display: grid; grid-template-columns: 1fr 1fr; gap: 6px;";
-		row2.appendChild(this.createNumberInput("Ancho (%)", elem.width, 2, 100, (v) => { elem.width = v; this.onSync(); this.updateCanvas(); }));
-		row2.appendChild(this.createNumberInput("Alto (%)", elem.height, 1, 100, (v) => { elem.height = v; this.onSync(); this.updateCanvas(); }));
-
-		// Anchor selector
-		const anchorSelect = document.createElement("select");
-		anchorSelect.style.cssText = "background: #111; color: #fff; border: 1px solid #444; padding: 4px; border-radius: 4px; font-size: 11px; margin-top: 4px;";
-		[
-			{ v: "top-left", t: "Anclaje: Superior Izquierda" },
-			{ v: "top-center", t: "Anclaje: Superior Centro" },
-			{ v: "top-right", t: "Anclaje: Superior Derecha" },
-			{ v: "center-left", t: "Anclaje: Centro Izquierda" },
-			{ v: "center", t: "Anclaje: Centro Exacto" },
-			{ v: "center-right", t: "Anclaje: Centro Derecha" },
-			{ v: "bottom-left", t: "Anclaje: Inferior Izquierda" },
-			{ v: "bottom-center", t: "Anclaje: Inferior Centro" },
-			{ v: "bottom-right", t: "Anclaje: Inferior Derecha" },
-		].forEach((anc) => {
-			const opt = document.createElement("option");
-			opt.value = anc.v;
-			opt.textContent = anc.t;
-			if ((elem.anchor || "center") === anc.v) opt.selected = true;
-			anchorSelect.appendChild(opt);
-		});
-		anchorSelect.onchange = () => {
-			this.recordHistory();
-			elem.anchor = anchorSelect.value as DeathScreenAnchor;
-			this.onSync();
-			this.updateCanvas();
-		};
-
-		geoBox.append(row1, row2, anchorSelect);
-		scroll.appendChild(geoBox);
-
-		// Typography
-		elem.style ||= {};
-		if (elem.type !== "panel" && elem.type !== "divider" && elem.type !== "image") {
-			const typoBox = document.createElement("div");
-			typoBox.style.cssText = "display: flex; flex-direction: column; gap: 6px; background: #20242f; padding: 8px; border-radius: 4px;";
-			typoBox.innerHTML = "<strong style='font-size:12px; color:#aaa;'>Tipografía</strong>";
-
-			typoBox.appendChild(this.createNumberSlider("Tamaño de Fuente (px)", elem.style.fontSize ?? 14, 9, 64, (v) => {
-				this.recordHistory();
-				elem.style!.fontSize = v;
-				this.onSync();
-				this.updateCanvas();
-			}));
-
-			typoBox.appendChild(this.createColorPicker("Color de Texto", elem.style.color || "#ffffff", (c) => {
-				this.recordHistory();
-				elem.style!.color = c;
-				this.onSync();
-				this.updateCanvas();
-			}));
-
-			// Align & Weight row
-			const alignRow = document.createElement("div");
-			alignRow.style.cssText = "display: grid; grid-template-columns: 1fr 1fr; gap: 6px;";
-			const alignSelect = document.createElement("select");
-			alignSelect.style.cssText = "background: #111; color: #fff; border: 1px solid #444; padding: 4px; border-radius: 4px;";
-			[["left", "Izquierda"], ["center", "Centro"], ["right", "Derecha"]].forEach(([v, t]) => {
-				const opt = document.createElement("option"); opt.value = v; opt.textContent = t;
-				if ((elem.style?.textAlign || "center") === v) opt.selected = true;
-				alignSelect.appendChild(opt);
-			});
-			alignSelect.onchange = () => {
-				this.recordHistory();
-				elem.style!.textAlign = alignSelect.value as any;
-				this.onSync();
-				this.updateCanvas();
-			};
-
-			const weightSelect = document.createElement("select");
-			weightSelect.style.cssText = "background: #111; color: #fff; border: 1px solid #444; padding: 4px; border-radius: 4px;";
-			[["normal", "Normal"], ["600", "Semibold"], ["bold", "Negrita"], ["800", "Extra Bold"]].forEach(([v, t]) => {
-				const opt = document.createElement("option"); opt.value = v; opt.textContent = t;
-				if ((elem.style?.fontWeight || "normal") === v) opt.selected = true;
-				weightSelect.appendChild(opt);
-			});
-			weightSelect.onchange = () => {
-				this.recordHistory();
-				elem.style!.fontWeight = weightSelect.value as any;
-				this.onSync();
-				this.updateCanvas();
-			};
-
-			alignRow.append(alignSelect, weightSelect);
-			typoBox.appendChild(alignRow);
-			scroll.appendChild(typoBox);
-		}
-
-		// Box Appearance (Background, Border, Radius, Blur)
-		const boxStyle = document.createElement("div");
-		boxStyle.style.cssText = "display: flex; flex-direction: column; gap: 6px; background: #20242f; padding: 8px; border-radius: 4px;";
-		boxStyle.innerHTML = "<strong style='font-size:12px; color:#aaa;'>Estilo y Contenedor</strong>";
-
-		boxStyle.appendChild(this.createColorPicker("Color de Fondo", elem.style.backgroundColor || "transparent", (c) => {
-			this.recordHistory();
-			elem.style!.backgroundColor = c;
-			this.onSync();
-			this.updateCanvas();
-		}));
-
-		boxStyle.appendChild(this.createNumberSlider("Radio de Borde (px)", elem.style.borderRadius ?? 0, 0, 40, (v) => {
-			this.recordHistory();
-			elem.style!.borderRadius = v;
-			this.onSync();
-			this.updateCanvas();
-		}));
-
-		boxStyle.appendChild(this.createColorPicker("Color de Borde", elem.style.borderColor || "transparent", (c) => {
-			this.recordHistory();
-			elem.style!.borderColor = c;
-			if (!elem.style!.borderWidth) elem.style!.borderWidth = 1;
-			elem.style!.borderStyle = "solid";
-			this.onSync();
-			this.updateCanvas();
-		}));
-
-		scroll.appendChild(boxStyle);
-
-		// Visibility Conditions
-		const condBox = document.createElement("div");
-		condBox.style.cssText = "display: flex; flex-direction: column; gap: 6px; background: #20242f; padding: 8px; border-radius: 4px;";
-		condBox.innerHTML = "<strong style='font-size:12px; color:#aaa;'>Condiciones de Visibilidad</strong>";
-
-		elem.conditions ||= {};
-		const causes = elem.conditions.causes || [];
-		const states = elem.conditions.states || [];
-
-		condBox.appendChild(document.createTextNode("Estados en que se muestra:"));
-		[
-			{ v: "respawn", t: "Reaparición disponible" },
-			{ v: "last_life", t: "Última vida" },
-			{ v: "game_over", t: "Fin de partida" },
-			{ v: "spectator", t: "Observador" },
-		].forEach((st) => {
-			const isChecked = states.length === 0 || states.includes(st.v as any);
-			condBox.appendChild(this.createCheckbox(st.t, isChecked, (chk) => {
-				this.recordHistory();
-				const sSet = new Set(elem.conditions!.states || ["respawn", "last_life", "game_over", "spectator"]);
-				if (chk) sSet.add(st.v as any);
-				else sSet.delete(st.v as any);
-				elem.conditions!.states = Array.from(sSet) as any;
-				this.onSync();
-				this.updateCanvas();
-			}));
-		});
-
-		condBox.appendChild(this.createCheckbox("Ocultar si faltan datos dinámicos", Boolean(elem.conditions.hideWhenMissingData), (chk) => {
-			this.recordHistory();
-			elem.conditions!.hideWhenMissingData = chk;
-			this.onSync();
-			this.updateCanvas();
-		}));
-
-		scroll.appendChild(condBox);
-
-		// Per-element animation override box
-		const elemAnimBox = document.createElement("div");
-		elemAnimBox.style.cssText = "display: flex; flex-direction: column; gap: 6px; background: #20242f; padding: 8px; border-radius: 4px; border: 1px solid #32384a;";
-		elemAnimBox.innerHTML = "<strong style='font-size:12px; color:#00d2ff;'>Animación del Elemento (Override)</strong>";
-
-		elem.animation ||= {};
-		const typeRow = document.createElement("div");
-		typeRow.style.cssText = "display: flex; flex-direction: column; gap: 3px;";
-		const tLabel = document.createElement("label");
-		tLabel.textContent = "Efecto de Entrada";
-		tLabel.style.cssText = "font-size: 11px; color: #aaa;";
-		const tSelect = document.createElement("select");
-		tSelect.style.cssText = "background: #111; color: #fff; border: 1px solid #444; padding: 4px; border-radius: 4px;";
-		[
-			["", "(Heredar del preset global)"],
-			["fade", "Fundido simple (Fade in)"],
-			["slide_up", "Deslizar desde abajo (Slide up)"],
-			["slide_down", "Deslizar desde arriba (Slide down)"],
-			["slide_left", "Deslizar desde la derecha"],
-			["slide_right", "Deslizar desde la izquierda"],
-			["scale_up", "Aparición con escala (Scale up)"],
-			["blur_in", "Enfoque progresivo (Blur in)"],
-			["none", "Sin animación (Instantáneo)"],
-		].forEach(([v, t]) => {
-			const opt = document.createElement("option");
-			opt.value = v;
-			opt.textContent = t;
-			if ((elem.animation?.type || "") === v) opt.selected = true;
-			tSelect.appendChild(opt);
-		});
-		tSelect.onchange = () => {
-			this.recordHistory();
-			elem.animation ||= {};
-			elem.animation.type = (tSelect.value || undefined) as any;
-			this.onSync();
-		};
-		typeRow.append(tLabel, tSelect);
-		elemAnimBox.appendChild(typeRow);
-
-		// Custom duration
-		elemAnimBox.appendChild(this.createNumberInput("Duración Personalizada (ms, 0 = auto)", elem.animation.duration ?? 0, 0, 2000, (v) => {
-			this.recordHistory();
-			elem.animation ||= {};
-			elem.animation.duration = v > 0 ? v : undefined;
-			this.onSync();
-		}));
-
-		// Custom delay
-		elemAnimBox.appendChild(this.createNumberInput("Retardo Personalizado (ms)", elem.animation.delay ?? 0, 0, 2000, (v) => {
-			this.recordHistory();
-			elem.animation ||= {};
-			elem.animation.delay = v > 0 ? v : undefined;
-			this.onSync();
-		}));
-
-		// Custom easing selector
-		const easeRow = document.createElement("div");
-		easeRow.style.cssText = "display: flex; flex-direction: column; gap: 3px;";
-		const easeLabel = document.createElement("label");
-		easeLabel.textContent = "Curva de Aceleración / Easing";
-		easeLabel.style.cssText = "font-size: 11px; color: #aaa;";
-		const easeSelect = document.createElement("select");
-		easeSelect.style.cssText = "background: #111; color: #fff; border: 1px solid #444; padding: 4px; border-radius: 4px;";
-		[
-			["", "(Heredar del preset global)"],
-			["easeOutCubic", "Suave (easeOutCubic)"],
-			["easeOutQuad", "Rápido (easeOutQuad)"],
-			["easeOutBack", "Rebote con anticipación (easeOutBack)"],
-			["easeOutElastic", "Elástico de impacto (easeOutElastic)"],
-			["easeInOutQuad", "Entrada y salida simétrica (easeInOutQuad)"],
-			["linear", "Lineal constante (linear)"],
-		].forEach(([v, t]) => {
-			const opt = document.createElement("option");
-			opt.value = v;
-			opt.textContent = t;
-			if ((elem.animation?.easing || "") === v) opt.selected = true;
-			easeSelect.appendChild(opt);
-		});
-		easeSelect.onchange = () => {
-			this.recordHistory();
-			elem.animation ||= {};
-			elem.animation.easing = (easeSelect.value || undefined) as any;
-			this.onSync();
-		};
-		easeRow.append(easeLabel, easeSelect);
-		elemAnimBox.appendChild(easeRow);
-
-		scroll.appendChild(elemAnimBox);
-
-		this.propertiesPanelEl!.appendChild(scroll);
+	private createSectionBox(title: string): HTMLElement {
+		const box = document.createElement("div");
+		box.style.cssText = `
+			background: ${StudioTokens.colors.surface2};
+			border: 1px solid ${StudioTokens.colors.borderSubtle};
+			border-radius: ${StudioTokens.radii.md};
+			padding: 10px;
+			display: flex;
+			flex-direction: column;
+			gap: 8px;
+		`;
+		const h = document.createElement("span");
+		h.textContent = title;
+		h.style.cssText = `font-size: ${StudioTokens.typography.sizeXs}; font-weight: 700; color: ${StudioTokens.colors.accent}; letter-spacing: 0.5px;`;
+		box.appendChild(h);
+		return box;
 	}
 
-	private handleRootKeyDown(e: KeyboardEvent) {
-		// Undo / Redo shortcuts
-		if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
-			e.preventDefault();
-			if (e.shiftKey) this.redo();
-			else this.undo();
-			return;
-		}
-		if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "y") {
-			e.preventDefault();
-			this.redo();
-			return;
-		}
-
-		if (!this.selectedElementId) return;
-		const elem = this.screen.elements?.find((e) => e.id === this.selectedElementId);
-		if (!elem) return;
-
-		// Ignore if typing in text inputs
-		if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || (e.target as any).isContentEditable) {
-			return;
-		}
-
-		// Delete
-		if (e.key === "Delete" || e.key === "Backspace") {
-			e.preventDefault();
-			this.removeElement(elem.id);
-			return;
-		}
-
-		// Deselect
-		if (e.key === "Escape") {
-			e.preventDefault();
-			this.selectedElementId = null;
-			this.updateAll();
-			return;
-		}
-
-		// Nudge arrow keys
-		const step = e.shiftKey ? 2.5 : 0.5;
-		if (e.key === "ArrowLeft") {
-			e.preventDefault();
-			elem.x = Math.max(0, elem.x - step);
-			this.onSync();
-			this.updateCanvas();
-			this.updatePropertiesPanel();
-		} else if (e.key === "ArrowRight") {
-			e.preventDefault();
-			elem.x = Math.min(100, elem.x + step);
-			this.onSync();
-			this.updateCanvas();
-			this.updatePropertiesPanel();
-		} else if (e.key === "ArrowUp") {
-			e.preventDefault();
-			elem.y = Math.max(0, elem.y - step);
-			this.onSync();
-			this.updateCanvas();
-			this.updatePropertiesPanel();
-		} else if (e.key === "ArrowDown") {
-			e.preventDefault();
-			elem.y = Math.min(100, elem.y + step);
-			this.onSync();
-			this.updateCanvas();
-			this.updatePropertiesPanel();
-		}
-	}
-
-	private updateAll() {
-		this.updateLayersList();
-		this.updateCanvas();
-		this.updatePropertiesPanel();
-	}
-
-	// UI Component Helpers
-	private createTextInput(labelStr: string, value: string, placeholder: string, onChange: (v: string) => void): HTMLElement {
+	private createTextInput(label: string, value: string, placeholder: string, onChange: (v: string) => void): HTMLElement {
 		const wrap = document.createElement("div");
 		wrap.style.cssText = "display: flex; flex-direction: column; gap: 4px;";
-		const l = document.createElement("label");
-		l.textContent = labelStr;
-		l.style.fontWeight = "bold";
+		const lbl = document.createElement("span");
+		lbl.textContent = label;
+		lbl.style.cssText = `font-size: ${StudioTokens.typography.sizeXs}; color: ${StudioTokens.colors.textSecondary};`;
 		const input = document.createElement("input");
 		input.type = "text";
 		input.value = value;
 		input.placeholder = placeholder;
-		input.style.cssText = "background: #111; color: #fff; border: 1px solid #444; padding: 5px 8px; border-radius: 4px;";
+		input.style.cssText = `
+			background: ${StudioTokens.colors.surface1};
+			color: ${StudioTokens.colors.textPrimary};
+			border: 1px solid ${StudioTokens.colors.borderNormal};
+			padding: 5px 8px;
+			border-radius: ${StudioTokens.radii.sm};
+			font-size: ${StudioTokens.typography.sizeSm};
+			outline: none;
+		`;
 		input.onchange = () => onChange(input.value);
-		wrap.append(l, input);
+		wrap.append(lbl, input);
 		return wrap;
 	}
 
-	private createColorPicker(labelStr: string, value: string, onChange: (c: string) => void): HTMLElement {
+	private createNumericInput(label: string, value: number, min: number, max: number, onChange: (v: number) => void): HTMLElement {
 		const wrap = document.createElement("div");
 		wrap.style.cssText = "display: flex; flex-direction: column; gap: 4px;";
-		const l = document.createElement("label");
-		l.textContent = labelStr;
-		l.style.fontWeight = "bold";
-
-		const row = document.createElement("div");
-		row.style.cssText = "display: flex; gap: 6px; align-items: center;";
-
-		const colorInput = document.createElement("input");
-		colorInput.type = "color";
-		colorInput.value = value.startsWith("#") ? value.slice(0, 7) : "#ffffff";
-		colorInput.style.cssText = "width: 32px; height: 28px; background: none; border: 1px solid #555; border-radius: 4px; cursor: pointer;";
-
-		const textInput = document.createElement("input");
-		textInput.type = "text";
-		textInput.value = value;
-		textInput.style.cssText = "background: #111; color: #fff; border: 1px solid #444; padding: 4px 6px; border-radius: 4px; flex: 1;";
-
-		colorInput.onchange = () => {
-			textInput.value = colorInput.value;
-			onChange(colorInput.value);
-		};
-		textInput.onchange = () => {
-			onChange(textInput.value);
-		};
-
-		row.append(colorInput, textInput);
-		wrap.append(l, row);
+		const lbl = document.createElement("span");
+		lbl.textContent = label;
+		lbl.style.cssText = `font-size: ${StudioTokens.typography.sizeXs}; color: ${StudioTokens.colors.textSecondary};`;
+		const input = document.createElement("input");
+		input.type = "number";
+		input.value = String(value);
+		input.min = String(min);
+		input.max = String(max);
+		input.style.cssText = `
+			background: ${StudioTokens.colors.surface1};
+			color: ${StudioTokens.colors.textPrimary};
+			border: 1px solid ${StudioTokens.colors.borderNormal};
+			padding: 4px 6px;
+			border-radius: ${StudioTokens.radii.sm};
+			font-size: ${StudioTokens.typography.sizeSm};
+			outline: none;
+		`;
+		input.onchange = () => onChange(parseFloat(input.value) || 0);
+		wrap.append(lbl, input);
 		return wrap;
 	}
 
-	private createNumberSlider(labelStr: string, value: number, min: number, max: number, onChange: (v: number) => void, step = 1): HTMLElement {
+	private createSliderInput(label: string, value: number, min: number, max: number, unit: string, onChange: (v: number) => void): HTMLElement {
 		const wrap = document.createElement("div");
 		wrap.style.cssText = "display: flex; flex-direction: column; gap: 4px;";
-		const l = document.createElement("label");
-		l.textContent = `${labelStr}: ${value}`;
-		l.style.fontWeight = "bold";
+		const top = document.createElement("div");
+		top.style.cssText = "display: flex; justify-content: space-between; align-items: center;";
+		const lbl = document.createElement("span");
+		lbl.textContent = label;
+		lbl.style.cssText = `font-size: ${StudioTokens.typography.sizeXs}; color: ${StudioTokens.colors.textSecondary};`;
+		const valSpan = document.createElement("span");
+		valSpan.textContent = `${value}${unit}`;
+		valSpan.style.cssText = `font-size: ${StudioTokens.typography.sizeXs}; color: ${StudioTokens.colors.textMuted}; font-family: ${StudioTokens.typography.fontMono};`;
+		top.append(lbl, valSpan);
 
 		const slider = document.createElement("input");
 		slider.type = "range";
 		slider.min = String(min);
 		slider.max = String(max);
-		slider.step = String(step);
 		slider.value = String(value);
-		slider.style.cssText = "width: 100%; cursor: pointer;";
-
+		slider.style.cssText = "width: 100%;";
 		slider.oninput = () => {
-			const val = parseFloat(slider.value);
-			l.textContent = `${labelStr}: ${val}`;
-			onChange(val);
+			const v = parseFloat(slider.value);
+			valSpan.textContent = `${v}${unit}`;
+			onChange(v);
 		};
-
-		wrap.append(l, slider);
+		wrap.append(top, slider);
 		return wrap;
 	}
 
-	private createNumberInput(labelStr: string, value: number, min: number, max: number, onChange: (v: number) => void): HTMLElement {
+	private createColorPickerInput(label: string, value: string, onChange: (c: string) => void): HTMLElement {
 		const wrap = document.createElement("div");
-		wrap.style.cssText = "display: flex; flex-direction: column; gap: 2px;";
-		const l = document.createElement("label");
-		l.textContent = labelStr;
-		l.style.fontSize = "11px";
-		l.style.color = "#aaa";
-		const input = document.createElement("input");
-		input.type = "number";
-		input.min = String(min);
-		input.max = String(max);
-		input.value = String(value);
-		input.style.cssText = "background: #111; color: #fff; border: 1px solid #444; padding: 4px; border-radius: 4px; width: 100%; box-sizing: border-box;";
-		input.onchange = () => {
-			const val = parseFloat(input.value);
-			if (!isNaN(val)) onChange(Math.max(min, Math.min(max, val)));
+		wrap.style.cssText = "display: flex; flex-direction: column; gap: 4px;";
+		const lbl = document.createElement("span");
+		lbl.textContent = label;
+		lbl.style.cssText = `font-size: ${StudioTokens.typography.sizeXs}; color: ${StudioTokens.colors.textSecondary};`;
+
+		const row = document.createElement("div");
+		row.style.cssText = "display: flex; align-items: center; gap: 6px;";
+
+		const picker = document.createElement("input");
+		picker.type = "color";
+		picker.value = value.startsWith("#") && value.length === 7 ? value : "#00d2ff";
+		picker.style.cssText = "width: 28px; height: 26px; border: none; padding: 0; background: transparent; cursor: pointer; border-radius: 4px;";
+
+		const textInput = document.createElement("input");
+		textInput.type = "text";
+		textInput.value = value;
+		textInput.style.cssText = `
+			flex: 1;
+			background: ${StudioTokens.colors.surface1};
+			color: ${StudioTokens.colors.textPrimary};
+			border: 1px solid ${StudioTokens.colors.borderNormal};
+			padding: 4px 6px;
+			border-radius: ${StudioTokens.radii.sm};
+			font-size: 11px;
+			font-family: ${StudioTokens.typography.fontMono};
+		`;
+
+		picker.oninput = () => {
+			textInput.value = picker.value;
+			onChange(picker.value);
 		};
-		wrap.append(l, input);
+		textInput.onchange = () => {
+			onChange(textInput.value);
+		};
+
+		row.append(picker, textInput);
+		wrap.append(lbl, row);
 		return wrap;
 	}
 
-	private createCheckbox(labelStr: string, checked: boolean, onChange: (c: boolean) => void): HTMLElement {
-		const label = document.createElement("label");
-		label.style.cssText = "display: flex; gap: 6px; align-items: center; color: #ddd; font-size: 12px; cursor: pointer;";
-		const chk = document.createElement("input");
-		chk.type = "checkbox";
-		chk.checked = checked;
-		chk.onchange = () => onChange(chk.checked);
-		label.append(chk, document.createTextNode(labelStr));
-		return label;
+	private createAnchorPointGrid(currentOrigin = "center center", onChange: (origin: string) => void): HTMLElement {
+		const wrap = document.createElement("div");
+		wrap.style.cssText = "display: flex; flex-direction: column; gap: 4px;";
+		const lbl = document.createElement("span");
+		lbl.textContent = "Punto de Anclaje / Pivote";
+		lbl.style.cssText = `font-size: ${StudioTokens.typography.sizeXs}; color: ${StudioTokens.colors.textSecondary};`;
+
+		const grid = document.createElement("div");
+		grid.style.cssText = "display: grid; grid-template-columns: repeat(3, 26px); grid-gap: 3px;";
+
+		const points = [
+			{ id: "top left", icon: "arrow-up", rot: "-45deg" },
+			{ id: "top center", icon: "arrow-up", rot: "0deg" },
+			{ id: "top right", icon: "arrow-up", rot: "45deg" },
+			{ id: "center left", icon: "arrow-left", rot: "0deg" },
+			{ id: "center center", icon: "crosshair", rot: "0deg" },
+			{ id: "center right", icon: "arrow-right", rot: "0deg" },
+			{ id: "bottom left", icon: "arrow-down", rot: "45deg" },
+			{ id: "bottom center", icon: "arrow-down", rot: "0deg" },
+			{ id: "bottom right", icon: "arrow-down", rot: "-45deg" },
+		];
+
+		points.forEach((pt) => {
+			const b = document.createElement("button");
+			b.type = "button";
+			const isA = currentOrigin === pt.id;
+			b.style.cssText = `
+				width: 26px;
+				height: 26px;
+				background: ${isA ? StudioTokens.colors.accent : StudioTokens.colors.surface1};
+				color: ${isA ? "#090b0e" : StudioTokens.colors.textSecondary};
+				border: 1px solid ${isA ? StudioTokens.colors.accent : StudioTokens.colors.borderSubtle};
+				border-radius: ${StudioTokens.radii.xs};
+				cursor: pointer;
+				padding: 0;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+			`;
+			b.innerHTML = renderStudioIcon(pt.icon as any, 12, isA ? "#090b0e" : "currentColor", `transform: rotate(${pt.rot});`);
+			b.onclick = () => onChange(pt.id);
+			grid.appendChild(b);
+		});
+
+		wrap.append(lbl, grid);
+		return wrap;
+	}
+
+	// --- 8. BOTTOM TIMELINE DOCK PREMIUM ---
+	private createTimelineDock(): HTMLElement {
+		this.timelineDockEl = document.createElement("div");
+		this.timelineDockEl.className = "death-screen-editor-timeline-dock";
+		this.timelineDockEl.style.cssText = `
+			height: ${this.timelineHeight}px;
+			background: ${StudioTokens.colors.surface1};
+			border-top: 1px solid ${StudioTokens.colors.borderSubtle};
+			display: ${this.isTimelineCollapsed ? "none" : "flex"};
+			flex-direction: column;
+			overflow: hidden;
+			z-index: 10;
+		`;
+		this.updateTimelineDock();
+		return this.timelineDockEl;
+	}
+
+	private updateTimelineDock() {
+		if (!this.timelineDockEl) return;
+		this.timelineDockEl.innerHTML = "";
+
+		// Timeline Transport Header
+		const header = document.createElement("div");
+		header.style.cssText = `
+			height: 38px;
+			background: ${StudioTokens.colors.surface2};
+			border-bottom: 1px solid ${StudioTokens.colors.borderSubtle};
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			padding: 0 12px;
+		`;
+
+		// Transport Controls (Play, Stop, Rewind, Auto-Key)
+		const left = document.createElement("div");
+		left.style.cssText = "display: flex; align-items: center; gap: 8px;";
+
+		const playBtn = document.createElement("button");
+		playBtn.type = "button";
+		playBtn.style.cssText = `
+			background: ${StudioTokens.colors.accent};
+			color: #090b0e;
+			border: none;
+			padding: 4px 10px;
+			border-radius: ${StudioTokens.radii.sm};
+			font-size: ${StudioTokens.typography.sizeSm};
+			font-weight: 600;
+			cursor: pointer;
+			display: flex;
+			align-items: center;
+			gap: 5px;
+		`;
+		playBtn.innerHTML = `${renderStudioIcon(this.isPlayingSequence ? "pause" : "play", 13, "#090b0e")} <span>${this.isPlayingSequence ? "Pausa" : "Play"}</span>`;
+		playBtn.onclick = () => {
+			if (this.isPlayingSequence) this.stopTimelineSequence();
+			else this.playTimelineSequence();
+		};
+
+		const stopBtn = document.createElement("button");
+		stopBtn.type = "button";
+		stopBtn.style.cssText = `background: ${StudioTokens.colors.surface3}; border: 1px solid ${StudioTokens.colors.borderNormal}; color: ${StudioTokens.colors.textSecondary}; padding: 4px 8px; border-radius: ${StudioTokens.radii.sm}; cursor: pointer; display: flex; align-items: center;`;
+		stopBtn.innerHTML = renderStudioIcon("stop", 13);
+		stopBtn.onclick = () => this.stopTimelineSequence();
+
+		const timeDisplay = document.createElement("span");
+		timeDisplay.className = "timeline-time-display";
+		timeDisplay.style.cssText = `font-size: ${StudioTokens.typography.sizeSm}; font-family: ${StudioTokens.typography.fontMono}; color: ${StudioTokens.colors.accent};`;
+		timeDisplay.textContent = `${(this.timelineCurrentTime / 1000).toFixed(2)}s / ${(this.timelineTotalDuration / 1000).toFixed(2)}s`;
+
+		const autoKeyBtn = document.createElement("button");
+		autoKeyBtn.type = "button";
+		autoKeyBtn.style.cssText = `
+			background: ${this.autoKeyEnabled ? StudioTokens.colors.accentMuted : "transparent"};
+			border: 1px solid ${this.autoKeyEnabled ? StudioTokens.colors.accent : StudioTokens.colors.borderSubtle};
+			color: ${this.autoKeyEnabled ? StudioTokens.colors.accent : StudioTokens.colors.textSecondary};
+			padding: 3px 8px;
+			border-radius: ${StudioTokens.radii.sm};
+			font-size: 11px;
+			font-weight: 600;
+			cursor: pointer;
+			display: flex;
+			align-items: center;
+			gap: 5px;
+		`;
+		autoKeyBtn.innerHTML = `${renderStudioIcon("keyframe", 12, this.autoKeyEnabled ? StudioTokens.colors.accent : "currentColor")} <span>Auto-Key ${this.autoKeyEnabled ? "ON" : "OFF"}</span>`;
+		autoKeyBtn.onclick = () => {
+			this.autoKeyEnabled = !this.autoKeyEnabled;
+			this.updateTimelineDock();
+		};
+
+		left.append(playBtn, stopBtn, timeDisplay, autoKeyBtn);
+		header.appendChild(left);
+
+		// Speed & Loop
+		const right = document.createElement("div");
+		right.style.cssText = "display: flex; align-items: center; gap: 8px;";
+
+		const loopBtn = document.createElement("button");
+		loopBtn.type = "button";
+		loopBtn.style.cssText = `
+			background: ${this.isLooping ? StudioTokens.colors.surfaceActive : "transparent"};
+			border: 1px solid ${this.isLooping ? StudioTokens.colors.accent : StudioTokens.colors.borderSubtle};
+			color: ${this.isLooping ? StudioTokens.colors.accent : StudioTokens.colors.textSecondary};
+			padding: 3px 8px;
+			border-radius: ${StudioTokens.radii.sm};
+			font-size: 11px;
+			cursor: pointer;
+			display: flex;
+			align-items: center;
+			gap: 4px;
+		`;
+		loopBtn.innerHTML = `${renderStudioIcon("repeat", 12)} <span>Loop</span>`;
+		loopBtn.onclick = () => {
+			this.isLooping = !this.isLooping;
+			loopBtn.style.borderColor = this.isLooping ? StudioTokens.colors.accent : StudioTokens.colors.borderSubtle;
+			loopBtn.style.color = this.isLooping ? StudioTokens.colors.accent : StudioTokens.colors.textSecondary;
+		};
+
+		right.appendChild(loopBtn);
+		header.appendChild(right);
+		this.timelineDockEl.appendChild(header);
+
+		// Multitrack List & Ruler Area
+		const trackContainer = document.createElement("div");
+		trackContainer.className = "custom-scrollbar";
+		trackContainer.style.cssText = "flex: 1; overflow-y: auto; overflow-x: hidden; position: relative;";
+
+		const elems = this.screen.elements || [];
+		elems.forEach((elem) => {
+			const isExpanded = this.expandedTracks.has(elem.id);
+			const row = document.createElement("div");
+			row.style.cssText = `
+				border-bottom: 1px solid ${StudioTokens.colors.borderSubtle};
+				background: ${this.selectedElementIds.has(elem.id) ? StudioTokens.colors.surface3 : "transparent"};
+				display: flex;
+				flex-direction: column;
+			`;
+
+			const mainTrack = document.createElement("div");
+			mainTrack.style.cssText = "height: 28px; display: flex; align-items: center; justify-content: space-between; padding: 0 10px; cursor: pointer;";
+			mainTrack.onclick = () => {
+				if (this.expandedTracks.has(elem.id)) this.expandedTracks.delete(elem.id);
+				else this.expandedTracks.add(elem.id);
+				this.updateTimelineDock();
+			};
+
+			const tLabel = document.createElement("div");
+			tLabel.style.cssText = "display: flex; align-items: center; gap: 6px;";
+			tLabel.innerHTML = `
+				${renderStudioIcon(isExpanded ? "chevron-down" : "chevron-right", 12, StudioTokens.colors.textSecondary)}
+				<span style="font-size:${StudioTokens.typography.sizeSm}; font-weight:500; color:${StudioTokens.colors.textPrimary};">${elem.name}</span>
+			`;
+
+			const tPill = document.createElement("div");
+			tPill.style.cssText = `
+				background: rgba(0, 210, 255, 0.15);
+				border: 1px solid rgba(0, 210, 255, 0.4);
+				color: ${StudioTokens.colors.accent};
+				padding: 1px 6px;
+				border-radius: 3px;
+				font-size: 10px;
+				font-family: ${StudioTokens.typography.fontMono};
+			`;
+			tPill.textContent = `${elem.animation?.duration || 400}ms`;
+
+			mainTrack.append(tLabel, tPill);
+			row.appendChild(mainTrack);
+
+			// Sub-tracks (Opacity, Pos X, Pos Y, Scale, Rotation)
+			if (isExpanded) {
+				const props = [
+					{ k: "opacity", l: "Opacidad", icon: "eye" },
+					{ k: "x", l: "Posición X", icon: "arrow-left" },
+					{ k: "y", l: "Posición Y", icon: "arrow-up" },
+					{ k: "scale", l: "Escala", icon: "maximize" },
+					{ k: "rotation", l: "Rotación", icon: "rotate" },
+				];
+
+				props.forEach((p) => {
+					const sub = document.createElement("div");
+					sub.style.cssText = `
+						height: 24px;
+						padding-left: 28px;
+						padding-right: 10px;
+						display: flex;
+						align-items: center;
+						justify-content: space-between;
+						background: ${StudioTokens.colors.surface2};
+						border-top: 1px solid rgba(255,255,255,0.03);
+					`;
+					sub.innerHTML = `
+						<div style="display:flex; align-items:center; gap:6px;">
+							${renderStudioIcon(p.icon as any, 11, StudioTokens.colors.textMuted)}
+							<span style="font-size:11px; color:${StudioTokens.colors.textSecondary};">${p.l}</span>
+						</div>
+					`;
+					row.appendChild(sub);
+				});
+			}
+
+			trackContainer.appendChild(row);
+		});
+
+		this.timelineDockEl.appendChild(trackContainer);
+	}
+
+	public addKeyframe(elemId: string, property: string, value: any) {
+		const elem = this.screen.elements?.find((e) => e.id === elemId);
+		if (!elem) return;
+		if (!elem.keyframes) elem.keyframes = [];
+
+		const time = this.timelineCurrentTime;
+		const existing = elem.keyframes.find((k) => k.time === time);
+		if (existing) {
+			(existing as any)[property] = value;
+		} else {
+			const kf: DeathScreenKeyframe = {
+				time,
+				easing: "outQuad",
+			};
+			(kf as any)[property] = value;
+			elem.keyframes.push(kf);
+			elem.keyframes.sort((a, b) => a.time - b.time);
+		}
+		this.hasUnsavedChanges = true;
+		this.updateTimelineDock();
+	}
+
+	public playTimelineSequence() {
+		this.isPlayingSequence = true;
+		this.timelineCurrentTime = 0;
+		this.updateTimelineDock();
+
+		const step = 33; // ~30 fps update
+		if (this.timelineTimerId) clearInterval(this.timelineTimerId);
+
+		this.timelineTimerId = window.setInterval(() => {
+			this.timelineCurrentTime += step * this.playbackSpeed;
+			if (this.timelineCurrentTime >= this.timelineTotalDuration) {
+				if (this.isLooping) {
+					this.timelineCurrentTime = 0;
+				} else {
+					this.stopTimelineSequence();
+					return;
+				}
+			}
+			const disp = this.container?.querySelector(".timeline-time-display");
+			if (disp) {
+				disp.textContent = `${(this.timelineCurrentTime / 1000).toFixed(2)}s / ${(this.timelineTotalDuration / 1000).toFixed(2)}s`;
+			}
+		}, step);
+	}
+
+	public stopTimelineSequence() {
+		this.isPlayingSequence = false;
+		if (this.timelineTimerId) {
+			clearInterval(this.timelineTimerId);
+			this.timelineTimerId = null;
+		}
+		this.timelineCurrentTime = 0;
+		this.updateTimelineDock();
+	}
+
+	// --- 9. BOTTOM STATUS BAR PREMIUM ---
+	private createStatusBar(): HTMLElement {
+		this.statusBarEl = document.createElement("div");
+		this.statusBarEl.className = "studio-status-bar";
+		this.statusBarEl.style.cssText = `
+			height: 24px;
+			background: ${StudioTokens.colors.surface1};
+			border-top: 1px solid ${StudioTokens.colors.borderSubtle};
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			padding: 0 12px;
+			font-size: ${StudioTokens.typography.sizeXs};
+			color: ${StudioTokens.colors.textMuted};
+			user-select: none;
+			z-index: 30;
+		`;
+		this.updateStatusBar();
+		return this.statusBarEl;
+	}
+
+	private updateStatusBar() {
+		if (!this.statusBarEl) return;
+		const selCount = this.selectedElementIds.size;
+		const selName = selCount === 1 ? this.getSelectedElements()[0]?.name : `${selCount} elementos`;
+
+		this.statusBarEl.innerHTML = `
+			<div style="display:flex; align-items:center; gap:12px;">
+				<span>MODO: <strong style="color:${StudioTokens.colors.accent};">${this.activeWorkspaceMode.toUpperCase()}</strong></span>
+				<span>HERRAMIENTA: <strong style="color:#fff;">${this.activeCanvasTool === "select" ? "SELECCIÓN (V)" : "MANO / PAN (H)"}</strong></span>
+				<span>SELECCIONADO: <strong style="color:#fff;">${selCount > 0 ? selName : "Ninguno"}</strong></span>
+			</div>
+			<div style="display:flex; align-items:center; gap:12px;">
+				<span>ZOOM: ${Math.round(this.zoomLevel * 100)}%</span>
+				<span>DISPOSITIVO: ${this.previewDevice.toUpperCase()}</span>
+				<span>CAPAS: ${this.screen.elements?.length || 0}</span>
+			</div>
+		`;
+	}
+
+	public updateSaveIndicator() {
+		const ind = this.container?.querySelector(".studio-save-indicator");
+		if (ind) {
+			ind.innerHTML = this.hasUnsavedChanges
+				? `<span style="width:6px; height:6px; border-radius:50%; background:${StudioTokens.colors.warning};"></span> Modificado`
+				: `${renderStudioIcon("check", 12, StudioTokens.colors.success)} Guardado`;
+			(ind as HTMLElement).style.color = this.hasUnsavedChanges ? StudioTokens.colors.warning : StudioTokens.colors.success;
+		}
+	}
+
+	// --- ELEMENT OPERATIONS ---
+	public addElement(type: DeathScreenElementType, name?: string, shapeType?: DeathScreenShapeType): DeathScreenElement {
+		this.recordHistory();
+		if (!this.screen.elements) this.screen.elements = [];
+
+		const baseElem: DeathScreenElement = {
+			id: `elem_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+			name: name || `Nuevo ${type}`,
+			type,
+			x: 50,
+			y: 50,
+			width: type === "title" ? 60 : (type === "card" || type === "container" ? 50 : 30),
+			height: type === "title" ? 12 : (type === "card" || type === "container" ? 25 : 8),
+			zIndex: this.screen.elements.length + 1,
+			style: {
+				fontSize: type === "title" ? 32 : 14,
+				fontWeight: type === "title" ? "bold" : "normal",
+				color: "#ffffff",
+				textAlign: "center",
+				shapeType,
+				backgroundColor: type === "container" || type === "card" ? "rgba(20,25,35,0.85)" : "transparent",
+				borderRadius: type === "badge" || shapeType === "pill" ? 9999 : 4,
+			},
+			content: type === "title" ? "HAS CAÍDO" : (type === "subtitle" ? "Reiniciando..." : (type === "action_button" ? "Aceptar" : "")),
+			animation: {
+				type: "fade_in",
+				duration: 400,
+				delay: 100,
+			},
+		};
+
+		this.screen.elements.push(baseElem);
+		this.selectedElementIds.clear();
+		this.selectedElementIds.add(baseElem.id);
+		this.hasUnsavedChanges = true;
+		this.onSync();
+		this.updateAll();
+		return baseElem;
+	}
+
+	public duplicateElement(elemId: string) {
+		const src = this.screen.elements?.find((e) => e.id === elemId);
+		if (!src) return;
+		this.recordHistory();
+		const clone: DeathScreenElement = JSON.parse(JSON.stringify(src));
+		clone.id = `elem_${Date.now()}`;
+		clone.name = `${src.name} (Copia)`;
+		clone.x = Math.min(95, clone.x + 3);
+		clone.y = Math.min(95, clone.y + 3);
+		clone.zIndex = (this.screen.elements?.length || 0) + 1;
+		this.screen.elements?.push(clone);
+		this.selectedElementIds.clear();
+		this.selectedElementIds.add(clone.id);
+		this.hasUnsavedChanges = true;
+		this.onSync();
+		this.updateAll();
+	}
+
+	public moveLayer(elemId: string, direction: number) {
+		if (!this.screen.elements) return;
+		const idx = this.screen.elements.findIndex((e) => e.id === elemId);
+		if (idx === -1) return;
+		const targetIdx = idx + direction;
+		if (targetIdx < 0 || targetIdx >= this.screen.elements.length) return;
+
+		this.recordHistory();
+		const [moved] = this.screen.elements.splice(idx, 1);
+		this.screen.elements.splice(targetIdx, 0, moved);
+
+		// Update z-indexes accordingly
+		this.screen.elements.forEach((el, i) => {
+			el.zIndex = i + 1;
+		});
+
+		this.hasUnsavedChanges = true;
+		this.onSync();
+		this.updateAll();
+	}
+
+	public removeElement(elemId: string) {
+		if (!this.screen.elements) return;
+		this.recordHistory();
+		this.screen.elements = this.screen.elements.filter((e) => e.id !== elemId);
+		this.selectedElementIds.delete(elemId);
+		this.hasUnsavedChanges = true;
+		this.onSync();
+		this.updateAll();
+	}
+
+	public updateAll() {
+		this.updateLayersList();
+		this.updateCanvas();
+		this.updatePropertiesPanel();
+		this.updateTimelineDock();
+		this.updateSaveIndicator();
+		this.updateStatusBar();
 	}
 }

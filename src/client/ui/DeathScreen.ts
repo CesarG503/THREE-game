@@ -137,7 +137,7 @@ export class DeathScreen {
 			z-index: 10000;
 		`;
 		const bannerText = document.createElement("span");
-		bannerText.textContent = "👁 MODO PREVISUALIZACIÓN DE PANTALLA";
+		bannerText.textContent = "MODO PREVISUALIZACIÓN";
 		const closePreviewBtn = document.createElement("button");
 		closePreviewBtn.type = "button";
 		closePreviewBtn.textContent = "Cerrar Vista Previa";
@@ -499,7 +499,7 @@ export class DeathScreen {
 
 			const tagName = elem.type === "action_button"
 				? "button"
-				: (elem.type === "title" ? "h1" : (elem.type === "subtitle" ? "p" : "div"));
+				: (elem.type === "title" ? "h1" : (elem.type === "subtitle" || elem.type === "text" ? "p" : "div"));
 			const el = document.createElement(tagName);
 			el.className = `viper-death-element viper-death-${elem.type}`;
 			el.dataset.elementId = elem.id;
@@ -513,22 +513,30 @@ export class DeathScreen {
 			el.style.boxSizing = "border-box";
 			el.style.zIndex = String(elem.zIndex ?? 1);
 
-			let transformStr = "translate(-50%, -50%)";
+			let anchorTransform = "translate(-50%, -50%)";
 			switch (elem.anchor) {
-				case "top-left": transformStr = "translate(0, 0)"; break;
-				case "top-center": transformStr = "translate(-50%, 0)"; break;
-				case "top-right": transformStr = "translate(-100%, 0)"; break;
-				case "center-left": transformStr = "translate(0, -50%)"; break;
-				case "center": transformStr = "translate(-50%, -50%)"; break;
-				case "center-right": transformStr = "translate(-100%, -50%)"; break;
-				case "bottom-left": transformStr = "translate(0, -100%)"; break;
-				case "bottom-center": transformStr = "translate(-50%, -100%)"; break;
-				case "bottom-right": transformStr = "translate(-100%, -100%)"; break;
+				case "top-left": anchorTransform = "translate(0, 0)"; break;
+				case "top-center": anchorTransform = "translate(-50%, 0)"; break;
+				case "top-right": anchorTransform = "translate(-100%, 0)"; break;
+				case "center-left": anchorTransform = "translate(0, -50%)"; break;
+				case "center": anchorTransform = "translate(-50%, -50%)"; break;
+				case "center-right": anchorTransform = "translate(-100%, -50%)"; break;
+				case "bottom-left": anchorTransform = "translate(0, -100%)"; break;
+				case "bottom-center": anchorTransform = "translate(-50%, -100%)"; break;
+				case "bottom-right": anchorTransform = "translate(-100%, -100%)"; break;
+			}
+
+			const s = elem.style || {};
+			let transformStr = anchorTransform;
+			if (typeof s.rotation === "number" && s.rotation !== 0) {
+				transformStr += ` rotate(${s.rotation}deg)`;
+			}
+			if ((s.scaleX !== undefined && s.scaleX !== 1) || (s.scaleY !== undefined && s.scaleY !== 1)) {
+				transformStr += ` scale(${s.scaleX ?? 1}, ${s.scaleY ?? 1})`;
 			}
 			el.style.transform = transformStr;
 
 			// Styling
-			const s = elem.style || {};
 			if (s.fontSize) el.style.fontSize = `${s.fontSize}px`;
 			if (s.fontWeight) el.style.fontWeight = s.fontWeight;
 			if (s.fontFamily) el.style.fontFamily = s.fontFamily;
@@ -536,16 +544,60 @@ export class DeathScreen {
 			if (s.textAlign) el.style.textAlign = s.textAlign;
 			if (s.textTransform) el.style.textTransform = s.textTransform;
 			if (s.letterSpacing) el.style.letterSpacing = s.letterSpacing;
+			if (s.lineHeight) el.style.lineHeight = String(s.lineHeight);
+			if (s.textStroke) (el.style as any).webkitTextStroke = s.textStroke;
 			if (s.backgroundColor) el.style.backgroundColor = s.backgroundColor;
+			if (s.gradient) el.style.backgroundImage = s.gradient;
 			if (s.borderColor) el.style.borderColor = s.borderColor;
 			if (s.borderWidth) el.style.borderWidth = `${s.borderWidth}px`;
 			if (s.borderStyle) el.style.borderStyle = s.borderStyle;
-			if (s.borderRadius) el.style.borderRadius = `${s.borderRadius}px`;
+			if (s.borderRadius !== undefined) el.style.borderRadius = `${s.borderRadius}px`;
 			if (s.opacity !== undefined) el.style.opacity = String(s.opacity);
 			if (s.backdropBlur) el.style.backdropFilter = `blur(${s.backdropBlur}px)`;
-			if (s.padding) el.style.padding = typeof s.padding === "number" ? `${s.padding}px` : s.padding;
+			if (s.padding !== undefined) el.style.padding = typeof s.padding === "number" ? `${s.padding}px` : s.padding;
 			if (s.boxShadow) el.style.boxShadow = s.boxShadow;
 			if (s.textShadow) el.style.textShadow = s.textShadow;
+			if (s.transformOrigin) el.style.transformOrigin = s.transformOrigin;
+			if (s.blendMode) el.style.mixBlendMode = s.blendMode;
+			if (s.filter) el.style.filter = s.filter;
+			if (s.clipPath) el.style.clipPath = s.clipPath;
+
+			// Shape & Badge Specific Geometry
+			if (elem.type === "shape" || s.shapeType) {
+				const shape = s.shapeType || "rectangle";
+				if (shape === "circle") el.style.borderRadius = "50%";
+				else if (shape === "pill") el.style.borderRadius = "9999px";
+				else if (shape === "triangle") el.style.clipPath = "polygon(50% 0%, 0% 100%, 100% 100%)";
+				else if (shape === "hexagon") el.style.clipPath = "polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%)";
+				else if (shape === "star") el.style.clipPath = "polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)";
+				else if (shape === "arrow") el.style.clipPath = "polygon(0% 20%, 60% 20%, 60% 0%, 100% 50%, 60% 100%, 60% 80%, 0% 80%)";
+				else if (shape === "corner") el.style.clipPath = "polygon(0 0, 100% 0, 100% 25%, 25% 25%, 25% 100%, 0 100%)";
+			} else if (elem.type === "badge") {
+				el.style.display = "inline-flex";
+				el.style.alignItems = "center";
+				el.style.justifyContent = "center";
+				if (s.borderRadius === undefined) el.style.borderRadius = "9999px";
+				if (s.padding === undefined) el.style.padding = "4px 12px";
+				if (!s.letterSpacing) el.style.letterSpacing = "0.08em";
+			} else if (elem.type === "progress_bar") {
+				el.style.display = "flex";
+				el.style.alignItems = "center";
+				el.style.overflow = "hidden";
+				const bar = document.createElement("div");
+				bar.style.height = "100%";
+				bar.style.width = "75%";
+				bar.style.backgroundColor = s.color || config.accentColor || "#00d2ff";
+				bar.style.borderRadius = "inherit";
+				el.appendChild(bar);
+			} else if (elem.type === "effect_overlay") {
+				el.style.pointerEvents = "none";
+				el.style.zIndex = "999";
+				if (elem.content?.includes("scanlines")) {
+					el.style.backgroundImage = "repeating-linear-gradient(0deg, rgba(0,0,0,0.18) 0px, rgba(0,0,0,0.18) 1px, transparent 1px, transparent 3px)";
+				} else if (elem.content?.includes("vignette")) {
+					el.style.background = "radial-gradient(circle, transparent 40%, rgba(0,0,0,0.85) 100%)";
+				}
+			}
 
 			// Content injection (strict textContent to prevent XSS)
 			if (elem.type === "image") {

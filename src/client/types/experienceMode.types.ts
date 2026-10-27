@@ -57,7 +57,25 @@ export type DeathScreenElementType =
 	| "remaining_lives"
 	| "killer_info"
 	| "stats"
-	| "action_button";
+	| "action_button"
+	| "text"
+	| "shape"
+	| "badge"
+	| "container"
+	| "progress_bar"
+	| "killfeed"
+	| "effect_overlay";
+
+export type DeathScreenShapeType =
+	| "rectangle"
+	| "circle"
+	| "pill"
+	| "triangle"
+	| "line"
+	| "hexagon"
+	| "star"
+	| "arrow"
+	| "corner";
 
 export type DeathScreenAnchor =
 	| "top-left"
@@ -78,7 +96,9 @@ export type DeathScreenAnimationType =
 	| "slide_left"
 	| "slide_right"
 	| "scale_up"
-	| "blur_in";
+	| "blur_in"
+	| "pop"
+	| "rotate_in";
 
 export type DeathScreenEasing =
 	| "linear"
@@ -89,11 +109,19 @@ export type DeathScreenEasing =
 	| "easeOutBack"
 	| "easeOutElastic";
 
+export interface DeathScreenKeyframe {
+	time: number; // ms offset
+	property: string; // e.g. "x", "y", "scale", "opacity", "rotation", "color"
+	value: number | string;
+	easing?: DeathScreenEasing;
+}
+
 export interface DeathScreenElementAnimation {
 	type?: DeathScreenAnimationType;
 	duration?: number; // ms
 	delay?: number; // ms
 	easing?: DeathScreenEasing;
+	keyframes?: DeathScreenKeyframe[];
 }
 
 export interface DeathScreenElementStyle {
@@ -104,6 +132,8 @@ export interface DeathScreenElementStyle {
 	textAlign?: "left" | "center" | "right";
 	textTransform?: "none" | "uppercase" | "lowercase" | "capitalize";
 	letterSpacing?: string;
+	lineHeight?: number;
+	textStroke?: string;
 	backgroundColor?: string;
 	borderColor?: string;
 	borderWidth?: number;
@@ -111,9 +141,27 @@ export interface DeathScreenElementStyle {
 	borderRadius?: number;
 	opacity?: number;
 	backdropBlur?: number;
-	padding?: number;
+	padding?: number | string;
 	boxShadow?: string;
 	textShadow?: string;
+	rotation?: number; // degrees (-360 to 360)
+	scaleX?: number;
+	scaleY?: number;
+	gradient?: string; // linear/radial CSS gradient
+	shapeType?: DeathScreenShapeType;
+	filter?: string;
+	clipPath?: string;
+	transformOrigin?: string;
+	blendMode?: string;
+}
+
+export interface DeathScreenCustomComponent {
+	id: string;
+	name: string;
+	category: string;
+	icon: string;
+	description?: string;
+	elements: DeathScreenElement[];
 }
 
 export interface DeathScreenElementConditions {
@@ -142,6 +190,10 @@ export interface DeathScreenElement {
 	icon?: string;
 	action?: DeathActionButtonType;
 	isPrimary?: boolean;
+	locked?: boolean;
+	groupId?: string;
+	keyframes?: DeathScreenKeyframe[];
+	sfx?: { onEnter?: string; onAction?: string; volume?: number };
 	conditions?: DeathScreenElementConditions;
 	causeOverrides?: Record<string, { content?: string; color?: string; style?: DeathScreenElementStyle }>;
 	animation?: DeathScreenElementAnimation;
@@ -1133,6 +1185,13 @@ export function normalizeDeathScreenElements(rawElements: any[]): DeathScreenEle
 		"killer_info",
 		"stats",
 		"action_button",
+		"text",
+		"shape",
+		"badge",
+		"container",
+		"progress_bar",
+		"killfeed",
+		"effect_overlay",
 	];
 
 	return rawElements
@@ -1156,7 +1215,7 @@ export function normalizeDeathScreenElements(rawElements: any[]): DeathScreenEle
 
 			const animation = e.animation && typeof e.animation === "object"
 				? {
-						type: (["none", "fade", "slide_up", "slide_down", "slide_left", "slide_right", "scale_up", "blur_in"].includes(e.animation.type)
+						type: (["none", "fade", "slide_up", "slide_down", "slide_left", "slide_right", "scale_up", "blur_in", "pop", "rotate_in"].includes(e.animation.type)
 							? e.animation.type
 							: "slide_up") as DeathScreenAnimationType,
 						duration: typeof e.animation.duration === "number" ? Math.max(0, e.animation.duration) : undefined,
@@ -1166,6 +1225,11 @@ export function normalizeDeathScreenElements(rawElements: any[]): DeathScreenEle
 							: undefined) as DeathScreenEasing,
 					}
 				: undefined;
+
+			const rawStyle = e.style && typeof e.style === "object" ? { ...e.style } : {};
+			if (typeof rawStyle.rotation === "number") {
+				rawStyle.rotation = Math.max(-360, Math.min(360, rawStyle.rotation));
+			}
 
 			return {
 				id,
@@ -1178,13 +1242,17 @@ export function normalizeDeathScreenElements(rawElements: any[]): DeathScreenEle
 				height,
 				anchor,
 				zIndex: typeof e.zIndex === "number" ? e.zIndex : idx + 1,
-				style: e.style && typeof e.style === "object" ? { ...e.style } : {},
+				style: rawStyle,
 				content: typeof e.content === "string" ? e.content : "",
 				fallbackContent: typeof e.fallbackContent === "string" ? e.fallbackContent : undefined,
 				imageUrl: sanitizeImageUrl(e.imageUrl),
 				icon: typeof e.icon === "string" ? e.icon : undefined,
 				action,
 				isPrimary: Boolean(e.isPrimary),
+				locked: Boolean(e.locked),
+				groupId: typeof e.groupId === "string" ? e.groupId : undefined,
+				keyframes: Array.isArray(e.keyframes) ? e.keyframes : undefined,
+				sfx: e.sfx && typeof e.sfx === "object" ? { ...e.sfx } : undefined,
 				conditions: e.conditions && typeof e.conditions === "object" ? { ...e.conditions } : undefined,
 				causeOverrides: e.causeOverrides && typeof e.causeOverrides === "object" ? { ...e.causeOverrides } : undefined,
 				animation,
@@ -1376,6 +1444,22 @@ export function evaluateDynamicTokens(template: string, state?: DeathState | any
 	const message = state?.activeMode?.deathScreen?.message || "Has sido eliminado de la partida.";
 	const accentColor = state?.activeMode?.deathScreen?.accentColor || "#ff3b47";
 
+	const damageDealt = state?.context?.damageDealt ?? "840";
+	const damageTaken = state?.context?.damageTaken ?? "1,250";
+	const distance = state?.context?.distance ?? "38m";
+	const placement = state?.context?.placement ?? "#12 / 24";
+	const timeAlive = state?.context?.timeAlive ?? "04:15";
+	const role = state?.context?.playerRole || (state as any)?.playerRoleId || "Operador";
+	const gameMode = state?.activeMode?.name || "VIPER.IO";
+	const score = state?.context?.score ?? "1,200";
+
+	const victimName = state?.context?.victimName || (state as any)?.victimName || "Jugador";
+	const killerClan = state?.context?.killerClan || (state as any)?.killerClan || "VIPER";
+	const headshot = (state?.context?.isHeadshot ?? (state as any)?.isHeadshot) ? "SÍ" : "NO";
+	const killCount = (state?.context?.killCount ?? (state as any)?.killCount) !== undefined ? String(state?.context?.killCount ?? (state as any)?.killCount) : "4";
+	const matchTime = state?.context?.matchTime || (state as any)?.matchTime || "12:45";
+	const xpGained = (state?.context?.xpGained ?? (state as any)?.xpGained) !== undefined ? String(state?.context?.xpGained ?? (state as any)?.xpGained) : "350";
+
 	text = text.replace(/\{killer_name\}/g, killerName);
 	text = text.replace(/\{killer_weapon\}/g, killerWeapon);
 	text = text.replace(/\{cause\}/g, causeLabel);
@@ -1385,6 +1469,22 @@ export function evaluateDynamicTokens(template: string, state?: DeathState | any
 	text = text.replace(/\{title\}/g, title);
 	text = text.replace(/\{message\}/g, message);
 	text = text.replace(/\{accentColor\}/g, accentColor);
+
+	text = text.replace(/\{damage_dealt\}/g, String(damageDealt));
+	text = text.replace(/\{damage_taken\}/g, String(damageTaken));
+	text = text.replace(/\{distance\}/g, String(distance));
+	text = text.replace(/\{placement\}/g, String(placement));
+	text = text.replace(/\{time_alive\}/g, String(timeAlive));
+	text = text.replace(/\{role\}/g, String(role));
+	text = text.replace(/\{game_mode\}/g, String(gameMode));
+	text = text.replace(/\{score\}/g, String(score));
+
+	text = text.replace(/\{victim_name\}/g, String(victimName));
+	text = text.replace(/\{killer_clan\}/g, String(killerClan));
+	text = text.replace(/\{headshot\}/g, String(headshot));
+	text = text.replace(/\{kill_count\}/g, String(killCount));
+	text = text.replace(/\{match_time\}/g, String(matchTime));
+	text = text.replace(/\{xp_gained\}/g, String(xpGained));
 
 	return text;
 }

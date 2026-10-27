@@ -362,6 +362,7 @@ export class DeathManager {
 		if (spectator.enabled === false) return;
 		this.isSpectator = true;
 		this.spectatorMode = mode;
+		if (typeof document !== "undefined" && typeof CustomEvent !== "undefined") document.dispatchEvent(new CustomEvent("gameSpectatorChanged", { detail: { isSpectator: true } }));
 
 		// Hide local active models
 		if (character.glbModel) character.glbModel.setVisible(false);
@@ -581,6 +582,23 @@ export class DeathManager {
 		message.textContent = `Observando a ${target.playerName || "Jugador"} (${perspectiveLabel})${cyclePrompt}`;
 		hud.appendChild(message);
 
+		if (peers.length > 1) {
+			for (const direction of [-1, 1]) {
+				const button = document.createElement("button");
+				button.type = "button";
+				button.textContent = direction < 0 ? "◀" : "▶";
+				button.setAttribute("aria-label", direction < 0 ? "Observar al jugador anterior" : "Observar al siguiente jugador");
+				button.title = direction < 0 ? "Q / Flecha izquierda" : "E / Flecha derecha";
+				button.style.cssText = "flex:0 0 auto;min-width:44px;min-height:44px;padding:8px 12px;border:1px solid #5d6a84;border-radius:7px;background:#263248;color:#fff;font:700 16px system-ui;cursor:pointer;touch-action:manipulation;";
+				button.onclick = (event) => {
+					event.preventDefault();
+					event.stopPropagation();
+					this.cycleSpectatorTarget(direction);
+				};
+				hud.appendChild(button);
+			}
+		}
+
 		if (spectator.perspective === "switchable") {
 			const switchButton = document.createElement("button");
 			switchButton.type = "button";
@@ -599,6 +617,7 @@ export class DeathManager {
 
 	private cleanupSpectator() {
 		this.isSpectator = false;
+		if (typeof document !== "undefined" && typeof CustomEvent !== "undefined") document.dispatchEvent(new CustomEvent("gameSpectatorChanged", { detail: { isSpectator: false } }));
 		this.spectatorMode = null;
 		this.spectatorTargetId = null;
 		if (this.deathScreen?.animationService) {

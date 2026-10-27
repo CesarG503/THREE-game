@@ -1,4 +1,4 @@
-export type GameMode = "lobby" | "play" | "editor";
+export type GameMode = "lobby" | "play" | "editor" | "death-lab";
 
 export interface Route {
 	mode: GameMode;

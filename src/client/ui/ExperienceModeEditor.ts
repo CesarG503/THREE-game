@@ -9,6 +9,7 @@ import {
 	normalizeExperienceModesConfig,
 } from "../types/experienceMode.types";
 import type { DeathScreenEditor } from "./DeathScreenEditor";
+import { renderStudioIcon } from "./studio/StudioIcons";
 
 export class ExperienceModeEditor {
 	private game: any;
@@ -866,19 +867,40 @@ export class ExperienceModeEditor {
 		const visualHeader = document.createElement("div");
 		visualHeader.style.cssText = "display: flex; flex-wrap: wrap; gap: 8px; justify-content: space-between; align-items: center; margin: 4px 0 10px; min-width: 0;";
 		const visualTitle = document.createElement("strong");
-		visualTitle.innerHTML = "🎨 Editor Visual de Diseño, Lienzo y Reglas";
+		visualTitle.innerHTML = `<span style="color:#00d2ff; font-weight:700;">VIPER STUDIO PREMIUM</span> <span style="font-size:10px; color:#888;">(Editor Visual)</span>`;
 		visualTitle.style.color = "#00d2ff";
+
+		const btnGroup = document.createElement("div");
+		btnGroup.style.cssText = "display: flex; gap: 6px; align-items: center;";
+
+		const expandStudioBtn = document.createElement("button");
+		expandStudioBtn.type = "button";
+		expandStudioBtn.innerHTML = `${renderStudioIcon("maximize", 12, "#00d2ff")} <span>Expandir Studio</span>`;
+		expandStudioBtn.title = "Abrir el espacio de trabajo profesional a pantalla completa";
+		expandStudioBtn.style.cssText = "background: #00d2ff1a; border: 1px solid #00d2ff66; color: #00d2ff; font-weight: bold; font-size: 11px; padding: 4px 10px; border-radius: 4px; cursor: pointer; display: flex; align-items: center; gap: 5px;";
+		expandStudioBtn.onclick = () => {
+			if (this.visualEditor) {
+				this.visualEditor.expandStudio();
+			} else {
+				this.showVisualEditor = true;
+				if (this.container) this.render(this.container);
+				setTimeout(() => {
+					this.visualEditor?.expandStudio();
+				}, 150);
+			}
+		};
 
 		const toggleVisualBtn = document.createElement("button");
 		toggleVisualBtn.type = "button";
-		toggleVisualBtn.textContent = this.showVisualEditor ? "▲ Ocultar Diseñador Visual" : "▼ Mostrar Diseñador Visual";
-		toggleVisualBtn.style.cssText = "background: #232734; border: 1px solid #3d445c; color: #eee; font-size: 11px; padding: 4px 10px; border-radius: 4px; cursor: pointer;";
+		toggleVisualBtn.innerHTML = `${renderStudioIcon("layout", 12)} <span>${this.showVisualEditor ? "Ocultar Diseñador" : "Mostrar Diseñador"}</span>`;
+		toggleVisualBtn.style.cssText = "background: #232734; border: 1px solid #3d445c; color: #eee; font-size: 11px; padding: 4px 10px; border-radius: 4px; cursor: pointer; display: flex; align-items: center; gap: 5px;";
 		toggleVisualBtn.onclick = () => {
 			this.showVisualEditor = !this.showVisualEditor;
 			if (!this.showVisualEditor) this.visualEditor = null;
 			if (this.container) this.render(this.container);
 		};
-		visualHeader.append(visualTitle, toggleVisualBtn);
+		btnGroup.append(expandStudioBtn, toggleVisualBtn);
+		visualHeader.append(visualTitle, btnGroup);
 		section.appendChild(visualHeader);
 
 		if (this.showVisualEditor) {
@@ -1159,8 +1181,12 @@ export class ExperienceModeEditor {
 
 		const previewBtn = document.createElement("button");
 		previewBtn.type = "button";
-		previewBtn.textContent = "▶ Previsualizar Pantalla de Muerte";
+		previewBtn.innerHTML = `${renderStudioIcon("play", 13, "white")} <span>Previsualizar Pantalla de Muerte</span>`;
 		previewBtn.style.cssText = `
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			gap: 6px;
 			background: linear-gradient(135deg, #e63946, #d90429);
 			color: white;
 			border: none;

@@ -73,7 +73,8 @@ export type StudioIconName =
 	| "badge"
 	| "star"
 	| "more-horizontal"
-	| "component";
+	| "component"
+	| "bezier";
 
 const SVG_PATHS: Record<StudioIconName, string> = {
 	cursor: `<path d="m3 3 7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/><path d="m13 13 6 6"/>`,
@@ -144,6 +145,7 @@ const SVG_PATHS: Record<StudioIconName, string> = {
 	star: `<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>`,
 	"more-horizontal": `<circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>`,
 	component: `<path d="M5.5 8.5 9 12l-3.5 3.5L2 12l3.5-3.5Z"/><path d="m12 2 3.5 3.5L12 9 8.5 5.5 12 2Z"/><path d="M18.5 8.5 22 12l-3.5 3.5L15 12l3.5-3.5Z"/><path d="m12 15 3.5 3.5L12 22l-3.5-3.5L12 15Z"/>`,
+	bezier: `<path d="M4 19 C 4 10, 20 14, 20 5"/><rect x="2" y="17" width="4" height="4" rx="1"/><rect x="18" y="3" width="4" height="4" rx="1"/><line x1="4" y1="17" x2="8" y2="10" stroke-dasharray="2 1"/><line x1="20" y1="7" x2="16" y2="14" stroke-dasharray="2 1"/><circle cx="8" cy="10" r="1.5"/><circle cx="16" cy="14" r="1.5"/>`,
 };
 
 /**

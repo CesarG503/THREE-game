@@ -774,6 +774,8 @@ export function injectPlatformStyles() {
 			.vp-shell {
 				grid-template-columns: 1fr;
 				grid-template-rows: auto minmax(0, 1fr);
+				padding-top: env(safe-area-inset-top);
+				padding-bottom: env(safe-area-inset-bottom);
 			}
 
 			.vp-sidebar {
@@ -783,7 +785,12 @@ export function injectPlatformStyles() {
 				overflow-y: hidden;
 				border-right: 0;
 				border-bottom: 1px solid var(--vp-border);
+				min-width: 0;
+				padding: 8px max(8px, env(safe-area-inset-right)) 8px max(8px, env(safe-area-inset-left));
+				scrollbar-width: none;
 			}
+
+			.vp-sidebar::-webkit-scrollbar { display: none; }
 
 			.vp-brand {
 				margin: 0 10px 0 0;
@@ -794,7 +801,11 @@ export function injectPlatformStyles() {
 				flex-direction: row;
 				margin-top: 0;
 				padding-top: 0;
+				gap: 4px;
 			}
+
+			.vp-nav-btn { width: auto; min-width: 44px; flex: 0 0 44px; min-height: 44px; padding: 0; justify-content: center; }
+			.vp-brand { flex: 0 0 36px; margin: 0 8px 0 0; }
 
 			.vp-main {
 				grid-template-rows: auto minmax(0, 1fr);
@@ -802,8 +813,9 @@ export function injectPlatformStyles() {
 			}
 
 			.vp-topbar {
-				padding: 14px;
+				padding: 10px 12px;
 				flex-wrap: wrap;
+				gap: 8px;
 			}
 
 			.vp-search {
@@ -817,12 +829,14 @@ export function injectPlatformStyles() {
 			}
 
 			.vp-content {
-				padding: 18px;
+				padding: 12px;
+				min-height: 0;
+				overflow-y: auto;
 			}
 
 			.vp-hero {
-				min-height: 320px;
-				padding: 26px;
+				min-height: 260px;
+				padding: clamp(18px, 6vw, 26px);
 			}
 
 			.vp-profile-header {
@@ -833,6 +847,20 @@ export function injectPlatformStyles() {
 			.vp-skin-controls {
 				grid-template-columns: repeat(2, minmax(0, 1fr));
 			}
+		}
+
+		@media (max-width: 380px) {
+			.vp-content { padding: 8px; }
+			.vp-topbar { padding: 8px; }
+			.vp-top-actions { flex-wrap: wrap; gap: 6px; }
+			.vp-primary-btn, .vp-secondary-btn, .vp-danger-btn, .vp-ghost-btn { min-height: 44px; padding: 9px 11px; }
+			.vp-hero-title { font-size: clamp(28px, 10vw, 42px); }
+			.vp-card-grid { grid-template-columns: minmax(0, 1fr); }
+		}
+
+		@media (pointer: coarse) {
+			.vp-nav-btn, .vp-icon-btn, .vp-card-actions button, .vp-skin-controls button { min-height: 44px; }
+			.vp-shell { height: 100vh; height: 100dvh; }
 		}
 	`;
 	document.head.appendChild(style);

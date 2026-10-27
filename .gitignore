@@ -16,3 +16,4 @@ tests/
 # Browser regression artifacts
 /test-results/
 /playwright-report/
+scratch/

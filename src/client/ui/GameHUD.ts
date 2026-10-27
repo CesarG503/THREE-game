@@ -1,6 +1,7 @@
 import { VehicleHUDWidget, ensureVehicleHUDDefaults, isVehicleHUDId, vehicleShowKey, type VehicleHUDData, type VehicleHUDId } from './modules/VehicleHUD';
 import { animate } from 'animejs'
 import type { HUDConfig, UIPosition, UIPositionObject } from '../types'
+import { EDITOR_MOBILE_TOOL_ACTIONS } from '../editor/explorer/EditorActionCatalog'
 import {
     applyResponsivePosition,
     applyViewportConstraint,
@@ -83,6 +84,9 @@ export class GameHUD {
     onViewportChange: () => void;
     isDestroyed: boolean;
     game: any;
+    private mobileControls: HTMLElement | null = null;
+    private mobilePointerIds = new Set<number>();
+    private mobileEvents: AbortController | null = null;
 
     constructor() {
         this.container = document.createElement('div')
@@ -90,7 +94,7 @@ export class GameHUD {
         this.container.style.cssText = `
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             overflow: hidden;
-            pointer-events: none; z-index: 1000;
+            pointer-events: none; z-index: 800;
         `
         document.body.appendChild(this.container)
 
@@ -125,6 +129,7 @@ export class GameHUD {
     createHUD(settings: HUDConfig) {
         if (this.isDestroyed) return
         this.settings = settings || {};
+        this.updateMobileControls();
         ensureStaminaHUDDefaults(this.settings);
         ensureVehicleHUDDefaults(this.settings);
         for (const widget of this.vehicleWidgets.values()) widget.destroy();
@@ -884,6 +889,10 @@ export class GameHUD {
         this.isDestroyed = true
         for (const widget of this.vehicleWidgets.values()) widget.destroy();
         this.vehicleWidgets.clear();
+        this.mobileEvents?.abort();
+        this.mobileEvents = null;
+        this.mobileControls?.remove();
+        this.mobileControls = null;
 
         if (this.resizeTimer !== null) {
             window.clearTimeout(this.resizeTimer)
@@ -918,6 +927,241 @@ export class GameHUD {
         this.staminaElement = null
         this.timerElement = null
         this.inventoryElement = null
+    }
+
+    private updateMobileControls() {
+        const viewportWidth = window.visualViewport?.width || window.innerWidth;
+        const viewportHeight = window.visualViewport?.height || window.innerHeight;
+        const compactViewport = viewportWidth <= 760 || (viewportWidth <= 1100 && viewportHeight <= 520);
+        const coarsePointer = window.matchMedia?.('(pointer: coarse)').matches
+            || navigator.maxTouchPoints > 0
+            || compactViewport;
+        const active = coarsePointer && ['play', 'editor'].includes(this.game?.gameMode);
+        if (!active) {
+            this.mobileEvents?.abort();
+            this.mobileEvents = null;
+            this.mobileControls?.remove();
+            this.mobileControls = null;
+            return;
+        }
+        if (this.mobileControls) {
+            this.updateMobileActionControls();
+            return;
+        }
+
+        const controls = document.createElement('div');
+        controls.className = 'viper-touch-controls';
+        controls.setAttribute('role', 'group');
+        controls.setAttribute('aria-label', 'Controles táctiles del juego');
+        controls.innerHTML = `
+            <div class="viper-touch-look" role="region" aria-label="Desliza para girar la vista"><span>Desliza para mirar</span></div>
+            <nav class="viper-touch-topbar" aria-label="Accesos del juego">
+                <button type="button" data-menu-action="toggle-menu" aria-label="Mostrar opciones" aria-expanded="false">☰</button>
+                <div class="viper-touch-menu" aria-label="Opciones">
+                    <button type="button" data-menu-action="settings" aria-label="Abrir configuración">⚙ <span>Configuración</span></button>
+                    <button type="button" data-menu-action="chat" aria-label="Abrir o cerrar chat">▰ <span>Chat</span></button>
+                    <button type="button" data-menu-action="camera" aria-label="Cambiar vista de cámara">◉ <span>Vista</span></button>
+                    ${this.game?.gameMode === 'editor' ? '<button type="button" data-menu-action="build" aria-label="Abrir herramientas de construcción">＋ <span>Objetos</span></button><button type="button" data-menu-action="hierarchy" aria-label="Abrir jerarquía e inspector">☷ <span>Escena</span></button><button type="button" data-menu-action="save" aria-label="Abrir guardar o cargar">▣ <span>Guardar / Cargar</span></button>' : ''}
+                </div>
+            </nav>
+            <div class="viper-touch-move" role="group" aria-label="Movimiento">
+                <button type="button" data-move="forward" aria-label="Avanzar">▲</button>
+                <div class="viper-touch-move-row">
+                    <button type="button" data-move="left" aria-label="Mover a la izquierda">◀</button>
+                    <button type="button" data-move="backward" aria-label="Retroceder">▼</button>
+                    <button type="button" data-move="right" aria-label="Mover a la derecha">▶</button>
+                </div>
+            </div>
+            <div class="viper-touch-actions" role="group" aria-label="Acciones">
+                <button type="button" data-action="interact" aria-label="Interactuar" class="viper-touch-interact">Usar</button>
+                <button type="button" data-action="jump" aria-label="Saltar" class="viper-touch-jump">Saltar</button>
+                <button type="button" data-action="attack" aria-label="Atacar" class="viper-touch-attack">Atacar</button>
+            </div>`;
+        this.container.appendChild(controls);
+        this.mobileControls = controls;
+        this.mobileEvents = new AbortController();
+        const signal = this.mobileEvents.signal;
+        document.addEventListener('gameSpectatorChanged', () => this.updateMobileActionControls(), { signal });
+        document.addEventListener('gamePauseChanged', (event: Event) => {
+            controls.classList.toggle('is-paused', Boolean((event as CustomEvent<{ isPaused: boolean }>).detail?.isPaused));
+        }, { signal });
+        const positionControls = () => {
+            const inventory = document.getElementById('inventory-container');
+            const inventoryRect = inventory?.getBoundingClientRect();
+            if (!inventoryRect || !inventory || getComputedStyle(inventory).display === 'none') return;
+            const viewportHeight = window.visualViewport?.height || window.innerHeight;
+            const safeBottom = Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--safe-bottom')) || 0;
+            const spacing = 10;
+            const groupBottom = inventoryRect.top > viewportHeight * 0.45
+                ? Math.max(safeBottom + spacing, viewportHeight - inventoryRect.top + spacing)
+                : Math.max(safeBottom + spacing, viewportHeight - inventoryRect.bottom - 160);
+            const move = controls.querySelector<HTMLElement>('.viper-touch-move');
+            const actions = controls.querySelector<HTMLElement>('.viper-touch-actions');
+            if (move) move.style.bottom = `${groupBottom}px`;
+            if (actions) actions.style.bottom = `${groupBottom}px`;
+        };
+        requestAnimationFrame(positionControls);
+        window.addEventListener('resize', positionControls, { signal });
+        window.visualViewport?.addEventListener('resize', positionControls, { signal });
+
+        const releaseAll = () => {
+            this.mobilePointerIds.clear();
+            for (const key of ['forward', 'backward', 'left', 'right', 'jump', 'crouch', 'attack', 'aim'] as const) {
+                this.game?.inputManager?.setVirtualInput?.(key, false);
+            }
+            document.dispatchEvent(new KeyboardEvent('keyup', { key: 'f', bubbles: true }));
+        };
+        window.addEventListener('blur', releaseAll, { signal });
+        controls.addEventListener('pointerdown', (event) => {
+            const target = (event.target as HTMLElement).closest<HTMLButtonElement>('button');
+            if (!target) return;
+            if (target.dataset.menuAction || target.dataset.editorAction || ['reload', 'drop', 'spectator-prev', 'spectator-next', 'spectator-view'].includes(target.dataset.action || '')) return;
+            event.preventDefault();
+            target.setPointerCapture?.(event.pointerId);
+            this.mobilePointerIds.add(event.pointerId);
+            if (target.dataset.move) this.game?.inputManager?.setVirtualInput?.(target.dataset.move, true);
+            if (target.dataset.action === 'jump' || target.dataset.action === 'attack' || target.dataset.action === 'aim' || target.dataset.action === 'crouch') {
+                this.game?.inputManager?.setVirtualInput?.(target.dataset.action, true);
+            }
+            if (target.dataset.action === 'interact') {
+                document.dispatchEvent(new KeyboardEvent('keydown', { key: 'f', bubbles: true }));
+            }
+        });
+        const releaseButton = (event: PointerEvent) => {
+            const target = (event.target as HTMLElement).closest<HTMLButtonElement>('button');
+            if (!target) return;
+            if (target.dataset.menuAction || target.dataset.editorAction || ['reload', 'drop', 'spectator-prev', 'spectator-next', 'spectator-view'].includes(target.dataset.action || '')) return;
+            if (target.dataset.move) this.game?.inputManager?.setVirtualInput?.(target.dataset.move, false);
+            if (target.dataset.action === 'jump' || target.dataset.action === 'attack' || target.dataset.action === 'aim' || target.dataset.action === 'crouch') {
+                this.game?.inputManager?.setVirtualInput?.(target.dataset.action, false);
+            }
+            if (target.dataset.action === 'interact') {
+                document.dispatchEvent(new KeyboardEvent('keyup', { key: 'f', bubbles: true }));
+            }
+            this.mobilePointerIds.delete(event.pointerId);
+        };
+        controls.addEventListener('pointerup', releaseButton);
+        controls.addEventListener('pointercancel', releaseButton);
+        controls.addEventListener('click', (event) => {
+            const target = (event.target as HTMLElement).closest<HTMLButtonElement>('button');
+            if (!target) return;
+            if (target.dataset.menuAction) {
+                if (target.dataset.menuAction === 'toggle-menu') {
+                    const nav = target.closest<HTMLElement>('.viper-touch-topbar');
+                    const expanded = nav?.classList.toggle('is-open') || false;
+                    target.setAttribute('aria-expanded', String(expanded));
+                    target.setAttribute('aria-label', expanded ? 'Ocultar opciones' : 'Mostrar opciones');
+                    return;
+                }
+                const nav = target.closest<HTMLElement>('.viper-touch-topbar');
+                nav?.classList.remove('is-open');
+                nav?.querySelector('[data-menu-action="toggle-menu"]')?.setAttribute('aria-expanded', 'false');
+                switch (target.dataset.menuAction) {
+                    case 'settings':
+                        this.game?.cameraController?.togglePause?.();
+                        break;
+                    case 'chat':
+                        if (this.game?.chatManager?.isChatOpen) {
+                            this.game.chatManager.closeChat();
+                            target.querySelector('span')!.textContent = 'Chat';
+                        } else {
+                            this.game?.chatManager?.openChat?.();
+                            target.querySelector('span')!.textContent = 'Cerrar chat';
+                        }
+                        break;
+                    case 'camera':
+                        if (this.game?.deathManager?.isSpectator) this.game.deathManager.toggleSpectatorPerspective();
+                        else this.game?.cameraController?.toggleCameraMode?.();
+                        break;
+                    case 'build': this.game?.constructionMenu?.toggle?.(); break;
+                    case 'hierarchy': this.game?.editorExplorer?.toggleVisibility?.(); break;
+                    case 'save':
+                        if (!this.game?.constructionMenu?.isVisible) this.game?.constructionMenu?.toggle?.();
+                        this.game?.constructionMenu?.switchTab?.('saveload');
+                        break;
+                }
+                return;
+            }
+            if (target.dataset.action === 'reload' || target.dataset.action === 'drop') {
+                const key = target.dataset.action === 'reload' ? 'r' : 'q';
+                document.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }));
+                document.dispatchEvent(new KeyboardEvent('keyup', { key, bubbles: true }));
+                return;
+            }
+            if (target.dataset.editorAction) {
+                this.game?.editorExplorer?.performMobileAction?.(target.dataset.editorAction);
+                return;
+            }
+            if (target.dataset.action === 'spectator-prev' || target.dataset.action === 'spectator-next') {
+                this.game?.deathManager?.cycleSpectatorTarget?.(target.dataset.action === 'spectator-next' ? 1 : -1);
+                return;
+            }
+            if (target.dataset.action === 'spectator-view') {
+                this.game?.deathManager?.toggleSpectatorPerspective?.();
+                return;
+            }
+            if ((event as MouseEvent).detail !== 0) return;
+            if (target.dataset.action === 'interact') {
+                document.dispatchEvent(new KeyboardEvent('keydown', { key: 'f', bubbles: true }));
+                document.dispatchEvent(new KeyboardEvent('keyup', { key: 'f', bubbles: true }));
+                return;
+            }
+            if (target.dataset.action === 'jump' || target.dataset.action === 'attack' || target.dataset.action === 'aim' || target.dataset.action === 'crouch') {
+                const action = target.dataset.action;
+                this.game?.inputManager?.setVirtualInput?.(action, true);
+                requestAnimationFrame(() => this.game?.inputManager?.setVirtualInput?.(action, false));
+            }
+        });
+
+        const look = controls.querySelector<HTMLElement>('.viper-touch-look');
+        let lastX = 0;
+        let lastY = 0;
+        look?.addEventListener('pointerdown', (event) => {
+            event.preventDefault();
+            lastX = event.clientX;
+            lastY = event.clientY;
+            look.setPointerCapture(event.pointerId);
+        });
+        look?.addEventListener('pointermove', (event) => {
+            if (!look.hasPointerCapture(event.pointerId)) return;
+            event.preventDefault();
+            const dx = event.clientX - lastX;
+            const dy = event.clientY - lastY;
+            lastX = event.clientX;
+            lastY = event.clientY;
+            this.game?.cameraController?.handleTouchLook?.(dx, dy);
+        });
+        this.updateMobileActionControls();
+    }
+
+    private updateMobileActionControls() {
+        const controls = this.mobileControls;
+        const actions = controls?.querySelector<HTMLElement>('.viper-touch-actions');
+        if (!controls || !actions) return;
+        const spectator = Boolean(this.game?.deathManager?.isSpectator);
+        controls.classList.toggle('is-spectating', spectator);
+        actions.setAttribute('aria-label', spectator ? 'Controles de observador' : this.game?.gameMode === 'editor' ? 'Herramientas del editor' : 'Acciones del juego');
+        if (spectator) {
+            actions.innerHTML = `
+                <button type="button" data-action="spectator-prev" aria-label="Jugador anterior">◀ Jugador</button>
+                <button type="button" data-action="spectator-view" aria-label="Cambiar perspectiva">Vista</button>
+                <button type="button" data-action="spectator-next" aria-label="Jugador siguiente">Jugador ▶</button>
+                <button type="button" data-action="jump" aria-label="Subir">Subir</button>
+                <button type="button" data-action="crouch" aria-label="Bajar">Bajar</button>`;
+        } else if (this.game?.gameMode === 'editor') {
+            actions.innerHTML = EDITOR_MOBILE_TOOL_ACTIONS
+                .map(({ id, label, ariaLabel }) => `<button type="button" data-editor-action="${id}" aria-label="${ariaLabel}">${label}</button>`)
+                .join('');
+        } else {
+            actions.innerHTML = `
+                <button type="button" data-action="interact" aria-label="Interactuar" class="viper-touch-interact">Usar</button>
+                <button type="button" data-action="jump" aria-label="Saltar" class="viper-touch-jump">Saltar</button>
+                <button type="button" data-action="attack" aria-label="Atacar" class="viper-touch-attack">Atacar</button>
+                <button type="button" data-action="aim" aria-label="Apuntar">Apuntar</button>
+                <button type="button" data-action="crouch" aria-label="Agacharse">Agachar</button>
+                <button type="button" data-action="reload" aria-label="Recargar o rotar">Recargar</button>
+                <button type="button" data-action="drop" aria-label="Soltar objeto">Soltar</button>`;
+        }
     }
 
     // --- STYLES ---

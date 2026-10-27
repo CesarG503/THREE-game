@@ -107,13 +107,21 @@ export type DeathScreenEasing =
 	| "easeInOutQuad"
 	| "easeOutCubic"
 	| "easeOutBack"
-	| "easeOutElastic";
+	| "easeOutElastic"
+	| "cubicBezier";
 
 export interface DeathScreenKeyframe {
 	time: number; // ms offset
-	property: string; // e.g. "x", "y", "scale", "opacity", "rotation", "color"
-	value: number | string;
-	easing?: DeathScreenEasing;
+	property?: string; // e.g. "x", "y", "scale", "opacity", "rotation", "color"
+	value?: number | string;
+	easing?: DeathScreenEasing | string;
+	bezierCurve?: [number, number, number, number]; // [x1, y1, x2, y2]
+	// Optional multi-property keyframe support
+	opacity?: number;
+	x?: number;
+	y?: number;
+	scale?: number;
+	rotation?: number;
 }
 
 export interface DeathScreenElementAnimation {
@@ -235,6 +243,10 @@ export interface DeathScreenBackgroundConfig {
 	overlayColor?: string;
 	overlayOpacity?: number; // 0 - 1
 	animation?: DeathScreenBgAnimationConfig;
+	filter?: string;
+	backdropBlur?: number;
+	vignette?: boolean | number;
+	desaturation?: number; // 0 - 100 percentage
 }
 
 /** Cinematic vignette used by the default in-world death-screen composition. */

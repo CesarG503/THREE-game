@@ -45,6 +45,7 @@ export class MapShapeEditor {
 
     initUI() {
         this.container = document.createElement('div');
+        this.container.id = 'map-shape-editor';
         this.container.style.cssText = `
             position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
             background: rgba(0,0,0,0.85); display: none; flex-direction: column;
@@ -53,6 +54,7 @@ export class MapShapeEditor {
         `;
 
         const panel = document.createElement('div');
+        panel.className = 'map-shape-editor-panel';
         panel.style.cssText = `
             width: 80%; height: 85%; background: #222; border: 1px solid #444;
             border-radius: 8px; display: flex; flex-direction: column; overflow: hidden;
@@ -82,10 +84,12 @@ export class MapShapeEditor {
 
         // Main Area
         const mainArea = document.createElement('div');
+        mainArea.className = 'map-shape-editor-main';
         mainArea.style.cssText = `display: flex; flex: 1; overflow: hidden;`;
 
         // Canvas Area
         const canvasContainer = document.createElement('div');
+        canvasContainer.className = 'map-shape-editor-canvas';
         canvasContainer.style.cssText = `
             flex: 1; background: #111; position: relative; overflow: hidden; cursor: crosshair;
         `;
@@ -95,6 +99,7 @@ export class MapShapeEditor {
 
         // Sidebar
         const sidebar = document.createElement('div');
+        sidebar.className = 'map-shape-editor-sidebar';
         sidebar.style.cssText = `
             width: 300px; background: #1a1a1a; border-left: 1px solid #333; padding: 20px;
             display: flex; flex-direction: column; gap: 20px; overflow-y: auto; color: white;

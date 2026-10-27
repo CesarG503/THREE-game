@@ -29,6 +29,7 @@ import { DeathAnimationService, resolveEasing } from "../managers/DeathAnimation
 import { StudioTokens } from "./studio/StudioTokens";
 import { renderStudioIcon } from "./studio/StudioIcons";
 import { StudioBackgroundManager } from "./studio/StudioBackgroundManager";
+import { StudioGraphEditor, type BezierCurveTuple } from "./studio/StudioGraphEditor";
 
 export interface DeathScreenEditorOptions {
 	mode: ExperienceModeProfile;
@@ -129,8 +130,11 @@ export class DeathScreenEditor {
 	public playbackSpeed: 0.5 | 1 | 2 = 1;
 	public isLooping = false;
 	public autoKeyEnabled = true;
+	public timelineViewMode: "dopesheet" | "graph" = "dopesheet";
+	public graphEditor: StudioGraphEditor | null = null;
+	public activeCurve: BezierCurveTuple = [0.34, 1.56, 0.64, 1];
 	public expandedTracks: Set<string> = new Set();
-	private selectedKeyframeInfo: { elemId: string; keyframeIdx: number } | null = null;
+	public selectedKeyframeInfo: { elemId: string; keyframeIdx: number } | null = null;
 
 	// Custom Components Library
 	public customComponents: DeathScreenCustomComponent[] = [];
@@ -150,6 +154,22 @@ export class DeathScreenEditor {
 			this.onSync();
 			this.updateCanvas();
 			this.updatePropertiesPanel();
+		});
+
+		this.graphEditor = new StudioGraphEditor({
+			curve: this.activeCurve,
+			onChange: (newCurve) => {
+				this.activeCurve = newCurve;
+				if (this.selectedKeyframeInfo) {
+					const elem = this.screen.elements?.find((e) => e.id === this.selectedKeyframeInfo?.elemId);
+					if (elem && elem.keyframes && elem.keyframes[this.selectedKeyframeInfo.keyframeIdx]) {
+						elem.keyframes[this.selectedKeyframeInfo.keyframeIdx].bezierCurve = [...newCurve];
+						elem.keyframes[this.selectedKeyframeInfo.keyframeIdx].easing = "cubicBezier";
+						this.hasUnsavedChanges = true;
+						this.onSync();
+					}
+				}
+			},
 		});
 
 		this.ensureConfig();
@@ -607,6 +627,15 @@ export class DeathScreenEditor {
 		if (this.container) {
 			this.render(this.container);
 		}
+	}
+
+	public setTimelineViewMode(mode: "dopesheet" | "graph") {
+		this.timelineViewMode = mode;
+		if (mode === "graph" && this.timelineHeight < 280) {
+			this.timelineHeight = 280;
+			if (this.timelineDockEl) this.timelineDockEl.style.height = `${this.timelineHeight}px`;
+		}
+		this.updateTimelineDock();
 	}
 
 	public startResizeLeftPanel(e: MouseEvent) {
@@ -1436,195 +1465,18 @@ export class DeathScreenEditor {
 	}
 
 	private renderBackgroundsManagerTab() {
-		const wrap = document.createElement("div");
-		wrap.style.cssText = "flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 12px;";
-
-		const topActions = document.createElement("div");
-		topActions.style.cssText = "display: flex; gap: 8px;";
-
-		const openGalleryBtn = document.createElement("button");
-		openGalleryBtn.type = "button";
-		openGalleryBtn.style.cssText = `
-			flex: 1;
-			background: ${StudioTokens.colors.surface2};
-			color: ${StudioTokens.colors.textPrimary};
-			border: 1px solid ${StudioTokens.colors.borderNormal};
-			padding: 7px 10px;
-			border-radius: ${StudioTokens.radii.sm};
-			font-size: ${StudioTokens.typography.sizeSm};
-			font-weight: 500;
-			cursor: pointer;
-			display: flex;
-			align-items: center;
-			justify-content: center;
-			gap: 6px;
-		`;
-		openGalleryBtn.innerHTML = `${renderStudioIcon("palette", 14, StudioTokens.colors.accent)} <span>Galería Completa</span>`;
-		openGalleryBtn.onclick = () => {
-			this.backgroundManager.openGalleryModal(this.screen.background || {}, (newBg) => {
+		if (!this.layersListEl) return;
+		this.backgroundManager.renderSidebarPanel(
+			this.layersListEl,
+			this.screen.background || {},
+			(newBg) => {
 				this.recordHistory();
 				this.screen.background = newBg;
 				this.hasUnsavedChanges = true;
 				this.onSync();
 				this.updateCanvas();
-				this.renderBackgroundsManagerTab();
-			});
-		};
-
-		const importBtn = document.createElement("button");
-		importBtn.type = "button";
-		importBtn.style.cssText = `
-			background: ${StudioTokens.colors.accent};
-			color: #090b0e;
-			border: none;
-			padding: 7px 12px;
-			border-radius: ${StudioTokens.radii.sm};
-			font-size: ${StudioTokens.typography.sizeSm};
-			font-weight: 600;
-			cursor: pointer;
-			display: flex;
-			align-items: center;
-			gap: 5px;
-		`;
-		importBtn.innerHTML = `${renderStudioIcon("upload", 13, "#090b0e")} <span>Importar</span>`;
-		importBtn.onclick = () => {
-			this.backgroundManager.importLocalImage((dataUrl) => {
-				this.recordHistory();
-				if (!this.screen.background) this.screen.background = {};
-				this.screen.background.type = "image";
-				this.screen.background.imageUrl = dataUrl;
-				this.screen.background.imageFit = "cover";
-				this.hasUnsavedChanges = true;
-				this.onSync();
-				this.updateCanvas();
-				this.renderBackgroundsManagerTab();
-			});
-		};
-
-		topActions.append(openGalleryBtn, importBtn);
-		wrap.appendChild(topActions);
-
-		// Current Background Quick Controls
-		const curBg = this.screen.background || {};
-		const curBox = document.createElement("div");
-		curBox.style.cssText = `
-			background: ${StudioTokens.colors.surface2};
-			border: 1px solid ${StudioTokens.colors.borderSubtle};
-			border-radius: ${StudioTokens.radii.md};
-			padding: 10px;
-			display: flex;
-			flex-direction: column;
-			gap: 8px;
-		`;
-
-		const curHeader = document.createElement("div");
-		curHeader.style.cssText = "display: flex; align-items: center; justify-content: space-between;";
-		curHeader.innerHTML = `<span style="font-size:${StudioTokens.typography.sizeXs}; font-weight:700; color:${StudioTokens.colors.textSecondary};">FONDO ACTUAL</span>`;
-		curBox.appendChild(curHeader);
-
-		// Type Select
-		const typeSelect = document.createElement("select");
-		typeSelect.style.cssText = `
-			background: ${StudioTokens.colors.surface1};
-			color: ${StudioTokens.colors.textPrimary};
-			border: 1px solid ${StudioTokens.colors.borderNormal};
-			padding: 5px;
-			border-radius: ${StudioTokens.radii.sm};
-			font-size: ${StudioTokens.typography.sizeSm};
-		`;
-		[
-			{ v: "transparent", t: "Transparente sobre 3D" },
-			{ v: "gradient", t: "Gradiente Dinámico" },
-			{ v: "color", t: "Color Sólido" },
-			{ v: "image", t: "Imagen / Textura" },
-			{ v: "animated", t: "Animado (Ken Burns / Scanlines)" },
-		].forEach((opt) => {
-			const o = document.createElement("option");
-			o.value = opt.v;
-			o.textContent = opt.t;
-			if ((curBg.type || "gradient") === opt.v) o.selected = true;
-			typeSelect.appendChild(o);
-		});
-		typeSelect.onchange = () => {
-			this.recordHistory();
-			if (!this.screen.background) this.screen.background = {};
-			this.screen.background.type = typeSelect.value as any;
-			this.hasUnsavedChanges = true;
-			this.onSync();
-			this.updateCanvas();
-			this.renderBackgroundsManagerTab();
-		};
-		curBox.appendChild(typeSelect);
-
-		// Opacity Overlay slider
-		const opWrap = document.createElement("div");
-		opWrap.style.cssText = "display: flex; flex-direction: column; gap: 4px;";
-		const opLbl = document.createElement("span");
-		opLbl.textContent = `Oscurecimiento Overlay (${Math.round((curBg.overlayOpacity ?? 0.7) * 100)}%)`;
-		opLbl.style.cssText = `font-size: ${StudioTokens.typography.sizeXs}; color: ${StudioTokens.colors.textSecondary};`;
-		const opSlider = document.createElement("input");
-		opSlider.type = "range";
-		opSlider.min = "0";
-		opSlider.max = "1";
-		opSlider.step = "0.05";
-		opSlider.value = String(curBg.overlayOpacity ?? 0.7);
-		opSlider.oninput = () => {
-			if (!this.screen.background) this.screen.background = {};
-			this.screen.background.overlayOpacity = parseFloat(opSlider.value);
-			opLbl.textContent = `Oscurecimiento Overlay (${Math.round(parseFloat(opSlider.value) * 100)}%)`;
-			this.onSync();
-			this.updateCanvas();
-		};
-		opWrap.append(opLbl, opSlider);
-		curBox.appendChild(opWrap);
-
-		wrap.appendChild(curBox);
-
-		// Quick Presets Grid
-		const presetsTitle = document.createElement("span");
-		presetsTitle.textContent = "PRESETS RÁPIDOS";
-		presetsTitle.style.cssText = `font-size: ${StudioTokens.typography.sizeXs}; font-weight: 700; color: ${StudioTokens.colors.accent}; letter-spacing: 0.5px;`;
-		wrap.appendChild(presetsTitle);
-
-		const pGrid = document.createElement("div");
-		pGrid.style.cssText = "display: grid; grid-template-columns: repeat(2, 1fr); grid-gap: 8px;";
-
-		StudioBackgroundManager.PRESETS.forEach((p) => {
-			const pCard = document.createElement("div");
-			pCard.style.cssText = `
-				background: ${StudioTokens.colors.surface2};
-				border: 1px solid ${StudioTokens.colors.borderSubtle};
-				border-radius: ${StudioTokens.radii.sm};
-				overflow: hidden;
-				cursor: pointer;
-				transition: ${StudioTokens.transitions.fast};
-			`;
-			pCard.onmouseenter = () => (pCard.style.borderColor = StudioTokens.colors.accent);
-			pCard.onmouseleave = () => (pCard.style.borderColor = StudioTokens.colors.borderSubtle);
-
-			const pThumb = document.createElement("div");
-			pThumb.style.cssText = `height: 50px; background: ${p.thumbnail}; background-size: cover;`;
-			const pLabel = document.createElement("div");
-			pLabel.textContent = p.name;
-			pLabel.style.cssText = `padding: 4px 6px; font-size: 10px; color: ${StudioTokens.colors.textPrimary}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;`;
-
-			pCard.append(pThumb, pLabel);
-			pCard.onclick = () => {
-				this.recordHistory();
-				this.screen.background = {
-					...this.screen.background,
-					...p.config,
-				};
-				this.hasUnsavedChanges = true;
-				this.onSync();
-				this.updateCanvas();
-				this.renderBackgroundsManagerTab();
-			};
-			pGrid.appendChild(pCard);
-		});
-
-		wrap.appendChild(pGrid);
-		this.layersListEl!.appendChild(wrap);
+			}
+		);
 	}
 
 	private renderCustomComponentsTab() {
@@ -2853,7 +2705,108 @@ export class DeathScreenEditor {
 			this.addKeyframe(elem.id, "opacity", elem.style?.opacity ?? 1);
 		};
 		animBox.appendChild(addKfBtn);
+
+		const openGraphBtn = document.createElement("button");
+		openGraphBtn.type = "button";
+		openGraphBtn.style.cssText = `
+			background: ${StudioTokens.colors.surface3};
+			color: ${StudioTokens.colors.textPrimary};
+			border: 1px solid ${StudioTokens.colors.borderNormal};
+			padding: 6px;
+			border-radius: ${StudioTokens.radii.sm};
+			font-size: ${StudioTokens.typography.sizeSm};
+			cursor: pointer;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			gap: 6px;
+		`;
+		openGraphBtn.innerHTML = `${renderStudioIcon("bezier", 13, StudioTokens.colors.accent)} <span>Editar Curva Bézier en Graph Editor</span>`;
+		openGraphBtn.onclick = () => {
+			this.setTimelineViewMode("graph");
+		};
+		animBox.appendChild(openGraphBtn);
 		scroll.appendChild(animBox);
+
+		// 6. Conditions & Gameplay
+		const condBox = this.createSectionBox("Condiciones de Activación");
+		const condNote = document.createElement("span");
+		condNote.textContent = "Mostrar solo en causas de muerte específicas:";
+		condNote.style.cssText = `font-size: 11px; color: ${StudioTokens.colors.textMuted};`;
+		condBox.appendChild(condNote);
+
+		const causesWrap = document.createElement("div");
+		causesWrap.style.cssText = "display: flex; flex-wrap: wrap; gap: 4px;";
+		const causes: DeathCause[] = ["damage", "fall", "logic", "vehicle"];
+		const elemCauses = new Set(elem.conditions?.causes || []);
+		causes.forEach((cause) => {
+			const badge = document.createElement("button");
+			badge.type = "button";
+			const isActive = elemCauses.size === 0 || elemCauses.has(cause);
+			badge.style.cssText = `
+				background: ${isActive ? StudioTokens.colors.surface3 : "transparent"};
+				border: 1px solid ${isActive ? StudioTokens.colors.accent : StudioTokens.colors.borderSubtle};
+				color: ${isActive ? StudioTokens.colors.accent : StudioTokens.colors.textMuted};
+				padding: 3px 8px;
+				border-radius: 9999px;
+				font-size: 10px;
+				cursor: pointer;
+			`;
+			badge.textContent = cause.toUpperCase();
+			badge.onclick = () => {
+				if (!elem.conditions) elem.conditions = {};
+				if (!elem.conditions.causes) elem.conditions.causes = [];
+				const idx = elem.conditions.causes.indexOf(cause);
+				if (idx >= 0) elem.conditions.causes.splice(idx, 1);
+				else elem.conditions.causes.push(cause);
+				this.hasUnsavedChanges = true;
+				this.onSync();
+				this.updatePropertiesPanel();
+			};
+			causesWrap.appendChild(badge);
+		});
+		condBox.appendChild(causesWrap);
+		scroll.appendChild(condBox);
+
+		// 7. Action Button Specific Settings
+		if (elem.type === "action_button") {
+			const actBox = this.createSectionBox("Interacción de Botón");
+			const actWrap = document.createElement("div");
+			actWrap.style.cssText = "display: flex; flex-direction: column; gap: 4px;";
+			const actLbl = document.createElement("span");
+			actLbl.textContent = "Acción al pulsar";
+			actLbl.style.cssText = `font-size: 11px; color: ${StudioTokens.colors.textSecondary};`;
+			const actSelect = document.createElement("select");
+			actSelect.style.cssText = `
+				background: ${StudioTokens.colors.surface1};
+				color: ${StudioTokens.colors.textPrimary};
+				border: 1px solid ${StudioTokens.colors.borderNormal};
+				padding: 4px;
+				border-radius: ${StudioTokens.radii.sm};
+				font-size: 11px;
+			`;
+			[
+				{ v: "respawn", l: "Reaparecer (Respawn)" },
+				{ v: "spectate", l: "Modo Observador (Spectate)" },
+				{ v: "restart", l: "Reiniciar Partida" },
+				{ v: "lobby", l: "Salir al Lobby" },
+			].forEach((act) => {
+				const opt = document.createElement("option");
+				opt.value = act.v;
+				opt.textContent = act.l;
+				if ((elem.action || "respawn") === act.v) opt.selected = true;
+				actSelect.appendChild(opt);
+			});
+			actSelect.onchange = () => {
+				elem.action = actSelect.value as any;
+				this.hasUnsavedChanges = true;
+				this.onSync();
+				this.updateCanvas();
+			};
+			actWrap.append(actLbl, actSelect);
+			actBox.appendChild(actWrap);
+			scroll.appendChild(actBox);
+		}
 
 		this.propertiesPanelEl!.appendChild(scroll);
 	}
@@ -3076,7 +3029,7 @@ export class DeathScreenEditor {
 			padding: 0 12px;
 		`;
 
-		// Transport Controls (Play, Stop, Rewind, Auto-Key)
+		// Left: Transport Controls (Play, Stop, Rewind, Time, Auto-Key)
 		const left = document.createElement("div");
 		left.style.cssText = "display: flex; align-items: center; gap: 8px;";
 
@@ -3107,6 +3060,17 @@ export class DeathScreenEditor {
 		stopBtn.innerHTML = renderStudioIcon("stop", 13);
 		stopBtn.onclick = () => this.stopTimelineSequence();
 
+		const rewindBtn = document.createElement("button");
+		rewindBtn.type = "button";
+		rewindBtn.title = "Rebobinar al inicio (0.00s)";
+		rewindBtn.style.cssText = stopBtn.style.cssText;
+		rewindBtn.innerHTML = renderStudioIcon("skip-back", 13);
+		rewindBtn.onclick = () => {
+			this.timelineCurrentTime = 0;
+			this.applyTimelineFrame(0);
+			this.updateTimelineDock();
+		};
+
 		const timeDisplay = document.createElement("span");
 		timeDisplay.className = "timeline-time-display";
 		timeDisplay.style.cssText = `font-size: ${StudioTokens.typography.sizeSm}; font-family: ${StudioTokens.typography.fontMono}; color: ${StudioTokens.colors.accent};`;
@@ -3133,12 +3097,98 @@ export class DeathScreenEditor {
 			this.updateTimelineDock();
 		};
 
-		left.append(playBtn, stopBtn, timeDisplay, autoKeyBtn);
+		left.append(playBtn, stopBtn, rewindBtn, timeDisplay, autoKeyBtn);
 		header.appendChild(left);
 
-		// Speed & Loop
+		// Center: Dope Sheet vs Graph Editor View Mode Toggle
+		const center = document.createElement("div");
+		center.style.cssText = "display: flex; align-items: center; gap: 4px; background: " + StudioTokens.colors.surface1 + "; padding: 2px; border-radius: " + StudioTokens.radii.sm + "; border: 1px solid " + StudioTokens.colors.borderSubtle + ";";
+
+		const dopesheetBtn = document.createElement("button");
+		dopesheetBtn.type = "button";
+		const isDope = this.timelineViewMode === "dopesheet";
+		dopesheetBtn.style.cssText = `
+			background: ${isDope ? StudioTokens.colors.surface3 : "transparent"};
+			color: ${isDope ? StudioTokens.colors.accent : StudioTokens.colors.textSecondary};
+			border: 1px solid ${isDope ? StudioTokens.colors.accentBorder : "transparent"};
+			padding: 3px 10px;
+			border-radius: ${StudioTokens.radii.sm};
+			font-size: 11px;
+			font-weight: ${isDope ? "600" : "500"};
+			cursor: pointer;
+			display: flex;
+			align-items: center;
+			gap: 5px;
+		`;
+		dopesheetBtn.innerHTML = `${renderStudioIcon("timeline", 12, isDope ? StudioTokens.colors.accent : "currentColor")} <span>Dope Sheet</span>`;
+		dopesheetBtn.onclick = () => this.setTimelineViewMode("dopesheet");
+
+		const graphBtn = document.createElement("button");
+		graphBtn.type = "button";
+		const isGraph = this.timelineViewMode === "graph";
+		graphBtn.style.cssText = `
+			background: ${isGraph ? StudioTokens.colors.surface3 : "transparent"};
+			color: ${isGraph ? StudioTokens.colors.accent : StudioTokens.colors.textSecondary};
+			border: 1px solid ${isGraph ? StudioTokens.colors.accentBorder : "transparent"};
+			padding: 3px 10px;
+			border-radius: ${StudioTokens.radii.sm};
+			font-size: 11px;
+			font-weight: ${isGraph ? "600" : "500"};
+			cursor: pointer;
+			display: flex;
+			align-items: center;
+			gap: 5px;
+		`;
+		graphBtn.innerHTML = `${renderStudioIcon("bezier", 12, isGraph ? StudioTokens.colors.accent : "currentColor")} <span>Graph Editor</span>`;
+		graphBtn.onclick = () => this.setTimelineViewMode("graph");
+
+		center.append(dopesheetBtn, graphBtn);
+		header.appendChild(center);
+
+		// Right: Keyframe Operations (Add, Delete, Loop)
 		const right = document.createElement("div");
 		right.style.cssText = "display: flex; align-items: center; gap: 8px;";
+
+		const addKfBtn = document.createElement("button");
+		addKfBtn.type = "button";
+		addKfBtn.title = "Añadir keyframe al playhead actual";
+		addKfBtn.style.cssText = `
+			background: ${StudioTokens.colors.surface3};
+			border: 1px solid ${StudioTokens.colors.borderNormal};
+			color: ${StudioTokens.colors.textPrimary};
+			padding: 3px 8px;
+			border-radius: ${StudioTokens.radii.sm};
+			font-size: 11px;
+			cursor: pointer;
+			display: flex;
+			align-items: center;
+			gap: 4px;
+		`;
+		addKfBtn.innerHTML = `${renderStudioIcon("plus", 12, StudioTokens.colors.accent)} <span>+ Keyframe</span>`;
+		addKfBtn.onclick = () => {
+			const sel = this.getSelectedElements()[0] || this.screen.elements?.[0];
+			if (sel) {
+				this.addKeyframe(sel.id, "opacity", sel.style?.opacity ?? 1);
+			}
+		};
+
+		const delKfBtn = document.createElement("button");
+		delKfBtn.type = "button";
+		delKfBtn.title = "Eliminar keyframe seleccionado";
+		delKfBtn.style.cssText = `
+			background: ${StudioTokens.colors.surface3};
+			border: 1px solid ${StudioTokens.colors.borderNormal};
+			color: ${this.selectedKeyframeInfo ? StudioTokens.colors.error : StudioTokens.colors.textMuted};
+			padding: 3px 8px;
+			border-radius: ${StudioTokens.radii.sm};
+			font-size: 11px;
+			cursor: ${this.selectedKeyframeInfo ? "pointer" : "default"};
+			display: flex;
+			align-items: center;
+			gap: 4px;
+		`;
+		delKfBtn.innerHTML = `${renderStudioIcon("trash", 12)} <span>Borrar</span>`;
+		delKfBtn.onclick = () => this.deleteSelectedKeyframe();
 
 		const loopBtn = document.createElement("button");
 		loopBtn.type = "button";
@@ -3161,11 +3211,173 @@ export class DeathScreenEditor {
 			loopBtn.style.color = this.isLooping ? StudioTokens.colors.accent : StudioTokens.colors.textSecondary;
 		};
 
-		right.appendChild(loopBtn);
+		right.append(addKfBtn, delKfBtn, loopBtn);
 		header.appendChild(right);
 		this.timelineDockEl.appendChild(header);
 
-		// Multitrack List & Ruler Area
+		// BODY: Render Graph Editor OR Dope Sheet
+		if (this.timelineViewMode === "graph") {
+			this.renderGraphEditorView();
+		} else {
+			this.renderDopeSheetView();
+		}
+	}
+
+	private renderGraphEditorView() {
+		if (!this.timelineDockEl) return;
+
+		const graphWrap = document.createElement("div");
+		graphWrap.style.cssText = `
+			flex: 1;
+			overflow-y: auto;
+			padding: 10px 14px;
+			display: flex;
+			flex-direction: column;
+			gap: 8px;
+			background: ${StudioTokens.colors.surfaceBase};
+		`;
+
+		// Subheader: Element & Keyframe context indicator
+		const subhead = document.createElement("div");
+		subhead.style.cssText = "display: flex; align-items: center; justify-content: space-between;";
+
+		const selElem = this.getSelectedElements()[0] || this.screen.elements?.[0];
+		const elemLabel = selElem ? selElem.name : "Elemento Global";
+
+		subhead.innerHTML = `
+			<div style="display:flex; align-items:center; gap:8px;">
+				<span style="font-size:11px; color:${StudioTokens.colors.textMuted};">CURVA ACTIVA:</span>
+				<strong style="font-size:12px; color:${StudioTokens.colors.accent};">${elemLabel}</strong>
+				${this.selectedKeyframeInfo ? `<span style="font-size:10px; background:${StudioTokens.colors.accentMuted}; color:${StudioTokens.colors.accent}; padding:1px 6px; border-radius:3px;">Keyframe a ${selElem?.keyframes?.[this.selectedKeyframeInfo.keyframeIdx]?.time ?? 0}ms</span>` : ""}
+			</div>
+			<span style="font-size:11px; color:${StudioTokens.colors.textSecondary}; font-family:${StudioTokens.typography.fontMono};">cubicBezier(${this.activeCurve.join(", ")})</span>
+		`;
+		graphWrap.appendChild(subhead);
+
+		// If a keyframe is selected with its own bezierCurve, sync it to graph editor
+		if (this.selectedKeyframeInfo && selElem && selElem.keyframes?.[this.selectedKeyframeInfo.keyframeIdx]?.bezierCurve) {
+			this.activeCurve = [...selElem.keyframes[this.selectedKeyframeInfo.keyframeIdx].bezierCurve!];
+		}
+
+		if (this.graphEditor) {
+			this.graphEditor.setCurve(this.activeCurve, false);
+			graphWrap.appendChild(this.graphEditor.render());
+		}
+
+		this.timelineDockEl.appendChild(graphWrap);
+	}
+
+	private renderDopeSheetView() {
+		if (!this.timelineDockEl) return;
+
+		// 1. Time Ruler Bar with scrubbing playhead
+		const ruler = document.createElement("div");
+		ruler.className = "timeline-time-ruler";
+		ruler.style.cssText = `
+			height: 24px;
+			background: ${StudioTokens.colors.surface1};
+			border-bottom: 1px solid ${StudioTokens.colors.borderSubtle};
+			display: flex;
+			position: relative;
+			user-select: none;
+		`;
+
+		const rulerHeaderSpacer = document.createElement("div");
+		rulerHeaderSpacer.style.cssText = `
+			width: 200px;
+			height: 100%;
+			border-right: 1px solid ${StudioTokens.colors.borderSubtle};
+			background: ${StudioTokens.colors.surface2};
+			display: flex;
+			align-items: center;
+			padding-left: 10px;
+			font-size: 10px;
+			font-weight: 600;
+			color: ${StudioTokens.colors.textMuted};
+		`;
+		rulerHeaderSpacer.textContent = "PISTAS / CAPAS";
+		ruler.appendChild(rulerHeaderSpacer);
+
+		const rulerTrack = document.createElement("div");
+		rulerTrack.style.cssText = "flex: 1; height: 100%; position: relative; cursor: crosshair;";
+
+		// Time Marks (0.0s, 0.5s, 1.0s, 1.5s, 2.0s, 2.5s, 3.0s)
+		const intervals = [0, 500, 1000, 1500, 2000, 2500, 3000];
+		intervals.forEach((t) => {
+			const pct = (t / this.timelineTotalDuration) * 100;
+			const tick = document.createElement("div");
+			tick.style.cssText = `
+				position: absolute;
+				left: ${pct}%;
+				top: 0;
+				bottom: 0;
+				border-left: 1px solid ${StudioTokens.colors.borderNormal};
+				padding-left: 3px;
+				font-size: 9px;
+				font-family: ${StudioTokens.typography.fontMono};
+				color: ${StudioTokens.colors.textMuted};
+				pointer-events: none;
+			`;
+			tick.textContent = `${(t / 1000).toFixed(1)}s`;
+			rulerTrack.appendChild(tick);
+		});
+
+		// Red Scrubbing Playhead Line
+		const playhead = document.createElement("div");
+		playhead.className = "timeline-playhead-line";
+		const playheadPct = (this.timelineCurrentTime / this.timelineTotalDuration) * 100;
+		playhead.style.cssText = `
+			position: absolute;
+			left: ${playheadPct}%;
+			top: 0;
+			bottom: -500px;
+			width: 2px;
+			background: #ff3366;
+			z-index: 50;
+			pointer-events: none;
+		`;
+		const playheadHead = document.createElement("div");
+		playheadHead.style.cssText = `
+			position: absolute;
+			top: 0;
+			left: -4px;
+			width: 10px;
+			height: 10px;
+			background: #ff3366;
+			clip-path: polygon(0 0, 100% 0, 100% 60%, 50% 100%, 0 60%);
+		`;
+		playhead.appendChild(playheadHead);
+		rulerTrack.appendChild(playhead);
+
+		// Ruler Scrub Handler
+		let isScrubbing = false;
+		const updateScrub = (ev: MouseEvent) => {
+			const rect = rulerTrack.getBoundingClientRect();
+			const pct = Math.max(0, Math.min(1, (ev.clientX - rect.left) / rect.width));
+			this.timelineCurrentTime = Math.round((pct * this.timelineTotalDuration) / 25) * 25; // 25ms snap
+			this.applyTimelineFrame(this.timelineCurrentTime);
+			playhead.style.left = `${(this.timelineCurrentTime / this.timelineTotalDuration) * 100}%`;
+			const disp = this.timelineDockEl?.querySelector(".timeline-time-display");
+			if (disp) disp.textContent = `${(this.timelineCurrentTime / 1000).toFixed(2)}s / ${(this.timelineTotalDuration / 1000).toFixed(2)}s`;
+		};
+
+		rulerTrack.addEventListener("mousedown", (e) => {
+			isScrubbing = true;
+			updateScrub(e);
+			const onMove = (ev: MouseEvent) => { if (isScrubbing) updateScrub(ev); };
+			const onUp = () => {
+				isScrubbing = false;
+				window.removeEventListener("mousemove", onMove);
+				window.removeEventListener("mouseup", onUp);
+			};
+			window.addEventListener("mousemove", onMove);
+			window.addEventListener("mouseup", onUp);
+		});
+
+		ruler.appendChild(rulerTrack);
+		this.timelineDockEl.appendChild(ruler);
+
+		// 2. Multitrack List & Ruler Area
 		const trackContainer = document.createElement("div");
 		trackContainer.className = "custom-scrollbar";
 		trackContainer.style.cssText = "flex: 1; overflow-y: auto; overflow-x: hidden; position: relative;";
@@ -3181,34 +3393,83 @@ export class DeathScreenEditor {
 				flex-direction: column;
 			`;
 
+			// Main Track
 			const mainTrack = document.createElement("div");
-			mainTrack.style.cssText = "height: 28px; display: flex; align-items: center; justify-content: space-between; padding: 0 10px; cursor: pointer;";
-			mainTrack.onclick = () => {
+			mainTrack.style.cssText = "height: 28px; display: flex; align-items: center; position: relative;";
+
+			// Left Label Area
+			const tLabel = document.createElement("div");
+			tLabel.style.cssText = `
+				width: 200px;
+				height: 100%;
+				padding: 0 8px;
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				border-right: 1px solid ${StudioTokens.colors.borderSubtle};
+				cursor: pointer;
+				background: ${StudioTokens.colors.surface2};
+			`;
+			tLabel.innerHTML = `
+				<div style="display:flex; align-items:center; gap:6px; overflow:hidden;">
+					${renderStudioIcon(isExpanded ? "chevron-down" : "chevron-right", 12, StudioTokens.colors.textSecondary)}
+					<span style="font-size:${StudioTokens.typography.sizeSm}; font-weight:500; color:${StudioTokens.colors.textPrimary}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${elem.name}</span>
+				</div>
+				<div style="background:rgba(0,210,255,0.12); border:1px solid rgba(0,210,255,0.3); color:${StudioTokens.colors.accent}; padding:1px 5px; border-radius:3px; font-size:10px; font-family:${StudioTokens.typography.fontMono};">${elem.animation?.duration || 400}ms</div>
+			`;
+			tLabel.onclick = () => {
 				if (this.expandedTracks.has(elem.id)) this.expandedTracks.delete(elem.id);
 				else this.expandedTracks.add(elem.id);
 				this.updateTimelineDock();
 			};
 
-			const tLabel = document.createElement("div");
-			tLabel.style.cssText = "display: flex; align-items: center; gap: 6px;";
-			tLabel.innerHTML = `
-				${renderStudioIcon(isExpanded ? "chevron-down" : "chevron-right", 12, StudioTokens.colors.textSecondary)}
-				<span style="font-size:${StudioTokens.typography.sizeSm}; font-weight:500; color:${StudioTokens.colors.textPrimary};">${elem.name}</span>
-			`;
+			// Right Track Canvas Bar with Keyframe Diamonds
+			const tBar = document.createElement("div");
+			tBar.style.cssText = "flex: 1; height: 100%; position: relative; background: rgba(0,0,0,0.2);";
 
-			const tPill = document.createElement("div");
-			tPill.style.cssText = `
-				background: rgba(0, 210, 255, 0.15);
-				border: 1px solid rgba(0, 210, 255, 0.4);
-				color: ${StudioTokens.colors.accent};
-				padding: 1px 6px;
-				border-radius: 3px;
-				font-size: 10px;
-				font-family: ${StudioTokens.typography.fontMono};
-			`;
-			tPill.textContent = `${elem.animation?.duration || 400}ms`;
+			// Render Keyframe Diamonds ◆
+			const kfs = elem.keyframes || [];
+			kfs.forEach((kf, idx) => {
+				const pct = (kf.time / this.timelineTotalDuration) * 100;
+				const isSelectedKf = this.selectedKeyframeInfo?.elemId === elem.id && this.selectedKeyframeInfo?.keyframeIdx === idx;
 
-			mainTrack.append(tLabel, tPill);
+				const diamond = document.createElement("div");
+				diamond.title = `Keyframe ${kf.time}ms - Easing: ${kf.easing || "cubicBezier"}`;
+				diamond.style.cssText = `
+					position: absolute;
+					left: ${pct}%;
+					top: 50%;
+					transform: translate(-50%, -50%) rotate(45deg);
+					width: 10px;
+					height: 10px;
+					background: ${isSelectedKf ? StudioTokens.colors.accent : "#8a99ad"};
+					border: 1.5px solid ${isSelectedKf ? "#ffffff" : StudioTokens.colors.surfaceBase};
+					cursor: pointer;
+					box-shadow: ${isSelectedKf ? "0 0 6px " + StudioTokens.colors.accentGlow : "none"};
+					z-index: 10;
+					transition: transform 0.1s;
+				`;
+
+				diamond.onclick = (e) => {
+					e.stopPropagation();
+					this.selectedKeyframeInfo = { elemId: elem.id, keyframeIdx: idx };
+					if (kf.bezierCurve) {
+						this.activeCurve = [...kf.bezierCurve];
+						if (this.graphEditor) this.graphEditor.setCurve(this.activeCurve, false);
+					}
+					this.updateTimelineDock();
+				};
+
+				diamond.ondblclick = (e) => {
+					e.stopPropagation();
+					this.selectedKeyframeInfo = { elemId: elem.id, keyframeIdx: idx };
+					this.setTimelineViewMode("graph");
+				};
+
+				tBar.appendChild(diamond);
+			});
+
+			mainTrack.append(tLabel, tBar);
 			row.appendChild(mainTrack);
 
 			// Sub-tracks (Opacity, Pos X, Pos Y, Scale, Rotation)
@@ -3224,21 +3485,59 @@ export class DeathScreenEditor {
 				props.forEach((p) => {
 					const sub = document.createElement("div");
 					sub.style.cssText = `
-						height: 24px;
-						padding-left: 28px;
-						padding-right: 10px;
+						height: 22px;
 						display: flex;
 						align-items: center;
-						justify-content: space-between;
-						background: ${StudioTokens.colors.surface2};
-						border-top: 1px solid rgba(255,255,255,0.03);
+						background: ${StudioTokens.colors.surface1};
+						border-top: 1px solid rgba(255,255,255,0.02);
 					`;
-					sub.innerHTML = `
-						<div style="display:flex; align-items:center; gap:6px;">
-							${renderStudioIcon(p.icon as any, 11, StudioTokens.colors.textMuted)}
-							<span style="font-size:11px; color:${StudioTokens.colors.textSecondary};">${p.l}</span>
-						</div>
+
+					const subLbl = document.createElement("div");
+					subLbl.style.cssText = `
+						width: 200px;
+						height: 100%;
+						padding-left: 28px;
+						display: flex;
+						align-items: center;
+						gap: 6px;
+						border-right: 1px solid ${StudioTokens.colors.borderSubtle};
 					`;
+					subLbl.innerHTML = `
+						${renderStudioIcon(p.icon as any, 10, StudioTokens.colors.textMuted)}
+						<span style="font-size:10px; color:${StudioTokens.colors.textSecondary};">${p.l}</span>
+					`;
+
+					const subBar = document.createElement("div");
+					subBar.style.cssText = "flex: 1; height: 100%; position: relative;";
+
+					// Check if any keyframe defines this property
+					kfs.forEach((kf, idx) => {
+						if ((kf as any)[p.k] !== undefined) {
+							const pct = (kf.time / this.timelineTotalDuration) * 100;
+							const isSelectedKf = this.selectedKeyframeInfo?.elemId === elem.id && this.selectedKeyframeInfo?.keyframeIdx === idx;
+
+							const subDiamond = document.createElement("div");
+							subDiamond.style.cssText = `
+								position: absolute;
+								left: ${pct}%;
+								top: 50%;
+								transform: translate(-50%, -50%) rotate(45deg);
+								width: 8px;
+								height: 8px;
+								background: ${isSelectedKf ? StudioTokens.colors.accent : "#718096"};
+								border: 1px solid ${StudioTokens.colors.surfaceBase};
+								cursor: pointer;
+							`;
+							subDiamond.onclick = (e) => {
+								e.stopPropagation();
+								this.selectedKeyframeInfo = { elemId: elem.id, keyframeIdx: idx };
+								this.updateTimelineDock();
+							};
+							subBar.appendChild(subDiamond);
+						}
+					});
+
+					sub.append(subLbl, subBar);
 					row.appendChild(sub);
 				});
 			}
@@ -3256,19 +3555,117 @@ export class DeathScreenEditor {
 
 		const time = this.timelineCurrentTime;
 		const existing = elem.keyframes.find((k) => k.time === time);
+		const curve = this.graphEditor ? this.graphEditor.getCurve() : this.activeCurve;
+
 		if (existing) {
 			(existing as any)[property] = value;
+			if (!existing.bezierCurve) existing.bezierCurve = [...curve];
 		} else {
 			const kf: DeathScreenKeyframe = {
 				time,
-				easing: "outQuad",
+				easing: "cubicBezier",
+				bezierCurve: [...curve],
 			};
 			(kf as any)[property] = value;
 			elem.keyframes.push(kf);
 			elem.keyframes.sort((a, b) => a.time - b.time);
 		}
 		this.hasUnsavedChanges = true;
+		this.onSync();
 		this.updateTimelineDock();
+	}
+
+	public deleteSelectedKeyframe() {
+		if (!this.selectedKeyframeInfo) return;
+		const elem = this.screen.elements?.find((e) => e.id === this.selectedKeyframeInfo?.elemId);
+		if (elem && elem.keyframes) {
+			elem.keyframes.splice(this.selectedKeyframeInfo.keyframeIdx, 1);
+			this.selectedKeyframeInfo = null;
+			this.hasUnsavedChanges = true;
+			this.onSync();
+			this.updateTimelineDock();
+		}
+	}
+
+	public applyTimelineFrame(time: number) {
+		const elems = this.screen.elements || [];
+		elems.forEach((elem) => {
+			const dom = this.canvasEl?.querySelector(`[data-element-id="${elem.id}"]`) as HTMLElement;
+			if (!dom) return;
+
+			if (!elem.keyframes || elem.keyframes.length === 0) return;
+
+			const kfs = [...elem.keyframes].sort((a, b) => a.time - b.time);
+			let targetOpacity = elem.style?.opacity ?? 1;
+			let targetX = elem.x;
+			let targetY = elem.y;
+			let targetScale = elem.style?.scaleX ?? 1;
+			let targetRot = elem.style?.rotation ?? 0;
+
+			if (time <= kfs[0].time) {
+				const k0 = kfs[0];
+				if (k0.opacity !== undefined) targetOpacity = k0.opacity;
+				if (k0.x !== undefined) targetX = k0.x;
+				if (k0.y !== undefined) targetY = k0.y;
+				if (k0.scale !== undefined) targetScale = k0.scale;
+				if (k0.rotation !== undefined) targetRot = k0.rotation;
+			} else if (time >= kfs[kfs.length - 1].time) {
+				const kLast = kfs[kfs.length - 1];
+				if (kLast.opacity !== undefined) targetOpacity = kLast.opacity;
+				if (kLast.x !== undefined) targetX = kLast.x;
+				if (kLast.y !== undefined) targetY = kLast.y;
+				if (kLast.scale !== undefined) targetScale = kLast.scale;
+				if (kLast.rotation !== undefined) targetRot = kLast.rotation;
+			} else {
+				let kA = kfs[0];
+				let kB = kfs[kfs.length - 1];
+				for (let i = 0; i < kfs.length - 1; i++) {
+					if (time >= kfs[i].time && time <= kfs[i + 1].time) {
+						kA = kfs[i];
+						kB = kfs[i + 1];
+						break;
+					}
+				}
+				const segDuration = Math.max(1, kB.time - kA.time);
+				const u = (time - kA.time) / segDuration;
+
+				// Calculate progress using Bézier curve
+				let p = u;
+				if (this.graphEditor) {
+					if (kB.bezierCurve) {
+						const tempGraph = new StudioGraphEditor({ curve: kB.bezierCurve });
+						p = tempGraph.evaluate(u);
+					} else {
+						p = this.graphEditor.evaluate(u);
+					}
+				}
+
+				const aOp = kA.opacity ?? elem.style?.opacity ?? 1;
+				const bOp = kB.opacity ?? elem.style?.opacity ?? 1;
+				targetOpacity = aOp + (bOp - aOp) * p;
+
+				const aX = kA.x ?? elem.x;
+				const bX = kB.x ?? elem.x;
+				targetX = aX + (bX - aX) * p;
+
+				const aY = kA.y ?? elem.y;
+				const bY = kB.y ?? elem.y;
+				targetY = aY + (bY - aY) * p;
+
+				const aSc = kA.scale ?? elem.style?.scaleX ?? 1;
+				const bSc = kB.scale ?? elem.style?.scaleX ?? 1;
+				targetScale = aSc + (bSc - aSc) * p;
+
+				const aRot = kA.rotation ?? elem.style?.rotation ?? 0;
+				const bRot = kB.rotation ?? elem.style?.rotation ?? 0;
+				targetRot = aRot + (bRot - aRot) * p;
+			}
+
+			dom.style.opacity = String(targetOpacity);
+			dom.style.left = `${targetX}%`;
+			dom.style.top = `${targetY}%`;
+			dom.style.transform = `translate(-50%, -50%) rotate(${targetRot}deg) scale(${targetScale})`;
+		});
 	}
 
 	public playTimelineSequence() {
@@ -3289,9 +3686,14 @@ export class DeathScreenEditor {
 					return;
 				}
 			}
-			const disp = this.container?.querySelector(".timeline-time-display");
+			this.applyTimelineFrame(this.timelineCurrentTime);
+			const disp = this.timelineDockEl?.querySelector(".timeline-time-display");
 			if (disp) {
 				disp.textContent = `${(this.timelineCurrentTime / 1000).toFixed(2)}s / ${(this.timelineTotalDuration / 1000).toFixed(2)}s`;
+			}
+			const playhead = this.timelineDockEl?.querySelector(".timeline-playhead-line") as HTMLElement;
+			if (playhead) {
+				playhead.style.left = `${(this.timelineCurrentTime / this.timelineTotalDuration) * 100}%`;
 			}
 		}, step);
 	}
@@ -3303,9 +3705,10 @@ export class DeathScreenEditor {
 			this.timelineTimerId = null;
 		}
 		this.timelineCurrentTime = 0;
+		this.applyTimelineFrame(0);
+		this.updateCanvas();
 		this.updateTimelineDock();
 	}
-
 	// --- 9. BOTTOM STATUS BAR PREMIUM ---
 	private createStatusBar(): HTMLElement {
 		this.statusBarEl = document.createElement("div");

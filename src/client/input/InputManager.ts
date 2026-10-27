@@ -81,6 +81,17 @@ export class InputManager {
     this.keys.aim = false;
   }
 
+  setVirtualInput(input: keyof InputState, pressed: boolean) {
+    if (this.isPaused || !this.enabled) {
+      this.keys[input] = false;
+      return;
+    }
+    const blocked = input === "attack" || input === "aim"
+      ? (this.actionCheckCallback ? this.actionCheckCallback() : this.uiCheckCallback?.())
+      : (this.movementCheckCallback ? this.movementCheckCallback() : this.uiCheckCallback?.());
+    this.keys[input] = pressed && !blocked;
+  }
+
   onKeyDown(event: KeyboardEvent) {
     if (this.isPaused || !this.enabled || isTextInput(event.target) || isTextInput(document.activeElement)) return;
 

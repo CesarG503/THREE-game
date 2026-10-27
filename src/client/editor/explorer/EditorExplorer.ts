@@ -20,6 +20,7 @@ import { PrefabManager } from "../prefabs/PrefabManager";
 import { PrefabSerializer } from "../prefabs/PrefabSerializer";
 import { PrefabService } from "../prefabs/PrefabService";
 import type { PlatformPrefabDto } from "../prefabs/PrefabTypes";
+import { EDITOR_DESKTOP_TOOL_ACTIONS } from "./EditorActionCatalog";
 
 export interface EditorExplorerOptions {
 	shortcutKey?: string; // Por defecto 'h'
@@ -446,26 +447,31 @@ export class EditorExplorer {
 		const btnNewGroup = createBtn("Grupo", "Agrupa los elementos seleccionados en un nuevo grupo (Ctrl+G), o crea un grupo vacío si no hay selección", () => {
 			this.handleCreateGroup();
 		});
+		btnNewGroup.dataset.editorAction = "create-group";
 
 		// Botón Crear Subgrupo Explícito (Acción diferenciada)
 		const btnNewSubgroup = createBtn("+ Subgrupo", "Crea un subgrupo explícito dentro del grupo seleccionado", () => {
 			this.handleCreateSubgroup();
 		});
+		btnNewSubgroup.dataset.editorAction = "create-subgroup";
 
 		// Botón Agrupar Selección (Agrupa el elemento seleccionado dentro de un nuevo grupo)
 		const btnGroupSelection = createBtn("Agrupar", "Agrupa los elementos seleccionados dentro de un nuevo grupo (Ctrl+G)", () => {
 			this.handleGroupSelection();
 		});
+		btnGroupSelection.dataset.editorAction = "group";
 
 		// Botón Desagrupar
 		const btnUngroup = createBtn("Desagrupar", "Desagrupa el grupo seleccionado devolviendo sus hijos al nivel superior (Ctrl+Shift+G)", () => {
 			this.handleUngroup();
 		});
+		btnUngroup.dataset.editorAction = "ungroup";
 
 		// Botón Desacoplar
 		const btnDecouple = createBtn("Desacoplar", "Desacopla el elemento seleccionado de su grupo actual (sube a la raíz)", () => {
 			this.handleDecouple();
 		});
+		btnDecouple.dataset.editorAction = "decouple";
 
 		// Botón Modo Acoples (Visualizar líneas y recuadros conectores 3D)
 		this.btnToggleCoupling = createBtn(
@@ -475,19 +481,31 @@ export class EditorExplorer {
 				this.toggleCouplingMode();
 			}
 		);
+		this.btnToggleCoupling.dataset.editorAction = "coupling";
 
 		// Botón Modo Editar Pivote (Reubicar pivote sin mover objetos)
 		this.btnTogglePivotEdit = createBtn("Pivote: OFF", "Modo para reubicar el pivote de un grupo sin mover sus objetos", () => {
 			this.togglePivotEditMode();
 		});
+		this.btnTogglePivotEdit.dataset.editorAction = "pivot";
 
 		// Botón Duplicar (Portapapeles gestionado por atajos universales Ctrl+C / Ctrl+V)
 		const btnDuplicate = createBtn("Duplicar", "Duplica el elemento o grupo actual con nuevos UUIDs (Ctrl+D)", () => this.handleDuplicate());
+		btnDuplicate.dataset.editorAction = "duplicate";
 
 		// Botones Prefab
 		const btnSavePrefab = createBtn("⭐ Prefab", "Guarda el grupo seleccionado como un prefab persistente", () => this.handleSavePrefab());
 		const btnExport = createBtn("📤 Exp", "Exporta el grupo seleccionado como JSON descargable", () => this.handleExportJson());
 		const btnImport = createBtn("📥 Imp", "Importa un archivo JSON de prefab", () => this.handleImportJson());
+		btnSavePrefab.dataset.editorAction = "save-prefab";
+		btnExport.dataset.editorAction = "export";
+		btnImport.dataset.editorAction = "import";
+		const desktopActionIds = new Set(EDITOR_DESKTOP_TOOL_ACTIONS.map(({ id }) => id));
+		const desktopButtons = [btnNewGroup, btnNewSubgroup, btnGroupSelection, btnUngroup, btnDecouple, this.btnToggleCoupling, this.btnTogglePivotEdit, btnDuplicate, btnSavePrefab, btnExport, btnImport];
+		const renderedDesktopActionIds = new Set(desktopButtons.map((button) => button.dataset.editorAction));
+		if (renderedDesktopActionIds.size !== desktopActionIds.size || [...desktopActionIds].some((id) => !renderedDesktopActionIds.has(id))) {
+			throw new Error("Las herramientas del editor de escritorio no coinciden con el catálogo de acciones");
+		}
 
 		toolbar.appendChild(btnNewGroup);
 		toolbar.appendChild(btnNewSubgroup);
@@ -1086,6 +1104,31 @@ export class EditorExplorer {
 			this.btnToggleCoupling.style.borderColor = active ? "#38bdf8" : "#555";
 		}
 		this.game.updateEditorInteractionMode?.();
+	}
+
+	/** Runs editor operations from the compact touch toolbar without hiding desktop tools. */
+	public performMobileAction(action: string) {
+		switch (action) {
+			case "undo":
+				if (this.history.undo()) this.renderTree();
+				break;
+			case "redo":
+				if (this.history.redo()) this.renderTree();
+				break;
+			case "duplicate": this.handleDuplicate(); break;
+			case "group": this.handleGroupSelection(); break;
+			case "create-group": this.handleCreateGroup(); break;
+			case "create-subgroup": this.handleCreateSubgroup(); break;
+			case "ungroup": this.handleUngroup(); break;
+			case "decouple": this.handleDecouple(); break;
+			case "coupling": this.toggleCouplingMode(); break;
+			case "pivot": this.togglePivotEditMode(); break;
+			case "copy": this.handleCopy(); break;
+			case "paste": this.handlePaste(); break;
+			case "save-prefab": void this.handleSavePrefab(); break;
+			case "export": this.handleExportJson(); break;
+			case "import": this.handleImportJson(); break;
+		}
 	}
 
 	private togglePivotEditMode() {

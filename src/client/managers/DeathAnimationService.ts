@@ -49,9 +49,15 @@ export function _resetAnimeModuleForTesting(): void {
 }
 
 /**
- * Maps DeathScreenEasing enum to Anime.js v4 easing names.
+ * Maps DeathScreenEasing enum or cubic Bézier curves to Anime.js v4 easing definitions.
  */
-export function resolveEasing(easing?: DeathScreenEasing): string {
+export function resolveEasing(easing?: DeathScreenEasing | string, bezierCurve?: [number, number, number, number], animeInst?: any): any {
+	if (bezierCurve && bezierCurve.length === 4) {
+		if (animeInst && typeof animeInst.cubicBezier === "function") {
+			return animeInst.cubicBezier(...bezierCurve);
+		}
+		return `cubicBezier(${bezierCurve.join(",")})`;
+	}
 	switch (easing) {
 		case "linear":
 			return "linear";
@@ -68,6 +74,9 @@ export function resolveEasing(easing?: DeathScreenEasing): string {
 		case "easeOutElastic":
 			return "outElastic";
 		default:
+			if (typeof easing === "string" && easing.startsWith("cubicBezier")) {
+				return easing;
+			}
 			return "outCubic";
 	}
 }

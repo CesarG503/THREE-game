@@ -59,13 +59,15 @@ export class SceneManager {
     this.skyboxRequestId = 0;
     this.sunVec = new THREE.Vector3();
 
-    this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    const viewportWidth = window.visualViewport?.width || window.innerWidth;
+    const viewportHeight = window.visualViewport?.height || window.innerHeight;
+    this.camera = new THREE.PerspectiveCamera(75, viewportWidth / viewportHeight, 0.1, 1000);
     this.camera.position.set(0, 5, 10);
     this.sunMoonVisual = new SunMoonVisual(this.scene, this.camera);
     this.skyMesh = this.sunMoonVisual.atmosphere;
 
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
-    this.renderer.setSize(window.innerWidth, window.innerHeight);
+    this.renderer.setSize(viewportWidth, viewportHeight);
     this.renderer.shadowMap.enabled = true;
     if (this.container) {
       this.container.appendChild(this.renderer.domElement);
@@ -76,6 +78,7 @@ export class SceneManager {
 
     this.boundResize = this.onWindowResize.bind(this);
     window.addEventListener("resize", this.boundResize);
+    window.visualViewport?.addEventListener("resize", this.boundResize);
   }
 
   initLights() {
@@ -377,9 +380,11 @@ export class SceneManager {
   }
 
   onWindowResize() {
-    this.camera.aspect = window.innerWidth / window.innerHeight;
+    const width = window.visualViewport?.width || window.innerWidth;
+    const height = window.visualViewport?.height || window.innerHeight;
+    this.camera.aspect = width / height;
     this.camera.updateProjectionMatrix();
-    this.renderer.setSize(window.innerWidth, window.innerHeight);
+    this.renderer.setSize(width, height);
   }
 
   setRenderDistance(distance: any) {
@@ -719,6 +724,7 @@ export class SceneManager {
 
   dispose() {
     window.removeEventListener("resize", this.boundResize);
+    window.visualViewport?.removeEventListener("resize", this.boundResize);
     this.sunMoonVisual.dispose();
 
     this.scene.traverse((object: any) => {

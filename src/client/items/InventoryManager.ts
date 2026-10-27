@@ -23,6 +23,18 @@ export class InventoryManager {
     this.onItemChange = null;
     this.game = null;
 
+    this.uiSlots.forEach((slot: Element, index: number) => {
+      const element = slot as HTMLElement;
+      element.setAttribute("role", "button");
+      element.tabIndex = 0;
+      element.addEventListener("click", () => this.selectSlot(index));
+      element.addEventListener("keydown", (event: KeyboardEvent) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+        this.selectSlot(index);
+      });
+    });
+
     this.setupEventListeners();
     this.updateUI();
   }
@@ -163,6 +175,8 @@ export class InventoryManager {
       }
 
       const item = this.slots[index];
+      const slot = slotEl as HTMLElement;
+      slot.setAttribute("aria-label", item ? `Ranura ${index + 1}: ${item.name}` : `Ranura ${index + 1}: vacía`);
       const numberEl = slotEl.querySelector(".slot-number");
       slotEl.innerHTML = "";
       if (numberEl) slotEl.appendChild(numberEl);

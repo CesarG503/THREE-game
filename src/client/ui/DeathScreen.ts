@@ -777,9 +777,20 @@ export class DeathScreen {
 
 		this.element.style.background = "transparent";
 
-		if (!isReducedMotion && blur > 0) {
-			this.element.style.backdropFilter = `blur(${blur}px)`;
-			(this.element.style as any).webkitBackdropFilter = `blur(${blur}px)`;
+		const effectiveBlur = (bg.backdropBlur !== undefined) ? bg.backdropBlur : blur;
+		const filterParts: string[] = [];
+		if (bg.desaturation && bg.desaturation > 0) {
+			filterParts.push(`grayscale(${bg.desaturation}%)`);
+		}
+		if (bg.filter) {
+			filterParts.push(bg.filter);
+		}
+		if (filterParts.length > 0 && this.bgLayer) {
+			this.bgLayer.style.filter = filterParts.join(" ");
+		}
+		if (!isReducedMotion && effectiveBlur > 0) {
+			this.element.style.backdropFilter = `blur(${effectiveBlur}px)`;
+			(this.element.style as any).webkitBackdropFilter = `blur(${effectiveBlur}px)`;
 		} else {
 			this.element.style.backdropFilter = "none";
 			(this.element.style as any).webkitBackdropFilter = "none";

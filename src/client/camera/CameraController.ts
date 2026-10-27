@@ -141,6 +141,26 @@ export class CameraController {
     this.lastCacheTime = 0;
   }
 
+  handleTouchLook(deltaX: number, deltaY: number) {
+    if (this.isPaused || this.isUIOpen || this.uiCheckCallback?.() || (!deltaX && !deltaY)) return;
+    if (this.isFirstPerson) {
+      const oldPitch = this.fpPitch;
+      this.fpYaw -= deltaX * this.rotationSpeed * (this.fpInvertAxisX ? -1 : 1);
+      this.fpPitch -= deltaY * this.rotationSpeed * (this.fpInvertAxisY ? -1 : 1);
+      this.fpPitch = Math.max(-this.maxPitch, Math.min(this.maxPitch, this.fpPitch));
+      this.manualPitchDelta += this.fpPitch - oldPitch;
+    } else {
+      const oldPhi = this.phi;
+      this.theta -= deltaX * this.rotationSpeed * (this.tpInvertAxisX ? -1 : 1);
+      this.phi += deltaY * this.rotationSpeed * (this.tpInvertAxisY ? -1 : 1);
+      const minP = this.mode === "free-fly" ? (-Math.PI / 2 + 0.01) : this.minPhi;
+      const maxP = this.mode === "free-fly" ? (Math.PI / 2 - 0.01) : this.maxPhi;
+      this.phi = Math.max(minP, Math.min(maxP, this.phi));
+      this.manualPitchDelta -= this.phi - oldPhi;
+    }
+    this.enforceYawConstraint();
+  }
+
   setupEventListeners() {
     window.addEventListener("blur", () => {
       this.isRightMouseDown = false;
@@ -778,7 +798,11 @@ export class CameraController {
     const farLookAtHeight = 1.2;
 
     const currentHeight = closeHeight + (farHeight - closeHeight) * zoomFactor;
-    const currentOffset = closeOffset + (farOffset - closeOffset) * zoomFactor + this.dynamicOffset * (1 - zoomFactor);
+    // Third-person shoulder framing can push the character out of a narrow
+    // portrait view. Fade the lateral offset by aspect ratio while preserving
+    // the configured desktop framing on landscape screens.
+    const lateralFraming = THREE.MathUtils.smoothstep(this.camera.aspect || 1, 0.55, 0.9);
+    const currentOffset = (closeOffset + (farOffset - closeOffset) * zoomFactor + this.dynamicOffset * (1 - zoomFactor)) * lateralFraming;
     const currentLookAtY = closeLookAtHeight + (farLookAtHeight - closeLookAtHeight) * zoomFactor;
 
     const horizontalDist = this.thirdPersonDistance * Math.cos(this.phi);
